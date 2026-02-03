@@ -6,7 +6,7 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
     reviewers:
-      - "twobearcapital"
+      - "timveil"
     labels:
       - "dependencies"
 
@@ -16,7 +16,7 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
     reviewers:
-      - "twobearcapital"
+      - "timveil"
     labels:
       - "dependencies"
       - "github-actions"

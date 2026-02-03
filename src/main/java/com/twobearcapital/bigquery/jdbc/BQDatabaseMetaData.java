@@ -648,29 +648,279 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
   public ResultSet getTables(
       String catalog, String schemaPattern, String tableNamePattern, String[] types)
       throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getTables not yet implemented");
+    checkClosed();
+
+    String projectId =
+        catalog != null ? catalog : connection.getProperties().projectId();
+
+    com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+    java.util.List<Object[]> rows = new java.util.ArrayList<>();
+
+    // Get datasets matching schema pattern
+    var datasets = bigquery.listDatasets(projectId);
+
+    for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
+      String datasetId = dataset.getDatasetId().getDataset();
+
+      // Apply schema pattern filter
+      if (schemaPattern != null && !matchesPattern(datasetId, schemaPattern)) {
+        continue;
+      }
+
+      // List tables in dataset
+      var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
+
+      for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
+        String tableName = table.getTableId().getTable();
+
+        // Apply table name pattern filter
+        if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+          continue;
+        }
+
+        // Map BigQuery table type to JDBC type
+        String tableType;
+        com.google.cloud.bigquery.TableDefinition def = table.getDefinition();
+        if (def instanceof com.google.cloud.bigquery.ViewDefinition) {
+          tableType = "VIEW";
+        } else if (def instanceof com.google.cloud.bigquery.MaterializedViewDefinition) {
+          tableType = "MATERIALIZED VIEW";
+        } else {
+          tableType = "TABLE";
+        }
+
+        // Apply type filter
+        if (types != null && !java.util.Arrays.asList(types).contains(tableType)) {
+          continue;
+        }
+
+        String remarks = table.getDescription() != null ? table.getDescription() : "";
+
+        rows.add(
+            new Object[] {
+              projectId, // TABLE_CAT
+              datasetId, // TABLE_SCHEM
+              tableName, // TABLE_NAME
+              tableType, // TABLE_TYPE
+              remarks, // REMARKS
+              null, // TYPE_CAT
+              null, // TYPE_SCHEM
+              null, // TYPE_NAME
+              null, // SELF_REFERENCING_COL_NAME
+              null // REF_GENERATION
+            });
+      }
+    }
+
+    return createResultSet(
+        new String[] {
+          "TABLE_CAT",
+          "TABLE_SCHEM",
+          "TABLE_NAME",
+          "TABLE_TYPE",
+          "REMARKS",
+          "TYPE_CAT",
+          "TYPE_SCHEM",
+          "TYPE_NAME",
+          "SELF_REFERENCING_COL_NAME",
+          "REF_GENERATION"
+        },
+        new int[] {
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR
+        },
+        rows);
   }
 
   @Override
   public ResultSet getSchemas() throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getSchemas not yet implemented");
+    return getSchemas(null, null);
   }
 
   @Override
   public ResultSet getCatalogs() throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getCatalogs not yet implemented");
+    checkClosed();
+
+    // BigQuery: Catalogs = Projects
+    // Return the current project
+    String projectId = connection.getProperties().projectId();
+
+    java.util.List<Object[]> rows = new java.util.ArrayList<>();
+    rows.add(new Object[] {projectId});
+
+    return createResultSet(
+        new String[] {"TABLE_CAT"}, new int[] {java.sql.Types.VARCHAR}, rows);
   }
 
   @Override
   public ResultSet getTableTypes() throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getTableTypes not yet implemented");
+    checkClosed();
+
+    java.util.List<Object[]> rows = new java.util.ArrayList<>();
+    rows.add(new Object[] {"TABLE"});
+    rows.add(new Object[] {"VIEW"});
+    rows.add(new Object[] {"MATERIALIZED VIEW"});
+
+    return createResultSet(
+        new String[] {"TABLE_TYPE"}, new int[] {java.sql.Types.VARCHAR}, rows);
   }
 
   @Override
   public ResultSet getColumns(
       String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
       throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getColumns not yet implemented");
+    checkClosed();
+
+    String projectId =
+        catalog != null ? catalog : connection.getProperties().projectId();
+
+    com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+    java.util.List<Object[]> rows = new java.util.ArrayList<>();
+
+    // Get datasets and tables matching patterns
+    var datasets = bigquery.listDatasets(projectId);
+
+    for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
+      String datasetId = dataset.getDatasetId().getDataset();
+
+      if (schemaPattern != null && !matchesPattern(datasetId, schemaPattern)) {
+        continue;
+      }
+
+      var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
+
+      for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
+        String tableName = table.getTableId().getTable();
+
+        if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+          continue;
+        }
+
+        // Get full table with schema
+        com.google.cloud.bigquery.Table fullTable = bigquery.getTable(table.getTableId());
+        if (fullTable == null) {
+          continue;
+        }
+
+        com.google.cloud.bigquery.Schema schema = fullTable.getDefinition().getSchema();
+        if (schema == null) {
+          continue;
+        }
+
+        int ordinalPosition = 1;
+        for (com.google.cloud.bigquery.Field field : schema.getFields()) {
+          String columnName = field.getName();
+
+          if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
+            continue;
+          }
+
+          com.google.cloud.bigquery.StandardSQLTypeName type = field.getType().getStandardType();
+          int jdbcType = TypeMapper.toJdbcType(type);
+          String typeName = type != null ? type.name() : "UNKNOWN";
+
+          int columnSize = TypeMapper.getColumnSize(type);
+          int decimalDigits = TypeMapper.getDecimalDigits(type);
+          int nullable =
+              field.getMode() == com.google.cloud.bigquery.Field.Mode.REQUIRED
+                  ? DatabaseMetaData.columnNoNulls
+                  : DatabaseMetaData.columnNullable;
+
+          rows.add(
+              new Object[] {
+                projectId, // TABLE_CAT
+                datasetId, // TABLE_SCHEM
+                tableName, // TABLE_NAME
+                columnName, // COLUMN_NAME
+                jdbcType, // DATA_TYPE
+                typeName, // TYPE_NAME
+                columnSize, // COLUMN_SIZE
+                null, // BUFFER_LENGTH (not used)
+                decimalDigits, // DECIMAL_DIGITS
+                10, // NUM_PREC_RADIX
+                nullable, // NULLABLE
+                field.getDescription(), // REMARKS
+                null, // COLUMN_DEF
+                null, // SQL_DATA_TYPE (not used)
+                null, // SQL_DATETIME_SUB (not used)
+                columnSize, // CHAR_OCTET_LENGTH
+                ordinalPosition, // ORDINAL_POSITION
+                nullable == DatabaseMetaData.columnNullable ? "YES" : "NO", // IS_NULLABLE
+                null, // SCOPE_CATALOG
+                null, // SCOPE_SCHEMA
+                null, // SCOPE_TABLE
+                null, // SOURCE_DATA_TYPE
+                "NO", // IS_AUTOINCREMENT
+                "NO" // IS_GENERATEDCOLUMN
+              });
+
+          ordinalPosition++;
+        }
+      }
+    }
+
+    return createResultSet(
+        new String[] {
+          "TABLE_CAT",
+          "TABLE_SCHEM",
+          "TABLE_NAME",
+          "COLUMN_NAME",
+          "DATA_TYPE",
+          "TYPE_NAME",
+          "COLUMN_SIZE",
+          "BUFFER_LENGTH",
+          "DECIMAL_DIGITS",
+          "NUM_PREC_RADIX",
+          "NULLABLE",
+          "REMARKS",
+          "COLUMN_DEF",
+          "SQL_DATA_TYPE",
+          "SQL_DATETIME_SUB",
+          "CHAR_OCTET_LENGTH",
+          "ORDINAL_POSITION",
+          "IS_NULLABLE",
+          "SCOPE_CATALOG",
+          "SCOPE_SCHEMA",
+          "SCOPE_TABLE",
+          "SOURCE_DATA_TYPE",
+          "IS_AUTOINCREMENT",
+          "IS_GENERATEDCOLUMN"
+        },
+        new int[] {
+          java.sql.Types.VARCHAR, // TABLE_CAT
+          java.sql.Types.VARCHAR, // TABLE_SCHEM
+          java.sql.Types.VARCHAR, // TABLE_NAME
+          java.sql.Types.VARCHAR, // COLUMN_NAME
+          java.sql.Types.INTEGER, // DATA_TYPE
+          java.sql.Types.VARCHAR, // TYPE_NAME
+          java.sql.Types.INTEGER, // COLUMN_SIZE
+          java.sql.Types.INTEGER, // BUFFER_LENGTH
+          java.sql.Types.INTEGER, // DECIMAL_DIGITS
+          java.sql.Types.INTEGER, // NUM_PREC_RADIX
+          java.sql.Types.INTEGER, // NULLABLE
+          java.sql.Types.VARCHAR, // REMARKS
+          java.sql.Types.VARCHAR, // COLUMN_DEF
+          java.sql.Types.INTEGER, // SQL_DATA_TYPE
+          java.sql.Types.INTEGER, // SQL_DATETIME_SUB
+          java.sql.Types.INTEGER, // CHAR_OCTET_LENGTH
+          java.sql.Types.INTEGER, // ORDINAL_POSITION
+          java.sql.Types.VARCHAR, // IS_NULLABLE
+          java.sql.Types.VARCHAR, // SCOPE_CATALOG
+          java.sql.Types.VARCHAR, // SCOPE_SCHEMA
+          java.sql.Types.VARCHAR, // SCOPE_TABLE
+          java.sql.Types.SMALLINT, // SOURCE_DATA_TYPE
+          java.sql.Types.VARCHAR, // IS_AUTOINCREMENT
+          java.sql.Types.VARCHAR // IS_GENERATEDCOLUMN
+        },
+        rows);
   }
 
   @Override
@@ -902,7 +1152,29 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
 
   @Override
   public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getSchemas not yet implemented");
+    checkClosed();
+
+    String projectId =
+        catalog != null ? catalog : connection.getProperties().projectId();
+
+    // Use BigQuery API to list datasets
+    com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+    var datasets = bigquery.listDatasets(projectId);
+
+    java.util.List<Object[]> rows = new java.util.ArrayList<>();
+    for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
+      String datasetId = dataset.getDatasetId().getDataset();
+
+      // Apply schema pattern filter if specified
+      if (schemaPattern == null || matchesPattern(datasetId, schemaPattern)) {
+        rows.add(new Object[] {datasetId, projectId});
+      }
+    }
+
+    return createResultSet(
+        new String[] {"TABLE_SCHEM", "TABLE_CATALOG"},
+        new int[] {java.sql.Types.VARCHAR, java.sql.Types.VARCHAR},
+        rows);
   }
 
   @Override
@@ -958,6 +1230,49 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
   @Override
   public boolean supportsSharding() throws SQLException {
     return false;
+  }
+
+  private void checkClosed() throws SQLException {
+    if (connection.isClosed()) {
+      throw new BQSQLException("Connection is closed", BQSQLException.SQLSTATE_CONNECTION_CLOSED);
+    }
+  }
+
+  /**
+   * Create a ResultSet from column names, types, and data rows.
+   *
+   * @param columnNames array of column names
+   * @param columnTypes array of JDBC type constants
+   * @param rows list of data rows (each row is an Object array)
+   * @return ResultSet containing the data
+   * @throws SQLException if result set creation fails
+   */
+  private ResultSet createResultSet(String[] columnNames, int[] columnTypes, java.util.List<Object[]> rows)
+      throws SQLException {
+    return new MetadataResultSet(columnNames, columnTypes, rows);
+  }
+
+  /**
+   * Convert SQL LIKE pattern to Java regex pattern.
+   *
+   * @param value the value to match
+   * @param pattern the SQL LIKE pattern (% = wildcard, _ = single char)
+   * @return true if value matches pattern
+   */
+  private boolean matchesPattern(String value, String pattern) {
+    if (pattern == null) {
+      return true;
+    }
+    // Convert SQL LIKE pattern to regex: % -> .*, _ -> .
+    String regex =
+        "^"
+            + pattern
+                .replace("\\", "\\\\")
+                .replace(".", "\\.")
+                .replace("%", ".*")
+                .replace("_", ".")
+            + "$";
+    return value.matches(regex);
   }
 
   @Override

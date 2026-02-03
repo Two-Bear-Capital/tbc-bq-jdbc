@@ -61,6 +61,21 @@ public class BQResultSet implements ResultSet {
     this.currentRow = null;
   }
 
+  /**
+   * Creates a new BigQuery ResultSet for metadata operations.
+   *
+   * <p>This constructor is used internally for creating result sets that represent metadata query
+   * results (e.g., from DatabaseMetaData methods).
+   *
+   * @param tableResult the BigQuery table result
+   */
+  BQResultSet(TableResult tableResult) {
+    this.statement = null;
+    this.tableResult = tableResult;
+    this.rowIterator = tableResult.iterateAll().iterator();
+    this.currentRow = null;
+  }
+
   private void checkClosed() throws SQLException {
     if (closed) {
       throw new BQSQLException("ResultSet is closed", BQSQLException.SQLSTATE_CONNECTION_CLOSED);
@@ -357,7 +372,7 @@ public class BQResultSet implements ResultSet {
   @Override
   public ResultSetMetaData getMetaData() throws SQLException {
     checkClosed();
-    throw new BQSQLFeatureNotSupportedException("ResultSetMetaData not yet implemented");
+    return new BQResultSetMetaData(tableResult.getSchema());
   }
 
   @Override
