@@ -48,7 +48,10 @@ class ConnectionPropertiesTest {
             false, // enableSessions
             null, // connectionTimeout
             null, // retryCount
-            null // maxBillingBytes
+            null, // maxBillingBytes
+            null, // metadataCacheTtl
+            null, // metadataCacheEnabled
+            null // metadataLazyLoad
             );
 
     // Then: Required fields should be set, defaults applied
@@ -87,7 +90,10 @@ class ConnectionPropertiesTest {
             true,
             60,
             5,
-            1000000L);
+            1000000L,
+            null,
+            null,
+            null);
 
     // Then: All fields should match
     assertEquals("my-project", props.projectId());
@@ -132,6 +138,9 @@ class ConnectionPropertiesTest {
                 false,
                 null,
                 null,
+                null,
+                null,
+                null,
                 null));
   }
 
@@ -155,6 +164,9 @@ class ConnectionPropertiesTest {
                 null,
                 null,
                 false,
+                null,
+                null,
+                null,
                 null,
                 null,
                 null));
@@ -182,6 +194,9 @@ class ConnectionPropertiesTest {
                 false,
                 null,
                 null,
+                null,
+                null,
+                null,
                 null));
   }
 
@@ -206,6 +221,9 @@ class ConnectionPropertiesTest {
             null,
             null,
             false,
+            null,
+            null,
+            null,
             null,
             null,
             null);
@@ -242,6 +260,9 @@ class ConnectionPropertiesTest {
             false,
             null,
             null,
+            null,
+            null,
+            null,
             null);
 
     // Then: Labels should be an empty immutable map
@@ -267,6 +288,9 @@ class ConnectionPropertiesTest {
             null,
             null,
             false,
+            null,
+            null,
+            null,
             null,
             null,
             null);
@@ -300,6 +324,9 @@ class ConnectionPropertiesTest {
             false,
             null,
             null,
+            null,
+            null,
+            null,
             null);
 
     // When: Getting the DatasetId
@@ -331,6 +358,9 @@ class ConnectionPropertiesTest {
             false,
             null,
             null,
+            null,
+            null,
+            null,
             null);
 
     // When: Getting the DatasetId
@@ -360,6 +390,9 @@ class ConnectionPropertiesTest {
             false,
             null,
             null,
+            null,
+            null,
+            null,
             null);
 
     // Then: Should default to REQUIRED
@@ -384,6 +417,9 @@ class ConnectionPropertiesTest {
             null,
             null, // null useStorageApi
             false,
+            null,
+            null,
+            null,
             null,
             null,
             null);
@@ -413,6 +449,9 @@ class ConnectionPropertiesTest {
             false,
             null,
             null,
+            null,
+            null,
+            null,
             null);
     ConnectionProperties props2 =
         new ConnectionProperties(
@@ -429,6 +468,9 @@ class ConnectionPropertiesTest {
             null,
             null,
             false,
+            null,
+            null,
+            null,
             null,
             null,
             null);
@@ -456,6 +498,9 @@ class ConnectionPropertiesTest {
             null,
             null,
             false,
+            null,
+            null,
+            null,
             null,
             null,
             null);

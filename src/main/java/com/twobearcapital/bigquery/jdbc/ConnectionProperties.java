@@ -39,6 +39,9 @@ import java.util.Objects;
  * @param connectionTimeout connection establishment timeout in seconds (default: 30)
  * @param retryCount retry attempts for transient errors (default: 3)
  * @param maxBillingBytes query cost limit in bytes (optional)
+ * @param metadataCacheTtl metadata cache TTL in seconds (default: 300 = 5 minutes)
+ * @param metadataCacheEnabled whether to enable metadata caching (default: true)
+ * @param metadataLazyLoad whether to use lazy loading for metadata (default: false)
  * @since 1.0.0
  */
 public record ConnectionProperties(
@@ -57,7 +60,10 @@ public record ConnectionProperties(
     boolean enableSessions,
     Integer connectionTimeout,
     Integer retryCount,
-    Long maxBillingBytes) {
+    Long maxBillingBytes,
+    Integer metadataCacheTtl,
+    Boolean metadataCacheEnabled,
+    Boolean metadataLazyLoad) {
 
   /** Default timeout in seconds. */
   public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -70,6 +76,9 @@ public record ConnectionProperties(
 
   /** Default retry count. */
   public static final int DEFAULT_RETRY_COUNT = 3;
+
+  /** Default metadata cache TTL in seconds (5 minutes). */
+  public static final int DEFAULT_METADATA_CACHE_TTL = 300;
 
   public ConnectionProperties {
     Objects.requireNonNull(projectId, "projectId is required");
@@ -95,6 +104,15 @@ public record ConnectionProperties(
     }
     if (retryCount == null) {
       retryCount = DEFAULT_RETRY_COUNT;
+    }
+    if (metadataCacheTtl == null) {
+      metadataCacheTtl = DEFAULT_METADATA_CACHE_TTL;
+    }
+    if (metadataCacheEnabled == null) {
+      metadataCacheEnabled = true;
+    }
+    if (metadataLazyLoad == null) {
+      metadataLazyLoad = false;
     }
   }
 

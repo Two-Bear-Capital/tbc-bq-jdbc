@@ -61,6 +61,9 @@ class StatementEnquoteTest {
                 false,
                 null,
                 null,
+                null,
+                null,
+                null,
                 null));
 
     statement = new BQStatement(connection);

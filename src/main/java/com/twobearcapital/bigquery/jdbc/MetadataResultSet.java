@@ -57,6 +57,39 @@ final class MetadataResultSet implements ResultSet {
     }
   }
 
+  /**
+   * Gets the column names.
+   *
+   * <p>Package-private accessor for caching support.
+   *
+   * @return the column names array
+   */
+  String[] getColumnNames() {
+    return columnNames;
+  }
+
+  /**
+   * Gets the column types.
+   *
+   * <p>Package-private accessor for caching support.
+   *
+   * @return the column types array
+   */
+  int[] getColumnTypes() {
+    return columnTypes;
+  }
+
+  /**
+   * Gets the data rows.
+   *
+   * <p>Package-private accessor for caching support.
+   *
+   * @return the rows list
+   */
+  List<Object[]> getRows() {
+    return rows;
+  }
+
   private void checkClosed() throws SQLException {
     if (closed) {
       throw new SQLException("ResultSet is closed");

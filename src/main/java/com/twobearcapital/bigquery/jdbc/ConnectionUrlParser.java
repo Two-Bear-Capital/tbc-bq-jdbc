@@ -120,6 +120,9 @@ public final class ConnectionUrlParser {
     Integer retryCount = parseInteger(properties, "retryCount");
     Long maxBillingBytes = parseLong(properties, "maxBillingBytes");
     String datasetProjectId = properties.get("datasetProjectId");
+    Integer metadataCacheTtl = parseInteger(properties, "metadataCacheTtl");
+    Boolean metadataCacheEnabled = parseBooleanObject(properties, "metadataCacheEnabled");
+    Boolean metadataLazyLoad = parseBooleanObject(properties, "metadataLazyLoad");
 
     return new ConnectionProperties(
         projectId,
@@ -137,7 +140,10 @@ public final class ConnectionUrlParser {
         enableSessions,
         connectionTimeout,
         retryCount,
-        maxBillingBytes);
+        maxBillingBytes,
+        metadataCacheTtl,
+        metadataCacheEnabled,
+        metadataLazyLoad);
   }
 
   private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties)
@@ -210,6 +216,14 @@ public final class ConnectionUrlParser {
     String value = properties.get(key);
     if (value == null) {
       return defaultValue;
+    }
+    return Boolean.parseBoolean(value);
+  }
+
+  private static Boolean parseBooleanObject(Map<String, String> properties, String key) {
+    String value = properties.get(key);
+    if (value == null) {
+      return null;
     }
     return Boolean.parseBoolean(value);
   }
