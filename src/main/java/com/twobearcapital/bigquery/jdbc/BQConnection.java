@@ -40,6 +40,7 @@ public final class BQConnection implements Connection {
   private final BigQuery bigquery;
   private final ConnectionProperties properties;
   private final Set<BQStatement> runningStatements = ConcurrentHashMap.newKeySet();
+  private final SessionManager sessionManager;
   private volatile boolean closed = false;
   private boolean autoCommit = true;
   private boolean readOnly = false;
@@ -66,6 +67,16 @@ public final class BQConnection implements Connection {
 
       this.bigquery = builder.build().getService();
       logger.info("Connected to BigQuery project: {}", properties.projectId());
+
+      // Initialize session manager
+      this.sessionManager = new SessionManager(bigquery, properties);
+
+      // Initialize session if enabled
+      if (properties.enableSessions()) {
+        sessionManager.initializeSession();
+        logger.info("BigQuery session mode enabled");
+      }
+
     } catch (IOException e) {
       throw new BQSQLException(
           "Failed to create BigQuery connection", BQSQLException.SQLSTATE_CONNECTION_ERROR, e);
@@ -88,6 +99,15 @@ public final class BQConnection implements Connection {
    */
   ConnectionProperties getProperties() {
     return properties;
+  }
+
+  /**
+   * Gets the session manager.
+   *
+   * @return the session manager
+   */
+  SessionManager getSessionManager() {
+    return sessionManager;
   }
 
   /**
@@ -140,10 +160,24 @@ public final class BQConnection implements Connection {
   @Override
   public void setAutoCommit(boolean autoCommit) throws SQLException {
     checkClosed();
-    if (!autoCommit) {
+
+    // If sessions are enabled, allow turning off auto-commit
+    if (!autoCommit && !properties.enableSessions()) {
       throw new BQSQLFeatureNotSupportedException(
-          "BigQuery does not support transactions outside of sessions");
+          "BigQuery does not support transactions outside of sessions. "
+              + "Enable sessions with: enableSessions=true");
     }
+
+    // Begin transaction when turning off auto-commit in session mode
+    if (!autoCommit && properties.enableSessions() && this.autoCommit) {
+      sessionManager.beginTransaction();
+    }
+
+    // Commit pending transaction when turning on auto-commit
+    if (autoCommit && properties.enableSessions() && !this.autoCommit) {
+      sessionManager.commit();
+    }
+
     this.autoCommit = autoCommit;
   }
 
@@ -156,15 +190,31 @@ public final class BQConnection implements Connection {
   @Override
   public void commit() throws SQLException {
     checkClosed();
+
+    // Allow commit in session mode
+    if (properties.enableSessions()) {
+      sessionManager.commit();
+      return;
+    }
+
     throw new BQSQLFeatureNotSupportedException(
-        "BigQuery does not support transactions outside of sessions");
+        "BigQuery does not support transactions outside of sessions. "
+            + "Enable sessions with: enableSessions=true");
   }
 
   @Override
   public void rollback() throws SQLException {
     checkClosed();
+
+    // Allow rollback in session mode
+    if (properties.enableSessions()) {
+      sessionManager.rollback();
+      return;
+    }
+
     throw new BQSQLFeatureNotSupportedException(
-        "BigQuery does not support transactions outside of sessions");
+        "BigQuery does not support transactions outside of sessions. "
+            + "Enable sessions with: enableSessions=true");
   }
 
   @Override
@@ -187,6 +237,11 @@ public final class BQConnection implements Connection {
 
     // Clear statement references
     runningStatements.clear();
+
+    // Close session if active
+    if (sessionManager != null) {
+      sessionManager.close();
+    }
 
     logger.info("BigQuery connection closed");
   }

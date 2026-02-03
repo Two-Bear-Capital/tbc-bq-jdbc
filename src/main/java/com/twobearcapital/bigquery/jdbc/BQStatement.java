@@ -17,6 +17,10 @@ package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.*;
 import java.sql.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,45 +73,75 @@ public class BQStatement implements Statement {
       configBuilder.setLabels(properties.labels());
     }
 
+    // Add session property if sessions are enabled
+    SessionManager sessionManager = connection.getSessionManager();
+    if (sessionManager != null && sessionManager.hasSession()) {
+      configBuilder = sessionManager.addSessionProperty(configBuilder);
+    }
+
     QueryJobConfiguration queryConfig = configBuilder.build();
 
+    long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
+
     try {
-      Job job = bigquery.create(JobInfo.of(queryConfig));
-      this.currentJob = job;
+      // Submit job asynchronously with timeout enforcement
+      CompletableFuture<TableResult> future =
+          CompletableFuture.supplyAsync(
+              () -> {
+                try {
+                  Job job = bigquery.create(JobInfo.of(queryConfig));
+                  this.currentJob = job;
 
-      logger.info("Query job created: {}", job.getJobId());
+                  logger.info("Query job created: {}", job.getJobId());
 
-      // Wait for job completion with timeout
-      long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
-      long waitTime = 0;
-      while (!job.isDone() && waitTime < timeoutSeconds) {
-        Thread.sleep(500);
-        job = job.reload();
-        waitTime += 1;
-      }
-      if (!job.isDone()) {
-        throw new SQLException("Query timeout exceeded");
-      }
+                  // Wait for job completion
+                  job = job.waitFor();
 
-      if (job == null) {
-        throw new SQLException("Job no longer exists");
-      }
+                  if (job == null) {
+                    throw new RuntimeException("Job no longer exists");
+                  }
 
-      JobStatus status = job.getStatus();
-      if (status.getError() != null) {
-        BigQueryError error = status.getError();
-        throw new BQSQLException(
-            "Query failed (job: " + job.getJobId() + "): " + error.getMessage(),
-            BQSQLException.SQLSTATE_SYNTAX_ERROR);
-      }
+                  JobStatus status = job.getStatus();
+                  if (status.getError() != null) {
+                    BigQueryError error = status.getError();
+                    throw new RuntimeException(
+                        "Query failed (job: " + job.getJobId() + "): " + error.getMessage());
+                  }
 
-      TableResult result = job.getQueryResults();
+                  return job.getQueryResults();
+
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  throw new RuntimeException("Query interrupted", e);
+                }
+              });
+
+      // Wait with timeout
+      TableResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
       currentResultSet = new BQResultSet(this, result);
       return currentResultSet;
 
+    } catch (TimeoutException e) {
+      // Cancel job on timeout
+      if (currentJob != null) {
+        try {
+          bigquery.cancel(currentJob.getJobId());
+          logger.warn("Query cancelled due to timeout: {}", currentJob.getJobId());
+        } catch (Exception cancelEx) {
+          logger.warn("Failed to cancel job after timeout", cancelEx);
+        }
+      }
+      throw new SQLTimeoutException("Query timeout after " + timeoutSeconds + " seconds");
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new BQSQLException("Query interrupted", e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw new BQSQLException(
+            cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
+      }
+      throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
     } catch (BigQueryException e) {
       throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
     }
