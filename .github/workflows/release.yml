@@ -8,6 +8,11 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      packages: write
 
     steps:
       - name: Checkout code
@@ -36,6 +41,12 @@ jobs:
               "username": "${{ github.actor }}",
               "password": "${{ secrets.GITHUB_TOKEN }}"
             }]
+
+      - name: Generate artifact attestations
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            target/tbc-bq-jdbc-*.jar
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
