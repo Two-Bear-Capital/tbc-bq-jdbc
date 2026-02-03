@@ -25,6 +25,9 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
 
       - name: Extract version from tag
         id: get_version
@@ -32,16 +35,6 @@ jobs:
 
       - name: Build and package
         run: mvn clean package -DskipTests -B
-
-      - name: Configure Maven settings
-        uses: s4u/maven-settings-action@v3
-        with:
-          servers: |
-            [{
-              "id": "github",
-              "username": "${{ github.actor }}",
-              "password": "${{ secrets.GITHUB_TOKEN }}"
-            }]
 
       - name: Generate artifact attestations
         uses: actions/attest-build-provenance@v3
@@ -69,4 +62,5 @@ jobs:
       - name: Deploy to GitHub Packages
         run: mvn deploy -DskipTests -B
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
