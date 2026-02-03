@@ -18,6 +18,8 @@ package com.twobearcapital.bigquery.jdbc;
 import com.google.auth.Credentials;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.BigQueryOptions;
+import com.twobearcapital.bigquery.jdbc.base.BaseCloseable;
+import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.io.IOException;
 import java.sql.*;
 import java.util.Map;
@@ -33,7 +35,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since 1.0.0
  */
-public final class BQConnection implements Connection {
+public final class BQConnection extends BaseCloseable implements Connection {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQConnection.class);
 
@@ -41,7 +43,6 @@ public final class BQConnection implements Connection {
 	private final ConnectionProperties properties;
 	private final Set<BQStatement> runningStatements = ConcurrentHashMap.newKeySet();
 	private final SessionManager sessionManager;
-	private volatile boolean closed = false;
 	private boolean autoCommit = true;
 	private boolean readOnly = false;
 	private int networkTimeout = 0;
@@ -130,10 +131,9 @@ public final class BQConnection implements Connection {
 		runningStatements.remove(statement);
 	}
 
-	private void checkClosed() throws SQLException {
-		if (closed) {
-			throw new BQSQLException("Connection is closed", BQSQLException.SQLSTATE_CONNECTION_CLOSED);
-		}
+	@Override
+	protected String getClosedErrorMessage() {
+		return ErrorMessages.CONNECTION_CLOSED;
 	}
 
 	@Override
@@ -217,12 +217,7 @@ public final class BQConnection implements Connection {
 	}
 
 	@Override
-	public void close() throws SQLException {
-		if (closed) {
-			return;
-		}
-		closed = true;
-
+	protected void doClose() throws SQLException {
 		logger.debug("Closing BigQuery connection");
 
 		// Cancel all running statements
@@ -557,16 +552,4 @@ public final class BQConnection implements Connection {
 		throw new BQSQLFeatureNotSupportedException("Sharding not supported");
 	}
 
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		if (iface.isInstance(this)) {
-			return iface.cast(this);
-		}
-		throw new SQLException("Cannot unwrap to " + iface.getName());
-	}
-
-	@Override
-	public boolean isWrapperFor(Class<?> iface) {
-		return iface.isInstance(this);
-	}
 }

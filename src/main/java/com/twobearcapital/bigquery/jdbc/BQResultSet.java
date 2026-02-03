@@ -18,6 +18,8 @@ package com.twobearcapital.bigquery.jdbc;
 import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.TableResult;
+import com.twobearcapital.bigquery.jdbc.base.BaseCloseable;
+import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -38,7 +40,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since 1.0.0
  */
-public class BQResultSet implements ResultSet {
+public class BQResultSet extends BaseCloseable implements ResultSet {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQResultSet.class);
 
@@ -46,7 +48,6 @@ public class BQResultSet implements ResultSet {
 	private final TableResult tableResult;
 	private final Iterator<FieldValueList> rowIterator;
 	private FieldValueList currentRow;
-	private boolean closed = false;
 	private boolean wasNull = false;
 
 	/**
@@ -81,10 +82,9 @@ public class BQResultSet implements ResultSet {
 		this.currentRow = null;
 	}
 
-	private void checkClosed() throws SQLException {
-		if (closed) {
-			throw new BQSQLException("ResultSet is closed", BQSQLException.SQLSTATE_CONNECTION_CLOSED);
-		}
+	@Override
+	protected String getClosedErrorMessage() {
+		return ErrorMessages.RESULTSET_CLOSED;
 	}
 
 	private void checkPosition() throws SQLException {
@@ -127,11 +127,7 @@ public class BQResultSet implements ResultSet {
 	}
 
 	@Override
-	public void close() throws SQLException {
-		if (closed) {
-			return;
-		}
-		closed = true;
+	protected void doClose() throws SQLException {
 		currentRow = null;
 		logger.debug("ResultSet closed");
 	}
@@ -1180,16 +1176,4 @@ public class BQResultSet implements ResultSet {
 		throw new BQSQLFeatureNotSupportedException("ResultSet updates not supported");
 	}
 
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		if (iface.isInstance(this)) {
-			return iface.cast(this);
-		}
-		throw new SQLException("Cannot unwrap to " + iface.getName());
-	}
-
-	@Override
-	public boolean isWrapperFor(Class<?> iface) {
-		return iface.isInstance(this);
-	}
 }

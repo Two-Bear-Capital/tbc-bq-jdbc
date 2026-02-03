@@ -15,6 +15,8 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
+import com.twobearcapital.bigquery.jdbc.base.BaseCloseable;
+import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -32,14 +34,13 @@ import java.util.*;
  *
  * @since 1.0.0
  */
-final class MetadataResultSet implements ResultSet {
+final class MetadataResultSet extends BaseCloseable implements ResultSet {
 
 	private final String[] columnNames;
 	private final int[] columnTypes;
 	private final List<Object[]> rows;
 	private int currentRowIndex = -1;
 	private Object[] currentRow;
-	private boolean closed = false;
 	private boolean wasNull = false;
 
 	/**
@@ -98,10 +99,9 @@ final class MetadataResultSet implements ResultSet {
 		return rows;
 	}
 
-	private void checkClosed() throws SQLException {
-		if (closed) {
-			throw new SQLException("ResultSet is closed");
-		}
+	@Override
+	protected String getClosedErrorMessage() {
+		return ErrorMessages.RESULTSET_CLOSED;
 	}
 
 	private void checkPosition() throws SQLException {
@@ -143,8 +143,7 @@ final class MetadataResultSet implements ResultSet {
 	}
 
 	@Override
-	public void close() throws SQLException {
-		closed = true;
+	protected void doClose() throws SQLException {
 		currentRow = null;
 	}
 
@@ -1190,19 +1189,6 @@ final class MetadataResultSet implements ResultSet {
 	@Override
 	public void updateObject(String columnLabel, Object x, SQLType targetSqlType) throws SQLException {
 		throw new SQLFeatureNotSupportedException("ResultSet updates not supported");
-	}
-
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		if (iface.isInstance(this)) {
-			return iface.cast(this);
-		}
-		throw new SQLException("Cannot unwrap to " + iface.getName());
-	}
-
-	@Override
-	public boolean isWrapperFor(Class<?> iface) {
-		return iface.isInstance(this);
 	}
 
 	/** Simple ResultSetMetaData implementation for metadata ResultSets. */

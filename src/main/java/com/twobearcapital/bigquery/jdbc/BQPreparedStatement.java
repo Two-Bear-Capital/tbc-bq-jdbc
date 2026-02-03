@@ -55,88 +55,20 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
 	}
 
 	@Override
+	protected QueryJobConfiguration.Builder buildQueryConfig(String sql) {
+		return QueryJobConfiguration.newBuilder(sql)
+			.setUseLegacySql(properties.useLegacySql())
+			.setPositionalParameters(parameters);
+	}
+
+	@Override
+	protected String getLogPrefix() {
+		return "Prepared query";
+	}
+
+	@Override
 	public ResultSet executeQuery() throws SQLException {
-		checkClosed();
-		logger.debug("Executing prepared query: {}", sqlTemplate);
-
-		QueryJobConfiguration.Builder configBuilder = QueryJobConfiguration.newBuilder(sqlTemplate)
-				.setUseLegacySql(properties.useLegacySql()).setPositionalParameters(parameters);
-
-		if (properties.getDatasetId() != null) {
-			configBuilder.setDefaultDataset(properties.getDatasetId());
-		}
-
-		if (!properties.labels().isEmpty()) {
-			configBuilder.setLabels(properties.labels());
-		}
-
-		// Add session property if sessions are enabled
-		SessionManager sessionManager = connection.getSessionManager();
-		if (sessionManager != null && sessionManager.hasSession()) {
-			configBuilder = sessionManager.addSessionProperty(configBuilder);
-		}
-
-		QueryJobConfiguration queryConfig = configBuilder.build();
-		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
-
-		try {
-			// Submit job asynchronously with timeout enforcement
-			CompletableFuture<TableResult> future = CompletableFuture.supplyAsync(() -> {
-				try {
-					Job job = bigquery.create(JobInfo.of(queryConfig));
-					this.currentJob = job;
-
-					logger.info("Prepared query job created: {}", job.getJobId());
-
-					// Wait for job completion
-					job = job.waitFor();
-
-					if (job == null) {
-						throw new RuntimeException("Job no longer exists");
-					}
-
-					JobStatus status = job.getStatus();
-					if (status.getError() != null) {
-						BigQueryError error = status.getError();
-						throw new RuntimeException("Query failed (job: " + job.getJobId() + "): " + error.getMessage());
-					}
-
-					return job.getQueryResults();
-
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					throw new RuntimeException("Query interrupted", e);
-				}
-			});
-
-			// Wait with timeout
-			TableResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
-			currentResultSet = new BQResultSet(this, result);
-			return currentResultSet;
-
-		} catch (TimeoutException e) {
-			// Cancel job on timeout
-			if (currentJob != null) {
-				try {
-					bigquery.cancel(currentJob.getJobId());
-					logger.warn("Prepared query cancelled due to timeout: {}", currentJob.getJobId());
-				} catch (Exception cancelEx) {
-					logger.warn("Failed to cancel job after timeout", cancelEx);
-				}
-			}
-			throw new SQLTimeoutException("Query timeout after " + timeoutSeconds + " seconds");
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new BQSQLException("Query interrupted", e);
-		} catch (ExecutionException e) {
-			Throwable cause = e.getCause();
-			if (cause instanceof RuntimeException) {
-				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
-			}
-			throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
-		} catch (BigQueryException e) {
-			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
-		}
+		return executeQueryInternal(sqlTemplate);
 	}
 
 	@Override

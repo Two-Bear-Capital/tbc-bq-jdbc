@@ -15,6 +15,7 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
+import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
 import java.sql.ParameterMetaData;
 import java.sql.SQLException;
 import java.sql.Types;
@@ -29,7 +30,7 @@ import java.sql.Types;
  *
  * @since 1.0.0
  */
-public final class BQParameterMetaData implements ParameterMetaData {
+public final class BQParameterMetaData extends BaseJdbcWrapper implements ParameterMetaData {
 
 	private final int parameterCount;
 
@@ -102,16 +103,4 @@ public final class BQParameterMetaData implements ParameterMetaData {
 		}
 	}
 
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		if (iface.isInstance(this)) {
-			return iface.cast(this);
-		}
-		throw new SQLException("Cannot unwrap to " + iface.getName());
-	}
-
-	@Override
-	public boolean isWrapperFor(Class<?> iface) {
-		return iface.isInstance(this);
-	}
 }

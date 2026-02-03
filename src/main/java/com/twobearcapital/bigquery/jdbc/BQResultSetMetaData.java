@@ -18,6 +18,7 @@ package com.twobearcapital.bigquery.jdbc;
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.StandardSQLTypeName;
+import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Objects;
@@ -31,7 +32,7 @@ import java.util.Objects;
  *
  * @since 1.0.0
  */
-public final class BQResultSetMetaData implements ResultSetMetaData {
+public final class BQResultSetMetaData extends BaseJdbcWrapper implements ResultSetMetaData {
 
 	private final Schema schema;
 
@@ -221,16 +222,4 @@ public final class BQResultSetMetaData implements ResultSetMetaData {
 		return TypeMapper.toJavaClassName(field.getType().getStandardType());
 	}
 
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		if (iface.isInstance(this)) {
-			return iface.cast(this);
-		}
-		throw new SQLException("Cannot unwrap to " + iface.getName());
-	}
-
-	@Override
-	public boolean isWrapperFor(Class<?> iface) {
-		return iface.isInstance(this);
-	}
 }

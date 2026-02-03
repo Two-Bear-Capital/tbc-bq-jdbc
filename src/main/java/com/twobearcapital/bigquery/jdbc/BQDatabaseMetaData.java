@@ -15,6 +15,7 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
+import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
 import java.sql.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +29,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since 1.0.0
  */
-public class BQDatabaseMetaData implements DatabaseMetaData {
+public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaData {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQDatabaseMetaData.class);
 
@@ -1747,16 +1748,4 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
 		return value.matches(regex);
 	}
 
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		if (iface.isInstance(this)) {
-			return iface.cast(this);
-		}
-		throw new SQLException("Cannot unwrap to " + iface.getName());
-	}
-
-	@Override
-	public boolean isWrapperFor(Class<?> iface) {
-		return iface.isInstance(this);
-	}
 }

@@ -16,11 +16,9 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.*;
+import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
+import com.twobearcapital.bigquery.jdbc.util.UnsupportedOperations;
 import java.sql.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,118 +27,33 @@ import org.slf4j.LoggerFactory;
  *
  * @since 1.0.0
  */
-public class BQStatement implements Statement {
+public class BQStatement extends AbstractBQStatement {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQStatement.class);
 
-	protected final BQConnection connection;
-	protected final BigQuery bigquery;
-	protected final ConnectionProperties properties;
-	protected volatile Job currentJob;
-	protected int queryTimeout = 0;
-	protected int maxRows = 0;
-	protected boolean closed = false;
-	protected ResultSet currentResultSet;
-
 	public BQStatement(BQConnection connection) {
-		this.connection = connection;
-		this.bigquery = connection.getBigQuery();
-		this.properties = connection.getProperties();
-		connection.registerStatement(this);
+		super(connection);
 	}
 
-	protected void checkClosed() throws SQLException {
-		if (closed) {
-			throw new BQSQLException("Statement is closed", BQSQLException.SQLSTATE_CONNECTION_CLOSED);
-		}
+	@Override
+	protected String getClosedErrorMessage() {
+		return ErrorMessages.STATEMENT_CLOSED;
+	}
+
+	@Override
+	protected QueryJobConfiguration.Builder buildQueryConfig(String sql) {
+		return QueryJobConfiguration.newBuilder(sql)
+			.setUseLegacySql(properties.useLegacySql());
+	}
+
+	@Override
+	protected String getLogPrefix() {
+		return "Query";
 	}
 
 	@Override
 	public ResultSet executeQuery(String sql) throws SQLException {
-		checkClosed();
-		logger.debug("Executing query: {}", sql);
-
-		QueryJobConfiguration.Builder configBuilder = QueryJobConfiguration.newBuilder(sql)
-				.setUseLegacySql(properties.useLegacySql());
-
-		// Set default dataset if configured
-		if (properties.getDatasetId() != null) {
-			configBuilder.setDefaultDataset(properties.getDatasetId());
-		}
-
-		// Set labels
-		if (!properties.labels().isEmpty()) {
-			configBuilder.setLabels(properties.labels());
-		}
-
-		// Add session property if sessions are enabled
-		SessionManager sessionManager = connection.getSessionManager();
-		if (sessionManager != null && sessionManager.hasSession()) {
-			configBuilder = sessionManager.addSessionProperty(configBuilder);
-		}
-
-		QueryJobConfiguration queryConfig = configBuilder.build();
-
-		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
-
-		try {
-			// Submit job asynchronously with timeout enforcement
-			CompletableFuture<TableResult> future = CompletableFuture.supplyAsync(() -> {
-				try {
-					Job job = bigquery.create(JobInfo.of(queryConfig));
-					this.currentJob = job;
-
-					logger.info("Query job created: {}", job.getJobId());
-
-					// Wait for job completion
-					job = job.waitFor();
-
-					if (job == null) {
-						throw new RuntimeException("Job no longer exists");
-					}
-
-					JobStatus status = job.getStatus();
-					if (status.getError() != null) {
-						BigQueryError error = status.getError();
-						throw new RuntimeException("Query failed (job: " + job.getJobId() + "): " + error.getMessage());
-					}
-
-					return job.getQueryResults();
-
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					throw new RuntimeException("Query interrupted", e);
-				}
-			});
-
-			// Wait with timeout
-			TableResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
-			currentResultSet = new BQResultSet(this, result);
-			return currentResultSet;
-
-		} catch (TimeoutException e) {
-			// Cancel job on timeout
-			if (currentJob != null) {
-				try {
-					bigquery.cancel(currentJob.getJobId());
-					logger.warn("Query cancelled due to timeout: {}", currentJob.getJobId());
-				} catch (Exception cancelEx) {
-					logger.warn("Failed to cancel job after timeout", cancelEx);
-				}
-			}
-			throw new SQLTimeoutException("Query timeout after " + timeoutSeconds + " seconds");
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new BQSQLException("Query interrupted", e);
-		} catch (ExecutionException e) {
-			Throwable cause = e.getCause();
-			if (cause instanceof RuntimeException) {
-				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
-			}
-			throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
-		} catch (BigQueryException e) {
-			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
-		}
+		return executeQueryInternal(sql);
 	}
 
 	@Override
@@ -150,70 +63,6 @@ public class BQStatement implements Statement {
 		executeQuery(sql);
 		// BigQuery doesn't return update counts in the same way
 		return 0;
-	}
-
-	@Override
-	public void close() throws SQLException {
-		if (closed) {
-			return;
-		}
-		closed = true;
-		connection.unregisterStatement(this);
-		if (currentResultSet != null) {
-			currentResultSet.close();
-		}
-	}
-
-	@Override
-	public int getMaxFieldSize() throws SQLException {
-		checkClosed();
-		return 0;
-	}
-
-	@Override
-	public void setMaxFieldSize(int max) throws SQLException {
-		checkClosed();
-	}
-
-	@Override
-	public int getMaxRows() throws SQLException {
-		checkClosed();
-		return maxRows;
-	}
-
-	@Override
-	public void setMaxRows(int max) throws SQLException {
-		checkClosed();
-		this.maxRows = max;
-	}
-
-	@Override
-	public void setEscapeProcessing(boolean enable) throws SQLException {
-		checkClosed();
-	}
-
-	@Override
-	public int getQueryTimeout() throws SQLException {
-		checkClosed();
-		return queryTimeout;
-	}
-
-	@Override
-	public void setQueryTimeout(int seconds) throws SQLException {
-		checkClosed();
-		this.queryTimeout = seconds;
-	}
-
-	@Override
-	public void cancel() throws SQLException {
-		if (currentJob != null) {
-			try {
-				bigquery.cancel(currentJob.getJobId());
-				logger.info("Query job cancelled: {}", currentJob.getJobId());
-			} catch (BigQueryException e) {
-				throw new BQSQLException("Failed to cancel query", e);
-			}
-		}
 	}
 
 	@Override
@@ -229,7 +78,7 @@ public class BQStatement implements Statement {
 
 	@Override
 	public void setCursorName(String name) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Named cursors not supported");
+		throw UnsupportedOperations.namedCursors();
 	}
 
 	@Override
@@ -238,23 +87,6 @@ public class BQStatement implements Statement {
 		return true;
 	}
 
-	@Override
-	public ResultSet getResultSet() throws SQLException {
-		checkClosed();
-		return currentResultSet;
-	}
-
-	@Override
-	public int getUpdateCount() throws SQLException {
-		checkClosed();
-		return -1;
-	}
-
-	@Override
-	public boolean getMoreResults() throws SQLException {
-		checkClosed();
-		return false;
-	}
 
 	@Override
 	public void setFetchDirection(int direction) throws SQLException {
@@ -295,23 +127,17 @@ public class BQStatement implements Statement {
 
 	@Override
 	public void addBatch(String sql) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Batch updates not supported");
+		throw UnsupportedOperations.batchUpdates();
 	}
 
 	@Override
 	public void clearBatch() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Batch updates not supported");
+		throw UnsupportedOperations.batchUpdates();
 	}
 
 	@Override
 	public int[] executeBatch() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Batch updates not supported");
-	}
-
-	@Override
-	public java.sql.Connection getConnection() throws SQLException {
-		checkClosed();
-		return connection;
+		throw UnsupportedOperations.batchUpdates();
 	}
 
 	@Override
@@ -322,7 +148,7 @@ public class BQStatement implements Statement {
 
 	@Override
 	public ResultSet getGeneratedKeys() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Generated keys not supported");
+		throw UnsupportedOperations.generatedKeys();
 	}
 
 	@Override
@@ -362,7 +188,7 @@ public class BQStatement implements Statement {
 	}
 
 	@Override
-	public boolean isClosed() {
+	public boolean isClosed() throws SQLException {
 		return closed;
 	}
 
@@ -430,16 +256,4 @@ public class BQStatement implements Statement {
 		return enquoteLiteral(val);
 	}
 
-	@Override
-	public <T> T unwrap(Class<T> iface) throws SQLException {
-		if (iface.isInstance(this)) {
-			return iface.cast(this);
-		}
-		throw new SQLException("Cannot unwrap to " + iface.getName());
-	}
-
-	@Override
-	public boolean isWrapperFor(Class<?> iface) {
-		return iface.isInstance(this);
-	}
 }
