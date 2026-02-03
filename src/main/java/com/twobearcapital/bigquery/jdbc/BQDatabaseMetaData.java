@@ -44,8 +44,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
 
     // Initialize cache if enabled
     if (properties.metadataCacheEnabled()) {
-      java.time.Duration cacheTtl =
-          java.time.Duration.ofSeconds(properties.metadataCacheTtl());
+      java.time.Duration cacheTtl = java.time.Duration.ofSeconds(properties.metadataCacheTtl());
       this.cache = new MetadataCache(cacheTtl);
       logger.debug("Metadata cache enabled with TTL: {}", cacheTtl);
     } else {
@@ -664,16 +663,17 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     checkClosed();
 
     String typesKey = types != null ? java.util.Arrays.toString(types) : "null";
-    String cacheKey = "tables:" + catalog + ":" + schemaPattern + ":" + tableNamePattern + ":" + typesKey;
+    String cacheKey =
+        "tables:" + catalog + ":" + schemaPattern + ":" + tableNamePattern + ":" + typesKey;
 
-    return getCachedOrExecute(cacheKey, () -> executeGetTables(catalog, schemaPattern, tableNamePattern, types));
+    return getCachedOrExecute(
+        cacheKey, () -> executeGetTables(catalog, schemaPattern, tableNamePattern, types));
   }
 
   private ResultSet executeGetTables(
       String catalog, String schemaPattern, String tableNamePattern, String[] types)
       throws SQLException {
-    String projectId =
-        catalog != null ? catalog : connection.getProperties().projectId();
+    String projectId = catalog != null ? catalog : connection.getProperties().projectId();
 
     com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
     boolean lazyLoad = connection.getProperties().metadataLazyLoad();
@@ -761,9 +761,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
         rows);
   }
 
-  /**
-   * Query tables from multiple datasets sequentially.
-   */
+  /** Query tables from multiple datasets sequentially. */
   private java.util.List<Object[]> queryTablesSequential(
       String projectId, java.util.List<String> datasetIds, String tableNamePattern, String[] types)
       throws SQLException {
@@ -771,7 +769,8 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
 
     for (String datasetId : datasetIds) {
-      allRows.addAll(queryTablesForDataset(bigquery, projectId, datasetId, tableNamePattern, types));
+      allRows.addAll(
+          queryTablesForDataset(bigquery, projectId, datasetId, tableNamePattern, types));
     }
 
     return allRows;
@@ -826,9 +825,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     }
   }
 
-  /**
-   * Query tables for a single dataset.
-   */
+  /** Query tables for a single dataset. */
   private java.util.List<Object[]> queryTablesForDataset(
       com.google.cloud.bigquery.BigQuery bigquery,
       String projectId,
@@ -839,8 +836,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     java.util.List<Object[]> rows = new java.util.ArrayList<>();
 
     // List tables in dataset
-    var tables =
-        bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
+    var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
 
     for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
       String tableName = table.getTableId().getTable();
@@ -895,32 +891,36 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
   public ResultSet getCatalogs() throws SQLException {
     checkClosed();
 
-    return getCachedOrExecute("catalogs", () -> {
-      // BigQuery: Catalogs = Projects
-      // Return the current project
-      String projectId = connection.getProperties().projectId();
+    return getCachedOrExecute(
+        "catalogs",
+        () -> {
+          // BigQuery: Catalogs = Projects
+          // Return the current project
+          String projectId = connection.getProperties().projectId();
 
-      java.util.List<Object[]> rows = new java.util.ArrayList<>();
-      rows.add(new Object[] {projectId});
+          java.util.List<Object[]> rows = new java.util.ArrayList<>();
+          rows.add(new Object[] {projectId});
 
-      return createResultSet(
-          new String[] {"TABLE_CAT"}, new int[] {java.sql.Types.VARCHAR}, rows);
-    });
+          return createResultSet(
+              new String[] {"TABLE_CAT"}, new int[] {java.sql.Types.VARCHAR}, rows);
+        });
   }
 
   @Override
   public ResultSet getTableTypes() throws SQLException {
     checkClosed();
 
-    return getCachedOrExecute("tableTypes", () -> {
-      java.util.List<Object[]> rows = new java.util.ArrayList<>();
-      rows.add(new Object[] {"TABLE"});
-      rows.add(new Object[] {"VIEW"});
-      rows.add(new Object[] {"MATERIALIZED VIEW"});
+    return getCachedOrExecute(
+        "tableTypes",
+        () -> {
+          java.util.List<Object[]> rows = new java.util.ArrayList<>();
+          rows.add(new Object[] {"TABLE"});
+          rows.add(new Object[] {"VIEW"});
+          rows.add(new Object[] {"MATERIALIZED VIEW"});
 
-      return createResultSet(
-          new String[] {"TABLE_TYPE"}, new int[] {java.sql.Types.VARCHAR}, rows);
-    });
+          return createResultSet(
+              new String[] {"TABLE_TYPE"}, new int[] {java.sql.Types.VARCHAR}, rows);
+        });
   }
 
   @Override
@@ -929,14 +929,22 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
       throws SQLException {
     checkClosed();
 
-    String cacheKey = "columns:" + catalog + ":" + schemaPattern + ":" + tableNamePattern + ":" + columnNamePattern;
+    String cacheKey =
+        "columns:"
+            + catalog
+            + ":"
+            + schemaPattern
+            + ":"
+            + tableNamePattern
+            + ":"
+            + columnNamePattern;
 
-    return getCachedOrExecute(cacheKey, () -> executeGetColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern));
+    return getCachedOrExecute(
+        cacheKey,
+        () -> executeGetColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern));
   }
 
-  /**
-   * Query columns from multiple datasets sequentially.
-   */
+  /** Query columns from multiple datasets sequentially. */
   private java.util.List<Object[]> queryColumnsSequential(
       String projectId,
       java.util.List<String> datasetIds,
@@ -955,9 +963,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     return allRows;
   }
 
-  /**
-   * Query columns from multiple datasets in parallel using virtual threads.
-   */
+  /** Query columns from multiple datasets in parallel using virtual threads. */
   private java.util.List<Object[]> queryColumnsParallel(
       String projectId,
       java.util.List<String> datasetIds,
@@ -1008,9 +1014,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     }
   }
 
-  /**
-   * Query columns for a single dataset.
-   */
+  /** Query columns for a single dataset. */
   private java.util.List<Object[]> queryColumnsForDataset(
       com.google.cloud.bigquery.BigQuery bigquery,
       String projectId,
@@ -1020,8 +1024,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
       throws SQLException {
     java.util.List<Object[]> rows = new java.util.ArrayList<>();
 
-    var tables =
-        bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
+    var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
 
     for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
       String tableName = table.getTableId().getTable();
@@ -1098,8 +1101,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
   private ResultSet executeGetColumns(
       String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
       throws SQLException {
-    String projectId =
-        catalog != null ? catalog : connection.getProperties().projectId();
+    String projectId = catalog != null ? catalog : connection.getProperties().projectId();
 
     com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
     boolean lazyLoad = connection.getProperties().metadataLazyLoad();
@@ -1182,14 +1184,10 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     java.util.List<Object[]> rows;
     if (datasetIds.size() >= 5) {
       logger.debug("Using parallel loading for columns in {} datasets", datasetIds.size());
-      rows =
-          queryColumnsParallel(
-              projectId, datasetIds, tableNamePattern, columnNamePattern);
+      rows = queryColumnsParallel(projectId, datasetIds, tableNamePattern, columnNamePattern);
     } else {
       logger.debug("Using sequential loading for columns in {} datasets", datasetIds.size());
-      rows =
-          queryColumnsSequential(
-              projectId, datasetIds, tableNamePattern, columnNamePattern);
+      rows = queryColumnsSequential(projectId, datasetIds, tableNamePattern, columnNamePattern);
     }
 
     return createResultSet(
@@ -1481,29 +1479,30 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
 
     String cacheKey = "schemas:" + catalog + ":" + schemaPattern;
 
-    return getCachedOrExecute(cacheKey, () -> {
-      String projectId =
-          catalog != null ? catalog : connection.getProperties().projectId();
+    return getCachedOrExecute(
+        cacheKey,
+        () -> {
+          String projectId = catalog != null ? catalog : connection.getProperties().projectId();
 
-      // Use BigQuery API to list datasets
-      com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-      var datasets = bigquery.listDatasets(projectId);
+          // Use BigQuery API to list datasets
+          com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+          var datasets = bigquery.listDatasets(projectId);
 
-      java.util.List<Object[]> rows = new java.util.ArrayList<>();
-      for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
-        String datasetId = dataset.getDatasetId().getDataset();
+          java.util.List<Object[]> rows = new java.util.ArrayList<>();
+          for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
+            String datasetId = dataset.getDatasetId().getDataset();
 
-        // Apply schema pattern filter if specified
-        if (schemaPattern == null || matchesPattern(datasetId, schemaPattern)) {
-          rows.add(new Object[] {datasetId, projectId});
-        }
-      }
+            // Apply schema pattern filter if specified
+            if (schemaPattern == null || matchesPattern(datasetId, schemaPattern)) {
+              rows.add(new Object[] {datasetId, projectId});
+            }
+          }
 
-      return createResultSet(
-          new String[] {"TABLE_SCHEM", "TABLE_CATALOG"},
-          new int[] {java.sql.Types.VARCHAR, java.sql.Types.VARCHAR},
-          rows);
-    });
+          return createResultSet(
+              new String[] {"TABLE_SCHEM", "TABLE_CATALOG"},
+              new int[] {java.sql.Types.VARCHAR, java.sql.Types.VARCHAR},
+              rows);
+        });
   }
 
   @Override
@@ -1598,9 +1597,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     return result;
   }
 
-  /**
-   * Functional interface for SQL operations that can throw SQLException.
-   */
+  /** Functional interface for SQL operations that can throw SQLException. */
   @FunctionalInterface
   private interface SqlSupplier<T> {
     T get() throws SQLException;
@@ -1615,8 +1612,8 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
    * @return ResultSet containing the data
    * @throws SQLException if result set creation fails
    */
-  private ResultSet createResultSet(String[] columnNames, int[] columnTypes, java.util.List<Object[]> rows)
-      throws SQLException {
+  private ResultSet createResultSet(
+      String[] columnNames, int[] columnTypes, java.util.List<Object[]> rows) throws SQLException {
     return new MetadataResultSet(columnNames, columnTypes, rows);
   }
 
@@ -1634,11 +1631,7 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     // Convert SQL LIKE pattern to regex: % -> .*, _ -> .
     String regex =
         "^"
-            + pattern
-                .replace("\\", "\\\\")
-                .replace(".", "\\.")
-                .replace("%", ".*")
-                .replace("_", ".")
+            + pattern.replace("\\", "\\\\").replace(".", "\\.").replace("%", ".*").replace("_", ".")
             + "$";
     return value.matches(regex);
   }

@@ -33,7 +33,9 @@ import org.openjdk.jmh.infra.Blackhole;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Benchmark)
-@Fork(value = 1, jvmArgs = {"-Xms2G", "-Xmx2G"})
+@Fork(
+    value = 1,
+    jvmArgs = {"-Xms2G", "-Xmx2G"})
 @Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 public class ResultSetIterationBenchmark {
@@ -65,9 +67,7 @@ public class ResultSetIterationBenchmark {
     }
   }
 
-  /**
-   * Benchmark: Iterate through generated rows.
-   */
+  /** Benchmark: Iterate through generated rows. */
   @Benchmark
   public void benchmarkResultSetIteration(Blackhole blackhole) throws Exception {
     String query =
@@ -93,9 +93,7 @@ public class ResultSetIterationBenchmark {
     }
   }
 
-  /**
-   * Benchmark: Column access by name vs index.
-   */
+  /** Benchmark: Column access by name vs index. */
   @Benchmark
   public void benchmarkColumnAccessByName(Blackhole blackhole) throws Exception {
     String query = "SELECT 1 as id, 'test' as name, 123.45 as value";
@@ -110,9 +108,7 @@ public class ResultSetIterationBenchmark {
     }
   }
 
-  /**
-   * Benchmark: Column access by index (faster).
-   */
+  /** Benchmark: Column access by index (faster). */
   @Benchmark
   public void benchmarkColumnAccessByIndex(Blackhole blackhole) throws Exception {
     String query = "SELECT 1 as id, 'test' as name, 123.45 as value";

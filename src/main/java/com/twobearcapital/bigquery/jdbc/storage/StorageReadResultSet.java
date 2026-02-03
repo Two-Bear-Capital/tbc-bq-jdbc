@@ -66,8 +66,7 @@ public class StorageReadResultSet extends BQResultSet {
    * @param tableId reference to the table to read
    * @throws SQLException if initialization fails
    */
-  public StorageReadResultSet(BQStatement statement, TableId tableId)
-      throws SQLException {
+  public StorageReadResultSet(BQStatement statement, TableId tableId) throws SQLException {
     super(statement, null); // Will override iteration logic
 
     this.tableId = tableId;
@@ -107,7 +106,8 @@ public class StorageReadResultSet extends BQResultSet {
     String table = tableId.getTable();
 
     String parent = String.format("projects/%s", projectId);
-    String tablePath = String.format("projects/%s/datasets/%s/tables/%s", projectId, datasetId, table);
+    String tablePath =
+        String.format("projects/%s/datasets/%s/tables/%s", projectId, datasetId, table);
 
     ReadSession.Builder sessionBuilder =
         ReadSession.newBuilder()

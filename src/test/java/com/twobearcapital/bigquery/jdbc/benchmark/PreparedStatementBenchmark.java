@@ -33,7 +33,9 @@ import org.openjdk.jmh.infra.Blackhole;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
-@Fork(value = 1, jvmArgs = {"-Xms2G", "-Xmx2G"})
+@Fork(
+    value = 1,
+    jvmArgs = {"-Xms2G", "-Xmx2G"})
 @Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 public class PreparedStatementBenchmark {
@@ -62,9 +64,7 @@ public class PreparedStatementBenchmark {
     }
   }
 
-  /**
-   * Benchmark: Single parameter binding.
-   */
+  /** Benchmark: Single parameter binding. */
   @Benchmark
   public void benchmarkSingleParameter(Blackhole blackhole) throws Exception {
     String sql = "SELECT ? as value";
@@ -78,9 +78,7 @@ public class PreparedStatementBenchmark {
     }
   }
 
-  /**
-   * Benchmark: Multiple parameter binding.
-   */
+  /** Benchmark: Multiple parameter binding. */
   @Benchmark
   public void benchmarkMultipleParameters(Blackhole blackhole) throws Exception {
     String sql = "SELECT ? as id, ? as name, ? as value, ? as flag";
@@ -100,9 +98,7 @@ public class PreparedStatementBenchmark {
     }
   }
 
-  /**
-   * Benchmark: PreparedStatement reuse.
-   */
+  /** Benchmark: PreparedStatement reuse. */
   @Benchmark
   public void benchmarkPreparedStatementReuse(Blackhole blackhole) throws Exception {
     String sql = "SELECT ? as value";
@@ -118,9 +114,7 @@ public class PreparedStatementBenchmark {
     }
   }
 
-  /**
-   * Benchmark: Parameter metadata access.
-   */
+  /** Benchmark: Parameter metadata access. */
   @Benchmark
   public void benchmarkParameterMetaData(Blackhole blackhole) throws Exception {
     String sql = "SELECT ? as a, ? as b, ? as c";

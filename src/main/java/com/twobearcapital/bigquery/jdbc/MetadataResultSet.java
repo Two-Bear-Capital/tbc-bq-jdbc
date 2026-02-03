@@ -25,8 +25,8 @@ import java.util.*;
 /**
  * A simple in-memory ResultSet implementation for database metadata queries.
  *
- * <p>This implementation is used by DatabaseMetaData methods to return catalog, schema, table,
- * and column information without requiring actual BigQuery queries.
+ * <p>This implementation is used by DatabaseMetaData methods to return catalog, schema, table, and
+ * column information without requiring actual BigQuery queries.
  *
  * @since 1.0.0
  */
@@ -1175,9 +1175,7 @@ final class MetadataResultSet implements ResultSet {
     return iface.isInstance(this);
   }
 
-  /**
-   * Simple ResultSetMetaData implementation for metadata ResultSets.
-   */
+  /** Simple ResultSetMetaData implementation for metadata ResultSets. */
   private static class MetadataResultSetMetaData implements ResultSetMetaData {
     private final String[] columnNames;
     private final int[] columnTypes;

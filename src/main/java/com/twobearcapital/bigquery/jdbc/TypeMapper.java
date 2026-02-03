@@ -16,7 +16,6 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.Field;
-import com.google.cloud.bigquery.LegacySQLTypeName;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import java.sql.Types;
 

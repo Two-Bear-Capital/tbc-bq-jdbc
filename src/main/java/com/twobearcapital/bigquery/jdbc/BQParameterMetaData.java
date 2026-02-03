@@ -22,8 +22,8 @@ import java.sql.Types;
 /**
  * JDBC ParameterMetaData implementation for BigQuery prepared statements.
  *
- * <p>This implementation provides basic parameter metadata. Full type information
- * is limited because BigQuery parameter types are inferred at query execution time.
+ * <p>This implementation provides basic parameter metadata. Full type information is limited
+ * because BigQuery parameter types are inferred at query execution time.
  *
  * @since 1.0.0
  */

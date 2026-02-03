@@ -196,9 +196,7 @@ public final class BQResultSetMetaData implements ResultSetMetaData {
         sb.append(", ");
       }
       Field field = fields.get(i);
-      sb.append(field.getName())
-          .append(" ")
-          .append(field.getType().getStandardType().name());
+      sb.append(field.getName()).append(" ").append(field.getType().getStandardType().name());
     }
     return sb.toString();
   }

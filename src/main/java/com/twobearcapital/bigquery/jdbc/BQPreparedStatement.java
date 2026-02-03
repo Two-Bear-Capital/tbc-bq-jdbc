@@ -136,8 +136,7 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof RuntimeException) {
-        throw new BQSQLException(
-            cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
+        throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
       }
       throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
     } catch (BigQueryException e) {

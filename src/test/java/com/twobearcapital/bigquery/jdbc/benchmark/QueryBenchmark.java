@@ -26,15 +26,16 @@ import org.openjdk.jmh.infra.Blackhole;
 /**
  * JMH benchmarks for query execution latency.
  *
- * <p>Run with: mvn clean package -DskipTests && java -jar
- * target/benchmarks.jar QueryBenchmark
+ * <p>Run with: mvn clean package -DskipTests && java -jar target/benchmarks.jar QueryBenchmark
  *
  * @since 1.0.0
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
-@Fork(value = 1, jvmArgs = {"-Xms2G", "-Xmx2G"})
+@Fork(
+    value = 1,
+    jvmArgs = {"-Xms2G", "-Xmx2G"})
 @Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 public class QueryBenchmark {
@@ -64,9 +65,7 @@ public class QueryBenchmark {
     }
   }
 
-  /**
-   * Baseline: SELECT 1 query to measure minimum latency.
-   */
+  /** Baseline: SELECT 1 query to measure minimum latency. */
   @Benchmark
   public void benchmarkSelectOne(Blackhole blackhole) throws Exception {
     try (Statement stmt = connection.createStatement();
@@ -77,9 +76,7 @@ public class QueryBenchmark {
     }
   }
 
-  /**
-   * Small query: SELECT with simple WHERE clause.
-   */
+  /** Small query: SELECT with simple WHERE clause. */
   @Benchmark
   public void benchmarkSmallQuery(Blackhole blackhole) throws Exception {
     try (Statement stmt = connection.createStatement();
@@ -93,9 +90,7 @@ public class QueryBenchmark {
     }
   }
 
-  /**
-   * Connection creation latency.
-   */
+  /** Connection creation latency. */
   @Benchmark
   public void benchmarkConnectionCreation(Blackhole blackhole) throws Exception {
     try (Connection conn = DriverManager.getConnection(JDBC_URL)) {

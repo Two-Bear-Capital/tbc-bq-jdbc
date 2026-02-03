@@ -31,8 +31,8 @@ import org.slf4j.LoggerFactory;
  * <p>This cache is particularly important for projects with many datasets (90+), addressing
  * JetBrains issue DBE-22088 where introspection can hang or become very slow.
  *
- * <p>The cache stores metadata query results with a configurable time-to-live (TTL). All
- * operations are thread-safe.
+ * <p>The cache stores metadata query results with a configurable time-to-live (TTL). All operations
+ * are thread-safe.
  *
  * @since 1.0.0
  */
@@ -130,8 +130,7 @@ final class MetadataCache {
    * @param keyPrefix the prefix to match
    */
   void invalidate(String keyPrefix) {
-    int removed =
-        (int) cache.keySet().stream().filter(key -> key.startsWith(keyPrefix)).count();
+    int removed = (int) cache.keySet().stream().filter(key -> key.startsWith(keyPrefix)).count();
 
     cache.keySet().removeIf(key -> key.startsWith(keyPrefix));
     logger.debug("Invalidated {} cache entries with prefix: {}", removed, keyPrefix);
