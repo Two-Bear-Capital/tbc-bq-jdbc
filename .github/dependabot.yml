@@ -5,18 +5,30 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    assignees:
+      - "timveil"
     reviewers:
       - "timveil"
     labels:
       - "dependencies"
+    groups:
+      maven-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    assignees:
+      - "timveil"
     reviewers:
       - "timveil"
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
