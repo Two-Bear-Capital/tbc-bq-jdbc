@@ -1339,8 +1339,8 @@ jdbc:bigquery:my-project?authType=ADC&metadataCacheEnabled=true&metadataCacheTtl
 ### Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/twobearcapital/tbc-bq-jdbc/issues
-- Documentation: https://github.com/twobearcapital/tbc-bq-jdbc/tree/main/docs
+- GitHub Issues: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues
+- Documentation: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/tree/main/docs
 - IntelliJ Guide: [INTELLIJ.md](INTELLIJ.md)
 
 ### References

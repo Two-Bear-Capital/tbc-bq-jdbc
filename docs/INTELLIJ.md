@@ -64,7 +64,7 @@ JetBrains' built-in BigQuery driver has several documented issues that affect us
 
 ### 1. Download the Driver
 
-Download the latest shaded JAR from the [releases page](https://github.com/twobearcapital/tbc-bq-jdbc/releases):
+Download the latest shaded JAR from the [releases page](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases):
 
 ```bash
 # Example filename
@@ -109,14 +109,14 @@ Choose one of these methods:
 
 **Option B: Build from Source**
 ```bash
-git clone https://github.com/twobearcapital/tbc-bq-jdbc.git
+git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
 cd tbc-bq-jdbc
 ./mvnw clean package
 # JAR will be in target/tbc-bq-jdbc-1.0.0-SNAPSHOT-shaded.jar
 ```
 
 **Option C: Download Release**
-- Visit [GitHub Releases](https://github.com/twobearcapital/tbc-bq-jdbc/releases)
+- Visit [GitHub Releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases)
 - Download `tbc-bq-jdbc-X.Y.Z-shaded.jar`
 
 ### Step 2: Configure IntelliJ Driver
@@ -656,7 +656,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 
 ## Additional Resources
 
-- [GitHub Repository](https://github.com/twobearcapital/tbc-bq-jdbc)
+- [GitHub Repository](https://github.com/Two-Bear-Capital/tbc-bq-jdbc)
 - [JetBrains Issues Analysis](JETBRAINS_ISSUES.md)
 - [Connection Properties Reference](CONNECTION_PROPERTIES.md)
 - [Authentication Guide](AUTHENTICATION.md)
@@ -671,7 +671,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 
 Found a bug or have a feature request?
 
-1. Check [existing issues](https://github.com/twobearcapital/tbc-bq-jdbc/issues)
+1. Check [existing issues](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues)
 2. Create a new issue with:
    - IntelliJ version
    - tbc-bq-jdbc version

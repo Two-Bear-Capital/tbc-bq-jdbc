@@ -11,7 +11,7 @@
 
     <name>BigQuery JDBC Driver</name>
     <description>Modern JDBC driver for Google BigQuery, built for Java 21+</description>
-    <url>https://github.com/twobearcapital/tbc-bq-jdbc</url>
+    <url>https://github.com/Two-Bear-Capital/tbc-bq-jdbc</url>
 
     <licenses>
         <license>
@@ -29,9 +29,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/twobearcapital/tbc-bq-jdbc.git</connection>
-        <developerConnection>scm:git:ssh://github.com:twobearcapital/tbc-bq-jdbc.git</developerConnection>
-        <url>https://github.com/twobearcapital/tbc-bq-jdbc</url>
+        <connection>scm:git:git://github.com/Two-Bear-Capital/tbc-bq-jdbc.git</connection>
+        <developerConnection>scm:git:ssh://github.com:Two-Bear-Capital/tbc-bq-jdbc.git</developerConnection>
+        <url>https://github.com/Two-Bear-Capital/tbc-bq-jdbc</url>
     </scm>
 
     <properties>
@@ -346,7 +346,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/timveil/tbc-bq-jdbc</url>
+            <url>https://maven.pkg.github.com/Two-Bear-Capital/tbc-bq-jdbc</url>
         </repository>
     </distributionManagement>
 </project>

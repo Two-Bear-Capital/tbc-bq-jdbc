@@ -464,8 +464,8 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 ## Support
 
 - 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/twobearcapital/tbc-bq-jdbc/issues)
-- 💬 [Discussions](https://github.com/twobearcapital/tbc-bq-jdbc/discussions)
+- 🐛 [Issue Tracker](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues)
+- 💬 [Discussions](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/discussions)
 
 ## Acknowledgments
 

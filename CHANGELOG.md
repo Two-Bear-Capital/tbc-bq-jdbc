@@ -114,4 +114,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/twobearcapital/tbc-bq-jdbc/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.0...HEAD

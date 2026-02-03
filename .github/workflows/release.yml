@@ -56,7 +56,7 @@ jobs:
             target/tbc-bq-jdbc-*.jar
           generate_release_notes: true
           body: |
-            See [CHANGELOG.md](https://github.com/twobearcapital/tbc-bq-jdbc/blob/main/CHANGELOG.md) for details.
+            See [CHANGELOG.md](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/blob/main/CHANGELOG.md) for details.
 
             ## Artifacts
             - `tbc-bq-jdbc-${{ steps.get_version.outputs.VERSION }}.jar` - Slim JAR (requires dependencies)

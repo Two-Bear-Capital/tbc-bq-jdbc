@@ -277,4 +277,4 @@ See [Troubleshooting Guide](TROUBLESHOOTING.md) for more solutions.
 ## Example Projects
 
 Complete example projects available at:
-- https://github.com/twobearcapital/tbc-bq-jdbc-examples
+- https://github.com/Two-Bear-Capital/tbc-bq-jdbc-examples

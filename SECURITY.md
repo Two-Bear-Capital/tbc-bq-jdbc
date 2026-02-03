@@ -17,7 +17,7 @@ We take the security of the BigQuery JDBC Driver seriously. If you believe you h
 
 Instead, please report them via GitHub Security Advisories:
 
-1. Go to https://github.com/timveil/tbc-bq-jdbc/security/advisories
+1. Go to https://github.com/Two-Bear-Capital/tbc-bq-jdbc/security/advisories
 2. Click "Report a vulnerability"
 3. Provide a detailed description of the vulnerability
 
