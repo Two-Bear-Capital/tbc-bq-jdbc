@@ -100,7 +100,10 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
 
   @Override
   public String getDatabaseProductName() throws SQLException {
-    return "Google BigQuery";
+    // Use a distinct name to avoid IntelliJ's built-in BigQuery dialect
+    // which has bugs in its introspector (null helper NPE)
+    // IntelliJ will use a generic SQL dialect instead, which works better
+    return "BigQuery (TBC Driver)";
   }
 
   @Override
