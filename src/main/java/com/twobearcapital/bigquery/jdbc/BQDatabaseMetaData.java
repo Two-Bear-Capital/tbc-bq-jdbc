@@ -681,10 +681,21 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
     boolean lazyLoad = connection.getProperties().metadataLazyLoad();
 
+    // Enhanced logging to debug IntelliJ introspection
+    logger.info(
+        "getTables() called - catalog: [{}], schemaPattern: [{}], tableNamePattern: [{}], types: [{}], lazyLoad: {}",
+        catalog,
+        schemaPattern,
+        tableNamePattern,
+        types != null ? java.util.Arrays.toString(types) : "null",
+        lazyLoad);
+
     // Lazy loading: If enabled and no specific patterns, return empty result
     // This allows IntelliJ to load the tree structure quickly without fetching all tables
     if (lazyLoad && schemaPattern == null && tableNamePattern == null) {
-      logger.debug("Lazy loading enabled: returning empty table list (no patterns specified)");
+      logger.info(
+          "Lazy loading enabled: returning empty table list (no patterns specified) - catalog: [{}]",
+          catalog);
       return createResultSet(
           new String[] {
             "TABLE_CAT",
@@ -726,15 +737,23 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
       }
     }
 
+    logger.info(
+        "Found {} dataset(s) matching pattern [{}]: {}",
+        datasetIds.size(),
+        schemaPattern,
+        datasetIds.size() <= 10 ? datasetIds : datasetIds.subList(0, 10) + "...");
+
     // Use parallel loading if there are multiple datasets (5+)
     java.util.List<Object[]> rows;
     if (datasetIds.size() >= 5) {
-      logger.debug("Using parallel loading for {} datasets", datasetIds.size());
+      logger.info("Using parallel loading for {} datasets", datasetIds.size());
       rows = queryTablesParallel(projectId, datasetIds, tableNamePattern, types);
     } else {
-      logger.debug("Using sequential loading for {} datasets", datasetIds.size());
+      logger.info("Using sequential loading for {} datasets", datasetIds.size());
       rows = queryTablesSequential(projectId, datasetIds, tableNamePattern, types);
     }
+
+    logger.info("getTables() returning {} table(s)", rows.size());
 
     return createResultSet(
         new String[] {
@@ -1109,11 +1128,22 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
     com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
     boolean lazyLoad = connection.getProperties().metadataLazyLoad();
 
+    // Enhanced logging to debug IntelliJ introspection
+    logger.info(
+        "getColumns() called - catalog: [{}], schemaPattern: [{}], tableNamePattern: [{}], columnNamePattern: [{}], lazyLoad: {}",
+        catalog,
+        schemaPattern,
+        tableNamePattern,
+        columnNamePattern,
+        lazyLoad);
+
     // Lazy loading: If enabled and no specific table pattern, return empty result
     // This allows IntelliJ to load the tree structure quickly without fetching all columns
     if (lazyLoad && tableNamePattern == null) {
-      logger.debug(
-          "Lazy loading enabled: returning empty column list (no table pattern specified)");
+      logger.info(
+          "Lazy loading enabled: returning empty column list (no table pattern specified) - catalog: [{}], schemaPattern: [{}]",
+          catalog,
+          schemaPattern);
       return createResultSet(
           new String[] {
             "TABLE_CAT",
@@ -1276,19 +1306,125 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
 
   @Override
   public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getPrimaryKeys not supported");
+    checkClosed();
+
+    logger.info(
+        "getPrimaryKeys() called - catalog: [{}], schema: [{}], table: [{}]",
+        catalog,
+        schema,
+        table);
+
+    // BigQuery doesn't have traditional primary keys, return empty result set
+    return createResultSet(
+        new String[] {
+          "TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME", "KEY_SEQ", "PK_NAME"
+        },
+        new int[] {
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.VARCHAR,
+          java.sql.Types.SMALLINT,
+          java.sql.Types.VARCHAR
+        },
+        new java.util.ArrayList<>());
   }
 
   @Override
   public ResultSet getImportedKeys(String catalog, String schema, String table)
       throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getImportedKeys not supported");
+    checkClosed();
+
+    logger.info(
+        "getImportedKeys() called - catalog: [{}], schema: [{}], table: [{}]",
+        catalog,
+        schema,
+        table);
+
+    // BigQuery doesn't have foreign keys, return empty result set
+    return createResultSet(
+        new String[] {
+          "PKTABLE_CAT",
+          "PKTABLE_SCHEM",
+          "PKTABLE_NAME",
+          "PKCOLUMN_NAME",
+          "FKTABLE_CAT",
+          "FKTABLE_SCHEM",
+          "FKTABLE_NAME",
+          "FKCOLUMN_NAME",
+          "KEY_SEQ",
+          "UPDATE_RULE",
+          "DELETE_RULE",
+          "FK_NAME",
+          "PK_NAME",
+          "DEFERRABILITY"
+        },
+        new int[] {
+          java.sql.Types.VARCHAR, // PKTABLE_CAT
+          java.sql.Types.VARCHAR, // PKTABLE_SCHEM
+          java.sql.Types.VARCHAR, // PKTABLE_NAME
+          java.sql.Types.VARCHAR, // PKCOLUMN_NAME
+          java.sql.Types.VARCHAR, // FKTABLE_CAT
+          java.sql.Types.VARCHAR, // FKTABLE_SCHEM
+          java.sql.Types.VARCHAR, // FKTABLE_NAME
+          java.sql.Types.VARCHAR, // FKCOLUMN_NAME
+          java.sql.Types.SMALLINT, // KEY_SEQ
+          java.sql.Types.SMALLINT, // UPDATE_RULE
+          java.sql.Types.SMALLINT, // DELETE_RULE
+          java.sql.Types.VARCHAR, // FK_NAME
+          java.sql.Types.VARCHAR, // PK_NAME
+          java.sql.Types.SMALLINT // DEFERRABILITY
+        },
+        new java.util.ArrayList<>());
   }
 
   @Override
   public ResultSet getExportedKeys(String catalog, String schema, String table)
       throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getExportedKeys not supported");
+    checkClosed();
+
+    logger.info(
+        "getExportedKeys() called - catalog: [{}], schema: [{}], table: [{}]",
+        catalog,
+        schema,
+        table);
+
+    // BigQuery doesn't have foreign keys, return empty result set (same structure as
+    // getImportedKeys)
+    return createResultSet(
+        new String[] {
+          "PKTABLE_CAT",
+          "PKTABLE_SCHEM",
+          "PKTABLE_NAME",
+          "PKCOLUMN_NAME",
+          "FKTABLE_CAT",
+          "FKTABLE_SCHEM",
+          "FKTABLE_NAME",
+          "FKCOLUMN_NAME",
+          "KEY_SEQ",
+          "UPDATE_RULE",
+          "DELETE_RULE",
+          "FK_NAME",
+          "PK_NAME",
+          "DEFERRABILITY"
+        },
+        new int[] {
+          java.sql.Types.VARCHAR, // PKTABLE_CAT
+          java.sql.Types.VARCHAR, // PKTABLE_SCHEM
+          java.sql.Types.VARCHAR, // PKTABLE_NAME
+          java.sql.Types.VARCHAR, // PKCOLUMN_NAME
+          java.sql.Types.VARCHAR, // FKTABLE_CAT
+          java.sql.Types.VARCHAR, // FKTABLE_SCHEM
+          java.sql.Types.VARCHAR, // FKTABLE_NAME
+          java.sql.Types.VARCHAR, // FKCOLUMN_NAME
+          java.sql.Types.SMALLINT, // KEY_SEQ
+          java.sql.Types.SMALLINT, // UPDATE_RULE
+          java.sql.Types.SMALLINT, // DELETE_RULE
+          java.sql.Types.VARCHAR, // FK_NAME
+          java.sql.Types.VARCHAR, // PK_NAME
+          java.sql.Types.SMALLINT // DEFERRABILITY
+        },
+        new java.util.ArrayList<>());
   }
 
   @Override
@@ -1305,7 +1441,307 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
 
   @Override
   public ResultSet getTypeInfo() throws SQLException {
-    throw new BQSQLFeatureNotSupportedException("getTypeInfo not yet implemented");
+    checkClosed();
+
+    logger.info("getTypeInfo() called");
+
+    java.util.List<Object[]> rows = new java.util.ArrayList<>();
+
+    // Add BigQuery data types
+    // Format: TYPE_NAME, DATA_TYPE, PRECISION, LITERAL_PREFIX, LITERAL_SUFFIX,
+    //         CREATE_PARAMS, NULLABLE, CASE_SENSITIVE, SEARCHABLE, UNSIGNED_ATTRIBUTE,
+    //         FIXED_PREC_SCALE, AUTO_INCREMENT, LOCAL_TYPE_NAME, MINIMUM_SCALE, MAXIMUM_SCALE,
+    //         SQL_DATA_TYPE, SQL_DATETIME_SUB, NUM_PREC_RADIX
+
+    // BOOL
+    rows.add(
+        createTypeInfoRow(
+            "BOOL", java.sql.Types.BOOLEAN, 1, null, null, null, true, false, true, null, false));
+
+    // INT64
+    rows.add(
+        createTypeInfoRow(
+            "INT64",
+            java.sql.Types.BIGINT,
+            19,
+            null,
+            null,
+            null,
+            true,
+            false,
+            true,
+            false,
+            false));
+
+    // FLOAT64
+    rows.add(
+        createTypeInfoRow(
+            "FLOAT64",
+            java.sql.Types.DOUBLE,
+            15,
+            null,
+            null,
+            null,
+            true,
+            false,
+            true,
+            false,
+            false));
+
+    // NUMERIC
+    rows.add(
+        createTypeInfoRow(
+            "NUMERIC",
+            java.sql.Types.DECIMAL,
+            38,
+            null,
+            null,
+            "precision,scale",
+            true,
+            false,
+            true,
+            false,
+            false));
+
+    // BIGNUMERIC
+    rows.add(
+        createTypeInfoRow(
+            "BIGNUMERIC",
+            java.sql.Types.DECIMAL,
+            76,
+            null,
+            null,
+            "precision,scale",
+            true,
+            false,
+            true,
+            false,
+            false));
+
+    // STRING
+    rows.add(
+        createTypeInfoRow(
+            "STRING",
+            java.sql.Types.VARCHAR,
+            1024 * 1024,
+            "'",
+            "'",
+            "length",
+            true,
+            true,
+            true,
+            null,
+            false));
+
+    // BYTES
+    rows.add(
+        createTypeInfoRow(
+            "BYTES",
+            java.sql.Types.VARBINARY,
+            1024 * 1024,
+            "B'",
+            "'",
+            "length",
+            true,
+            true,
+            true,
+            null,
+            false));
+
+    // DATE
+    rows.add(
+        createTypeInfoRow(
+            "DATE", java.sql.Types.DATE, 10, "'", "'", null, true, false, true, null, false));
+
+    // DATETIME
+    rows.add(
+        createTypeInfoRow(
+            "DATETIME",
+            java.sql.Types.TIMESTAMP,
+            27,
+            "'",
+            "'",
+            null,
+            true,
+            false,
+            true,
+            null,
+            false));
+
+    // TIME
+    rows.add(
+        createTypeInfoRow(
+            "TIME", java.sql.Types.TIME, 15, "'", "'", null, true, false, true, null, false));
+
+    // TIMESTAMP
+    rows.add(
+        createTypeInfoRow(
+            "TIMESTAMP",
+            java.sql.Types.TIMESTAMP,
+            27,
+            "'",
+            "'",
+            null,
+            true,
+            false,
+            true,
+            null,
+            false));
+
+    // GEOGRAPHY
+    rows.add(
+        createTypeInfoRow(
+            "GEOGRAPHY",
+            java.sql.Types.VARCHAR,
+            1024 * 1024,
+            "'",
+            "'",
+            null,
+            true,
+            true,
+            true,
+            null,
+            false));
+
+    // JSON
+    rows.add(
+        createTypeInfoRow(
+            "JSON",
+            java.sql.Types.VARCHAR,
+            1024 * 1024,
+            "'",
+            "'",
+            null,
+            true,
+            true,
+            true,
+            null,
+            false));
+
+    // ARRAY
+    rows.add(
+        createTypeInfoRow(
+            "ARRAY",
+            java.sql.Types.ARRAY,
+            1024 * 1024,
+            "[",
+            "]",
+            "element_type",
+            true,
+            true,
+            true,
+            null,
+            false));
+
+    // STRUCT
+    rows.add(
+        createTypeInfoRow(
+            "STRUCT",
+            java.sql.Types.STRUCT,
+            1024 * 1024,
+            "STRUCT(",
+            ")",
+            "field_list",
+            true,
+            true,
+            true,
+            null,
+            false));
+
+    logger.info("getTypeInfo() returning {} type(s)", rows.size());
+
+    return createResultSet(
+        new String[] {
+          "TYPE_NAME",
+          "DATA_TYPE",
+          "PRECISION",
+          "LITERAL_PREFIX",
+          "LITERAL_SUFFIX",
+          "CREATE_PARAMS",
+          "NULLABLE",
+          "CASE_SENSITIVE",
+          "SEARCHABLE",
+          "UNSIGNED_ATTRIBUTE",
+          "FIXED_PREC_SCALE",
+          "AUTO_INCREMENT",
+          "LOCAL_TYPE_NAME",
+          "MINIMUM_SCALE",
+          "MAXIMUM_SCALE",
+          "SQL_DATA_TYPE",
+          "SQL_DATETIME_SUB",
+          "NUM_PREC_RADIX"
+        },
+        new int[] {
+          java.sql.Types.VARCHAR, // TYPE_NAME
+          java.sql.Types.INTEGER, // DATA_TYPE
+          java.sql.Types.INTEGER, // PRECISION
+          java.sql.Types.VARCHAR, // LITERAL_PREFIX
+          java.sql.Types.VARCHAR, // LITERAL_SUFFIX
+          java.sql.Types.VARCHAR, // CREATE_PARAMS
+          java.sql.Types.SMALLINT, // NULLABLE
+          java.sql.Types.BOOLEAN, // CASE_SENSITIVE
+          java.sql.Types.SMALLINT, // SEARCHABLE
+          java.sql.Types.BOOLEAN, // UNSIGNED_ATTRIBUTE
+          java.sql.Types.BOOLEAN, // FIXED_PREC_SCALE
+          java.sql.Types.BOOLEAN, // AUTO_INCREMENT
+          java.sql.Types.VARCHAR, // LOCAL_TYPE_NAME
+          java.sql.Types.SMALLINT, // MINIMUM_SCALE
+          java.sql.Types.SMALLINT, // MAXIMUM_SCALE
+          java.sql.Types.INTEGER, // SQL_DATA_TYPE
+          java.sql.Types.INTEGER, // SQL_DATETIME_SUB
+          java.sql.Types.INTEGER // NUM_PREC_RADIX
+        },
+        rows);
+  }
+
+  /**
+   * Helper method to create a type info row.
+   *
+   * @param typeName the SQL type name
+   * @param dataType the JDBC data type
+   * @param precision the maximum precision
+   * @param literalPrefix prefix for literals
+   * @param literalSuffix suffix for literals
+   * @param createParams parameters for creation
+   * @param nullable whether nullable
+   * @param caseSensitive whether case sensitive
+   * @param searchable whether searchable
+   * @param unsigned whether unsigned
+   * @param fixedPrecScale whether fixed precision/scale
+   * @return row data
+   */
+  private Object[] createTypeInfoRow(
+      String typeName,
+      int dataType,
+      int precision,
+      String literalPrefix,
+      String literalSuffix,
+      String createParams,
+      boolean nullable,
+      boolean caseSensitive,
+      boolean searchable,
+      Boolean unsigned,
+      boolean fixedPrecScale) {
+    return new Object[] {
+      typeName, // TYPE_NAME
+      dataType, // DATA_TYPE
+      precision, // PRECISION
+      literalPrefix, // LITERAL_PREFIX
+      literalSuffix, // LITERAL_SUFFIX
+      createParams, // CREATE_PARAMS
+      nullable ? DatabaseMetaData.typeNullable : DatabaseMetaData.typeNoNulls, // NULLABLE
+      caseSensitive, // CASE_SENSITIVE
+      searchable ? DatabaseMetaData.typeSearchable : DatabaseMetaData.typePredNone, // SEARCHABLE
+      unsigned, // UNSIGNED_ATTRIBUTE
+      fixedPrecScale, // FIXED_PREC_SCALE
+      false, // AUTO_INCREMENT
+      typeName, // LOCAL_TYPE_NAME
+      (short) 0, // MINIMUM_SCALE
+      (short) 9, // MAXIMUM_SCALE
+      null, // SQL_DATA_TYPE
+      null, // SQL_DATETIME_SUB
+      10 // NUM_PREC_RADIX
+    };
   }
 
   @Override
@@ -1480,6 +1916,8 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
   public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException {
     checkClosed();
 
+    logger.info("getSchemas() called - catalog: [{}], schemaPattern: [{}]", catalog, schemaPattern);
+
     String cacheKey = "schemas:" + catalog + ":" + schemaPattern;
 
     return getCachedOrExecute(
@@ -1500,6 +1938,8 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
               rows.add(new Object[] {datasetId, projectId});
             }
           }
+
+          logger.info("getSchemas() returning {} schema(s)", rows.size());
 
           return createResultSet(
               new String[] {"TABLE_SCHEM", "TABLE_CATALOG"},
