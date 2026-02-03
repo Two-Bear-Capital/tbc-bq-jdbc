@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
-      attestations: write
+      # id-token: write  # Disabled for private repository
+      # attestations: write  # Disabled for private repository
       packages: write
 
     steps:
@@ -36,11 +36,12 @@ jobs:
       - name: Build and package
         run: mvn clean package -DskipTests -B
 
-      - name: Generate artifact attestations
-        uses: actions/attest-build-provenance@v3
-        with:
-          subject-path: |
-            target/tbc-bq-jdbc-*.jar
+      # Attestations disabled for private repository
+      # - name: Generate artifact attestations
+      #   uses: actions/attest-build-provenance@v3
+      #   with:
+      #     subject-path: |
+      #       target/tbc-bq-jdbc-*.jar
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
