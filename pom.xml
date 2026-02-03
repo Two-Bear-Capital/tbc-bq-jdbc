@@ -341,4 +341,12 @@
             </build>
         </profile>
     </profiles>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/timveil/tbc-bq-jdbc</url>
+        </repository>
+    </distributionManagement>
 </project>

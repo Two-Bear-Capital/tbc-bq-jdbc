@@ -27,6 +27,16 @@ jobs:
       - name: Build and package
         run: mvn clean package -DskipTests -B
 
+      - name: Configure Maven settings
+        uses: s4u/maven-settings-action@v3
+        with:
+          servers: |
+            [{
+              "id": "github",
+              "username": "${{ github.actor }}",
+              "password": "${{ secrets.GITHUB_TOKEN }}"
+            }]
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -44,10 +54,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # TODO: Phase 5 - Add Maven Central deployment
-      # - name: Deploy to Maven Central
-      #   run: mvn deploy -DskipTests -B
-      #   env:
-      #     MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-      #     MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-      #     GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Deploy to GitHub Packages
+        run: mvn deploy -DskipTests -B
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
