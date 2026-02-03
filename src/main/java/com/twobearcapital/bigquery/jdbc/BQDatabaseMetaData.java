@@ -2063,19 +2063,58 @@ public class BQDatabaseMetaData implements DatabaseMetaData {
   /**
    * Convert SQL LIKE pattern to Java regex pattern.
    *
+   * <p>SQL LIKE patterns support: - % matches any sequence of characters - _ matches any single
+   * character - \ is the escape character (e.g., \_ matches literal underscore, \% matches literal
+   * percent)
+   *
    * @param value the value to match
-   * @param pattern the SQL LIKE pattern (% = wildcard, _ = single char)
+   * @param pattern the SQL LIKE pattern
    * @return true if value matches pattern
    */
   private boolean matchesPattern(String value, String pattern) {
     if (pattern == null) {
       return true;
     }
-    // Convert SQL LIKE pattern to regex: % -> .*, _ -> .
-    String regex =
-        "^"
-            + pattern.replace("\\", "\\\\").replace(".", "\\.").replace("%", ".*").replace("_", ".")
-            + "$";
+
+    // Handle SQL LIKE escape sequences before converting to regex
+    // Use unique Unicode placeholders that won't be affected by string replacements
+    String escapedUnderscore = "\u0001\u0002\u0003"; // Placeholder for \_
+    String escapedPercent = "\u0004\u0005\u0006"; // Placeholder for \%
+    String escapedBackslash = "\u0007\u0008\u0009"; // Placeholder for \\
+
+    // Step 1: Replace escaped sequences with placeholders
+    String processed = pattern;
+    processed = processed.replace("\\\\", escapedBackslash); // \\ -> literal \
+    processed = processed.replace("\\_", escapedUnderscore); // \_ -> literal _
+    processed = processed.replace("\\%", escapedPercent); // \% -> literal %
+
+    // Step 2: Escape regex special characters (except our wildcards)
+    processed = processed.replace(".", "\\.");
+    processed = processed.replace("^", "\\^");
+    processed = processed.replace("$", "\\$");
+    processed = processed.replace("|", "\\|");
+    processed = processed.replace("(", "\\(");
+    processed = processed.replace(")", "\\)");
+    processed = processed.replace("[", "\\[");
+    processed = processed.replace("]", "\\]");
+    processed = processed.replace("{", "\\{");
+    processed = processed.replace("}", "\\}");
+    processed = processed.replace("+", "\\+");
+    processed = processed.replace("*", "\\*");
+    processed = processed.replace("?", "\\?");
+
+    // Step 3: Convert SQL LIKE wildcards to regex
+    processed = processed.replace("%", ".*"); // % -> any sequence
+    processed = processed.replace("_", "."); // _ -> any single char
+
+    // Step 4: Replace placeholders with literal characters (regex-escaped where needed)
+    processed = processed.replace(escapedUnderscore, "_"); // Literal underscore (no escaping needed)
+    processed = processed.replace(escapedPercent, "%"); // Literal percent (no escaping needed)
+    processed = processed.replace(escapedBackslash, "\\\\"); // Literal backslash (needs escaping)
+
+    // Step 5: Build final regex with anchors
+    String regex = "^" + processed + "$";
+
     return value.matches(regex);
   }
 
