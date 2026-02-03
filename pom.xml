@@ -230,6 +230,11 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
                 <configuration>
+                    <argLine>-XX:+EnableDynamicAgentLoading</argLine>
+                    <classpathDependencyExcludes>
+                        <!-- Exclude logback from test classpath to avoid SLF4J multiple bindings -->
+                        <classpathDependencyExclude>ch.qos.logback:logback-classic</classpathDependencyExclude>
+                    </classpathDependencyExcludes>
                     <excludes>
                         <!-- Exclude integration tests from unit test phase -->
                         <exclude>**/*IntegrationTest.java</exclude>
