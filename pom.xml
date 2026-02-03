@@ -37,7 +37,7 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <google.cloud.bom.version>26.50.0</google.cloud.bom.version>
+        <google.cloud.bom.version>26.75.0</google.cloud.bom.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>6.0.2</junit.version>
         <testcontainers.version>1.21.4</testcontainers.version>
@@ -163,7 +163,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.3.0</version>
+                <version>3.5.0</version>
                 <configuration>
                     <archive>
                         <manifestEntries>
@@ -177,7 +177,7 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>2.43.0</version>
+                <version>3.2.1</version>
                 <configuration>
                     <java>
                         <googleJavaFormat>
@@ -218,7 +218,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>3.5.4</version>
                 <configuration>
                     <excludes>
                         <!-- Exclude integration tests from unit test phase -->
