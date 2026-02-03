@@ -1348,4 +1348,4 @@ For issues or questions:
 - JetBrains YouTrack BigQuery Issues: https://youtrack.jetbrains.com/issues?q=%23DBE%20%23BigQuery
 - BigQuery JDBC Documentation: [README.md](../README.md)
 - Connection Properties: [CONNECTION_PROPERTIES.md](CONNECTION_PROPERTIES.md)
-- Performance Guide: [PERFORMANCE.md](PERFORMANCE.md)
+- Performance Tuning: [CONNECTION_PROPERTIES.md](CONNECTION_PROPERTIES.md#performance-tuning)

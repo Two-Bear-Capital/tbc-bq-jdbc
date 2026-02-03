@@ -568,4 +568,4 @@ Use ORMs for read-only queries. For writes, use:
 - [Quick Start](QUICKSTART.md) - Get started quickly
 - [Connection Properties](CONNECTION_PROPERTIES.md) - Configuration options
 - [Type Mapping](TYPE_MAPPING.md) - Data type conversions
-- [Performance Tuning](PERFORMANCE.md) - Optimization strategies
+- [Connection Properties](CONNECTION_PROPERTIES.md#performance-tuning) - Performance optimization

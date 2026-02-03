@@ -101,7 +101,9 @@ try (Connection conn = DriverManager.getConnection(url);
 }
 ```
 
-## URL Format
+## URL Formats
+
+### Traditional Format
 
 ```
 jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
@@ -119,6 +121,36 @@ jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
 - `enableSessions` - Enable BigQuery sessions for temp tables (default: false)
 
 See [Connection Properties](CONNECTION_PROPERTIES.md) for full list.
+
+### Simba Format (Migration Support)
+
+tbc-bq-jdbc also supports Simba BigQuery JDBC driver URLs:
+
+```
+jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Property1]=[Value1];...
+```
+
+**Examples:**
+
+```java
+// Application Default Credentials
+String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3";
+
+// Service Account
+String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;DefaultDataset=my_dataset;OAuthType=0;OAuthPvtKeyPath=/path/to/key.json";
+
+// With additional properties
+String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;Timeout=120;Location=EU";
+```
+
+**OAuthType Values:**
+- `0` = Service Account (requires `OAuthPvtKeyPath`)
+- `1` = User OAuth (requires `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken`)
+- `3` = Application Default Credentials (recommended)
+
+If you're migrating from Simba driver, simply replace the driver JAR - your existing connection strings will work without modification.
+
+See [Connection Properties - Simba Format](CONNECTION_PROPERTIES.md#simba-bigquery-driver-format) for complete property mapping.
 
 ## Common Examples
 
@@ -264,14 +296,14 @@ Increase timeout in the URL:
 jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600
 ```
 
-See [Troubleshooting Guide](TROUBLESHOOTING.md) for more solutions.
+See [Connection Properties](CONNECTION_PROPERTIES.md) for all configuration options.
 
 ## Next Steps
 
 - [Authentication Guide](AUTHENTICATION.md) - All authentication methods
 - [Connection Properties](CONNECTION_PROPERTIES.md) - Full configuration reference
 - [Type Mapping](TYPE_MAPPING.md) - BigQuery to JDBC type conversions
-- [Performance Tuning](PERFORMANCE.md) - Optimize for large queries
+- [Connection Properties](CONNECTION_PROPERTIES.md#performance-tuning) - Performance optimization
 - [Compatibility Matrix](COMPATIBILITY.md) - JDBC features and limitations
 
 ## Example Projects

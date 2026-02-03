@@ -28,12 +28,31 @@ import org.slf4j.LoggerFactory;
 /**
  * JDBC driver for Google BigQuery.
  *
- * <p>URL format: {@code jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2}
+ * <p>Supports two URL formats:
+ *
+ * <p><b>Traditional Format:</b>
+ *
+ * <pre>{@code
+ * jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
+ * }</pre>
  *
  * <p>Example:
  *
  * <pre>{@code
  * String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
+ * Connection conn = DriverManager.getConnection(url);
+ * }</pre>
+ *
+ * <p><b>Simba Format:</b>
+ *
+ * <pre>{@code
+ * jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];...
+ * }</pre>
+ *
+ * <p>Example:
+ *
+ * <pre>{@code
+ * String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3";
  * Connection conn = DriverManager.getConnection(url);
  * }</pre>
  *

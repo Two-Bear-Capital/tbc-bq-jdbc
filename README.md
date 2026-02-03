@@ -195,6 +195,8 @@ try (Connection conn = DriverManager.getConnection(url)) {
 
 ## URL Format
 
+### Traditional Format
+
 ```
 jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
 ```
@@ -215,7 +217,53 @@ jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
 "jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=50000"
 ```
 
-See [Connection Properties](docs/CONNECTION_PROPERTIES.md) for all available options.
+### Simba BigQuery Driver Compatibility
+
+tbc-bq-jdbc supports **Simba BigQuery JDBC driver URL format** for easy migration from Simba-based applications. Use the same connection strings without modification:
+
+```
+jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Property1]=[Value1];...
+```
+
+**Simba Format Examples:**
+
+```java
+// Application Default Credentials (OAuthType=3)
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3"
+
+// Service Account (OAuthType=0)
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;DefaultDataset=my_dataset;OAuthType=0;OAuthPvtKeyPath=/path/to/key.json"
+
+// User OAuth (OAuthType=1)
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=1;OAuthClientId=id;OAuthClientSecret=secret;OAuthRefreshToken=token"
+
+// With additional properties
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;DefaultDataset=my_dataset;OAuthType=3;Timeout=120;Location=EU"
+```
+
+**OAuthType Values:**
+
+| OAuthType | Authentication Method | Notes |
+|-----------|----------------------|-------|
+| `0` | Service Account | Requires `OAuthPvtKeyPath` |
+| `1` | User OAuth | Requires `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken` |
+| `3` | Application Default | Recommended for most use cases |
+| `4` | External Account | Requires `credentialConfigFile` via Properties |
+
+**Property Mapping:**
+
+Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
+
+| Simba Property | tbc-bq-jdbc Property |
+|----------------|---------------------|
+| `ProjectId` | `projectId` |
+| `DefaultDataset` | `datasetId` |
+| `OAuthPvtKeyPath` | `credentials` |
+| `Timeout` | `timeout` |
+| `MaxResults` | `maxResults` |
+| `Location` | `location` |
+
+See [Connection Properties](docs/CONNECTION_PROPERTIES.md) for complete property mapping and all available options.
 
 ## Connection Pooling
 
@@ -393,7 +441,7 @@ See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete details.
 - Cache frequently executed queries
 - Set appropriate timeouts
 
-See [Performance Guide](docs/PERFORMANCE.md) for detailed optimization strategies.
+See [Connection Properties - Performance Tuning](docs/CONNECTION_PROPERTIES.md#performance-tuning) for detailed optimization strategies.
 
 ## Known Limitations
 

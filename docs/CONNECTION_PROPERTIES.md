@@ -2,11 +2,87 @@
 
 Complete reference for all JDBC connection URL properties.
 
-## URL Format
+## URL Formats
+
+### Traditional Format
 
 ```
 jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
 ```
+
+### Simba BigQuery Driver Format
+
+tbc-bq-jdbc supports the Simba BigQuery JDBC driver URL format for seamless migration:
+
+```
+jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Property1]=[Value1];...
+```
+
+**Example:**
+```
+jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;DefaultDataset=my_dataset;OAuthType=3
+```
+
+**Key Differences from Traditional Format:**
+
+| Aspect | Traditional | Simba |
+|--------|------------|-------|
+| URL prefix | `jdbc:bigquery:` | `jdbc:bigquery://` |
+| Project specification | Path segment | `ProjectId=` parameter |
+| Dataset specification | Path segment | `DefaultDataset=` parameter |
+| Parameter separator | `&` | `;` |
+| Parameter prefix | `?` | None |
+
+**Simba Property Mapping:**
+
+All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
+
+| Simba Property | tbc-bq-jdbc Property | Description |
+|----------------|---------------------|-------------|
+| `ProjectId` | `projectId` | Google Cloud project ID (required) |
+| `DefaultDataset` | `datasetId` | Default dataset name |
+| `OAuthType` | `authType` | Authentication type (see below) |
+| `OAuthPvtKeyPath` | `credentials` | Service account key file path |
+| `OAuthClientId` | `clientId` | OAuth 2.0 client ID |
+| `OAuthClientSecret` | `clientSecret` | OAuth 2.0 client secret |
+| `OAuthRefreshToken` | `refreshToken` | OAuth 2.0 refresh token |
+| `Timeout` | `timeout` | Query timeout in seconds |
+| `MaxResults` | `maxResults` | Maximum rows to fetch |
+| `UseLegacySQL` | `useLegacySql` | Use legacy SQL dialect |
+| `Location` | `location` | BigQuery location |
+| `DatasetProjectId` | `datasetProjectId` | Cross-project dataset access |
+
+**OAuthType Values:**
+
+| OAuthType | Authentication Type | tbc-bq-jdbc authType | Required Properties |
+|-----------|-------------------|---------------------|-------------------|
+| `0` | Service Account | `SERVICE_ACCOUNT` | `OAuthPvtKeyPath` |
+| `1` | User OAuth | `USER_OAUTH` | `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken` |
+| `2` | Pre-generated Token | ❌ Not supported | - |
+| `3` | Application Default | `ADC` | None (recommended) |
+| `4` | External Account | `WORKLOAD` | `credentialConfigFile` (via Properties) |
+
+**Simba Format Examples:**
+
+```java
+// Application Default Credentials (OAuthType=3)
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3"
+
+// Service Account (OAuthType=0)
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=0;OAuthPvtKeyPath=/path/to/key.json"
+
+// User OAuth (OAuthType=1)
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=1;OAuthClientId=id;OAuthClientSecret=secret;OAuthRefreshToken=token"
+
+// With dataset and additional properties
+"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;DefaultDataset=my_dataset;OAuthType=3;Timeout=120;Location=EU"
+```
+
+**Migration from Simba:**
+
+Simply replace your existing Simba JDBC driver with tbc-bq-jdbc - your connection strings will work without modification.
+
+**Note:** The host and port in Simba URLs are validated but not used for actual connections (tbc-bq-jdbc always uses Google's BigQuery API endpoints).
 
 ## Required Components
 
@@ -425,6 +501,7 @@ Connection conn = DriverManager.getConnection(url, props);
 ## See Also
 
 - [Authentication Guide](AUTHENTICATION.md) - Credential configuration
-- [Performance Tuning](PERFORMANCE.md) - Optimization strategies
 - [Quick Start](QUICKSTART.md) - Basic examples
-- [Troubleshooting](TROUBLESHOOTING.md) - Common configuration issues
+- [Type Mapping](TYPE_MAPPING.md) - BigQuery ↔ JDBC type conversions
+- [Compatibility Matrix](COMPATIBILITY.md) - JDBC features and limitations
+- [IntelliJ Integration](INTELLIJ.md) - Database tool setup and optimization

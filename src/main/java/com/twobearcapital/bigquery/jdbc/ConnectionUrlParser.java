@@ -27,7 +27,11 @@ import java.util.regex.Pattern;
 /**
  * Parses BigQuery JDBC connection URLs.
  *
- * <p>URL format: {@code jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2}
+ * <p>Supports two URL formats:
+ *
+ * <p><b>Traditional tbc-bq-jdbc Format:</b>
+ *
+ * <pre>{@code jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2}</pre>
  *
  * <p>Examples:
  *
@@ -37,13 +41,33 @@ import java.util.regex.Pattern;
  *   <li>{@code jdbc:bigquery:my-project/my_dataset?timeout=60&useLegacySql=false}
  * </ul>
  *
+ * <p><b>Simba BigQuery Driver Format:</b>
+ *
+ * <pre>{@code
+ * jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Property1]=[Value1];...
+ * }</pre>
+ *
+ * <p>Examples:
+ *
+ * <ul>
+ *   <li>{@code
+ *       jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3}
+ *   <li>{@code
+ *       jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;DefaultDataset=my_dataset;OAuthType=0;OAuthPvtKeyPath=/path/to/key.json}
+ *   <li>{@code
+ *       jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=1;OAuthClientId=id;OAuthClientSecret=secret;OAuthRefreshToken=token}
+ * </ul>
+ *
  * @since 1.0.0
  */
 public final class ConnectionUrlParser {
 
   private static final String URL_PREFIX = "jdbc:bigquery:";
+  private static final String SIMBA_URL_PREFIX = "jdbc:bigquery://";
   private static final Pattern URL_PATTERN =
       Pattern.compile("^jdbc:bigquery:([^/?]+)(?:/([^?]+))?(?:\\?(.*))?$");
+  private static final Pattern SIMBA_URL_PATTERN =
+      Pattern.compile("^jdbc:bigquery://([^;]+);(.*)$");
 
   private ConnectionUrlParser() {
     // Utility class
@@ -62,6 +86,34 @@ public final class ConnectionUrlParser {
       throw new SQLException("Invalid BigQuery JDBC URL: " + url);
     }
 
+    // Determine format and dispatch to appropriate parser
+    if (isSimbaFormat(url)) {
+      return parseSimbaUrl(url, info);
+    } else {
+      return parseTraditionalUrl(url, info);
+    }
+  }
+
+  /**
+   * Determines if the URL is in Simba format.
+   *
+   * @param url the JDBC URL
+   * @return true if the URL is in Simba format, false otherwise
+   */
+  private static boolean isSimbaFormat(String url) {
+    return url != null && url.startsWith(SIMBA_URL_PREFIX);
+  }
+
+  /**
+   * Parses a traditional tbc-bq-jdbc format URL.
+   *
+   * @param url the JDBC URL
+   * @param info additional connection properties
+   * @return the parsed connection properties
+   * @throws SQLException if the URL is invalid or required properties are missing
+   */
+  private static ConnectionProperties parseTraditionalUrl(String url, Properties info)
+      throws SQLException {
     Matcher matcher = URL_PATTERN.matcher(url);
     if (!matcher.matches()) {
       throw new SQLException("Invalid BigQuery JDBC URL format: " + url);
@@ -93,6 +145,137 @@ public final class ConnectionUrlParser {
     }
 
     return buildConnectionProperties(projectId, datasetId, properties);
+  }
+
+  /**
+   * Parses a Simba BigQuery JDBC driver format URL.
+   *
+   * @param url the JDBC URL in Simba format
+   * @param info additional connection properties
+   * @return the parsed connection properties
+   * @throws SQLException if the URL is invalid or required properties are missing
+   */
+  private static ConnectionProperties parseSimbaUrl(String url, Properties info)
+      throws SQLException {
+    Matcher matcher = SIMBA_URL_PATTERN.matcher(url);
+    if (!matcher.matches()) {
+      throw new SQLException(
+          "Invalid Simba BigQuery JDBC URL format. Expected: jdbc:bigquery://host:port;ProjectId=...");
+    }
+
+    // Extract host:port (for validation, but not used for connection)
+    String hostPort = matcher.group(1);
+    String paramString = matcher.group(2);
+
+    Map<String, String> simbaProperties = new HashMap<>();
+
+    // Parse semicolon-separated parameters
+    if (paramString != null && !paramString.isEmpty()) {
+      // Remove trailing semicolon if present
+      String params =
+          paramString.endsWith(";")
+              ? paramString.substring(0, paramString.length() - 1)
+              : paramString;
+
+      for (String param : params.split(";")) {
+        int idx = param.indexOf('=');
+        if (idx > 0) {
+          String key = param.substring(0, idx).trim();
+          String value = param.substring(idx + 1).trim();
+          simbaProperties.put(key, value);
+        }
+      }
+    }
+
+    // Map Simba properties to tbc-bq-jdbc properties
+    Map<String, String> properties = mapSimbaProperties(simbaProperties);
+
+    // Merge with Properties object (Properties override URL params)
+    if (info != null) {
+      for (String key : info.stringPropertyNames()) {
+        properties.put(key, info.getProperty(key));
+      }
+    }
+
+    // Extract projectId and datasetId from properties
+    String projectId = properties.remove("projectId");
+    if (projectId == null) {
+      throw new SQLException("Missing required property 'ProjectId' in Simba URL");
+    }
+    String datasetId = properties.remove("datasetId");
+
+    return buildConnectionProperties(projectId, datasetId, properties);
+  }
+
+  /**
+   * Maps Simba driver property names to tbc-bq-jdbc property names.
+   *
+   * @param simbaProperties the Simba properties map
+   * @return the mapped tbc-bq-jdbc properties
+   * @throws SQLException if property mapping fails or required properties are missing
+   */
+  private static Map<String, String> mapSimbaProperties(Map<String, String> simbaProperties)
+      throws SQLException {
+    Map<String, String> properties = new HashMap<>();
+
+    for (Map.Entry<String, String> entry : simbaProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+
+      switch (key) {
+        case "ProjectId" -> properties.put("projectId", value);
+        case "DefaultDataset" -> properties.put("datasetId", value);
+        case "OAuthType" -> {
+          String authType = parseOAuthType(value, simbaProperties);
+          properties.put("authType", authType);
+        }
+        case "OAuthPvtKeyPath" -> properties.put("credentials", value);
+        case "OAuthClientId" -> properties.put("clientId", value);
+        case "OAuthClientSecret" -> properties.put("clientSecret", value);
+        case "OAuthRefreshToken" -> properties.put("refreshToken", value);
+        case "Timeout" -> properties.put("timeout", value);
+        case "MaxResults" -> properties.put("maxResults", value);
+        case "UseLegacySQL" -> properties.put("useLegacySql", value);
+        case "Location" -> properties.put("location", value);
+        case "DatasetProjectId" -> properties.put("datasetProjectId", value);
+        default -> {
+          // Unknown properties are ignored for forward compatibility
+          // Could add DEBUG logging here if needed
+        }
+      }
+    }
+
+    return properties;
+  }
+
+  /**
+   * Converts Simba OAuthType numeric value to tbc-bq-jdbc authType string.
+   *
+   * @param oauthType the Simba OAuthType value
+   * @param simbaProperties all Simba properties (for context-dependent mapping)
+   * @return the tbc-bq-jdbc authType string
+   * @throws SQLException if the OAuthType is invalid or unsupported
+   */
+  private static String parseOAuthType(String oauthType, Map<String, String> simbaProperties)
+      throws SQLException {
+    return switch (oauthType) {
+      case "0" -> "SERVICE_ACCOUNT"; // Service Account
+      case "1" -> "USER_OAUTH"; // User Account
+      case "2" ->
+          throw new SQLException(
+              "Pre-generated access tokens (OAuthType=2) not supported. Use Service Account (0) or ADC (3)");
+      case "3" -> "ADC"; // Application Default Credentials
+      case "4" -> {
+        // External Account - could be WORKFORCE or WORKLOAD
+        // Default to WORKLOAD for now; users can override via Properties object if needed
+        yield "WORKLOAD";
+      }
+      default ->
+          throw new SQLException(
+              "Invalid OAuthType value '"
+                  + oauthType
+                  + "'. Supported: 0 (Service Account), 1 (User), 3 (ADC), 4 (External Account)");
+    };
   }
 
   private static ConnectionProperties buildConnectionProperties(

@@ -407,4 +407,4 @@ String url = "jdbc:bigquery:my-project/my_dataset?" +
 
 - [Connection Properties](CONNECTION_PROPERTIES.md) - All configuration options
 - [Quick Start](QUICKSTART.md) - Get started in 5 minutes
-- [Troubleshooting](TROUBLESHOOTING.md) - Common authentication issues
+- [Connection Properties](CONNECTION_PROPERTIES.md) - Configuration reference
