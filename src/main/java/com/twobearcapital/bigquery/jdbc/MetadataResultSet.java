@@ -208,6 +208,8 @@ final class MetadataResultSet implements ResultSet {
     return Double.parseDouble(value.toString());
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
     Object value = getValue(columnIndex);
@@ -288,6 +290,8 @@ final class MetadataResultSet implements ResultSet {
     return getDouble(getColumnIndex(columnLabel));
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
     return getBigDecimal(getColumnIndex(columnLabel), scale);
@@ -428,6 +432,8 @@ final class MetadataResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException("getAsciiStream not supported");
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public InputStream getUnicodeStream(int columnIndex) throws SQLException {
     throw new SQLFeatureNotSupportedException("getUnicodeStream not supported");
@@ -443,6 +449,8 @@ final class MetadataResultSet implements ResultSet {
     throw new SQLFeatureNotSupportedException("getAsciiStream not supported");
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public InputStream getUnicodeStream(String columnLabel) throws SQLException {
     throw new SQLFeatureNotSupportedException("getUnicodeStream not supported");

@@ -164,6 +164,9 @@
                 <version>3.15.0</version>
                 <configuration>
                     <release>21</release>
+                    <compilerArgs>
+                        <arg>-Xlint:deprecation</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
 
@@ -270,7 +273,7 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.12.0</version>
                 <configuration>
-                    <doclint>all</doclint>
+                    <doclint>all,-missing</doclint>
                 </configuration>
                 <executions>
                     <execution>

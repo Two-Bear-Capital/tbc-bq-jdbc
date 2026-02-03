@@ -185,6 +185,8 @@ public class BQResultSet implements ResultSet {
     return value.isNull() ? 0 : value.getDoubleValue();
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
     FieldValue value = getFieldValue(columnIndex);
@@ -235,6 +237,8 @@ public class BQResultSet implements ResultSet {
     throw new BQSQLFeatureNotSupportedException("getAsciiStream not supported");
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public InputStream getUnicodeStream(int columnIndex) throws SQLException {
     throw new BQSQLFeatureNotSupportedException("getUnicodeStream not supported");
@@ -293,6 +297,8 @@ public class BQResultSet implements ResultSet {
     return value.isNull() ? 0 : value.getDoubleValue();
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
     FieldValue value = getFieldValue(columnLabel);
@@ -343,6 +349,8 @@ public class BQResultSet implements ResultSet {
     throw new BQSQLFeatureNotSupportedException("getAsciiStream not supported");
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public InputStream getUnicodeStream(String columnLabel) throws SQLException {
     throw new BQSQLFeatureNotSupportedException("getUnicodeStream not supported");

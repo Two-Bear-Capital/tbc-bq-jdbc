@@ -253,6 +253,8 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
     throw new BQSQLFeatureNotSupportedException("setAsciiStream not supported");
   }
 
+  @Deprecated
+  @SuppressWarnings("deprecation")
   @Override
   public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
     throw new BQSQLFeatureNotSupportedException("setUnicodeStream not supported");
