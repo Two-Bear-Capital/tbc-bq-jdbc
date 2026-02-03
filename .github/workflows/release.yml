@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build and package
+        run: mvn clean package -DskipTests -B
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/tbc-bq-jdbc-*.jar
+          generate_release_notes: true
+          body: |
+            See [CHANGELOG.md](https://github.com/twobearcapital/tbc-bq-jdbc/blob/main/CHANGELOG.md) for details.
+
+            ## Artifacts
+            - `tbc-bq-jdbc-${{ steps.get_version.outputs.VERSION }}.jar` - Slim JAR (requires dependencies)
+            - `tbc-bq-jdbc-${{ steps.get_version.outputs.VERSION }}-shaded.jar` - Fat JAR (all dependencies included)
+            - `tbc-bq-jdbc-${{ steps.get_version.outputs.VERSION }}-sources.jar` - Source code
+            - `tbc-bq-jdbc-${{ steps.get_version.outputs.VERSION }}-javadoc.jar` - Javadoc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # TODO: Phase 5 - Add Maven Central deployment
+      # - name: Deploy to Maven Central
+      #   run: mvn deploy -DskipTests -B
+      #   env:
+      #     MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+      #     MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+      #     GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
