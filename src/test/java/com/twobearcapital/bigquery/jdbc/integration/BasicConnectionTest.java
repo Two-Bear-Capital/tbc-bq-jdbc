@@ -27,195 +27,194 @@ import org.junit.jupiter.api.Test;
  */
 class BasicConnectionTest extends AbstractBigQueryIntegrationTest {
 
-  @Test
-  void testConnectionIsValid() throws SQLException {
-    // Then: Connection should be valid
-    assertTrue(connection.isValid(5));
-    assertFalse(connection.isClosed());
-  }
+	@Test
+	void testConnectionIsValid() throws SQLException {
+		// Then: Connection should be valid
+		assertTrue(connection.isValid(5));
+		assertFalse(connection.isClosed());
+	}
 
-  @Test
-  void testGetCatalog() throws SQLException {
-    // When: Getting catalog
-    String catalog = connection.getCatalog();
+	@Test
+	void testGetCatalog() throws SQLException {
+		// When: Getting catalog
+		String catalog = connection.getCatalog();
 
-    // Then: Should return project ID
-    assertEquals(TEST_PROJECT_ID, catalog);
-  }
+		// Then: Should return project ID
+		assertEquals(TEST_PROJECT_ID, catalog);
+	}
 
-  @Test
-  void testGetSchema() throws SQLException {
-    // When: Getting schema
-    String schema = connection.getSchema();
+	@Test
+	void testGetSchema() throws SQLException {
+		// When: Getting schema
+		String schema = connection.getSchema();
 
-    // Then: Should return dataset
-    assertEquals(TEST_DATASET, schema);
-  }
+		// Then: Should return dataset
+		assertEquals(TEST_DATASET, schema);
+	}
 
-  @Test
-  void testAutoCommitIsTrue() throws SQLException {
-    // Then: Auto-commit should be true (BigQuery has no transactions)
-    assertTrue(connection.getAutoCommit());
-  }
+	@Test
+	void testAutoCommitIsTrue() throws SQLException {
+		// Then: Auto-commit should be true (BigQuery has no transactions)
+		assertTrue(connection.getAutoCommit());
+	}
 
-  @Test
-  void testSetAutoCommitFalseThrowsException() {
-    // Then: Setting auto-commit to false should throw exception
-    assertThrows(SQLFeatureNotSupportedException.class, () -> connection.setAutoCommit(false));
-  }
+	@Test
+	void testSetAutoCommitFalseThrowsException() {
+		// Then: Setting auto-commit to false should throw exception
+		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.setAutoCommit(false));
+	}
 
-  @Test
-  void testCommitThrowsException() {
-    // Then: Commit should throw exception
-    assertThrows(SQLFeatureNotSupportedException.class, () -> connection.commit());
-  }
+	@Test
+	void testCommitThrowsException() {
+		// Then: Commit should throw exception
+		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.commit());
+	}
 
-  @Test
-  void testRollbackThrowsException() {
-    // Then: Rollback should throw exception
-    assertThrows(SQLFeatureNotSupportedException.class, () -> connection.rollback());
-  }
+	@Test
+	void testRollbackThrowsException() {
+		// Then: Rollback should throw exception
+		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.rollback());
+	}
 
-  @Test
-  void testTransactionIsolationIsNone() throws SQLException {
-    // When: Getting transaction isolation
-    int isolation = connection.getTransactionIsolation();
+	@Test
+	void testTransactionIsolationIsNone() throws SQLException {
+		// When: Getting transaction isolation
+		int isolation = connection.getTransactionIsolation();
 
-    // Then: Should be TRANSACTION_NONE
-    assertEquals(Connection.TRANSACTION_NONE, isolation);
-  }
+		// Then: Should be TRANSACTION_NONE
+		assertEquals(Connection.TRANSACTION_NONE, isolation);
+	}
 
-  @Test
-  void testSetTransactionIsolationNonNoneThrowsException() {
-    // Then: Setting isolation level should throw exception
-    assertThrows(
-        SQLFeatureNotSupportedException.class,
-        () -> connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED));
-  }
+	@Test
+	void testSetTransactionIsolationNonNoneThrowsException() {
+		// Then: Setting isolation level should throw exception
+		assertThrows(SQLFeatureNotSupportedException.class,
+				() -> connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED));
+	}
 
-  @Test
-  void testGetMetaData() throws SQLException {
-    // When: Getting metadata
-    DatabaseMetaData metaData = connection.getMetaData();
+	@Test
+	void testGetMetaData() throws SQLException {
+		// When: Getting metadata
+		DatabaseMetaData metaData = connection.getMetaData();
 
-    // Then: Should return metadata object
-    assertNotNull(metaData);
-    assertEquals("Google BigQuery", metaData.getDatabaseProductName());
-    assertEquals("Two Bear Capital BigQuery JDBC Driver", metaData.getDriverName());
-  }
+		// Then: Should return metadata object
+		assertNotNull(metaData);
+		assertEquals("Google BigQuery", metaData.getDatabaseProductName());
+		assertEquals("Two Bear Capital BigQuery JDBC Driver", metaData.getDriverName());
+	}
 
-  @Test
-  void testCreateStatement() throws SQLException {
-    // When: Creating statement
-    Statement stmt = connection.createStatement();
+	@Test
+	void testCreateStatement() throws SQLException {
+		// When: Creating statement
+		Statement stmt = connection.createStatement();
 
-    // Then: Should create successfully
-    assertNotNull(stmt);
-    assertFalse(stmt.isClosed());
+		// Then: Should create successfully
+		assertNotNull(stmt);
+		assertFalse(stmt.isClosed());
 
-    stmt.close();
-    assertTrue(stmt.isClosed());
-  }
+		stmt.close();
+		assertTrue(stmt.isClosed());
+	}
 
-  @Test
-  void testPrepareStatement() throws SQLException {
-    // When: Preparing statement
-    PreparedStatement pstmt = connection.prepareStatement("SELECT ?");
+	@Test
+	void testPrepareStatement() throws SQLException {
+		// When: Preparing statement
+		PreparedStatement pstmt = connection.prepareStatement("SELECT ?");
 
-    // Then: Should create successfully
-    assertNotNull(pstmt);
-    assertFalse(pstmt.isClosed());
+		// Then: Should create successfully
+		assertNotNull(pstmt);
+		assertFalse(pstmt.isClosed());
 
-    pstmt.close();
-    assertTrue(pstmt.isClosed());
-  }
+		pstmt.close();
+		assertTrue(pstmt.isClosed());
+	}
 
-  @Test
-  void testCloseConnection() throws SQLException {
-    // Given: An open connection
-    Connection conn = createTestConnection();
-    assertFalse(conn.isClosed());
+	@Test
+	void testCloseConnection() throws SQLException {
+		// Given: An open connection
+		Connection conn = createTestConnection();
+		assertFalse(conn.isClosed());
 
-    // When: Closing connection
-    conn.close();
+		// When: Closing connection
+		conn.close();
 
-    // Then: Should be closed
-    assertTrue(conn.isClosed());
+		// Then: Should be closed
+		assertTrue(conn.isClosed());
 
-    // And: Operations should throw exception
-    assertThrows(SQLException.class, () -> conn.createStatement());
-  }
+		// And: Operations should throw exception
+		assertThrows(SQLException.class, () -> conn.createStatement());
+	}
 
-  @Test
-  void testMultipleConnections() throws SQLException {
-    // Given: Multiple connections
-    Connection conn1 = createTestConnection();
-    Connection conn2 = createTestConnection();
+	@Test
+	void testMultipleConnections() throws SQLException {
+		// Given: Multiple connections
+		Connection conn1 = createTestConnection();
+		Connection conn2 = createTestConnection();
 
-    // Then: Both should be independent and valid
-    assertTrue(conn1.isValid(5));
-    assertTrue(conn2.isValid(5));
+		// Then: Both should be independent and valid
+		assertTrue(conn1.isValid(5));
+		assertTrue(conn2.isValid(5));
 
-    // When: Closing one
-    conn1.close();
+		// When: Closing one
+		conn1.close();
 
-    // Then: Other should still be valid
-    assertTrue(conn1.isClosed());
-    assertFalse(conn2.isClosed());
-    assertTrue(conn2.isValid(5));
+		// Then: Other should still be valid
+		assertTrue(conn1.isClosed());
+		assertFalse(conn2.isClosed());
+		assertTrue(conn2.isValid(5));
 
-    conn2.close();
-  }
+		conn2.close();
+	}
 
-  @Test
-  void testConnectionWarnings() throws SQLException {
-    // When: Getting warnings
-    SQLWarning warning = connection.getWarnings();
+	@Test
+	void testConnectionWarnings() throws SQLException {
+		// When: Getting warnings
+		SQLWarning warning = connection.getWarnings();
 
-    // Then: Should be null (no warnings)
-    assertNull(warning);
+		// Then: Should be null (no warnings)
+		assertNull(warning);
 
-    // When: Clearing warnings
-    connection.clearWarnings();
+		// When: Clearing warnings
+		connection.clearWarnings();
 
-    // Then: Should not throw exception
-    assertNull(connection.getWarnings());
-  }
+		// Then: Should not throw exception
+		assertNull(connection.getWarnings());
+	}
 
-  @Test
-  void testBeginEndRequest() throws SQLException {
-    // When: Using request lifecycle methods
-    connection.beginRequest();
-    connection.endRequest();
+	@Test
+	void testBeginEndRequest() throws SQLException {
+		// When: Using request lifecycle methods
+		connection.beginRequest();
+		connection.endRequest();
 
-    // Then: Should not throw exception
-    assertTrue(connection.isValid(5));
-  }
+		// Then: Should not throw exception
+		assertTrue(connection.isValid(5));
+	}
 
-  @Test
-  void testSetReadOnly() throws SQLException {
-    // When: Setting read-only
-    connection.setReadOnly(true);
+	@Test
+	void testSetReadOnly() throws SQLException {
+		// When: Setting read-only
+		connection.setReadOnly(true);
 
-    // Then: Should be set
-    assertTrue(connection.isReadOnly());
+		// Then: Should be set
+		assertTrue(connection.isReadOnly());
 
-    // When: Setting back to read-write
-    connection.setReadOnly(false);
+		// When: Setting back to read-write
+		connection.setReadOnly(false);
 
-    // Then: Should be unset
-    assertFalse(connection.isReadOnly());
-  }
+		// Then: Should be unset
+		assertFalse(connection.isReadOnly());
+	}
 
-  @Test
-  void testNativeSQL() throws SQLException {
-    // Given: A SQL string
-    String sql = "SELECT * FROM table";
+	@Test
+	void testNativeSQL() throws SQLException {
+		// Given: A SQL string
+		String sql = "SELECT * FROM table";
 
-    // When: Converting to native SQL
-    String nativeSql = connection.nativeSQL(sql);
+		// When: Converting to native SQL
+		String nativeSql = connection.nativeSQL(sql);
 
-    // Then: Should return as-is (no transformation)
-    assertEquals(sql, nativeSql);
-  }
+		// Then: Should return as-is (no transformation)
+		assertEquals(sql, nativeSql);
+	}
 }

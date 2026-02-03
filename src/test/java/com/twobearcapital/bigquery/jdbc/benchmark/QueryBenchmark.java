@@ -26,75 +26,72 @@ import org.openjdk.jmh.infra.Blackhole;
 /**
  * JMH benchmarks for query execution latency.
  *
- * <p>Run with: mvn clean package -DskipTests && java -jar target/benchmarks.jar QueryBenchmark
+ * <p>
+ * Run with: mvn clean package -DskipTests && java -jar target/benchmarks.jar
+ * QueryBenchmark
  *
  * @since 1.0.0
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
-@Fork(
-    value = 1,
-    jvmArgs = {"-Xms2G", "-Xmx2G"})
+@Fork(value = 1, jvmArgs = {"-Xms2G", "-Xmx2G"})
 @Warmup(iterations = 3, time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 public class QueryBenchmark {
 
-  private Connection connection;
-  private static final String JDBC_URL = System.getenv("BENCHMARK_JDBC_URL");
+	private Connection connection;
+	private static final String JDBC_URL = System.getenv("BENCHMARK_JDBC_URL");
 
-  @Setup(Level.Trial)
-  public void setupTrial() throws Exception {
-    if (JDBC_URL == null) {
-      throw new IllegalStateException(
-          "BENCHMARK_JDBC_URL environment variable must be set to run benchmarks");
-    }
-    // Load driver
-    Class.forName("com.twobearcapital.bigquery.jdbc.BQDriver");
-  }
+	@Setup(Level.Trial)
+	public void setupTrial() throws Exception {
+		if (JDBC_URL == null) {
+			throw new IllegalStateException("BENCHMARK_JDBC_URL environment variable must be set to run benchmarks");
+		}
+		// Load driver
+		Class.forName("com.twobearcapital.bigquery.jdbc.BQDriver");
+	}
 
-  @Setup(Level.Iteration)
-  public void setupIteration() throws Exception {
-    connection = DriverManager.getConnection(JDBC_URL);
-  }
+	@Setup(Level.Iteration)
+	public void setupIteration() throws Exception {
+		connection = DriverManager.getConnection(JDBC_URL);
+	}
 
-  @TearDown(Level.Iteration)
-  public void tearDownIteration() throws Exception {
-    if (connection != null && !connection.isClosed()) {
-      connection.close();
-    }
-  }
+	@TearDown(Level.Iteration)
+	public void tearDownIteration() throws Exception {
+		if (connection != null && !connection.isClosed()) {
+			connection.close();
+		}
+	}
 
-  /** Baseline: SELECT 1 query to measure minimum latency. */
-  @Benchmark
-  public void benchmarkSelectOne(Blackhole blackhole) throws Exception {
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT 1 as value")) {
-      while (rs.next()) {
-        blackhole.consume(rs.getInt(1));
-      }
-    }
-  }
+	/** Baseline: SELECT 1 query to measure minimum latency. */
+	@Benchmark
+	public void benchmarkSelectOne(Blackhole blackhole) throws Exception {
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery("SELECT 1 as value")) {
+			while (rs.next()) {
+				blackhole.consume(rs.getInt(1));
+			}
+		}
+	}
 
-  /** Small query: SELECT with simple WHERE clause. */
-  @Benchmark
-  public void benchmarkSmallQuery(Blackhole blackhole) throws Exception {
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs =
-            stmt.executeQuery(
-                "SELECT name, value FROM UNNEST([STRUCT('test' AS name, 123 AS value)])")) {
-      while (rs.next()) {
-        blackhole.consume(rs.getString(1));
-        blackhole.consume(rs.getInt(2));
-      }
-    }
-  }
+	/** Small query: SELECT with simple WHERE clause. */
+	@Benchmark
+	public void benchmarkSmallQuery(Blackhole blackhole) throws Exception {
+		try (Statement stmt = connection.createStatement();
+				ResultSet rs = stmt
+						.executeQuery("SELECT name, value FROM UNNEST([STRUCT('test' AS name, 123 AS value)])")) {
+			while (rs.next()) {
+				blackhole.consume(rs.getString(1));
+				blackhole.consume(rs.getInt(2));
+			}
+		}
+	}
 
-  /** Connection creation latency. */
-  @Benchmark
-  public void benchmarkConnectionCreation(Blackhole blackhole) throws Exception {
-    try (Connection conn = DriverManager.getConnection(JDBC_URL)) {
-      blackhole.consume(conn.isValid(5));
-    }
-  }
+	/** Connection creation latency. */
+	@Benchmark
+	public void benchmarkConnectionCreation(Blackhole blackhole) throws Exception {
+		try (Connection conn = DriverManager.getConnection(JDBC_URL)) {
+			blackhole.consume(conn.isValid(5));
+		}
+	}
 }

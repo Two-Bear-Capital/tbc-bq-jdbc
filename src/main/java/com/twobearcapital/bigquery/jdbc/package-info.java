@@ -17,8 +17,9 @@
 /**
  * Modern JDBC driver for Google BigQuery.
  *
- * <p>This package provides a JDBC 4.3 compliant driver for connecting to and querying Google
- * BigQuery.
+ * <p>
+ * This package provides a JDBC 4.3 compliant driver for connecting to and
+ * querying Google BigQuery.
  *
  * <h2>Quick Start</h2>
  *
@@ -26,27 +27,28 @@
  * String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
  *
  * try (Connection conn = DriverManager.getConnection(url);
- *      Statement stmt = conn.createStatement();
- *      ResultSet rs = stmt.executeQuery("SELECT name, count FROM my_table")) {
+ * 		Statement stmt = conn.createStatement();
+ * 		ResultSet rs = stmt.executeQuery("SELECT name, count FROM my_table")) {
  *
- *     while (rs.next()) {
- *         System.out.println(rs.getString("name") + ": " + rs.getLong("count"));
- *     }
+ * 	while (rs.next()) {
+ * 		System.out.println(rs.getString("name") + ": " + rs.getLong("count"));
+ * 	}
  * }
  * }</pre>
  *
  * <h2>URL Format</h2>
  *
- * <p>{@code jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2}
+ * <p>
+ * {@code jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2}
  *
  * <h2>Supported Authentication Types</h2>
  *
  * <ul>
- *   <li>SERVICE_ACCOUNT - Service account JSON key file
- *   <li>ADC - Application Default Credentials
- *   <li>USER_OAUTH - User OAuth credentials
- *   <li>WORKFORCE - Workforce Identity Federation
- *   <li>WORKLOAD - Workload Identity Federation
+ * <li>SERVICE_ACCOUNT - Service account JSON key file
+ * <li>ADC - Application Default Credentials
+ * <li>USER_OAUTH - User OAuth credentials
+ * <li>WORKFORCE - Workforce Identity Federation
+ * <li>WORKLOAD - Workload Identity Federation
  * </ul>
  *
  * @since 1.0.0

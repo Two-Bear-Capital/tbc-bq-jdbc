@@ -29,82 +29,78 @@ import org.junit.jupiter.api.Test;
  */
 class DriverRegistrationTest {
 
-  @Test
-  void testDriverRegisteredViaServiceLoader() {
-    // Given: The BQDriver static initializer should have registered the driver
-    // When: We enumerate all registered drivers
-    Enumeration<Driver> drivers = DriverManager.getDrivers();
+	@Test
+	void testDriverRegisteredViaServiceLoader() {
+		// Given: The BQDriver static initializer should have registered the driver
+		// When: We enumerate all registered drivers
+		Enumeration<Driver> drivers = DriverManager.getDrivers();
 
-    // Then: BQDriver should be in the list
-    boolean found = false;
-    while (drivers.hasMoreElements()) {
-      Driver driver = drivers.nextElement();
-      if (driver instanceof BQDriver) {
-        found = true;
-        break;
-      }
-    }
+		// Then: BQDriver should be in the list
+		boolean found = false;
+		while (drivers.hasMoreElements()) {
+			Driver driver = drivers.nextElement();
+			if (driver instanceof BQDriver) {
+				found = true;
+				break;
+			}
+		}
 
-    assertTrue(found, "BQDriver should be registered with DriverManager");
-  }
+		assertTrue(found, "BQDriver should be registered with DriverManager");
+	}
 
-  @Test
-  void testDriverAcceptsValidUrl() throws Exception {
-    // Given: A BQDriver instance
-    BQDriver driver = new BQDriver();
+	@Test
+	void testDriverAcceptsValidUrl() throws Exception {
+		// Given: A BQDriver instance
+		BQDriver driver = new BQDriver();
 
-    // Then: It should accept BigQuery URLs
-    assertTrue(driver.acceptsURL("jdbc:bigquery:my-project/my-dataset"));
-    assertTrue(driver.acceptsURL("jdbc:bigquery:my-project"));
-    assertTrue(driver.acceptsURL("jdbc:bigquery:my-project/my-dataset?authType=ADC"));
-    assertTrue(
-        driver.acceptsURL(
-            "jdbc:bigquery:my-project/my-dataset?authType=SERVICE_ACCOUNT&credentials=/path/to/key.json"));
-  }
+		// Then: It should accept BigQuery URLs
+		assertTrue(driver.acceptsURL("jdbc:bigquery:my-project/my-dataset"));
+		assertTrue(driver.acceptsURL("jdbc:bigquery:my-project"));
+		assertTrue(driver.acceptsURL("jdbc:bigquery:my-project/my-dataset?authType=ADC"));
+		assertTrue(driver.acceptsURL(
+				"jdbc:bigquery:my-project/my-dataset?authType=SERVICE_ACCOUNT&credentials=/path/to/key.json"));
+	}
 
-  @Test
-  void testDriverRejectsInvalidUrl() throws Exception {
-    // Given: A BQDriver instance
-    BQDriver driver = new BQDriver();
+	@Test
+	void testDriverRejectsInvalidUrl() throws Exception {
+		// Given: A BQDriver instance
+		BQDriver driver = new BQDriver();
 
-    // Then: It should reject non-BigQuery URLs
-    assertFalse(driver.acceptsURL("jdbc:postgresql://localhost/db"));
-    assertFalse(driver.acceptsURL("jdbc:mysql://localhost/db"));
-    assertFalse(driver.acceptsURL("jdbc:oracle:thin:@localhost:1521:xe"));
-    assertFalse(driver.acceptsURL("https://www.google.com"));
-    assertFalse(driver.acceptsURL(null));
-  }
+		// Then: It should reject non-BigQuery URLs
+		assertFalse(driver.acceptsURL("jdbc:postgresql://localhost/db"));
+		assertFalse(driver.acceptsURL("jdbc:mysql://localhost/db"));
+		assertFalse(driver.acceptsURL("jdbc:oracle:thin:@localhost:1521:xe"));
+		assertFalse(driver.acceptsURL("https://www.google.com"));
+		assertFalse(driver.acceptsURL(null));
+	}
 
-  @Test
-  void testDriverVersion() {
-    // Given: A BQDriver instance
-    BQDriver driver = new BQDriver();
+	@Test
+	void testDriverVersion() {
+		// Given: A BQDriver instance
+		BQDriver driver = new BQDriver();
 
-    // Then: Version should be set
-    assertEquals(1, driver.getMajorVersion());
-    assertEquals(0, driver.getMinorVersion());
-  }
+		// Then: Version should be set
+		assertEquals(1, driver.getMajorVersion());
+		assertEquals(0, driver.getMinorVersion());
+	}
 
-  @Test
-  void testDriverNotJdbcCompliant() {
-    // Given: A BQDriver instance
-    BQDriver driver = new BQDriver();
+	@Test
+	void testDriverNotJdbcCompliant() {
+		// Given: A BQDriver instance
+		BQDriver driver = new BQDriver();
 
-    // Then: Should not claim JDBC compliance due to BigQuery limitations
-    assertFalse(
-        driver.jdbcCompliant(),
-        "Driver should not be JDBC compliant due to BigQuery transaction limitations");
-  }
+		// Then: Should not claim JDBC compliance due to BigQuery limitations
+		assertFalse(driver.jdbcCompliant(),
+				"Driver should not be JDBC compliant due to BigQuery transaction limitations");
+	}
 
-  @Test
-  void testGetParentLoggerThrowsException() {
-    // Given: A BQDriver instance
-    BQDriver driver = new BQDriver();
+	@Test
+	void testGetParentLoggerThrowsException() {
+		// Given: A BQDriver instance
+		BQDriver driver = new BQDriver();
 
-    // Then: getParentLogger should throw SQLFeatureNotSupportedException
-    assertThrows(
-        java.sql.SQLFeatureNotSupportedException.class,
-        driver::getParentLogger,
-        "getParentLogger should throw SQLFeatureNotSupportedException");
-  }
+		// Then: getParentLogger should throw SQLFeatureNotSupportedException
+		assertThrows(java.sql.SQLFeatureNotSupportedException.class, driver::getParentLogger,
+				"getParentLogger should throw SQLFeatureNotSupportedException");
+	}
 }

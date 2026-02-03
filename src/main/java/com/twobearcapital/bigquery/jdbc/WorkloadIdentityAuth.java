@@ -24,20 +24,21 @@ import java.util.Objects;
 /**
  * Workload Identity Federation authentication.
  *
- * @param credentialConfigFile path to the credential configuration file
+ * @param credentialConfigFile
+ *            path to the credential configuration file
  * @since 1.0.0
  */
 public record WorkloadIdentityAuth(String credentialConfigFile) implements AuthType {
 
-  public WorkloadIdentityAuth {
-    Objects.requireNonNull(credentialConfigFile, "credentialConfigFile cannot be null");
-    if (credentialConfigFile.isBlank()) {
-      throw new IllegalArgumentException("credentialConfigFile cannot be blank");
-    }
-  }
+	public WorkloadIdentityAuth {
+		Objects.requireNonNull(credentialConfigFile, "credentialConfigFile cannot be null");
+		if (credentialConfigFile.isBlank()) {
+			throw new IllegalArgumentException("credentialConfigFile cannot be blank");
+		}
+	}
 
-  @Override
-  public Credentials toCredentials() throws IOException {
-    return ExternalAccountCredentials.fromStream(new FileInputStream(credentialConfigFile));
-  }
+	@Override
+	public Credentials toCredentials() throws IOException {
+		return ExternalAccountCredentials.fromStream(new FileInputStream(credentialConfigFile));
+	}
 }

@@ -21,22 +21,21 @@ import java.io.IOException;
 /**
  * Authentication type for BigQuery connections.
  *
- * <p>This sealed interface defines all supported authentication methods for connecting to BigQuery.
+ * <p>
+ * This sealed interface defines all supported authentication methods for
+ * connecting to BigQuery.
  *
  * @since 1.0.0
  */
 public sealed interface AuthType
-    permits ServiceAccountAuth,
-        ApplicationDefaultAuth,
-        UserOAuthAuth,
-        WorkforceIdentityAuth,
-        WorkloadIdentityAuth {
+		permits ServiceAccountAuth, ApplicationDefaultAuth, UserOAuthAuth, WorkforceIdentityAuth, WorkloadIdentityAuth {
 
-  /**
-   * Converts this authentication type to Google Cloud credentials.
-   *
-   * @return the Google Cloud credentials
-   * @throws IOException if credentials cannot be created
-   */
-  Credentials toCredentials() throws IOException;
+	/**
+	 * Converts this authentication type to Google Cloud credentials.
+	 *
+	 * @return the Google Cloud credentials
+	 * @throws IOException
+	 *             if credentials cannot be created
+	 */
+	Credentials toCredentials() throws IOException;
 }

@@ -26,51 +26,50 @@ import org.junit.jupiter.api.Test;
  */
 class JobCreationModeTest {
 
-  @Test
-  void testEnumValues() {
-    // Then: Should have REQUIRED and OPTIONAL values
-    JobCreationMode[] values = JobCreationMode.values();
-    assertEquals(2, values.length);
-    assertArrayEquals(
-        new JobCreationMode[] {JobCreationMode.REQUIRED, JobCreationMode.OPTIONAL}, values);
-  }
+	@Test
+	void testEnumValues() {
+		// Then: Should have REQUIRED and OPTIONAL values
+		JobCreationMode[] values = JobCreationMode.values();
+		assertEquals(2, values.length);
+		assertArrayEquals(new JobCreationMode[]{JobCreationMode.REQUIRED, JobCreationMode.OPTIONAL}, values);
+	}
 
-  @Test
-  void testValueOf() {
-    // When: Getting enum by name
-    JobCreationMode required = JobCreationMode.valueOf("REQUIRED");
-    JobCreationMode optional = JobCreationMode.valueOf("OPTIONAL");
+	@Test
+	void testValueOf() {
+		// When: Getting enum by name
+		JobCreationMode required = JobCreationMode.valueOf("REQUIRED");
+		JobCreationMode optional = JobCreationMode.valueOf("OPTIONAL");
 
-    // Then: Should return correct values
-    assertEquals(JobCreationMode.REQUIRED, required);
-    assertEquals(JobCreationMode.OPTIONAL, optional);
-  }
+		// Then: Should return correct values
+		assertEquals(JobCreationMode.REQUIRED, required);
+		assertEquals(JobCreationMode.OPTIONAL, optional);
+	}
 
-  @Test
-  void testValueOfInvalidThrowsException() {
-    // Then: Invalid name should throw IllegalArgumentException
-    assertThrows(IllegalArgumentException.class, () -> JobCreationMode.valueOf("INVALID"));
-  }
+	@Test
+	void testValueOfInvalidThrowsException() {
+		// Then: Invalid name should throw IllegalArgumentException
+		assertThrows(IllegalArgumentException.class, () -> JobCreationMode.valueOf("INVALID"));
+	}
 
-  @Test
-  void testEnumEquality() {
-    // Given: Same enum values
-    JobCreationMode mode1 = JobCreationMode.REQUIRED;
-    JobCreationMode mode2 = JobCreationMode.REQUIRED;
+	@Test
+	void testEnumEquality() {
+		// Given: Same enum values
+		JobCreationMode mode1 = JobCreationMode.REQUIRED;
+		JobCreationMode mode2 = JobCreationMode.REQUIRED;
 
-    // Then: Should be equal
-    assertSame(mode1, mode2);
-    assertEquals(mode1, mode2);
-  }
+		// Then: Should be equal
+		assertSame(mode1, mode2);
+		assertEquals(mode1, mode2);
+	}
 
-  @Test
-  void testEnumToString() {
-    // When: Converting to string
-    String requiredStr = JobCreationMode.REQUIRED.toString();
-    String optionalStr = JobCreationMode.OPTIONAL.toString();
+	@Test
+	void testEnumToString() {
+		// When: Converting to string
+		String requiredStr = JobCreationMode.REQUIRED.toString();
+		String optionalStr = JobCreationMode.OPTIONAL.toString();
 
-    // Then: Should return enum name
-    assertEquals("REQUIRED", requiredStr);
-    assertEquals("OPTIONAL", optionalStr);
-  }
+		// Then: Should return enum name
+		assertEquals("REQUIRED", requiredStr);
+		assertEquals("OPTIONAL", optionalStr);
+	}
 }

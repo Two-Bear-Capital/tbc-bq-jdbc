@@ -22,94 +22,96 @@ import java.sql.Types;
 /**
  * JDBC ParameterMetaData implementation for BigQuery prepared statements.
  *
- * <p>This implementation provides basic parameter metadata. Full type information is limited
- * because BigQuery parameter types are inferred at query execution time.
+ * <p>
+ * This implementation provides basic parameter metadata. Full type information
+ * is limited because BigQuery parameter types are inferred at query execution
+ * time.
  *
  * @since 1.0.0
  */
 public final class BQParameterMetaData implements ParameterMetaData {
 
-  private final int parameterCount;
+	private final int parameterCount;
 
-  /**
-   * Creates parameter metadata.
-   *
-   * @param parameterCount the number of parameters
-   */
-  public BQParameterMetaData(int parameterCount) {
-    this.parameterCount = parameterCount;
-  }
+	/**
+	 * Creates parameter metadata.
+	 *
+	 * @param parameterCount
+	 *            the number of parameters
+	 */
+	public BQParameterMetaData(int parameterCount) {
+		this.parameterCount = parameterCount;
+	}
 
-  @Override
-  public int getParameterCount() throws SQLException {
-    return parameterCount;
-  }
+	@Override
+	public int getParameterCount() throws SQLException {
+		return parameterCount;
+	}
 
-  @Override
-  public int isNullable(int param) throws SQLException {
-    checkParameterIndex(param);
-    return ParameterMetaData.parameterNullableUnknown;
-  }
+	@Override
+	public int isNullable(int param) throws SQLException {
+		checkParameterIndex(param);
+		return ParameterMetaData.parameterNullableUnknown;
+	}
 
-  @Override
-  public boolean isSigned(int param) throws SQLException {
-    checkParameterIndex(param);
-    return false; // Unknown at compile time
-  }
+	@Override
+	public boolean isSigned(int param) throws SQLException {
+		checkParameterIndex(param);
+		return false; // Unknown at compile time
+	}
 
-  @Override
-  public int getPrecision(int param) throws SQLException {
-    checkParameterIndex(param);
-    return 0; // Unknown at compile time
-  }
+	@Override
+	public int getPrecision(int param) throws SQLException {
+		checkParameterIndex(param);
+		return 0; // Unknown at compile time
+	}
 
-  @Override
-  public int getScale(int param) throws SQLException {
-    checkParameterIndex(param);
-    return 0; // Unknown at compile time
-  }
+	@Override
+	public int getScale(int param) throws SQLException {
+		checkParameterIndex(param);
+		return 0; // Unknown at compile time
+	}
 
-  @Override
-  public int getParameterType(int param) throws SQLException {
-    checkParameterIndex(param);
-    return Types.OTHER; // Type is inferred by BigQuery at execution time
-  }
+	@Override
+	public int getParameterType(int param) throws SQLException {
+		checkParameterIndex(param);
+		return Types.OTHER; // Type is inferred by BigQuery at execution time
+	}
 
-  @Override
-  public String getParameterTypeName(int param) throws SQLException {
-    checkParameterIndex(param);
-    return "OTHER"; // Type is inferred by BigQuery at execution time
-  }
+	@Override
+	public String getParameterTypeName(int param) throws SQLException {
+		checkParameterIndex(param);
+		return "OTHER"; // Type is inferred by BigQuery at execution time
+	}
 
-  @Override
-  public String getParameterClassName(int param) throws SQLException {
-    checkParameterIndex(param);
-    return Object.class.getName();
-  }
+	@Override
+	public String getParameterClassName(int param) throws SQLException {
+		checkParameterIndex(param);
+		return Object.class.getName();
+	}
 
-  @Override
-  public int getParameterMode(int param) throws SQLException {
-    checkParameterIndex(param);
-    return ParameterMetaData.parameterModeIn;
-  }
+	@Override
+	public int getParameterMode(int param) throws SQLException {
+		checkParameterIndex(param);
+		return ParameterMetaData.parameterModeIn;
+	}
 
-  private void checkParameterIndex(int param) throws SQLException {
-    if (param < 1 || param > parameterCount) {
-      throw new SQLException(
-          "Invalid parameter index: " + param + ". Valid range: 1 to " + parameterCount);
-    }
-  }
+	private void checkParameterIndex(int param) throws SQLException {
+		if (param < 1 || param > parameterCount) {
+			throw new SQLException("Invalid parameter index: " + param + ". Valid range: 1 to " + parameterCount);
+		}
+	}
 
-  @Override
-  public <T> T unwrap(Class<T> iface) throws SQLException {
-    if (iface.isInstance(this)) {
-      return iface.cast(this);
-    }
-    throw new SQLException("Cannot unwrap to " + iface.getName());
-  }
+	@Override
+	public <T> T unwrap(Class<T> iface) throws SQLException {
+		if (iface.isInstance(this)) {
+			return iface.cast(this);
+		}
+		throw new SQLException("Cannot unwrap to " + iface.getName());
+	}
 
-  @Override
-  public boolean isWrapperFor(Class<?> iface) {
-    return iface.isInstance(this);
-  }
+	@Override
+	public boolean isWrapperFor(Class<?> iface) {
+		return iface.isInstance(this);
+	}
 }

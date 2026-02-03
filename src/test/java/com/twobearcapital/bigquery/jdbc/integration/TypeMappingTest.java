@@ -28,305 +28,278 @@ import org.junit.jupiter.api.Test;
  */
 class TypeMappingTest extends AbstractBigQueryIntegrationTest {
 
-  @Test
-  void testStringType() throws SQLException {
-    // Given: A STRING value
-    String sql = "SELECT 'Hello, World!' as str_value";
+	@Test
+	void testStringType() throws SQLException {
+		// Given: A STRING value
+		String sql = "SELECT 'Hello, World!' as str_value";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as String
-      assertTrue(rs.next());
-      assertEquals("Hello, World!", rs.getString("str_value"));
-      assertEquals("Hello, World!", rs.getObject("str_value", String.class));
-    }
-  }
+			// Then: Should return as String
+			assertTrue(rs.next());
+			assertEquals("Hello, World!", rs.getString("str_value"));
+			assertEquals("Hello, World!", rs.getObject("str_value", String.class));
+		}
+	}
 
-  @Test
-  void testInt64Type() throws SQLException {
-    // Given: An INT64 value
-    String sql = "SELECT 9223372036854775807 as big_int";
+	@Test
+	void testInt64Type() throws SQLException {
+		// Given: An INT64 value
+		String sql = "SELECT 9223372036854775807 as big_int";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as long
-      assertTrue(rs.next());
-      assertEquals(9223372036854775807L, rs.getLong("big_int"));
-      assertEquals(9223372036854775807L, rs.getObject("big_int", Long.class));
-    }
-  }
+			// Then: Should return as long
+			assertTrue(rs.next());
+			assertEquals(9223372036854775807L, rs.getLong("big_int"));
+			assertEquals(9223372036854775807L, rs.getObject("big_int", Long.class));
+		}
+	}
 
-  @Test
-  void testFloat64Type() throws SQLException {
-    // Given: A FLOAT64 value
-    String sql = "SELECT 3.14159265359 as pi";
+	@Test
+	void testFloat64Type() throws SQLException {
+		// Given: A FLOAT64 value
+		String sql = "SELECT 3.14159265359 as pi";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as double
-      assertTrue(rs.next());
-      assertEquals(3.14159265359, rs.getDouble("pi"), 0.0001);
-      assertEquals(3.14159265359, rs.getObject("pi", Double.class), 0.0001);
-    }
-  }
+			// Then: Should return as double
+			assertTrue(rs.next());
+			assertEquals(3.14159265359, rs.getDouble("pi"), 0.0001);
+			assertEquals(3.14159265359, rs.getObject("pi", Double.class), 0.0001);
+		}
+	}
 
-  @Test
-  void testBoolType() throws SQLException {
-    // Given: BOOL values
-    String sql = "SELECT true as is_true, false as is_false";
+	@Test
+	void testBoolType() throws SQLException {
+		// Given: BOOL values
+		String sql = "SELECT true as is_true, false as is_false";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as boolean
-      assertTrue(rs.next());
-      assertTrue(rs.getBoolean("is_true"));
-      assertFalse(rs.getBoolean("is_false"));
-      assertEquals(Boolean.TRUE, rs.getObject("is_true", Boolean.class));
-      assertEquals(Boolean.FALSE, rs.getObject("is_false", Boolean.class));
-    }
-  }
+			// Then: Should return as boolean
+			assertTrue(rs.next());
+			assertTrue(rs.getBoolean("is_true"));
+			assertFalse(rs.getBoolean("is_false"));
+			assertEquals(Boolean.TRUE, rs.getObject("is_true", Boolean.class));
+			assertEquals(Boolean.FALSE, rs.getObject("is_false", Boolean.class));
+		}
+	}
 
-  @Test
-  void testNumericType() throws SQLException {
-    // Given: A NUMERIC value
-    String sql = "SELECT NUMERIC '123.456' as num_value";
+	@Test
+	void testNumericType() throws SQLException {
+		// Given: A NUMERIC value
+		String sql = "SELECT NUMERIC '123.456' as num_value";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as BigDecimal
-      assertTrue(rs.next());
-      BigDecimal expected = new BigDecimal("123.456");
-      assertEquals(expected, rs.getBigDecimal("num_value"));
-    }
-  }
+			// Then: Should return as BigDecimal
+			assertTrue(rs.next());
+			BigDecimal expected = new BigDecimal("123.456");
+			assertEquals(expected, rs.getBigDecimal("num_value"));
+		}
+	}
 
-  @Test
-  void testDateType() throws SQLException {
-    // Given: A DATE value
-    String sql = "SELECT DATE '2024-03-15' as date_value";
+	@Test
+	void testDateType() throws SQLException {
+		// Given: A DATE value
+		String sql = "SELECT DATE '2024-03-15' as date_value";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as Date
-      assertTrue(rs.next());
-      Date expectedDate = Date.valueOf("2024-03-15");
-      assertEquals(expectedDate, rs.getDate("date_value"));
-    }
-  }
+			// Then: Should return as Date
+			assertTrue(rs.next());
+			Date expectedDate = Date.valueOf("2024-03-15");
+			assertEquals(expectedDate, rs.getDate("date_value"));
+		}
+	}
 
-  @Test
-  void testTimeType() throws SQLException {
-    // Given: A TIME value
-    String sql = "SELECT TIME '14:30:45' as time_value";
+	@Test
+	void testTimeType() throws SQLException {
+		// Given: A TIME value
+		String sql = "SELECT TIME '14:30:45' as time_value";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as Time
-      assertTrue(rs.next());
-      assertNotNull(rs.getTime("time_value"));
-    }
-  }
+			// Then: Should return as Time
+			assertTrue(rs.next());
+			assertNotNull(rs.getTime("time_value"));
+		}
+	}
 
-  @Test
-  void testTimestampType() throws SQLException {
-    // Given: A TIMESTAMP value
-    String sql = "SELECT TIMESTAMP '2024-03-15 14:30:45.123456 UTC' as ts_value";
+	@Test
+	void testTimestampType() throws SQLException {
+		// Given: A TIMESTAMP value
+		String sql = "SELECT TIMESTAMP '2024-03-15 14:30:45.123456 UTC' as ts_value";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as Timestamp
-      assertTrue(rs.next());
-      assertNotNull(rs.getTimestamp("ts_value"));
-    }
-  }
+			// Then: Should return as Timestamp
+			assertTrue(rs.next());
+			assertNotNull(rs.getTimestamp("ts_value"));
+		}
+	}
 
-  @Test
-  void testNullValues() throws SQLException {
-    // Given: NULL values of different types
-    String sql =
-        "SELECT "
-            + "CAST(NULL AS STRING) as null_string, "
-            + "CAST(NULL AS INT64) as null_int, "
-            + "CAST(NULL AS FLOAT64) as null_float, "
-            + "CAST(NULL AS BOOL) as null_bool, "
-            + "CAST(NULL AS DATE) as null_date";
+	@Test
+	void testNullValues() throws SQLException {
+		// Given: NULL values of different types
+		String sql = "SELECT " + "CAST(NULL AS STRING) as null_string, " + "CAST(NULL AS INT64) as null_int, "
+				+ "CAST(NULL AS FLOAT64) as null_float, " + "CAST(NULL AS BOOL) as null_bool, "
+				+ "CAST(NULL AS DATE) as null_date";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: All should be NULL
-      assertTrue(rs.next());
+			// Then: All should be NULL
+			assertTrue(rs.next());
 
-      assertNull(rs.getString("null_string"));
-      assertTrue(rs.wasNull());
+			assertNull(rs.getString("null_string"));
+			assertTrue(rs.wasNull());
 
-      assertEquals(0, rs.getLong("null_int"));
-      assertTrue(rs.wasNull());
+			assertEquals(0, rs.getLong("null_int"));
+			assertTrue(rs.wasNull());
 
-      assertEquals(0.0, rs.getDouble("null_float"));
-      assertTrue(rs.wasNull());
+			assertEquals(0.0, rs.getDouble("null_float"));
+			assertTrue(rs.wasNull());
 
-      assertFalse(rs.getBoolean("null_bool"));
-      assertTrue(rs.wasNull());
+			assertFalse(rs.getBoolean("null_bool"));
+			assertTrue(rs.wasNull());
 
-      assertNull(rs.getDate("null_date"));
-      assertTrue(rs.wasNull());
-    }
-  }
+			assertNull(rs.getDate("null_date"));
+			assertTrue(rs.wasNull());
+		}
+	}
 
-  @Test
-  void testBytesType() throws SQLException {
-    // Given: BYTES value
-    String sql = "SELECT CAST('Hello' AS BYTES) as bytes_value";
+	@Test
+	void testBytesType() throws SQLException {
+		// Given: BYTES value
+		String sql = "SELECT CAST('Hello' AS BYTES) as bytes_value";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return as byte array
-      assertTrue(rs.next());
-      byte[] bytes = rs.getBytes("bytes_value");
-      assertNotNull(bytes);
-      assertTrue(bytes.length > 0);
-    }
-  }
+			// Then: Should return as byte array
+			assertTrue(rs.next());
+			byte[] bytes = rs.getBytes("bytes_value");
+			assertNotNull(bytes);
+			assertTrue(bytes.length > 0);
+		}
+	}
 
-  @Test
-  void testLargeNumbers() throws SQLException {
-    // Given: Large numbers
-    String sql =
-        "SELECT "
-            + "9223372036854775807 as max_int64, "
-            + "-9223372036854775808 as min_int64, "
-            + "1.7976931348623157E308 as large_float";
+	@Test
+	void testLargeNumbers() throws SQLException {
+		// Given: Large numbers
+		String sql = "SELECT " + "9223372036854775807 as max_int64, " + "-9223372036854775808 as min_int64, "
+				+ "1.7976931348623157E308 as large_float";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should handle large values
-      assertTrue(rs.next());
-      assertEquals(Long.MAX_VALUE, rs.getLong("max_int64"));
-      assertEquals(Long.MIN_VALUE, rs.getLong("min_int64"));
-      assertEquals(1.7976931348623157E308, rs.getDouble("large_float"), 1E290);
-    }
-  }
+			// Then: Should handle large values
+			assertTrue(rs.next());
+			assertEquals(Long.MAX_VALUE, rs.getLong("max_int64"));
+			assertEquals(Long.MIN_VALUE, rs.getLong("min_int64"));
+			assertEquals(1.7976931348623157E308, rs.getDouble("large_float"), 1E290);
+		}
+	}
 
-  @Test
-  void testZeroValues() throws SQLException {
-    // Given: Zero values
-    String sql = "SELECT 0 as zero_int, 0.0 as zero_float, '' as empty_string";
+	@Test
+	void testZeroValues() throws SQLException {
+		// Given: Zero values
+		String sql = "SELECT 0 as zero_int, 0.0 as zero_float, '' as empty_string";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should handle zeros correctly
-      assertTrue(rs.next());
-      assertEquals(0, rs.getInt("zero_int"));
-      assertEquals(0.0, rs.getDouble("zero_float"));
-      assertEquals("", rs.getString("empty_string"));
-    }
-  }
+			// Then: Should handle zeros correctly
+			assertTrue(rs.next());
+			assertEquals(0, rs.getInt("zero_int"));
+			assertEquals(0.0, rs.getDouble("zero_float"));
+			assertEquals("", rs.getString("empty_string"));
+		}
+	}
 
-  @Test
-  void testNegativeNumbers() throws SQLException {
-    // Given: Negative numbers
-    String sql = "SELECT -42 as neg_int, -3.14 as neg_float";
+	@Test
+	void testNegativeNumbers() throws SQLException {
+		// Given: Negative numbers
+		String sql = "SELECT -42 as neg_int, -3.14 as neg_float";
 
-    // When: Querying
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should handle negatives
-      assertTrue(rs.next());
-      assertEquals(-42, rs.getInt("neg_int"));
-      assertEquals(-3.14, rs.getDouble("neg_float"), 0.01);
-    }
-  }
+			// Then: Should handle negatives
+			assertTrue(rs.next());
+			assertEquals(-42, rs.getInt("neg_int"));
+			assertEquals(-3.14, rs.getDouble("neg_float"), 0.01);
+		}
+	}
 
-  @Test
-  void testGetObjectWithoutType() throws SQLException {
-    // Given: Various types
-    String sql = "SELECT 42 as int_val, 'text' as str_val, true as bool_val";
+	@Test
+	void testGetObjectWithoutType() throws SQLException {
+		// Given: Various types
+		String sql = "SELECT 42 as int_val, 'text' as str_val, true as bool_val";
 
-    // When: Using getObject without type
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Using getObject without type
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should return appropriate Java types
-      assertTrue(rs.next());
-      Object intObj = rs.getObject("int_val");
-      Object strObj = rs.getObject("str_val");
-      Object boolObj = rs.getObject("bool_val");
+			// Then: Should return appropriate Java types
+			assertTrue(rs.next());
+			Object intObj = rs.getObject("int_val");
+			Object strObj = rs.getObject("str_val");
+			Object boolObj = rs.getObject("bool_val");
 
-      assertNotNull(intObj);
-      assertNotNull(strObj);
-      assertNotNull(boolObj);
+			assertNotNull(intObj);
+			assertNotNull(strObj);
+			assertNotNull(boolObj);
 
-      assertTrue(intObj instanceof Number);
-      assertTrue(strObj instanceof String);
-      assertTrue(boolObj instanceof Boolean);
-    }
-  }
+			assertTrue(intObj instanceof Number);
+			assertTrue(strObj instanceof String);
+			assertTrue(boolObj instanceof Boolean);
+		}
+	}
 
-  @Test
-  void testGetStringOnNonStringTypes() throws SQLException {
-    // Given: Non-string types
-    String sql = "SELECT 42 as int_val, 3.14 as float_val, true as bool_val";
+	@Test
+	void testGetStringOnNonStringTypes() throws SQLException {
+		// Given: Non-string types
+		String sql = "SELECT 42 as int_val, 3.14 as float_val, true as bool_val";
 
-    // When: Getting as String
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Getting as String
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      // Then: Should convert to String
-      assertTrue(rs.next());
-      assertNotNull(rs.getString("int_val"));
-      assertNotNull(rs.getString("float_val"));
-      assertNotNull(rs.getString("bool_val"));
-    }
-  }
+			// Then: Should convert to String
+			assertTrue(rs.next());
+			assertNotNull(rs.getString("int_val"));
+			assertNotNull(rs.getString("float_val"));
+			assertNotNull(rs.getString("bool_val"));
+		}
+	}
 
-  @Test
-  void testColumnMetaDataTypes() throws SQLException {
-    // Given: Query with various types
-    String sql =
-        "SELECT "
-            + "CAST(1 AS INT64) as int_col, "
-            + "CAST('text' AS STRING) as str_col, "
-            + "CAST(3.14 AS FLOAT64) as float_col, "
-            + "CAST(true AS BOOL) as bool_col";
+	@Test
+	void testColumnMetaDataTypes() throws SQLException {
+		// Given: Query with various types
+		String sql = "SELECT " + "CAST(1 AS INT64) as int_col, " + "CAST('text' AS STRING) as str_col, "
+				+ "CAST(3.14 AS FLOAT64) as float_col, " + "CAST(true AS BOOL) as bool_col";
 
-    // When: Getting column metadata
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(sql)) {
+		// When: Getting column metadata
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
-      ResultSetMetaData metaData = rs.getMetaData();
+			ResultSetMetaData metaData = rs.getMetaData();
 
-      // Then: Should have correct type information
-      assertEquals(4, metaData.getColumnCount());
+			// Then: Should have correct type information
+			assertEquals(4, metaData.getColumnCount());
 
-      assertEquals("int_col", metaData.getColumnName(1));
-      assertEquals("str_col", metaData.getColumnName(2));
-      assertEquals("float_col", metaData.getColumnName(3));
-      assertEquals("bool_col", metaData.getColumnName(4));
-    }
-  }
+			assertEquals("int_col", metaData.getColumnName(1));
+			assertEquals("str_col", metaData.getColumnName(2));
+			assertEquals("float_col", metaData.getColumnName(3));
+			assertEquals("bool_col", metaData.getColumnName(4));
+		}
+	}
 }

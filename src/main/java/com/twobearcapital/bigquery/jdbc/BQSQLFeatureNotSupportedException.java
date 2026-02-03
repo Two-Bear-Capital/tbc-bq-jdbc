@@ -24,11 +24,11 @@ import java.sql.SQLFeatureNotSupportedException;
  */
 public class BQSQLFeatureNotSupportedException extends SQLFeatureNotSupportedException {
 
-  public BQSQLFeatureNotSupportedException(String reason) {
-    super(reason, BQSQLException.SQLSTATE_FEATURE_NOT_SUPPORTED);
-  }
+	public BQSQLFeatureNotSupportedException(String reason) {
+		super(reason, BQSQLException.SQLSTATE_FEATURE_NOT_SUPPORTED);
+	}
 
-  public BQSQLFeatureNotSupportedException(String reason, Throwable cause) {
-    super(reason, BQSQLException.SQLSTATE_FEATURE_NOT_SUPPORTED, cause);
-  }
+	public BQSQLFeatureNotSupportedException(String reason, Throwable cause) {
+		super(reason, BQSQLException.SQLSTATE_FEATURE_NOT_SUPPORTED, cause);
+	}
 }

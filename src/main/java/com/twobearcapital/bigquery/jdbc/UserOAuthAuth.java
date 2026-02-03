@@ -23,26 +23,25 @@ import java.util.Objects;
 /**
  * User OAuth authentication.
  *
- * @param clientId OAuth client ID
- * @param clientSecret OAuth client secret
- * @param refreshToken OAuth refresh token
+ * @param clientId
+ *            OAuth client ID
+ * @param clientSecret
+ *            OAuth client secret
+ * @param refreshToken
+ *            OAuth refresh token
  * @since 1.0.0
  */
-public record UserOAuthAuth(String clientId, String clientSecret, String refreshToken)
-    implements AuthType {
+public record UserOAuthAuth(String clientId, String clientSecret, String refreshToken) implements AuthType {
 
-  public UserOAuthAuth {
-    Objects.requireNonNull(clientId, "clientId cannot be null");
-    Objects.requireNonNull(clientSecret, "clientSecret cannot be null");
-    Objects.requireNonNull(refreshToken, "refreshToken cannot be null");
-  }
+	public UserOAuthAuth {
+		Objects.requireNonNull(clientId, "clientId cannot be null");
+		Objects.requireNonNull(clientSecret, "clientSecret cannot be null");
+		Objects.requireNonNull(refreshToken, "refreshToken cannot be null");
+	}
 
-  @Override
-  public Credentials toCredentials() throws IOException {
-    return UserCredentials.newBuilder()
-        .setClientId(clientId)
-        .setClientSecret(clientSecret)
-        .setRefreshToken(refreshToken)
-        .build();
-  }
+	@Override
+	public Credentials toCredentials() throws IOException {
+		return UserCredentials.newBuilder().setClientId(clientId).setClientSecret(clientSecret)
+				.setRefreshToken(refreshToken).build();
+	}
 }

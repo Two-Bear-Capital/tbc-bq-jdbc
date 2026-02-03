@@ -28,28 +28,33 @@ import org.slf4j.LoggerFactory;
 /**
  * JDBC driver for Google BigQuery.
  *
- * <p>Supports two URL formats:
+ * <p>
+ * Supports two URL formats:
  *
- * <p><b>Traditional Format:</b>
+ * <p>
+ * <b>Traditional Format:</b>
  *
  * <pre>{@code
  * jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
  * }</pre>
  *
- * <p>Example:
+ * <p>
+ * Example:
  *
  * <pre>{@code
  * String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
  * Connection conn = DriverManager.getConnection(url);
  * }</pre>
  *
- * <p><b>Simba Format:</b>
+ * <p>
+ * <b>Simba Format:</b>
  *
  * <pre>{@code
  * jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];...
  * }</pre>
  *
- * <p>Example:
+ * <p>
+ * Example:
  *
  * <pre>{@code
  * String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3";
@@ -60,76 +65,76 @@ import org.slf4j.LoggerFactory;
  */
 public final class BQDriver implements Driver {
 
-  private static final org.slf4j.Logger logger = LoggerFactory.getLogger(BQDriver.class);
-  private static final String URL_PREFIX = "jdbc:bigquery:";
-  private static final int MAJOR_VERSION = 1;
-  private static final int MINOR_VERSION = 0;
+	private static final org.slf4j.Logger logger = LoggerFactory.getLogger(BQDriver.class);
+	private static final String URL_PREFIX = "jdbc:bigquery:";
+	private static final int MAJOR_VERSION = 1;
+	private static final int MINOR_VERSION = 0;
 
-  static {
-    try {
-      DriverManager.registerDriver(new BQDriver());
-      logger.info("BigQuery JDBC Driver registered (version {}.{})", MAJOR_VERSION, MINOR_VERSION);
-    } catch (SQLException e) {
-      logger.error("Failed to register BigQuery JDBC Driver", e);
-      throw new RuntimeException("Failed to register BigQuery JDBC Driver", e);
-    }
-  }
+	static {
+		try {
+			DriverManager.registerDriver(new BQDriver());
+			logger.info("BigQuery JDBC Driver registered (version {}.{})", MAJOR_VERSION, MINOR_VERSION);
+		} catch (SQLException e) {
+			logger.error("Failed to register BigQuery JDBC Driver", e);
+			throw new RuntimeException("Failed to register BigQuery JDBC Driver", e);
+		}
+	}
 
-  /** Default constructor. */
-  public BQDriver() {
-    // Required for ServiceLoader
-  }
+	/** Default constructor. */
+	public BQDriver() {
+		// Required for ServiceLoader
+	}
 
-  @Override
-  public Connection connect(String url, Properties info) throws SQLException {
-    if (!acceptsURL(url)) {
-      return null;
-    }
+	@Override
+	public Connection connect(String url, Properties info) throws SQLException {
+		if (!acceptsURL(url)) {
+			return null;
+		}
 
-    logger.debug("Connecting to BigQuery with URL: {}", url);
+		logger.debug("Connecting to BigQuery with URL: {}", url);
 
-    try {
-      ConnectionProperties properties = ConnectionUrlParser.parse(url, info);
-      return new BQConnection(properties);
-    } catch (SQLException e) {
-      logger.error("Failed to create BigQuery connection", e);
-      throw e;
-    }
-  }
+		try {
+			ConnectionProperties properties = ConnectionUrlParser.parse(url, info);
+			return new BQConnection(properties);
+		} catch (SQLException e) {
+			logger.error("Failed to create BigQuery connection", e);
+			throw e;
+		}
+	}
 
-  @Override
-  public boolean acceptsURL(String url) {
-    return url != null && url.startsWith(URL_PREFIX);
-  }
+	@Override
+	public boolean acceptsURL(String url) {
+		return url != null && url.startsWith(URL_PREFIX);
+	}
 
-  @Override
-  public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
-    return new DriverPropertyInfo[0];
-  }
+	@Override
+	public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
+		return new DriverPropertyInfo[0];
+	}
 
-  @Override
-  public int getMajorVersion() {
-    return MAJOR_VERSION;
-  }
+	@Override
+	public int getMajorVersion() {
+		return MAJOR_VERSION;
+	}
 
-  @Override
-  public int getMinorVersion() {
-    return MINOR_VERSION;
-  }
+	@Override
+	public int getMinorVersion() {
+		return MINOR_VERSION;
+	}
 
-  @Override
-  public boolean jdbcCompliant() {
-    // BigQuery has limitations that prevent full JDBC compliance:
-    // - No traditional transaction support outside of sessions
-    // - Limited DML operations
-    // - No UPDATE/DELETE with traditional syntax (requires DML)
-    // - No stored procedures
-    // - No savepoints
-    return false;
-  }
+	@Override
+	public boolean jdbcCompliant() {
+		// BigQuery has limitations that prevent full JDBC compliance:
+		// - No traditional transaction support outside of sessions
+		// - Limited DML operations
+		// - No UPDATE/DELETE with traditional syntax (requires DML)
+		// - No stored procedures
+		// - No savepoints
+		return false;
+	}
 
-  @Override
-  public Logger getParentLogger() throws SQLFeatureNotSupportedException {
-    throw new SQLFeatureNotSupportedException("getParentLogger not supported");
-  }
+	@Override
+	public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+		throw new SQLFeatureNotSupportedException("getParentLogger not supported");
+	}
 }

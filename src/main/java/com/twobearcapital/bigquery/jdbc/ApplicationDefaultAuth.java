@@ -22,20 +22,21 @@ import java.io.IOException;
 /**
  * Application Default Credentials (ADC) authentication.
  *
- * <p>This will use credentials from:
+ * <p>
+ * This will use credentials from:
  *
  * <ol>
- *   <li>GOOGLE_APPLICATION_CREDENTIALS environment variable
- *   <li>Google Cloud SDK credentials (gcloud auth application-default login)
- *   <li>Compute Engine/GKE metadata server
+ * <li>GOOGLE_APPLICATION_CREDENTIALS environment variable
+ * <li>Google Cloud SDK credentials (gcloud auth application-default login)
+ * <li>Compute Engine/GKE metadata server
  * </ol>
  *
  * @since 1.0.0
  */
 public record ApplicationDefaultAuth() implements AuthType {
 
-  @Override
-  public Credentials toCredentials() throws IOException {
-    return GoogleCredentials.getApplicationDefault();
-  }
+	@Override
+	public Credentials toCredentials() throws IOException {
+		return GoogleCredentials.getApplicationDefault();
+	}
 }

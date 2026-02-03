@@ -24,20 +24,21 @@ import java.util.Objects;
 /**
  * Service account authentication using a JSON key file.
  *
- * @param jsonKeyPath path to the service account JSON key file
+ * @param jsonKeyPath
+ *            path to the service account JSON key file
  * @since 1.0.0
  */
 public record ServiceAccountAuth(String jsonKeyPath) implements AuthType {
 
-  public ServiceAccountAuth {
-    Objects.requireNonNull(jsonKeyPath, "jsonKeyPath cannot be null");
-    if (jsonKeyPath.isBlank()) {
-      throw new IllegalArgumentException("jsonKeyPath cannot be blank");
-    }
-  }
+	public ServiceAccountAuth {
+		Objects.requireNonNull(jsonKeyPath, "jsonKeyPath cannot be null");
+		if (jsonKeyPath.isBlank()) {
+			throw new IllegalArgumentException("jsonKeyPath cannot be blank");
+		}
+	}
 
-  @Override
-  public Credentials toCredentials() throws IOException {
-    return ServiceAccountCredentials.fromStream(new FileInputStream(jsonKeyPath));
-  }
+	@Override
+	public Credentials toCredentials() throws IOException {
+		return ServiceAccountCredentials.fromStream(new FileInputStream(jsonKeyPath));
+	}
 }

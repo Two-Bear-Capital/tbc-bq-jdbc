@@ -21,9 +21,9 @@ package com.twobearcapital.bigquery.jdbc;
  * @since 1.0.0
  */
 public enum JobCreationMode {
-  /** Always create a BigQuery job for query execution. */
-  REQUIRED,
+	/** Always create a BigQuery job for query execution. */
+	REQUIRED,
 
-  /** Create a job only if necessary (may use cached results or fast path). */
-  OPTIONAL
+	/** Create a job only if necessary (may use cached results or fast path). */
+	OPTIONAL
 }
