@@ -89,6 +89,14 @@
             <version>${slf4j.version}</version>
         </dependency>
 
+        <!-- Logback (optional, included only in with-logging variant) -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.4.14</version>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -280,7 +288,9 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.6.1</version>
                 <executions>
+                    <!-- Standard shaded JAR (no logging implementation) -->
                     <execution>
+                        <id>shade-standard</id>
                         <phase>package</phase>
                         <goals>
                             <goal>shade</goal>
@@ -300,6 +310,57 @@
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>com.twobearcapital.bigquery.jdbc.shaded.google</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Exclude logback.xml from standard shaded jar -->
+                                        <exclude>logback.xml</exclude>
+                                    </excludes>
+                                </filter>
+                                <!-- Exclude logback from standard shaded jar -->
+                                <filter>
+                                    <artifact>ch.qos.logback:*</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+
+                    <!-- Shaded JAR with Logback (for IntelliJ and other IDEs) -->
+                    <execution>
+                        <id>shade-with-logging</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>with-logging</shadedClassifierName>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <manifestEntries>
+                                        <Automatic-Module-Name>com.twobearcapital.bigquery.jdbc</Automatic-Module-Name>
+                                    </manifestEntries>
+                                </transformer>
+                            </transformers>
+                            <relocations>
+                                <relocation>
+                                    <pattern>com.google</pattern>
+                                    <shadedPattern>com.twobearcapital.bigquery.jdbc.shaded.google</shadedPattern>
+                                </relocation>
+                                <!-- Relocate Logback to avoid conflicts -->
+                                <relocation>
+                                    <pattern>ch.qos.logback</pattern>
+                                    <shadedPattern>com.twobearcapital.bigquery.jdbc.shaded.logback</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>

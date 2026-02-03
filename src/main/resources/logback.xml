@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Default Logback configuration for BigQuery JDBC Driver
+
+  This configuration is included in the 'with-logging' variant of the driver.
+
+  Default behavior:
+  - Logs driver messages (DEBUG level) to: logs/bigquery-jdbc.log
+  - Daily log rotation with 30-day retention
+  - Console output disabled by default (can be enabled below)
+
+  To override this configuration:
+  - Place your own logback.xml in your application's classpath
+  - It will take precedence over this default configuration
+-->
+<configuration>
+
+    <!-- File appender for BigQuery JDBC driver -->
+    <appender name="FILE" class="com.twobearcapital.bigquery.jdbc.shaded.logback.core.rolling.RollingFileAppender">
+        <!--
+            Log file location: ${user.home}/.bigquery-jdbc/logs/bigquery-jdbc.log
+
+            On macOS/Linux: /Users/username/.bigquery-jdbc/logs/bigquery-jdbc.log
+            On Windows: C:\Users\username\.bigquery-jdbc\logs\bigquery-jdbc.log
+        -->
+        <file>${user.home}/.bigquery-jdbc/logs/bigquery-jdbc.log</file>
+
+        <rollingPolicy class="com.twobearcapital.bigquery.jdbc.shaded.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Daily rollover -->
+            <fileNamePattern>${user.home}/.bigquery-jdbc/logs/bigquery-jdbc.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- Keep 30 days of history -->
+            <maxHistory>30</maxHistory>
+            <!-- Total size cap of 500MB -->
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{40} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Console appender (disabled by default) -->
+    <appender name="CONSOLE" class="com.twobearcapital.bigquery.jdbc.shaded.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Logger for BigQuery JDBC driver -->
+    <logger name="com.twobearcapital.bigquery.jdbc" level="DEBUG" additivity="false">
+        <appender-ref ref="FILE"/>
+        <!-- Uncomment to also log to console -->
+        <!-- <appender-ref ref="CONSOLE"/> -->
+    </logger>
+
+    <!-- Logger for Google Cloud BigQuery API (less verbose) -->
+    <logger name="com.google.cloud.bigquery" level="WARN" additivity="false">
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- Root logger - catches everything else -->
+    <root level="WARN">
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>

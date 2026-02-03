@@ -1,0 +1,17 @@
+<!--
+  IntelliJ IDEA Logging Configuration Example
+
+  To suppress BigQuery dialect warnings, add this to your IntelliJ logging configuration.
+
+  Location options:
+  1. IntelliJ config: ~/Library/Application Support/JetBrains/IntelliJIdea<version>/bin/log.xml
+  2. Help -> Diagnostic Tools -> Debug Log Settings
+
+  Add these lines to reduce logging from BigQuery dialect:
+-->
+
+<!-- In Help -> Diagnostic Tools -> Debug Log Settings, add: -->
+#com.intellij.database.remote.jdba.jdbc.dialects.BigQueryIntermediateFacade:error
+
+<!-- Or to completely suppress remote process warnings: -->
+#com.intellij.execution.rmi.RemoteProcessSupport:error

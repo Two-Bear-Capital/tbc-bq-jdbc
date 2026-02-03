@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Console appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File appender for detailed driver debug logs -->
+    <appender name="BQ_DRIVER_DEBUG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/bq-jdbc-debug.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/bq-jdbc-debug.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Very detailed logging for BigQuery driver -->
+    <logger name="com.twobearcapital.bigquery.jdbc" level="TRACE" additivity="false">
+        <appender-ref ref="BQ_DRIVER_DEBUG"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- Also log BigQuery API calls -->
+    <logger name="com.google.cloud.bigquery" level="DEBUG" additivity="false">
+        <appender-ref ref="BQ_DRIVER_DEBUG"/>
+    </logger>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
