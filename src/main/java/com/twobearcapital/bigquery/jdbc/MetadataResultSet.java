@@ -17,10 +17,8 @@ package com.twobearcapital.bigquery.jdbc;
 
 import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
-import java.io.InputStream;
-import java.io.Reader;
+
 import java.math.BigDecimal;
-import java.net.URL;
 import java.sql.*;
 import java.util.*;
 

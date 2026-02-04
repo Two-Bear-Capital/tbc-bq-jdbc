@@ -15,8 +15,6 @@
  */
 package com.twobearcapital.bigquery.jdbc.util;
 
-import com.twobearcapital.bigquery.jdbc.BQSQLException;
-
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 
