@@ -73,7 +73,7 @@ public final class BQDriver implements Driver {
 	static {
 		try {
 			DriverManager.registerDriver(new BQDriver());
-			logger.info("BigQuery JDBC Driver registered (version {})", DriverVersion.getVersionString());
+			logger.info("BigQuery JDBC Driver registered: {}", DriverVersion.getFullVersionInfo());
 		} catch (SQLException e) {
 			logger.error("Failed to register BigQuery JDBC Driver", e);
 			throw new RuntimeException("Failed to register BigQuery JDBC Driver", e);

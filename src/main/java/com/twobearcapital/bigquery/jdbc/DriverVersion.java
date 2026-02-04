@@ -27,7 +27,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>
  * The version is injected at build time from the Maven POM version using
- * resource filtering.
+ * resource filtering. Git commit information is also included for precise build
+ * identification.
  *
  * @since 1.0.0
  */
@@ -35,34 +36,84 @@ public final class DriverVersion {
 
 	private static final Logger logger = LoggerFactory.getLogger(DriverVersion.class);
 	private static final String VERSION_PROPERTIES = "/driver-version.properties";
+	private static final String GIT_PROPERTIES = "/git.properties";
 
 	private static final String VERSION_STRING;
 	private static final int MAJOR_VERSION;
 	private static final int MINOR_VERSION;
 	private static final int PATCH_VERSION;
 
+	// Git build information
+	private static final String GIT_COMMIT_ID;
+	private static final String GIT_COMMIT_ID_SHORT;
+	private static final String GIT_COMMIT_TIME;
+	private static final String GIT_COMMIT_MESSAGE_SHORT;
+	private static final String GIT_BRANCH;
+	private static final String GIT_DIRTY;
+	private static final String BUILD_TIME;
+	private static final String BUILD_VERSION;
+
 	static {
+		// Load version information
+		Properties versionProps = loadVersionProperties();
+		VERSION_STRING = parseVersionString(versionProps.getProperty("driver.version", "0.0.0"));
+		String[] parts = parseVersionParts(VERSION_STRING);
+		MAJOR_VERSION = Integer.parseInt(parts[0]);
+		MINOR_VERSION = Integer.parseInt(parts[1]);
+		PATCH_VERSION = Integer.parseInt(parts[2]);
+		logger.debug("Loaded driver version: {}", VERSION_STRING);
+
+		// Load Git build information
+		Properties gitProps = loadGitProperties();
+		GIT_COMMIT_ID = gitProps.getProperty("git.commit.id.full", "unknown");
+		GIT_COMMIT_ID_SHORT = gitProps.getProperty("git.commit.id.abbrev", "unknown");
+		GIT_COMMIT_TIME = gitProps.getProperty("git.commit.time", "unknown");
+		GIT_COMMIT_MESSAGE_SHORT = gitProps.getProperty("git.commit.message.short", "unknown");
+		GIT_BRANCH = gitProps.getProperty("git.branch", "unknown");
+		GIT_DIRTY = gitProps.getProperty("git.dirty", "unknown");
+		BUILD_TIME = gitProps.getProperty("git.build.time", "unknown");
+		BUILD_VERSION = gitProps.getProperty("git.build.version", "unknown");
+		if (!"unknown".equals(GIT_COMMIT_ID_SHORT)) {
+			logger.debug("Loaded Git commit information: {} ({})", GIT_COMMIT_ID_SHORT, GIT_BRANCH);
+		}
+	}
+
+	/**
+	 * Load version properties from the Maven-filtered properties file.
+	 *
+	 * @return Properties object (empty if file not found or error occurs)
+	 */
+	private static Properties loadVersionProperties() {
 		Properties props = new Properties();
 		try (InputStream in = DriverVersion.class.getResourceAsStream(VERSION_PROPERTIES)) {
 			if (in == null) {
 				logger.warn("Could not find {} in classpath, using default version 0.0.0", VERSION_PROPERTIES);
-				VERSION_STRING = "0.0.0";
-				MAJOR_VERSION = 0;
-				MINOR_VERSION = 0;
-				PATCH_VERSION = 0;
 			} else {
 				props.load(in);
-				VERSION_STRING = parseVersionString(props.getProperty("driver.version", "0.0.0"));
-				String[] parts = parseVersionParts(VERSION_STRING);
-				MAJOR_VERSION = Integer.parseInt(parts[0]);
-				MINOR_VERSION = Integer.parseInt(parts[1]);
-				PATCH_VERSION = Integer.parseInt(parts[2]);
-				logger.debug("Loaded driver version: {}", VERSION_STRING);
 			}
-		} catch (IOException | NumberFormatException e) {
+		} catch (IOException e) {
 			logger.error("Failed to load driver version from {}", VERSION_PROPERTIES, e);
-			throw new RuntimeException("Failed to load driver version", e);
 		}
+		return props;
+	}
+
+	/**
+	 * Load Git properties from the generated git.properties file.
+	 *
+	 * @return Properties object (empty if file not found or error occurs)
+	 */
+	private static Properties loadGitProperties() {
+		Properties props = new Properties();
+		try (InputStream in = DriverVersion.class.getResourceAsStream(GIT_PROPERTIES)) {
+			if (in == null) {
+				logger.debug("Git properties not found, using default values");
+			} else {
+				props.load(in);
+			}
+		} catch (IOException e) {
+			logger.warn("Failed to load Git properties from {}, using default values", GIT_PROPERTIES, e);
+		}
+		return props;
 	}
 
 	/**
@@ -140,5 +191,102 @@ public final class DriverVersion {
 	 */
 	public static int getPatchVersion() {
 		return PATCH_VERSION;
+	}
+
+	/**
+	 * Get the full Git commit SHA.
+	 *
+	 * @return Git commit ID (full SHA)
+	 */
+	public static String getGitCommitId() {
+		return GIT_COMMIT_ID;
+	}
+
+	/**
+	 * Get the abbreviated Git commit SHA (typically 7 characters).
+	 *
+	 * @return Git commit ID (short)
+	 */
+	public static String getGitCommitIdShort() {
+		return GIT_COMMIT_ID_SHORT;
+	}
+
+	/**
+	 * Get the Git commit timestamp.
+	 *
+	 * @return Git commit time
+	 */
+	public static String getGitCommitTime() {
+		return GIT_COMMIT_TIME;
+	}
+
+	/**
+	 * Get the short commit message.
+	 *
+	 * @return Git commit message (first line)
+	 */
+	public static String getGitCommitMessageShort() {
+		return GIT_COMMIT_MESSAGE_SHORT;
+	}
+
+	/**
+	 * Get the Git branch name.
+	 *
+	 * @return Git branch
+	 */
+	public static String getGitBranch() {
+		return GIT_BRANCH;
+	}
+
+	/**
+	 * Check if the build had uncommitted changes.
+	 *
+	 * @return "true" if working directory was dirty, "false" if clean
+	 */
+	public static String getGitDirty() {
+		return GIT_DIRTY;
+	}
+
+	/**
+	 * Get the build timestamp.
+	 *
+	 * @return build time
+	 */
+	public static String getBuildTime() {
+		return BUILD_TIME;
+	}
+
+	/**
+	 * Get the build version (same as VERSION_STRING).
+	 *
+	 * @return build version
+	 */
+	public static String getBuildVersion() {
+		return BUILD_VERSION;
+	}
+
+	/**
+	 * Get a comprehensive version string including Git information.
+	 *
+	 * <p>
+	 * Example: "1.0.1 (commit abc1234 on main, built 2026-02-04T10:30:00-0500)"
+	 *
+	 * @return detailed version string
+	 */
+	public static String getFullVersionInfo() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(VERSION_STRING);
+		sb.append(" (commit ").append(GIT_COMMIT_ID_SHORT);
+		if (!"unknown".equals(GIT_BRANCH)) {
+			sb.append(" on ").append(GIT_BRANCH);
+		}
+		if ("true".equals(GIT_DIRTY)) {
+			sb.append(" [dirty]");
+		}
+		if (!"unknown".equals(BUILD_TIME)) {
+			sb.append(", built ").append(BUILD_TIME);
+		}
+		sb.append(")");
+		return sb.toString();
 	}
 }
