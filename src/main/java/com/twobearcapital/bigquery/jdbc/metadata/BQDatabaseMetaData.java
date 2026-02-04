@@ -711,15 +711,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		logger.info("Found {} dataset(s) matching pattern [{}]: {}", datasetIds.size(), schemaPattern,
 				datasetIds.size() <= 10 ? datasetIds : datasetIds.subList(0, 10) + "...");
 
-		// Use parallel loading if there are multiple datasets (5+)
-		java.util.List<Object[]> rows;
-		if (datasetIds.size() >= 5) {
-			logger.info("Using parallel loading for {} datasets", datasetIds.size());
-			rows = queryTablesParallel(projectId, datasetIds, tableNamePattern, types);
-		} else {
-			logger.info("Using sequential loading for {} datasets", datasetIds.size());
-			rows = queryTablesSequential(projectId, datasetIds, tableNamePattern, types);
-		}
+		// Always use parallel loading for better performance with BigQuery API
+		logger.info("Using parallel loading for {} datasets", datasetIds.size());
+		java.util.List<Object[]> rows = queryTablesParallel(projectId, datasetIds, tableNamePattern, types);
 
 		logger.info("getTables() returning {} table(s)", rows.size());
 
@@ -1028,15 +1022,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// Get datasets matching schema pattern
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
 
-		// Use parallel loading if there are multiple datasets (5+)
-		java.util.List<Object[]> rows;
-		if (datasetIds.size() >= 5) {
-			logger.debug("Using parallel loading for columns in {} datasets", datasetIds.size());
-			rows = queryColumnsParallel(projectId, datasetIds, tableNamePattern, columnNamePattern);
-		} else {
-			logger.debug("Using sequential loading for columns in {} datasets", datasetIds.size());
-			rows = queryColumnsSequential(projectId, datasetIds, tableNamePattern, columnNamePattern);
-		}
+		// Always use parallel loading for better performance with BigQuery API
+		logger.debug("Using parallel loading for columns in {} datasets", datasetIds.size());
+		java.util.List<Object[]> rows = queryColumnsParallel(projectId, datasetIds, tableNamePattern,
+				columnNamePattern);
 
 		return createResultSet(MetadataColumns.Columns.COLUMN_NAMES, MetadataColumns.Columns.COLUMN_TYPES, rows);
 	}
