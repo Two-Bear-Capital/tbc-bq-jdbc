@@ -69,13 +69,11 @@ public final class BQDriver implements Driver {
 
 	private static final org.slf4j.Logger logger = LoggerFactory.getLogger(BQDriver.class);
 	private static final String URL_PREFIX = "jdbc:bigquery:";
-	private static final int MAJOR_VERSION = 1;
-	private static final int MINOR_VERSION = 0;
 
 	static {
 		try {
 			DriverManager.registerDriver(new BQDriver());
-			logger.info("BigQuery JDBC Driver registered (version {}.{})", MAJOR_VERSION, MINOR_VERSION);
+			logger.info("BigQuery JDBC Driver registered (version {})", DriverVersion.getVersionString());
 		} catch (SQLException e) {
 			logger.error("Failed to register BigQuery JDBC Driver", e);
 			throw new RuntimeException("Failed to register BigQuery JDBC Driver", e);
@@ -116,12 +114,12 @@ public final class BQDriver implements Driver {
 
 	@Override
 	public int getMajorVersion() {
-		return MAJOR_VERSION;
+		return DriverVersion.getMajorVersion();
 	}
 
 	@Override
 	public int getMinorVersion() {
-		return MINOR_VERSION;
+		return DriverVersion.getMinorVersion();
 	}
 
 	@Override

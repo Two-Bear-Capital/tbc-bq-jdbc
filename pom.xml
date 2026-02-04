@@ -6,7 +6,7 @@
 
     <groupId>com.twobearcapital</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.0-alpha</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <name>BigQuery JDBC Driver</name>
@@ -156,6 +156,24 @@
     </dependencies>
 
     <build>
+        <!-- Enable resource filtering for version substitution -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/driver-version.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>**/driver-version.properties</exclude>
+                </excludes>
+            </resource>
+        </resources>
+
         <plugins>
             <!-- Compiler -->
             <plugin>
@@ -167,6 +185,16 @@
                     <compilerArgs>
                         <arg>-Xlint:deprecation</arg>
                     </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <!-- Maven Resources Plugin (for filtering) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
 

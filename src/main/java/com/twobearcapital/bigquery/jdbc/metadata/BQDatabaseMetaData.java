@@ -128,17 +128,17 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	@Override
 	public String getDriverVersion() throws SQLException {
-		return "1.0.0";
+		return com.twobearcapital.bigquery.jdbc.DriverVersion.getVersionString();
 	}
 
 	@Override
 	public int getDriverMajorVersion() {
-		return 1;
+		return com.twobearcapital.bigquery.jdbc.DriverVersion.getMajorVersion();
 	}
 
 	@Override
 	public int getDriverMinorVersion() {
-		return 0;
+		return com.twobearcapital.bigquery.jdbc.DriverVersion.getMinorVersion();
 	}
 
 	@Override
