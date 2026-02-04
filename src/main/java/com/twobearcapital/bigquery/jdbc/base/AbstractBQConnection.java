@@ -16,6 +16,7 @@
 package com.twobearcapital.bigquery.jdbc.base;
 
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
+import com.twobearcapital.bigquery.jdbc.util.UnsupportedOperations;
 import java.sql.*;
 
 /**
@@ -34,40 +35,40 @@ public abstract class AbstractBQConnection extends BaseCloseable implements Conn
 
 	@Override
 	public CallableStatement prepareCall(String sql) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("CallableStatement not supported by BigQuery");
+		throw UnsupportedOperations.callableStatements();
 	}
 
 	@Override
 	public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("CallableStatement not supported");
+		throw UnsupportedOperations.callableStatements();
 	}
 
 	@Override
 	public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
 			int resultSetHoldability) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("CallableStatement not supported");
+		throw UnsupportedOperations.callableStatements();
 	}
 
 	// Savepoints - not supported
 
 	@Override
 	public Savepoint setSavepoint() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
+		throw UnsupportedOperations.savepoints();
 	}
 
 	@Override
 	public Savepoint setSavepoint(String name) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
+		throw UnsupportedOperations.savepoints();
 	}
 
 	@Override
 	public void rollback(Savepoint savepoint) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
+		throw UnsupportedOperations.savepoints();
 	}
 
 	@Override
 	public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
+		throw UnsupportedOperations.savepoints();
 	}
 
 	// Type maps - not supported
