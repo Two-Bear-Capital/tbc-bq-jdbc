@@ -90,7 +90,16 @@ public abstract class BaseReadOnlyResultSet extends BaseCloseable implements Res
 	@Override
 	public abstract double getDouble(int columnIndex) throws SQLException;
 
+	/**
+	 * {@inheritDoc}
+	 *
+	 * @deprecated Use {@link #getBigDecimal(int)} instead. This method is
+	 *             deprecated in JDBC 2.0 but must be implemented for interface
+	 *             compliance.
+	 */
 	@Override
+	@Deprecated(since = "JDBC 2.0")
+	@SuppressWarnings("deprecation")
 	public abstract BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException;
 
 	@Override
