@@ -32,6 +32,10 @@ import java.util.Objects;
  *            project (optional)
  * @param authType
  *            the authentication type (required)
+ * @param host
+ *            custom host for BigQuery API (e.g., for emulator) (optional)
+ * @param port
+ *            custom port for BigQuery API (optional)
  * @param timeoutSeconds
  *            query timeout in seconds (default: 300)
  * @param maxResults
@@ -65,10 +69,10 @@ import java.util.Objects;
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
-		Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location, Map<String, String> labels,
-		JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi, boolean enableSessions,
-		Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
-		Boolean metadataCacheEnabled, Boolean metadataLazyLoad) {
+		String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
+		Map<String, String> labels, JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi,
+		boolean enableSessions, Integer connectionTimeout, Integer retryCount, Long maxBillingBytes,
+		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;

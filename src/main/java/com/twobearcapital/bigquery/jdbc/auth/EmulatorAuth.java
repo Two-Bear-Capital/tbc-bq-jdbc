@@ -16,26 +16,27 @@
 package com.twobearcapital.bigquery.jdbc.auth;
 
 import com.google.auth.Credentials;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
 import java.io.IOException;
+import java.util.Date;
 
 /**
- * Authentication type for BigQuery connections.
+ * Emulator authentication (no real authentication).
  *
  * <p>
- * This sealed interface defines all supported authentication methods for
- * connecting to BigQuery.
+ * Used for connecting to BigQuery emulators that don't require authentication.
  *
  * @since 1.0.0
  */
-public sealed interface AuthType permits ServiceAccountAuth, ApplicationDefaultAuth, UserOAuthAuth,
-		WorkforceIdentityAuth, WorkloadIdentityAuth, EmulatorAuth {
+public record EmulatorAuth() implements AuthType {
 
-	/**
-	 * Converts this authentication type to Google Cloud credentials.
-	 *
-	 * @return the Google Cloud credentials
-	 * @throws IOException
-	 *             if credentials cannot be created
-	 */
-	Credentials toCredentials() throws IOException;
+	@Override
+	public Credentials toCredentials() throws IOException {
+		// Return a GoogleCredentials instance with a fake access token that never
+		// expires
+		// The emulator doesn't validate credentials, so this is sufficient
+		AccessToken fakeToken = new AccessToken("emulator-fake-token", new Date(Long.MAX_VALUE));
+		return GoogleCredentials.create(fakeToken);
+	}
 }

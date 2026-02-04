@@ -38,6 +38,8 @@ class ConnectionPropertiesTest {
 				null, // datasetId
 				null, // datasetProjectId
 				new ApplicationDefaultAuth(), // authType
+				null, // host
+				null, // port
 				null, // timeoutSeconds
 				null, // maxResults
 				false, // useLegacySql
@@ -75,8 +77,8 @@ class ConnectionPropertiesTest {
 		// Given: All properties set
 		Map<String, String> labels = Map.of("env", "prod", "team", "data");
 		ConnectionProperties props = new ConnectionProperties("my-project", "my_dataset", "dataset-project",
-				new ServiceAccountAuth("/path/to/key.json"), 120, 1000L, true, "EU", labels, JobCreationMode.OPTIONAL,
-				5000, "true", true, 60, 5, 1000000L, null, null, null);
+				new ServiceAccountAuth("/path/to/key.json"), null, null, 120, 1000L, true, "EU", labels,
+				JobCreationMode.OPTIONAL, 5000, "true", true, 60, 5, 1000000L, null, null, null);
 
 		// Then: All fields should match
 		assertEquals("my-project", props.projectId());
@@ -103,23 +105,24 @@ class ConnectionPropertiesTest {
 	void testNullProjectIdThrowsException() {
 		// Then: Null projectId should throw NPE
 		assertThrows(NullPointerException.class, () -> new ConnectionProperties(null, // projectId
-				null, null, new ApplicationDefaultAuth(), null, null, false, null, null, null, null, null, false, null,
-				null, null, null, null, null));
+				null, null, new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, null,
+				false, null, null, null, null, null, null));
 	}
 
 	@Test
 	void testBlankProjectIdThrowsException() {
 		// Then: Blank projectId should throw IllegalArgumentException
 		assertThrows(IllegalArgumentException.class, () -> new ConnectionProperties("", // blank projectId
-				null, null, new ApplicationDefaultAuth(), null, null, false, null, null, null, null, null, false, null,
-				null, null, null, null, null));
+				null, null, new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, null,
+				false, null, null, null, null, null, null));
 	}
 
 	@Test
 	void testNullAuthTypeThrowsException() {
 		// Then: Null authType should throw NPE
 		assertThrows(NullPointerException.class, () -> new ConnectionProperties("my-project", null, null, null, // authType
-				null, null, false, null, null, null, null, null, false, null, null, null, null, null, null));
+				null, null, null, null, false, null, null, null, null, null, false, null, null, null, null, null,
+				null));
 	}
 
 	@Test
@@ -129,7 +132,8 @@ class ConnectionPropertiesTest {
 		mutableLabels.put("key1", "value1");
 
 		ConnectionProperties props = new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(),
-				null, null, false, null, mutableLabels, null, null, null, false, null, null, null, null, null, null);
+				null, null, null, null, false, null, mutableLabels, null, null, null, false, null, null, null, null,
+				null, null);
 
 		// When: We try to modify the original map
 		mutableLabels.put("key2", "value2");
@@ -147,7 +151,7 @@ class ConnectionPropertiesTest {
 	void testNullLabelsConvertsToEmptyMap() {
 		// Given: Null labels
 		ConnectionProperties props = new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(),
-				null, null, false, null, null, // null labels
+				null, null, null, null, false, null, null, // null labels
 				null, null, null, false, null, null, null, null, null, null);
 
 		// Then: Labels should be an empty immutable map
@@ -159,8 +163,8 @@ class ConnectionPropertiesTest {
 	void testGetDatasetIdWithDataset() {
 		// Given: Properties with dataset
 		ConnectionProperties props = new ConnectionProperties("my-project", "my_dataset", null,
-				new ApplicationDefaultAuth(), null, null, false, null, null, null, null, null, false, null, null, null,
-				null, null, null);
+				new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, null, false, null,
+				null, null, null, null, null);
 
 		// When: Getting the DatasetId
 		DatasetId datasetId = props.getDatasetId();
@@ -175,8 +179,8 @@ class ConnectionPropertiesTest {
 	void testGetDatasetIdWithDifferentProject() {
 		// Given: Properties with dataset in different project
 		ConnectionProperties props = new ConnectionProperties("my-project", "my_dataset", "other-project", // datasetProjectId
-				new ApplicationDefaultAuth(), null, null, false, null, null, null, null, null, false, null, null, null,
-				null, null, null);
+				new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, null, false, null,
+				null, null, null, null, null);
 
 		// When: Getting the DatasetId
 		DatasetId datasetId = props.getDatasetId();
@@ -191,8 +195,8 @@ class ConnectionPropertiesTest {
 	void testGetDatasetIdWithoutDataset() {
 		// Given: Properties without dataset
 		ConnectionProperties props = new ConnectionProperties("my-project", null, // no dataset
-				null, new ApplicationDefaultAuth(), null, null, false, null, null, null, null, null, false, null, null,
-				null, null, null, null);
+				null, new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, null, false,
+				null, null, null, null, null, null);
 
 		// When: Getting the DatasetId
 		DatasetId datasetId = props.getDatasetId();
@@ -205,7 +209,7 @@ class ConnectionPropertiesTest {
 	void testDefaultJobCreationMode() {
 		// Given: Properties without jobCreationMode
 		ConnectionProperties props = new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(),
-				null, null, false, null, null, null, // null jobCreationMode
+				null, null, null, null, false, null, null, null, // null jobCreationMode
 				null, null, false, null, null, null, null, null, null);
 
 		// Then: Should default to REQUIRED
@@ -216,7 +220,7 @@ class ConnectionPropertiesTest {
 	void testDefaultUseStorageApi() {
 		// Given: Properties without useStorageApi
 		ConnectionProperties props = new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(),
-				null, null, false, null, null, null, null, null, // null useStorageApi
+				null, null, null, null, false, null, null, null, null, null, // null useStorageApi
 				false, null, null, null, null, null, null);
 
 		// Then: Should default to "auto"
@@ -227,10 +231,10 @@ class ConnectionPropertiesTest {
 	void testRecordEquality() {
 		// Given: Two identical ConnectionProperties
 		AuthType auth = new ApplicationDefaultAuth();
-		ConnectionProperties props1 = new ConnectionProperties("my-project", null, null, auth, null, null, false, null,
-				null, null, null, null, false, null, null, null, null, null, null);
-		ConnectionProperties props2 = new ConnectionProperties("my-project", null, null, auth, null, null, false, null,
-				null, null, null, null, false, null, null, null, null, null, null);
+		ConnectionProperties props1 = new ConnectionProperties("my-project", null, null, auth, null, null, null, null,
+				false, null, null, null, null, null, false, null, null, null, null, null, null);
+		ConnectionProperties props2 = new ConnectionProperties("my-project", null, null, auth, null, null, null, null,
+				false, null, null, null, null, null, false, null, null, null, null, null, null);
 
 		// Then: They should be equal
 		assertEquals(props1, props2);
@@ -241,8 +245,8 @@ class ConnectionPropertiesTest {
 	void testRecordToString() {
 		// Given: ConnectionProperties
 		ConnectionProperties props = new ConnectionProperties("my-project", "my_dataset", null,
-				new ApplicationDefaultAuth(), null, null, false, null, null, null, null, null, false, null, null, null,
-				null, null, null);
+				new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, null, false, null,
+				null, null, null, null, null);
 
 		// When: Converting to string
 		String str = props.toString();

@@ -61,14 +61,8 @@ public abstract class AbstractBigQueryIntegrationTest {
 
 	@BeforeEach
 	void setup() throws SQLException {
-		String host = bigqueryEmulator.getHost();
-		int port = bigqueryEmulator.getMappedPort(9050);
-
-		// Create JDBC URL pointing to emulator
-		String jdbcUrl = String.format("jdbc:bigquery://%s:%d;ProjectId=%s;DefaultDataset=%s;OAuthType=0", host, port,
-				TEST_PROJECT_ID, TEST_DATASET);
-
-		logger.info("Connecting to BigQuery emulator at: {}", jdbcUrl);
+		logger.info("Connecting to BigQuery emulator at: {}:{}", bigqueryEmulator.getHost(),
+				bigqueryEmulator.getMappedPort(9050));
 
 		// For emulator, we use a simplified connection approach
 		// In production tests, you would use proper authentication
@@ -96,8 +90,12 @@ public abstract class AbstractBigQueryIntegrationTest {
 	 *             if connection fails
 	 */
 	protected Connection createTestConnection() throws SQLException {
-		// For emulator testing, use ADC which will work without credentials
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC", TEST_PROJECT_ID, TEST_DATASET);
+		// For emulator testing, connect directly to the emulator
+		// When a custom host is provided, authType automatically defaults to EMULATOR
+		String host = bigqueryEmulator.getHost();
+		int port = bigqueryEmulator.getMappedPort(9050);
+		String url = String.format("jdbc:bigquery://%s:%d;ProjectId=%s;DefaultDataset=%s", host, port, TEST_PROJECT_ID,
+				TEST_DATASET);
 		return DriverManager.getConnection(url);
 	}
 

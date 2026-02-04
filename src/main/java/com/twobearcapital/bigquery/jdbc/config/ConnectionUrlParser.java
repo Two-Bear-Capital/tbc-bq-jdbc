@@ -175,11 +175,28 @@ public final class ConnectionUrlParser {
 					"Invalid Simba BigQuery JDBC URL format. Expected: jdbc:bigquery://host:port;ProjectId=...");
 		}
 
-		// Extract host:port (for validation, but not used for connection)
+		// Extract host:port
 		String hostPort = matcher.group(1);
 		String paramString = matcher.group(2);
 
 		Map<String, String> simbaProperties = new HashMap<>();
+
+		// Parse host and port
+		String host = null;
+		Integer port = null;
+		if (hostPort != null && !hostPort.isEmpty()) {
+			int colonIdx = hostPort.lastIndexOf(':');
+			if (colonIdx > 0) {
+				host = hostPort.substring(0, colonIdx);
+				try {
+					port = Integer.parseInt(hostPort.substring(colonIdx + 1));
+				} catch (NumberFormatException e) {
+					throw new SQLException("Invalid port number in URL: " + hostPort.substring(colonIdx + 1));
+				}
+			} else {
+				host = hostPort;
+			}
+		}
 
 		// Parse semicolon-separated parameters
 		if (paramString != null && !paramString.isEmpty()) {
@@ -200,6 +217,14 @@ public final class ConnectionUrlParser {
 
 		// Map Simba properties to tbc-bq-jdbc properties
 		Map<String, String> properties = mapSimbaProperties(simbaProperties);
+
+		// Add host and port to properties
+		if (host != null) {
+			properties.put("host", host);
+		}
+		if (port != null) {
+			properties.put("port", String.valueOf(port));
+		}
 
 		// Merge with Properties object (Properties override URL params)
 		if (info != null) {
@@ -292,10 +317,15 @@ public final class ConnectionUrlParser {
 	private static ConnectionProperties buildConnectionProperties(String projectId, String datasetId,
 			Map<String, String> properties) throws SQLException {
 
+		// Parse host and port (for emulator support)
+		String host = properties.get("host");
+		Integer port = parseInteger(properties, "port");
+
 		// Parse authType (required)
 		String authTypeStr = properties.get("authType");
 		if (authTypeStr == null) {
-			authTypeStr = "ADC"; // Default to Application Default Credentials
+			// If host is specified, default to EMULATOR auth, otherwise ADC
+			authTypeStr = (host != null) ? "EMULATOR" : "ADC";
 		}
 
 		AuthType authType = parseAuthType(authTypeStr, properties);
@@ -318,14 +348,15 @@ public final class ConnectionUrlParser {
 		Boolean metadataCacheEnabled = parseBooleanObject(properties, "metadataCacheEnabled");
 		Boolean metadataLazyLoad = parseBooleanObject(properties, "metadataLazyLoad");
 
-		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, timeoutSeconds, maxResults,
-				useLegacySql, location, labels, jobCreationMode, pageSize, useStorageApi, enableSessions,
+		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
+				maxResults, useLegacySql, location, labels, jobCreationMode, pageSize, useStorageApi, enableSessions,
 				connectionTimeout, retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled,
 				metadataLazyLoad);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
 		return switch (authTypeStr.toUpperCase()) {
+			case "EMULATOR" -> new EmulatorAuth();
 			case "SERVICE_ACCOUNT" -> {
 				String credentials = properties.get("credentials");
 				if (credentials == null) {
