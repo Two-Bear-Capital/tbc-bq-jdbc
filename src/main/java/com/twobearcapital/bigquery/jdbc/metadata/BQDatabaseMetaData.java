@@ -38,9 +38,12 @@ import org.slf4j.LoggerFactory;
 public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaData {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQDatabaseMetaData.class);
+	private static final int STATS_LOG_INTERVAL = 10; // Log stats every N cache operations
 
 	private final BQConnection connection;
 	private final MetadataCache cache;
+	private int cacheHits = 0;
+	private int cacheMisses = 0;
 
 	/**
 	 * Creates a new BigQuery DatabaseMetaData.
@@ -1508,12 +1511,16 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		if (cache != null) {
 			java.util.Optional<ResultSet> cached = cache.get(cacheKey);
 			if (cached.isPresent()) {
-				logger.trace("Returning cached result for: {}", cacheKey);
+				cacheHits++;
+				logger.trace("Cache hit for: {}", cacheKey);
+				logCacheStatsIfNeeded();
 				return cached.get();
 			}
 		}
 
 		// Execute query
+		cacheMisses++;
+		logger.trace("Cache miss for: {}", cacheKey);
 		ResultSet result = supplier.get();
 
 		// Store in cache if enabled
@@ -1522,7 +1529,20 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			logger.trace("Cached result for: {}", cacheKey);
 		}
 
+		logCacheStatsIfNeeded();
 		return result;
+	}
+
+	/**
+	 * Logs cache statistics periodically based on operation count.
+	 */
+	private void logCacheStatsIfNeeded() {
+		int totalOps = cacheHits + cacheMisses;
+		if (totalOps > 0 && totalOps % STATS_LOG_INTERVAL == 0) {
+			double hitRate = (double) cacheHits / totalOps * 100;
+			logger.info("Metadata cache performance: {} hits, {} misses, {:.1f}% hit rate, {}",
+					cacheHits, cacheMisses, hitRate, cache != null ? cache.getStats() : "disabled");
+		}
 	}
 
 	/** Functional interface for SQL operations that can throw SQLException. */
@@ -1648,6 +1668,28 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		if (cache != null) {
 			cache.clear();
 			logger.debug("Metadata cache cleared");
+		}
+	}
+
+	/**
+	 * Invalidates cache entries matching the specified prefix.
+	 *
+	 * <p>
+	 * This is useful for targeted cache invalidation when specific metadata changes,
+	 * such as after DDL operations. For example:
+	 * <ul>
+	 * <li>After creating/dropping a table: invalidate("tables:project.dataset")
+	 * <li>After modifying a dataset: invalidate("tables:project.dataset") or
+	 * invalidate("schemas:project.dataset")
+	 * <li>After altering columns: invalidate("columns:project.dataset.table")
+	 * </ul>
+	 *
+	 * @param keyPrefix
+	 *            the cache key prefix to invalidate
+	 */
+	public void invalidateCache(String keyPrefix) {
+		if (cache != null) {
+			cache.invalidate(keyPrefix);
 		}
 	}
 

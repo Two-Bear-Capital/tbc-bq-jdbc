@@ -263,6 +263,10 @@ public final class BQConnection extends AbstractBQConnection {
 
 		// Clear metadata cache
 		if (metadata != null) {
+			String cacheStats = metadata.getCacheStats();
+			if (cacheStats != null) {
+				logger.info("Metadata cache statistics: {}", cacheStats);
+			}
 			metadata.clearCache();
 		}
 
