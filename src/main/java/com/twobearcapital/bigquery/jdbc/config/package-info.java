@@ -18,13 +18,19 @@
  * Connection configuration and URL parsing for BigQuery JDBC connections.
  *
  * <p>
- * This package handles parsing JDBC connection URLs, managing connection properties, and session management:
+ * This package handles parsing JDBC connection URLs, managing connection
+ * properties, and session management:
  * <ul>
- * <li>{@link com.twobearcapital.bigquery.jdbc.config.ConnectionUrlParser} - Parses JDBC URLs in both traditional and Simba formats
- * <li>{@link com.twobearcapital.bigquery.jdbc.config.ConnectionProperties} - Connection configuration properties
- * <li>{@link com.twobearcapital.bigquery.jdbc.config.SessionManager} - Manages BigQuery sessions for connections
- * <li>{@link com.twobearcapital.bigquery.jdbc.config.MetadataCache} - Caches database metadata for performance
- * <li>{@link com.twobearcapital.bigquery.jdbc.config.JobCreationMode} - Query job creation mode configuration
+ * <li>{@link com.twobearcapital.bigquery.jdbc.config.ConnectionUrlParser} -
+ * Parses JDBC URLs in both traditional and Simba formats
+ * <li>{@link com.twobearcapital.bigquery.jdbc.config.ConnectionProperties} -
+ * Connection configuration properties
+ * <li>{@link com.twobearcapital.bigquery.jdbc.config.SessionManager} - Manages
+ * BigQuery sessions for connections
+ * <li>{@link com.twobearcapital.bigquery.jdbc.config.MetadataCache} - Caches
+ * database metadata for performance
+ * <li>{@link com.twobearcapital.bigquery.jdbc.config.JobCreationMode} - Query
+ * job creation mode configuration
  * </ul>
  *
  * @since 1.0.0

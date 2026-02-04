@@ -18,10 +18,13 @@
  * Custom exception types for BigQuery JDBC operations.
  *
  * <p>
- * This package provides specialized SQLException implementations for BigQuery-specific errors:
+ * This package provides specialized SQLException implementations for
+ * BigQuery-specific errors:
  * <ul>
- * <li>{@link com.twobearcapital.bigquery.jdbc.exception.BQSQLException} - General BigQuery SQL exceptions with SQL state codes
- * <li>{@link com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException} - Unsupported JDBC features
+ * <li>{@link com.twobearcapital.bigquery.jdbc.exception.BQSQLException} -
+ * General BigQuery SQL exceptions with SQL state codes
+ * <li>{@link com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException}
+ * - Unsupported JDBC features
  * </ul>
  *
  * @since 1.0.0

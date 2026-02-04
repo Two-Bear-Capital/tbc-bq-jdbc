@@ -18,13 +18,19 @@
  * Authentication types and credentials handling for BigQuery JDBC connections.
  *
  * <p>
- * This package provides implementations for different authentication methods supported by the BigQuery JDBC driver:
+ * This package provides implementations for different authentication methods
+ * supported by the BigQuery JDBC driver:
  * <ul>
- * <li>{@link com.twobearcapital.bigquery.jdbc.auth.ApplicationDefaultAuth} - Application Default Credentials
- * <li>{@link com.twobearcapital.bigquery.jdbc.auth.ServiceAccountAuth} - Service Account authentication
- * <li>{@link com.twobearcapital.bigquery.jdbc.auth.UserOAuthAuth} - User OAuth authentication
- * <li>{@link com.twobearcapital.bigquery.jdbc.auth.WorkforceIdentityAuth} - Workforce Identity Federation
- * <li>{@link com.twobearcapital.bigquery.jdbc.auth.WorkloadIdentityAuth} - Workload Identity Federation
+ * <li>{@link com.twobearcapital.bigquery.jdbc.auth.ApplicationDefaultAuth} -
+ * Application Default Credentials
+ * <li>{@link com.twobearcapital.bigquery.jdbc.auth.ServiceAccountAuth} -
+ * Service Account authentication
+ * <li>{@link com.twobearcapital.bigquery.jdbc.auth.UserOAuthAuth} - User OAuth
+ * authentication
+ * <li>{@link com.twobearcapital.bigquery.jdbc.auth.WorkforceIdentityAuth} -
+ * Workforce Identity Federation
+ * <li>{@link com.twobearcapital.bigquery.jdbc.auth.WorkloadIdentityAuth} -
+ * Workload Identity Federation
  * </ul>
  *
  * @since 1.0.0
