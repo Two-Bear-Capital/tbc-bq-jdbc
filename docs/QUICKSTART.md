@@ -243,7 +243,7 @@ For production applications, use a connection pool:
 <dependency>
     <groupId>com.zaxxer</groupId>
     <artifactId>HikariCP</artifactId>
-    <version>1.0.6</version>
+    <version>5.1.0</version>
 </dependency>
 ```
 
@@ -303,7 +303,7 @@ See [Connection Properties](CONNECTION_PROPERTIES.md) for all configuration opti
 - [Authentication Guide](AUTHENTICATION.md) - All authentication methods
 - [Connection Properties](CONNECTION_PROPERTIES.md) - Full configuration reference
 - [Type Mapping](TYPE_MAPPING.md) - BigQuery to JDBC type conversions
-- [Connection Properties](CONNECTION_PROPERTIES.md#performance-tuning) - Performance optimization
+- [Performance Tuning](CONNECTION_PROPERTIES.md#performance-tuning) - Performance optimization
 - [Compatibility Matrix](COMPATIBILITY.md) - JDBC features and limitations
 
 ## Example Projects
