@@ -336,7 +336,7 @@ This driver is **specifically optimized for IntelliJ IDEA** and provides a **sup
 
 **Step 1: Download Driver**
 ```bash
-wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.4/tbc-bq-jdbc-1.0.4.jar
+wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.5/tbc-bq-jdbc-1.0.5.jar
 ```
 
 **Step 2: Add Driver**
