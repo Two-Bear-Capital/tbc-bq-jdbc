@@ -16,19 +16,14 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.*;
+import com.twobearcapital.bigquery.jdbc.base.AbstractBQPreparedStatement;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
-import java.io.InputStream;
-import java.io.Reader;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +32,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since 1.0.0
  */
-public final class BQPreparedStatement extends BQStatement implements PreparedStatement {
+public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQPreparedStatement.class);
 
@@ -176,22 +171,6 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
 		}
 	}
 
-	@Override
-	public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setAsciiStream not supported");
-	}
-
-	@Deprecated
-	@SuppressWarnings("deprecation")
-	@Override
-	public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setUnicodeStream not supported");
-	}
-
-	@Override
-	public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setBinaryStream not supported");
-	}
 
 	@Override
 	public void clearParameters() throws SQLException {
@@ -238,35 +217,6 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
 		return true;
 	}
 
-	@Override
-	public void addBatch() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Batch updates not supported");
-	}
-
-	@Override
-	public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setCharacterStream not supported");
-	}
-
-	@Override
-	public void setRef(int parameterIndex, Ref x) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setRef not supported");
-	}
-
-	@Override
-	public void setBlob(int parameterIndex, Blob x) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setBlob not supported");
-	}
-
-	@Override
-	public void setClob(int parameterIndex, Clob x) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setClob not supported");
-	}
-
-	@Override
-	public void setArray(int parameterIndex, Array x) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setArray not supported yet");
-	}
 
 	@Override
 	public ResultSetMetaData getMetaData() throws SQLException {
@@ -307,100 +257,18 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
 		return new BQParameterMetaData(parameters.size());
 	}
 
-	@Override
-	public void setRowId(int parameterIndex, RowId x) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setRowId not supported");
-	}
 
 	@Override
 	public void setNString(int parameterIndex, String value) throws SQLException {
 		setString(parameterIndex, value);
 	}
 
-	@Override
-	public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setNCharacterStream not supported");
-	}
-
-	@Override
-	public void setNClob(int parameterIndex, NClob value) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setNClob not supported");
-	}
-
-	@Override
-	public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setClob not supported");
-	}
-
-	@Override
-	public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setBlob not supported");
-	}
-
-	@Override
-	public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setNClob not supported");
-	}
-
-	@Override
-	public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setSQLXML not supported");
-	}
 
 	@Override
 	public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
 		setObject(parameterIndex, x);
 	}
 
-	@Override
-	public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setAsciiStream not supported");
-	}
-
-	@Override
-	public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setBinaryStream not supported");
-	}
-
-	@Override
-	public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setCharacterStream not supported");
-	}
-
-	@Override
-	public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setAsciiStream not supported");
-	}
-
-	@Override
-	public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setBinaryStream not supported");
-	}
-
-	@Override
-	public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setCharacterStream not supported");
-	}
-
-	@Override
-	public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setNCharacterStream not supported");
-	}
-
-	@Override
-	public void setClob(int parameterIndex, Reader reader) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setClob not supported");
-	}
-
-	@Override
-	public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setBlob not supported");
-	}
-
-	@Override
-	public void setNClob(int parameterIndex, Reader reader) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("setNClob not supported");
-	}
 
 	@Override
 	public void setObject(int parameterIndex, Object x, SQLType targetSqlType, int scaleOrLength) throws SQLException {

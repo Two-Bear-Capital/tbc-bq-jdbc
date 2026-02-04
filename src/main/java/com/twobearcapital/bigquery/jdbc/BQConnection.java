@@ -18,7 +18,7 @@ package com.twobearcapital.bigquery.jdbc;
 import com.google.auth.Credentials;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.BigQueryOptions;
-import com.twobearcapital.bigquery.jdbc.base.BaseCloseable;
+import com.twobearcapital.bigquery.jdbc.base.AbstractBQConnection;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.io.IOException;
 import java.sql.*;
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since 1.0.0
  */
-public final class BQConnection extends BaseCloseable implements Connection {
+public final class BQConnection extends AbstractBQConnection {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQConnection.class);
 
@@ -131,35 +131,26 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		runningStatements.remove(statement);
 	}
 
-	@Override
 	protected String getClosedErrorMessage() {
 		return ErrorMessages.CONNECTION_CLOSED;
 	}
 
-	@Override
 	public Statement createStatement() throws SQLException {
 		checkClosed();
 		return new BQStatement(this);
 	}
 
-	@Override
 	public PreparedStatement prepareStatement(String sql) throws SQLException {
 		checkClosed();
 		return new BQPreparedStatement(this, sql);
 	}
 
-	@Override
-	public CallableStatement prepareCall(String sql) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("CallableStatement not supported by BigQuery");
-	}
 
-	@Override
 	public String nativeSQL(String sql) throws SQLException {
 		checkClosed();
 		return sql;
 	}
 
-	@Override
 	public void setAutoCommit(boolean autoCommit) throws SQLException {
 		checkClosed();
 
@@ -193,13 +184,11 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		}
 	}
 
-	@Override
 	public boolean getAutoCommit() throws SQLException {
 		checkClosed();
 		return autoCommit;
 	}
 
-	@Override
 	public void commit() throws SQLException {
 		checkClosed();
 
@@ -213,7 +202,6 @@ public final class BQConnection extends BaseCloseable implements Connection {
 				+ "Enable sessions with: enableSessions=true");
 	}
 
-	@Override
 	public void rollback() throws SQLException {
 		checkClosed();
 
@@ -227,7 +215,6 @@ public final class BQConnection extends BaseCloseable implements Connection {
 				+ "Enable sessions with: enableSessions=true");
 	}
 
-	@Override
 	protected void doClose() throws SQLException {
 		logger.debug("Closing BigQuery connection");
 
@@ -251,43 +238,36 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		logger.info("BigQuery connection closed");
 	}
 
-	@Override
 	public boolean isClosed() {
 		return closed;
 	}
 
-	@Override
 	public DatabaseMetaData getMetaData() throws SQLException {
 		checkClosed();
 		return new BQDatabaseMetaData(this);
 	}
 
-	@Override
 	public void setReadOnly(boolean readOnly) throws SQLException {
 		checkClosed();
 		this.readOnly = readOnly;
 	}
 
-	@Override
 	public boolean isReadOnly() throws SQLException {
 		checkClosed();
 		return readOnly;
 	}
 
-	@Override
 	public void setCatalog(String catalog) throws SQLException {
 		checkClosed();
 		// BigQuery uses project as catalog, but we don't allow changing it
 		logger.debug("setCatalog called with: {} (ignored)", catalog);
 	}
 
-	@Override
 	public String getCatalog() throws SQLException {
 		checkClosed();
 		return properties.projectId();
 	}
 
-	@Override
 	public void setTransactionIsolation(int level) throws SQLException {
 		checkClosed();
 		if (level != Connection.TRANSACTION_NONE) {
@@ -295,24 +275,20 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		}
 	}
 
-	@Override
 	public int getTransactionIsolation() throws SQLException {
 		checkClosed();
 		return Connection.TRANSACTION_NONE;
 	}
 
-	@Override
 	public SQLWarning getWarnings() throws SQLException {
 		checkClosed();
 		return null;
 	}
 
-	@Override
 	public void clearWarnings() throws SQLException {
 		checkClosed();
 	}
 
-	@Override
 	public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
 		checkClosed();
 		if (resultSetType != ResultSet.TYPE_FORWARD_ONLY) {
@@ -324,7 +300,6 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		return createStatement();
 	}
 
-	@Override
 	public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
 			throws SQLException {
 		checkClosed();
@@ -337,24 +312,13 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		return prepareStatement(sql);
 	}
 
-	@Override
-	public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("CallableStatement not supported");
-	}
 
-	@Override
 	public Map<String, Class<?>> getTypeMap() throws SQLException {
 		checkClosed();
 		return Map.of();
 	}
 
-	@Override
-	public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
-		checkClosed();
-		throw new BQSQLFeatureNotSupportedException("Custom type maps not supported");
-	}
 
-	@Override
 	public void setHoldability(int holdability) throws SQLException {
 		checkClosed();
 		if (holdability != ResultSet.CLOSE_CURSORS_AT_COMMIT) {
@@ -362,33 +326,12 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		}
 	}
 
-	@Override
 	public int getHoldability() throws SQLException {
 		checkClosed();
 		return ResultSet.CLOSE_CURSORS_AT_COMMIT;
 	}
 
-	@Override
-	public Savepoint setSavepoint() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
-	}
 
-	@Override
-	public Savepoint setSavepoint(String name) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
-	}
-
-	@Override
-	public void rollback(Savepoint savepoint) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
-	}
-
-	@Override
-	public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Savepoints not supported");
-	}
-
-	@Override
 	public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
 			throws SQLException {
 		checkClosed();
@@ -398,7 +341,6 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		return createStatement(resultSetType, resultSetConcurrency);
 	}
 
-	@Override
 	public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
 			int resultSetHoldability) throws SQLException {
 		checkClosed();
@@ -408,52 +350,9 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		return prepareStatement(sql, resultSetType, resultSetConcurrency);
 	}
 
-	@Override
-	public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
-			int resultSetHoldability) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("CallableStatement not supported");
-	}
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-		checkClosed();
-		if (autoGeneratedKeys != Statement.NO_GENERATED_KEYS) {
-			throw new BQSQLFeatureNotSupportedException("Generated keys not supported");
-		}
-		return prepareStatement(sql);
-	}
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Generated keys not supported");
-	}
 
-	@Override
-	public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Generated keys not supported");
-	}
-
-	@Override
-	public Clob createClob() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Clob not supported");
-	}
-
-	@Override
-	public Blob createBlob() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Blob not supported");
-	}
-
-	@Override
-	public NClob createNClob() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("NClob not supported");
-	}
-
-	@Override
-	public SQLXML createSQLXML() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("SQLXML not supported");
-	}
-
-	@Override
 	public boolean isValid(int timeout) throws SQLException {
 		if (timeout < 0) {
 			throw new BQSQLException(
@@ -480,39 +379,25 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		}
 	}
 
-	@Override
 	public void setClientInfo(String name, String value) throws SQLClientInfoException {
 		// Silently ignore
 	}
 
-	@Override
 	public void setClientInfo(Properties properties) throws SQLClientInfoException {
 		// Silently ignore
 	}
 
-	@Override
 	public String getClientInfo(String name) throws SQLException {
 		checkClosed();
 		return null;
 	}
 
-	@Override
 	public Properties getClientInfo() throws SQLException {
 		checkClosed();
 		return new Properties();
 	}
 
-	@Override
-	public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("createArrayOf not supported");
-	}
 
-	@Override
-	public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("createStruct not supported");
-	}
-
-	@Override
 	public void setSchema(String schema) throws SQLException {
 		checkClosed();
 		// BigQuery uses dataset as schema, but we don't allow changing it after
@@ -520,13 +405,11 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		logger.debug("setSchema called with: {} (ignored)", schema);
 	}
 
-	@Override
 	public String getSchema() throws SQLException {
 		checkClosed();
 		return properties.datasetId();
 	}
 
-	@Override
 	public void abort(Executor executor) throws SQLException {
 		if (closed) {
 			return;
@@ -534,13 +417,11 @@ public final class BQConnection extends BaseCloseable implements Connection {
 		close();
 	}
 
-	@Override
 	public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
 		checkClosed();
 		this.networkTimeout = milliseconds;
 	}
 
-	@Override
 	public int getNetworkTimeout() throws SQLException {
 		checkClosed();
 		return networkTimeout;
@@ -548,37 +429,14 @@ public final class BQConnection extends BaseCloseable implements Connection {
 
 	// JDBC 4.3 methods
 
-	@Override
 	public void beginRequest() throws SQLException {
 		checkClosed();
 		logger.debug("beginRequest called");
 	}
 
-	@Override
 	public void endRequest() throws SQLException {
 		checkClosed();
 		logger.debug("endRequest called");
-	}
-
-	@Override
-	public boolean setShardingKeyIfValid(ShardingKey shardingKey, ShardingKey superShardingKey, int timeout)
-			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Sharding not supported");
-	}
-
-	@Override
-	public boolean setShardingKeyIfValid(ShardingKey shardingKey, int timeout) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Sharding not supported");
-	}
-
-	@Override
-	public void setShardingKey(ShardingKey shardingKey, ShardingKey superShardingKey) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Sharding not supported");
-	}
-
-	@Override
-	public void setShardingKey(ShardingKey shardingKey) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Sharding not supported");
 	}
 
 }
