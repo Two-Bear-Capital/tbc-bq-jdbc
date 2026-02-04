@@ -172,9 +172,9 @@ Check the logs for detailed error messages:
 
 ## More Information
 
-- [Full Logging Documentation](docs/LOGGING.md)
-- [Connection Properties](docs/CONNECTION_PROPERTIES.md)
-- [Authentication Guide](docs/AUTHENTICATION.md)
+- [Full Logging Documentation](LOGGING.md)
+- [Connection Properties](CONNECTION_PROPERTIES.md)
+- [Authentication Guide](AUTHENTICATION.md)
 
 ## Support
 

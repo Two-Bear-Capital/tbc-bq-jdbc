@@ -191,7 +191,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 - **[Connection Properties](docs/CONNECTION_PROPERTIES.md)** - Complete configuration reference
 - **[Type Mapping](docs/TYPE_MAPPING.md)** - BigQuery ↔ JDBC type conversions
 - **[Compatibility Matrix](docs/COMPATIBILITY.md)** - JDBC features and limitations
-- **[Integration Tests](INTEGRATION_TESTS.md)** - Running integration tests
+- **[Integration Tests](docs/INTEGRATION_TESTS.md)** - Running integration tests
 
 ## URL Format
 
@@ -380,7 +380,7 @@ mvn test
 mvn verify -Pintegration-tests
 ```
 
-See [Integration Tests Guide](INTEGRATION_TESTS.md) for details.
+See [Integration Tests Guide](docs/INTEGRATION_TESTS.md) for details.
 
 ### Benchmarks
 
