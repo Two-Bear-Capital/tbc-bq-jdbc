@@ -720,19 +720,6 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return createResultSet(MetadataColumns.Tables.COLUMN_NAMES, MetadataColumns.Tables.COLUMN_TYPES, rows);
 	}
 
-	/** Query tables from multiple datasets sequentially. */
-	private java.util.List<Object[]> queryTablesSequential(String projectId, java.util.List<String> datasetIds,
-			String tableNamePattern, String[] types) throws SQLException {
-		java.util.List<Object[]> allRows = new java.util.ArrayList<>();
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-
-		for (String datasetId : datasetIds) {
-			allRows.addAll(queryTablesForDataset(bigquery, projectId, datasetId, tableNamePattern, types));
-		}
-
-		return allRows;
-	}
-
 	/**
 	 * Query tables from multiple datasets in parallel using virtual threads.
 	 *
@@ -743,35 +730,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private java.util.List<Object[]> queryTablesParallel(String projectId, java.util.List<String> datasetIds,
 			String tableNamePattern, String[] types) throws SQLException {
 		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-
-		// Use virtual threads for concurrent queries
-		try (java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors
-				.newVirtualThreadPerTaskExecutor()) {
-
-			java.util.List<java.util.concurrent.CompletableFuture<java.util.List<Object[]>>> futures = datasetIds
-					.stream().map(datasetId -> java.util.concurrent.CompletableFuture.supplyAsync(() -> {
-						try {
-							return queryTablesForDataset(bigquery, projectId, datasetId, tableNamePattern, types);
-						} catch (SQLException e) {
-							throw new RuntimeException(e);
-						}
-					}, executor)).toList();
-
-			// Combine all results
-			java.util.List<Object[]> allRows = new java.util.ArrayList<>();
-			for (java.util.concurrent.CompletableFuture<java.util.List<Object[]>> future : futures) {
-				try {
-					allRows.addAll(future.join());
-				} catch (java.util.concurrent.CompletionException e) {
-					if (e.getCause() instanceof RuntimeException && e.getCause().getCause() instanceof SQLException) {
-						throw (SQLException) e.getCause().getCause();
-					}
-					throw new SQLException("Error querying tables in parallel", e);
-				}
-			}
-
-			return allRows;
-		}
+		return executeInParallel(datasetIds,
+				datasetId -> queryTablesForDataset(bigquery, projectId, datasetId, tableNamePattern, types),
+				"Error querying tables in parallel");
 	}
 
 	/** Query tables for a single dataset. */
@@ -871,126 +832,120 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				() -> executeGetColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern));
 	}
 
-	/** Query columns from multiple datasets sequentially. */
-	private java.util.List<Object[]> queryColumnsSequential(String projectId, java.util.List<String> datasetIds,
-			String tableNamePattern, String columnNamePattern) throws SQLException {
-		java.util.List<Object[]> allRows = new java.util.ArrayList<>();
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-
-		for (String datasetId : datasetIds) {
-			allRows.addAll(queryColumnsForDataset(bigquery, projectId, datasetId, tableNamePattern, columnNamePattern));
-		}
-
-		return allRows;
-	}
-
 	/** Query columns from multiple datasets in parallel using virtual threads. */
 	private java.util.List<Object[]> queryColumnsParallel(String projectId, java.util.List<String> datasetIds,
 			String tableNamePattern, String columnNamePattern) throws SQLException {
 		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-
-		// Use virtual threads for concurrent queries
-		try (java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors
-				.newVirtualThreadPerTaskExecutor()) {
-
-			java.util.List<java.util.concurrent.CompletableFuture<java.util.List<Object[]>>> futures = datasetIds
-					.stream().map(datasetId -> java.util.concurrent.CompletableFuture.supplyAsync(() -> {
-						try {
-							return queryColumnsForDataset(bigquery, projectId, datasetId, tableNamePattern,
-									columnNamePattern);
-						} catch (SQLException e) {
-							throw new RuntimeException(e);
-						}
-					}, executor)).toList();
-
-			// Combine all results
-			java.util.List<Object[]> allRows = new java.util.ArrayList<>();
-			for (java.util.concurrent.CompletableFuture<java.util.List<Object[]>> future : futures) {
-				try {
-					allRows.addAll(future.join());
-				} catch (java.util.concurrent.CompletionException e) {
-					if (e.getCause() instanceof RuntimeException && e.getCause().getCause() instanceof SQLException) {
-						throw (SQLException) e.getCause().getCause();
-					}
-					throw new SQLException("Error querying columns in parallel", e);
-				}
-			}
-
-			return allRows;
-		}
+		return executeInParallel(datasetIds, datasetId -> queryColumnsForDataset(bigquery, projectId, datasetId,
+				tableNamePattern, columnNamePattern), "Error querying columns in parallel");
 	}
 
-	/** Query columns for a single dataset. */
+	/**
+	 * Query columns for a single dataset with nested parallelization.
+	 *
+	 * <p>
+	 * Always uses parallel table fetching for better performance with BigQuery API.
+	 */
 	private java.util.List<Object[]> queryColumnsForDataset(com.google.cloud.bigquery.BigQuery bigquery,
 			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
-		java.util.List<Object[]> rows = new java.util.ArrayList<>();
-
 		var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
 
+		// Collect tables that match the pattern
+		java.util.List<com.google.cloud.bigquery.Table> tablesToQuery = new java.util.ArrayList<>();
 		for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
 			String tableName = table.getTableId().getTable();
+			if (tableNamePattern == null || matchesPattern(tableName, tableNamePattern)) {
+				tablesToQuery.add(table);
+			}
+		}
 
-			if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+		// Always use nested parallel loading for better performance
+		logger.debug("Using nested parallel loading for {} tables in dataset {}", tablesToQuery.size(), datasetId);
+		return fetchAndProcessTablesParallel(bigquery, projectId, datasetId, tablesToQuery, columnNamePattern);
+	}
+
+	/**
+	 * Fetch and process tables in parallel within a dataset using virtual threads.
+	 *
+	 * <p>
+	 * This provides nested parallelization: parallel across datasets AND parallel
+	 * across tables within each dataset.
+	 */
+	private java.util.List<Object[]> fetchAndProcessTablesParallel(com.google.cloud.bigquery.BigQuery bigquery,
+			String projectId, String datasetId, java.util.List<com.google.cloud.bigquery.Table> tablesToQuery,
+			String columnNamePattern) throws SQLException {
+		return executeInParallel(tablesToQuery,
+				table -> processTableColumns(bigquery, projectId, datasetId, table, columnNamePattern),
+				"Error fetching table columns in parallel");
+	}
+
+	/**
+	 * Process columns for a single table.
+	 *
+	 * @return list of column rows for this table
+	 */
+	private java.util.List<Object[]> processTableColumns(com.google.cloud.bigquery.BigQuery bigquery, String projectId,
+			String datasetId, com.google.cloud.bigquery.Table table, String columnNamePattern) throws SQLException {
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+
+		String tableName = table.getTableId().getTable();
+
+		// Get full table with schema
+		com.google.cloud.bigquery.Table fullTable = bigquery.getTable(table.getTableId());
+		if (fullTable == null) {
+			return rows;
+		}
+
+		com.google.cloud.bigquery.Schema schema = fullTable.getDefinition().getSchema();
+		if (schema == null) {
+			return rows;
+		}
+
+		int ordinalPosition = 1;
+		for (com.google.cloud.bigquery.Field field : schema.getFields()) {
+			String columnName = field.getName();
+
+			if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
 				continue;
 			}
 
-			// Get full table with schema
-			com.google.cloud.bigquery.Table fullTable = bigquery.getTable(table.getTableId());
-			if (fullTable == null) {
-				continue;
-			}
+			com.google.cloud.bigquery.StandardSQLTypeName type = field.getType().getStandardType();
+			int jdbcType = TypeMapper.toJdbcType(type);
+			String typeName = type != null ? type.name() : "UNKNOWN";
 
-			com.google.cloud.bigquery.Schema schema = fullTable.getDefinition().getSchema();
-			if (schema == null) {
-				continue;
-			}
+			int columnSize = TypeMapper.getColumnSize(type);
+			int decimalDigits = TypeMapper.getDecimalDigits(type);
+			int nullable = field.getMode() == com.google.cloud.bigquery.Field.Mode.REQUIRED
+					? DatabaseMetaData.columnNoNulls
+					: DatabaseMetaData.columnNullable;
 
-			int ordinalPosition = 1;
-			for (com.google.cloud.bigquery.Field field : schema.getFields()) {
-				String columnName = field.getName();
+			rows.add(new Object[]{projectId, // TABLE_CAT
+					datasetId, // TABLE_SCHEM
+					tableName, // TABLE_NAME
+					columnName, // COLUMN_NAME
+					jdbcType, // DATA_TYPE
+					typeName, // TYPE_NAME
+					columnSize, // COLUMN_SIZE
+					null, // BUFFER_LENGTH (not used)
+					decimalDigits, // DECIMAL_DIGITS
+					10, // NUM_PREC_RADIX
+					nullable, // NULLABLE
+					field.getDescription(), // REMARKS
+					null, // COLUMN_DEF
+					null, // SQL_DATA_TYPE (not used)
+					null, // SQL_DATETIME_SUB (not used)
+					columnSize, // CHAR_OCTET_LENGTH
+					ordinalPosition, // ORDINAL_POSITION
+					nullable == DatabaseMetaData.columnNullable ? "YES" : "NO", // IS_NULLABLE
+					null, // SCOPE_CATALOG
+					null, // SCOPE_SCHEMA
+					null, // SCOPE_TABLE
+					null, // SOURCE_DATA_TYPE
+					"NO", // IS_AUTOINCREMENT
+					"NO" // IS_GENERATEDCOLUMN
+			});
 
-				if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
-					continue;
-				}
-
-				com.google.cloud.bigquery.StandardSQLTypeName type = field.getType().getStandardType();
-				int jdbcType = TypeMapper.toJdbcType(type);
-				String typeName = type != null ? type.name() : "UNKNOWN";
-
-				int columnSize = TypeMapper.getColumnSize(type);
-				int decimalDigits = TypeMapper.getDecimalDigits(type);
-				int nullable = field.getMode() == com.google.cloud.bigquery.Field.Mode.REQUIRED
-						? DatabaseMetaData.columnNoNulls
-						: DatabaseMetaData.columnNullable;
-
-				rows.add(new Object[]{projectId, // TABLE_CAT
-						datasetId, // TABLE_SCHEM
-						tableName, // TABLE_NAME
-						columnName, // COLUMN_NAME
-						jdbcType, // DATA_TYPE
-						typeName, // TYPE_NAME
-						columnSize, // COLUMN_SIZE
-						null, // BUFFER_LENGTH (not used)
-						decimalDigits, // DECIMAL_DIGITS
-						10, // NUM_PREC_RADIX
-						nullable, // NULLABLE
-						field.getDescription(), // REMARKS
-						null, // COLUMN_DEF
-						null, // SQL_DATA_TYPE (not used)
-						null, // SQL_DATETIME_SUB (not used)
-						columnSize, // CHAR_OCTET_LENGTH
-						ordinalPosition, // ORDINAL_POSITION
-						nullable == DatabaseMetaData.columnNullable ? "YES" : "NO", // IS_NULLABLE
-						null, // SCOPE_CATALOG
-						null, // SCOPE_SCHEMA
-						null, // SCOPE_TABLE
-						null, // SOURCE_DATA_TYPE
-						"NO", // IS_AUTOINCREMENT
-						"NO" // IS_GENERATEDCOLUMN
-				});
-
-				ordinalPosition++;
-			}
+			ordinalPosition++;
 		}
 
 		return rows;
@@ -1538,6 +1493,66 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@FunctionalInterface
 	private interface SqlSupplier<T> {
 		T get() throws SQLException;
+	}
+
+	/**
+	 * Functional interface for operations that process items and can throw
+	 * SQLException.
+	 */
+	@FunctionalInterface
+	private interface SqlFunction<T, R> {
+		R apply(T item) throws SQLException;
+	}
+
+	/**
+	 * Generic parallel execution helper using virtual threads.
+	 *
+	 * <p>
+	 * Executes a function on each item in parallel and combines results. Follows
+	 * DRY principle for all parallel metadata operations.
+	 *
+	 * @param <T>
+	 *            the input item type
+	 * @param items
+	 *            the collection of items to process
+	 * @param processor
+	 *            the function to apply to each item
+	 * @param errorMessage
+	 *            the error message prefix for exceptions
+	 * @return combined list of results
+	 * @throws SQLException
+	 *             if any processing fails
+	 */
+	private <T> java.util.List<Object[]> executeInParallel(java.util.Collection<T> items,
+			SqlFunction<T, java.util.List<Object[]>> processor, String errorMessage) throws SQLException {
+		// Use virtual threads for concurrent execution
+		try (java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors
+				.newVirtualThreadPerTaskExecutor()) {
+
+			java.util.List<java.util.concurrent.CompletableFuture<java.util.List<Object[]>>> futures = items.stream()
+					.map(item -> java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+						try {
+							return processor.apply(item);
+						} catch (SQLException e) {
+							throw new RuntimeException(e);
+						}
+					}, executor)).toList();
+
+			// Combine all results
+			java.util.List<Object[]> allRows = new java.util.ArrayList<>();
+			for (java.util.concurrent.CompletableFuture<java.util.List<Object[]>> future : futures) {
+				try {
+					allRows.addAll(future.join());
+				} catch (java.util.concurrent.CompletionException e) {
+					if (e.getCause() instanceof RuntimeException && e.getCause().getCause() instanceof SQLException) {
+						throw (SQLException) e.getCause().getCause();
+					}
+					throw new SQLException(errorMessage, e);
+				}
+			}
+
+			return allRows;
+		}
 	}
 
 	/**
