@@ -95,7 +95,7 @@ public final class TypeMapper {
 			case TIMESTAMP, DATETIME -> java.sql.Timestamp.class.getName();
 			case DATE -> java.sql.Date.class.getName();
 			case TIME -> java.sql.Time.class.getName();
-            case STRUCT -> java.util.Map.class.getName();
+			case STRUCT -> java.util.Map.class.getName();
 			case ARRAY -> java.util.List.class.getName();
 			default -> Object.class.getName();
 		};

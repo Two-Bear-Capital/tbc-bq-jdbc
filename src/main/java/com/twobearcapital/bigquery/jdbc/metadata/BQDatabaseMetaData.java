@@ -1540,8 +1540,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		int totalOps = cacheHits + cacheMisses;
 		if (totalOps > 0 && totalOps % STATS_LOG_INTERVAL == 0) {
 			double hitRate = (double) cacheHits / totalOps * 100;
-			logger.info("Metadata cache performance: {} hits, {} misses, {:.1f}% hit rate, {}",
-					cacheHits, cacheMisses, hitRate, cache != null ? cache.getStats() : "disabled");
+			logger.info("Metadata cache performance: {} hits, {} misses, {}% hit rate, {}", cacheHits, cacheMisses,
+					String.format("%.1f", hitRate), cache != null ? cache.getStats() : "disabled");
 		}
 	}
 
@@ -1675,8 +1675,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * Invalidates cache entries matching the specified prefix.
 	 *
 	 * <p>
-	 * This is useful for targeted cache invalidation when specific metadata changes,
-	 * such as after DDL operations. For example:
+	 * This is useful for targeted cache invalidation when specific metadata
+	 * changes, such as after DDL operations. For example:
 	 * <ul>
 	 * <li>After creating/dropping a table: invalidate("tables:project.dataset")
 	 * <li>After modifying a dataset: invalidate("tables:project.dataset") or

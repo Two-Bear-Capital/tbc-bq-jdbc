@@ -361,6 +361,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 		return currentRowIndex + 1;
 	}
 
+	@Override
 	public boolean isFirst() throws SQLException {
 		checkClosed();
 		return currentRowIndex == 0;

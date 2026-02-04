@@ -64,7 +64,7 @@ public final class UnsupportedOperations {
 				SQLStates.FEATURE_NOT_SUPPORTED);
 	}
 
-    /**
+	/**
 	 * Creates exception for unsupported named cursors.
 	 */
 	public static SQLException namedCursors() {

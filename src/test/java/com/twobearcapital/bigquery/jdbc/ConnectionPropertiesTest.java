@@ -240,8 +240,8 @@ class ConnectionPropertiesTest {
 	}
 
 	private ConnectionProperties createMinimalProps(String projectId, AuthType auth) {
-		return new ConnectionProperties(projectId, null, null, auth, null, null, null, null,
-				false, null, null, null, null, null, false, null, null, null, null, null, null);
+		return new ConnectionProperties(projectId, null, null, auth, null, null, null, null, false, null, null, null,
+				null, null, false, null, null, null, null, null, null);
 	}
 
 	@Test

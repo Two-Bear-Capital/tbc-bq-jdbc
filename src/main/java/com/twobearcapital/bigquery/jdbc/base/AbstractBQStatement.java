@@ -105,8 +105,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	}
 
 	/**
-	 * Creates a ResultSet for the given query result and job. Determines whether
-	 * to use Storage API based on configuration and result size.
+	 * Creates a ResultSet for the given query result and job. Determines whether to
+	 * use Storage API based on configuration and result size.
 	 *
 	 * @param result
 	 *            the table result from BigQuery
@@ -117,8 +117,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected ResultSet createResultSet(TableResult result, Job job) {
 		// Check if we should use Storage API
 		String useStorageApiSetting = properties.useStorageApi();
-		if (useStorageApiSetting != null &&
-		    com.twobearcapital.bigquery.jdbc.storage.StorageReadResultSet.shouldUseStorageApi(result, useStorageApiSetting)) {
+		if (useStorageApiSetting != null && com.twobearcapital.bigquery.jdbc.storage.StorageReadResultSet
+				.shouldUseStorageApi(result, useStorageApiSetting)) {
 
 			// Extract destination table from job
 			TableId tableId = extractTableId(job);
@@ -126,10 +126,12 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			if (tableId != null) {
 				try {
 					logger.debug("Using Storage API for result set (table: {})", tableId);
-					return new com.twobearcapital.bigquery.jdbc.storage.StorageReadResultSet((BQStatement) this, tableId);
+					return new com.twobearcapital.bigquery.jdbc.storage.StorageReadResultSet((BQStatement) this,
+							tableId);
 				} catch (SQLException e) {
 					// Fallback to standard result set on Storage API failure
-					logger.warn("Storage API initialization failed, falling back to standard ResultSet: {}", e.getMessage());
+					logger.warn("Storage API initialization failed, falling back to standard ResultSet: {}",
+							e.getMessage());
 				}
 			} else {
 				logger.debug("Cannot use Storage API: no destination table found in job");

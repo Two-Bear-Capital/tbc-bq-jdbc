@@ -480,6 +480,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return getTimestamp(columnLabel);
 	}
 
+	@Override
 	public String getNString(int columnIndex) throws SQLException {
 		return getString(columnIndex);
 	}

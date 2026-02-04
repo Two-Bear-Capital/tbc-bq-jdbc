@@ -289,9 +289,9 @@ public final class ConnectionUrlParser {
 	 * Converts Simba OAuthType numeric value to tbc-bq-jdbc authType string.
 	 *
 	 * <p>
-	 * Note: OAuthType=4 (External Account) is mapped to WORKLOAD identity federation.
-	 * Users requiring WORKFORCE identity should override via Properties:
-	 * {@code info.setProperty("authType", "WORKFORCE")}
+	 * Note: OAuthType=4 (External Account) is mapped to WORKLOAD identity
+	 * federation. Users requiring WORKFORCE identity should override via
+	 * Properties: {@code info.setProperty("authType", "WORKFORCE")}
 	 *
 	 * @param oauthType
 	 *            the Simba OAuthType value
@@ -307,9 +307,9 @@ public final class ConnectionUrlParser {
 					"Pre-generated access tokens (OAuthType=2) not supported. Use Service Account (0) or ADC (3)");
 			case "3" -> "ADC"; // Application Default Credentials
 			case "4" -> // External Account - could be WORKFORCE or WORKLOAD
-                // Default to WORKLOAD for now; users can override via Properties object if
-                // needed
-                "WORKLOAD";
+				// Default to WORKLOAD for now; users can override via Properties object if
+				// needed
+				"WORKLOAD";
 			default -> throw new SQLException("Invalid OAuthType value '" + oauthType
 					+ "'. Supported: 0 (Service Account), 1 (User), 3 (ADC), 4 (External Account)");
 		};
