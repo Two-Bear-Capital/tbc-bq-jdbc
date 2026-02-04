@@ -192,7 +192,7 @@
                 <configuration>
                     <java>
                         <eclipse>
-                            <version>4.32.0</version>
+                            <version>4.32</version>
                         </eclipse>
                         <licenseHeader>
                             <content>/*
