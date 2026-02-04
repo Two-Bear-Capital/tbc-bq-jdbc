@@ -7,23 +7,23 @@ Thank you for considering contributing to the BigQuery JDBC driver!
 ### Prerequisites
 
 - Java 21 or later
-- Maven 3.9+
 - Git
+- No need to install Maven (project includes Maven Wrapper)
 
 ### Building
 
 ```bash
-mvn clean install
+./mvnw clean install
 ```
 
 ### Running Tests
 
 ```bash
 # Unit tests only
-mvn test
+./mvnw test
 
 # All tests (including integration tests)
-mvn verify
+./mvnw verify
 ```
 
 ### Code Formatting
@@ -32,13 +32,13 @@ This project uses Google Java Format via Spotless:
 
 ```bash
 # Check formatting
-mvn spotless:check
+./mvnw spotless:check
 
 # Apply formatting
-mvn spotless:apply
+./mvnw spotless:apply
 ```
 
-**Important**: All code must pass `mvn spotless:check` before submission.
+**Important**: All code must pass `./mvnw spotless:check` before submission.
 
 ## Contribution Guidelines
 

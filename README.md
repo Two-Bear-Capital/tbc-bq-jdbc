@@ -330,16 +330,16 @@ See [Authentication Guide](docs/AUTHENTICATION.md) for all methods.
 
 ```bash
 # Build slim JAR
-mvn clean install
+./mvnw clean install
 
 # Build shaded JAR (includes all dependencies)
-mvn clean package
+./mvnw clean package
 
 # Run unit tests
-mvn test
+./mvnw test
 
 # Run integration tests (requires Docker)
-mvn verify -Pintegration-tests
+./mvnw verify -Pintegration-tests
 ```
 
 ### Build Artifacts
@@ -363,7 +363,7 @@ After building:
 - JDBC 4.3 methods
 
 ```bash
-mvn test
+./mvnw test
 ```
 
 ### Integration Tests
@@ -377,7 +377,7 @@ mvn test
 - ResultSet operations
 
 ```bash
-mvn verify -Pintegration-tests
+./mvnw verify -Pintegration-tests
 ```
 
 See [Integration Tests Guide](docs/INTEGRATION_TESTS.md) for details.
@@ -391,7 +391,7 @@ JMH benchmarks for performance testing:
 export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 
 # Run benchmarks
-mvn clean package
+./mvnw clean package
 java -jar target/benchmarks.jar
 ```
 
@@ -489,20 +489,19 @@ Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guideli
 
 1. Clone the repository
 2. Install Java 21+
-3. Install Maven 3.9+
-4. Run `mvn clean install`
+3. Run `./mvnw clean install` (Maven Wrapper included, no need to install Maven)
 
 ### Running Tests
 
 ```bash
 # Unit tests
-mvn test
+./mvnw test
 
 # Integration tests (requires Docker)
-mvn verify -Pintegration-tests
+./mvnw verify -Pintegration-tests
 
 # Format code
-mvn spotless:apply
+./mvnw spotless:apply
 ```
 
 ## License

@@ -261,13 +261,15 @@ public final class BQConnection extends AbstractBQConnection {
 			sessionManager.close();
 		}
 
-		// Clear metadata cache
+		// Log metadata cache statistics (cache persists across connections)
 		if (metadata != null) {
 			String cacheStats = metadata.getCacheStats();
 			if (cacheStats != null) {
 				logger.info("Metadata cache statistics: {}", cacheStats);
 			}
-			metadata.clearCache();
+			// Note: Cache is NOT cleared on connection close - it persists across
+			// connections and expires based on TTL. This improves performance for
+			// applications (like IntelliJ) that frequently reopen connections.
 		}
 
 		logger.info("BigQuery connection closed");

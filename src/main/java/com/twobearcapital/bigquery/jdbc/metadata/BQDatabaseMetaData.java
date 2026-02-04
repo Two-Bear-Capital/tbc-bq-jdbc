@@ -40,8 +40,17 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private static final Logger logger = LoggerFactory.getLogger(BQDatabaseMetaData.class);
 	private static final int STATS_LOG_INTERVAL = 10; // Log stats every N cache operations
 
+	/**
+	 * Static cache shared across all connections to the same project.
+	 * Cache key format: "projectId:ttlSeconds"
+	 * This allows the cache to persist across connection open/close cycles,
+	 * which is critical for IntelliJ IDEA that frequently reopens connections.
+	 */
+	private static final java.util.concurrent.ConcurrentHashMap<String, MetadataCache> SHARED_CACHES = new java.util.concurrent.ConcurrentHashMap<>();
+
 	private final BQConnection connection;
 	private final MetadataCache cache;
+	private final String cacheKey;
 	private int cacheHits = 0;
 	private int cacheMisses = 0;
 
@@ -58,10 +67,22 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// Initialize cache if enabled
 		if (properties.metadataCacheEnabled()) {
 			java.time.Duration cacheTtl = java.time.Duration.ofSeconds(properties.metadataCacheTtl());
-			this.cache = new MetadataCache(cacheTtl);
-			logger.debug("Metadata cache enabled with TTL: {}", cacheTtl);
+
+			// Create cache key based on project and TTL
+			this.cacheKey = properties.projectId() + ":" + properties.metadataCacheTtl();
+
+			// Get or create shared cache instance
+			this.cache = SHARED_CACHES.computeIfAbsent(cacheKey, k -> {
+				logger.info("Creating new shared metadata cache for project: {} with TTL: {}",
+					properties.projectId(), cacheTtl);
+				return new MetadataCache(cacheTtl);
+			});
+
+			logger.debug("Using shared metadata cache for project: {} (cache instances: {})",
+				properties.projectId(), SHARED_CACHES.size());
 		} else {
 			this.cache = null;
+			this.cacheKey = null;
 			logger.debug("Metadata cache disabled");
 		}
 	}
@@ -1662,16 +1683,22 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	}
 
 	/**
-	 * Clears the metadata cache.
+	 * Clears the metadata cache for this project.
 	 *
 	 * <p>
-	 * This method is called when the connection is closed to release cached
-	 * metadata. It can also be called manually to force a refresh of metadata.
+	 * This method clears the shared cache for the current project, affecting
+	 * all connections to this project. Use this to force a refresh of metadata
+	 * after schema changes (DDL operations).
+	 *
+	 * <p>
+	 * Note: The cache is shared across connections and persists based on TTL.
+	 * This method should only be called when you need to force an immediate
+	 * cache refresh, not during normal connection close operations.
 	 */
 	public void clearCache() {
 		if (cache != null) {
 			cache.clear();
-			logger.debug("Metadata cache cleared");
+			logger.info("Shared metadata cache cleared for project (cache key: {})", cacheKey);
 		}
 	}
 
@@ -1704,6 +1731,44 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	public String getCacheStats() {
 		return cache != null ? cache.getStats() : null;
+	}
+
+	/**
+	 * Clears all shared metadata caches across all projects.
+	 *
+	 * <p>
+	 * This static method clears all shared cache instances, affecting all
+	 * connections to all projects. This is primarily useful for:
+	 * <ul>
+	 * <li>Testing - to ensure tests start with a clean cache state
+	 * <li>Debugging - to force a complete metadata refresh
+	 * <li>After major schema changes - when you want to refresh all cached metadata
+	 * </ul>
+	 *
+	 * <p>
+	 * Under normal operation, you should not need to call this method as the
+	 * cache expires entries based on TTL automatically.
+	 */
+	public static void clearAllSharedCaches() {
+		int clearedCount = 0;
+		for (MetadataCache cache : SHARED_CACHES.values()) {
+			cache.clear();
+			clearedCount++;
+		}
+		logger.info("Cleared {} shared metadata cache instance(s)", clearedCount);
+	}
+
+	/**
+	 * Gets the number of shared cache instances currently active.
+	 *
+	 * <p>
+	 * This is primarily useful for monitoring and debugging to understand
+	 * how many distinct project caches are being maintained.
+	 *
+	 * @return the number of shared cache instances
+	 */
+	public static int getSharedCacheCount() {
+		return SHARED_CACHES.size();
 	}
 
 }

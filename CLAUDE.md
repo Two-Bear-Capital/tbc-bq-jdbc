@@ -156,9 +156,14 @@ src/main/java/com/twobearcapital/bigquery/jdbc/
 
 #### Metadata Caching
 - `MetadataCache` provides TTL-based caching with concurrent access
+- **Cache is shared statically across all connections** to the same project (persists across connection open/close cycles)
+- Cache instances keyed by `projectId:ttlSeconds` for isolation
+- Cache is NOT cleared on connection close - only expires based on TTL
+- This design is critical for IntelliJ IDEA which frequently reopens connections
 - `BQDatabaseMetaData` reuses single instance per connection (fixes IntelliJ slowness)
 - Configurable via `metadataCacheEnabled`, `metadataCacheTtl`, `metadataLazyLoad`
 - Parallel dataset loading for projects with 50+ datasets
+- Static methods: `clearAllSharedCaches()` and `getSharedCacheCount()` for testing/debugging
 
 #### Exception Handling
 - `BQSQLException` wraps BigQuery exceptions with appropriate SQL states
