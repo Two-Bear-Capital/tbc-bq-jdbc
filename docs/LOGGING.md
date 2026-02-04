@@ -6,18 +6,18 @@ The BigQuery JDBC Driver uses [SLF4J](https://www.slf4j.org/) as its logging fac
 
 The driver is distributed in three variants:
 
-### 1. Standard JAR (`tbc-bq-jdbc-1.0.0-alpha.jar`)
+### 1. Standard JAR (`tbc-bq-jdbc-1.0.2.jar`)
 - **Use case:** When included as a Maven/Gradle dependency
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Smallest (runtime dependencies not included)
 
-### 2. Shaded JAR (`tbc-bq-jdbc-1.0.0-alpha-shaded.jar`)
+### 2. Shaded JAR (`tbc-bq-jdbc-1.0.2-shaded.jar`)
 - **Use case:** Standalone usage with all dependencies bundled
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Large (~40MB, includes Google Cloud libraries)
 - **Dependencies:** All dependencies relocated to avoid conflicts
 
-### 3. Shaded JAR with Logging (`tbc-bq-jdbc-1.0.0-alpha-with-logging.jar`)
+### 3. Shaded JAR with Logging (`tbc-bq-jdbc-1.0.2-with-logging.jar`)
 - **Use case:** IntelliJ IDEA, DBeaver, and other database tools/IDEs
 - **Logging:** Includes Logback with sensible defaults
 - **Size:** Largest (~45MB, includes everything + Logback)
@@ -41,7 +41,7 @@ When using the `with-logging` variant in IntelliJ:
 1. **Add the driver** to IntelliJ's database configuration:
    - File → Project Structure → Libraries
    - Or use the Database tool window driver configuration
-   - Select the `tbc-bq-jdbc-1.0.0-alpha-with-logging.jar` file
+   - Select the `tbc-bq-jdbc-1.0.2-with-logging.jar` file
 
 2. **Default logging behavior:**
    - Driver logs are written to `logs/bigquery-jdbc.log` in your working directory
@@ -94,7 +94,7 @@ When using the standard JAR, add an SLF4J implementation:
     <dependency>
         <groupId>com.twobearcapital</groupId>
         <artifactId>tbc-bq-jdbc</artifactId>
-        <version>1.0.0-alpha</version>
+        <version>1.0.2</version>
     </dependency>
 
     <!-- Add your preferred logging implementation -->
@@ -109,7 +109,7 @@ When using the standard JAR, add an SLF4J implementation:
 ### Gradle
 ```groovy
 dependencies {
-    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.0-alpha'
+    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.2'
     implementation 'ch.qos.logback:logback-classic:1.4.14'
 }
 ```
