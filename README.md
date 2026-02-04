@@ -1,5 +1,8 @@
 # BigQuery JDBC Driver
 
+[![Build](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/build.yml/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/build.yml)
+[![CodeQL](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/github-code-scanning/codeql)
+[![Dependabot Updates](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/dependabot/dependabot-updates)
 [![Java](https://img.shields.io/badge/Java-21+-blue.svg)](https://openjdk.org/)
 [![JDBC](https://img.shields.io/badge/JDBC-4.3-green.svg)](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/module-summary.html)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
