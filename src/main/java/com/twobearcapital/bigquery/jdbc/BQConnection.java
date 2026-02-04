@@ -25,6 +25,7 @@ import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
 import com.twobearcapital.bigquery.jdbc.metadata.BQDatabaseMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
+import com.twobearcapital.bigquery.jdbc.util.UnsupportedOperations;
 import java.io.IOException;
 import java.sql.*;
 import java.util.Map;
@@ -358,7 +359,7 @@ public final class BQConnection extends AbstractBQConnection {
 	public void setHoldability(int holdability) throws SQLException {
 		checkClosed();
 		if (holdability != ResultSet.CLOSE_CURSORS_AT_COMMIT) {
-			throw new BQSQLFeatureNotSupportedException("Only CLOSE_CURSORS_AT_COMMIT holdability is supported");
+			throw UnsupportedOperations.holdability();
 		}
 	}
 
