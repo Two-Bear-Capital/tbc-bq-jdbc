@@ -18,6 +18,8 @@ package com.twobearcapital.bigquery.jdbc.metadata;
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.StandardSQLTypeName;
+import com.twobearcapital.bigquery.jdbc.TypeMapper;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;

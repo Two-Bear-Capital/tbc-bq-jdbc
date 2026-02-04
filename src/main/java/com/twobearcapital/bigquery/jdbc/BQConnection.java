@@ -94,7 +94,7 @@ public final class BQConnection extends AbstractBQConnection {
 	 *
 	 * @return the BigQuery client
 	 */
-	BigQuery getBigQuery() {
+	public BigQuery getBigQuery() {
 		return bigquery;
 	}
 
@@ -103,7 +103,7 @@ public final class BQConnection extends AbstractBQConnection {
 	 *
 	 * @return the connection properties
 	 */
-	ConnectionProperties getProperties() {
+	public ConnectionProperties getProperties() {
 		return properties;
 	}
 
@@ -112,7 +112,7 @@ public final class BQConnection extends AbstractBQConnection {
 	 *
 	 * @return the session manager
 	 */
-	SessionManager getSessionManager() {
+	public SessionManager getSessionManager() {
 		return sessionManager;
 	}
 
@@ -122,7 +122,7 @@ public final class BQConnection extends AbstractBQConnection {
 	 * @param statement
 	 *            the statement to register
 	 */
-	void registerStatement(BQStatement statement) {
+	public void registerStatement(BQStatement statement) {
 		runningStatements.add(statement);
 	}
 
@@ -132,7 +132,7 @@ public final class BQConnection extends AbstractBQConnection {
 	 * @param statement
 	 *            the statement to unregister
 	 */
-	void unregisterStatement(BQStatement statement) {
+	public void unregisterStatement(BQStatement statement) {
 		runningStatements.remove(statement);
 	}
 

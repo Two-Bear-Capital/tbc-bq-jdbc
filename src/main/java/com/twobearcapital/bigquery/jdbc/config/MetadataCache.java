@@ -15,6 +15,7 @@
  */
 package com.twobearcapital.bigquery.jdbc.config;
 
+import com.twobearcapital.bigquery.jdbc.metadata.MetadataResultSet;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -53,13 +54,13 @@ public final class MetadataCache {
 	 * @param ttl
 	 *            the time-to-live for cache entries
 	 */
-	MetadataCache(Duration ttl) {
+	public MetadataCache(Duration ttl) {
 		this.ttl = ttl != null ? ttl : DEFAULT_TTL;
 		logger.debug("Metadata cache initialized with TTL: {}", this.ttl);
 	}
 
 	/** Creates a new metadata cache with the default TTL of 5 minutes. */
-	MetadataCache() {
+	public MetadataCache() {
 		this(DEFAULT_TTL);
 	}
 
@@ -71,7 +72,7 @@ public final class MetadataCache {
 	 * @return Optional containing the cached ResultSet if available and not
 	 *         expired, empty otherwise
 	 */
-	Optional<ResultSet> get(String key) {
+	public Optional<ResultSet> get(String key) {
 		CacheEntry entry = cache.get(key);
 		if (entry == null) {
 			logger.trace("Cache miss for key: {}", key);
@@ -103,7 +104,7 @@ public final class MetadataCache {
 	 * @throws SQLException
 	 *             if an error occurs reading the ResultSet
 	 */
-	void put(String key, ResultSet resultSet) throws SQLException {
+	public void put(String key, ResultSet resultSet) throws SQLException {
 		if (!(resultSet instanceof MetadataResultSet)) {
 			logger.warn("Cannot cache non-MetadataResultSet: {}", resultSet.getClass().getName());
 			return;

@@ -18,6 +18,7 @@ package com.twobearcapital.bigquery.jdbc;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 

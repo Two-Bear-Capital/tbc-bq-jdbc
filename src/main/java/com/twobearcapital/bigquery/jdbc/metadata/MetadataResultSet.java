@@ -32,7 +32,7 @@ import java.util.*;
  *
  * @since 1.0.0
  */
-final class MetadataResultSet extends BaseReadOnlyResultSet {
+public final class MetadataResultSet extends BaseReadOnlyResultSet {
 
 	private final String[] columnNames;
 	private final int[] columnTypes;
@@ -51,7 +51,7 @@ final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * @param rows
 	 *            list of data rows (each row is an Object array)
 	 */
-	MetadataResultSet(String[] columnNames, int[] columnTypes, List<Object[]> rows) {
+	public MetadataResultSet(String[] columnNames, int[] columnTypes, List<Object[]> rows) {
 		this.columnNames = Objects.requireNonNull(columnNames, "columnNames cannot be null");
 		this.columnTypes = Objects.requireNonNull(columnTypes, "columnTypes cannot be null");
 		this.rows = Objects.requireNonNull(rows, "rows cannot be null");
@@ -65,11 +65,11 @@ final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * Gets the column names.
 	 *
 	 * <p>
-	 * Package-private accessor for caching support.
+	 * Public accessor for caching support.
 	 *
 	 * @return the column names array
 	 */
-	String[] getColumnNames() {
+	public String[] getColumnNames() {
 		return columnNames;
 	}
 
@@ -77,11 +77,11 @@ final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * Gets the column types.
 	 *
 	 * <p>
-	 * Package-private accessor for caching support.
+	 * Public accessor for caching support.
 	 *
 	 * @return the column types array
 	 */
-	int[] getColumnTypes() {
+	public int[] getColumnTypes() {
 		return columnTypes;
 	}
 
@@ -89,11 +89,11 @@ final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * Gets the data rows.
 	 *
 	 * <p>
-	 * Package-private accessor for caching support.
+	 * Public accessor for caching support.
 	 *
 	 * @return the rows list
 	 */
-	List<Object[]> getRows() {
+	public List<Object[]> getRows() {
 		return rows;
 	}
 

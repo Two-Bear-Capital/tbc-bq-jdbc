@@ -24,7 +24,7 @@ import java.sql.Types;
  *
  * @since 1.0.0
  */
-final class TypeMapper {
+public final class TypeMapper {
 
 	private TypeMapper() {
 		// Utility class
@@ -37,7 +37,7 @@ final class TypeMapper {
 	 *            the BigQuery type
 	 * @return the JDBC type constant
 	 */
-	static int toJdbcType(StandardSQLTypeName bqType) {
+	public static int toJdbcType(StandardSQLTypeName bqType) {
 		if (bqType == null) {
 			return Types.OTHER;
 		}
@@ -70,7 +70,7 @@ final class TypeMapper {
 	 *            the BigQuery field
 	 * @return the JDBC type constant
 	 */
-	static int toJdbcType(Field field) {
+	public static int toJdbcType(Field field) {
 		if (field == null) {
 			return Types.OTHER;
 		}
@@ -84,7 +84,7 @@ final class TypeMapper {
 	 *            the BigQuery type
 	 * @return the Java class name
 	 */
-	static String toJavaClassName(StandardSQLTypeName bqType) {
+	public static String toJavaClassName(StandardSQLTypeName bqType) {
 		if (bqType == null) {
 			return Object.class.getName();
 		}
@@ -114,7 +114,7 @@ final class TypeMapper {
 	 *            the BigQuery type
 	 * @return the column size
 	 */
-	static int getColumnSize(StandardSQLTypeName bqType) {
+	public static int getColumnSize(StandardSQLTypeName bqType) {
 		if (bqType == null) {
 			return 0;
 		}
@@ -143,7 +143,7 @@ final class TypeMapper {
 	 *            the BigQuery type
 	 * @return the decimal digits
 	 */
-	static int getDecimalDigits(StandardSQLTypeName bqType) {
+	public static int getDecimalDigits(StandardSQLTypeName bqType) {
 		if (bqType == null) {
 			return 0;
 		}
@@ -163,7 +163,7 @@ final class TypeMapper {
 	 *            the JDBC type constant
 	 * @return the BigQuery StandardSQLTypeName
 	 */
-	static StandardSQLTypeName toBigQueryType(int jdbcType) {
+	public static StandardSQLTypeName toBigQueryType(int jdbcType) {
 		return switch (jdbcType) {
 			case Types.VARCHAR, Types.CHAR, Types.LONGVARCHAR, Types.NVARCHAR, Types.NCHAR ->
 				StandardSQLTypeName.STRING;

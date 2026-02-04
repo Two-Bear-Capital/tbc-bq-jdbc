@@ -16,9 +16,12 @@
 package com.twobearcapital.bigquery.jdbc.metadata;
 
 import com.twobearcapital.bigquery.jdbc.BQConnection;
+import com.twobearcapital.bigquery.jdbc.TypeMapper;
 import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
 import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
 import com.twobearcapital.bigquery.jdbc.config.MetadataCache;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
 import java.sql.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
