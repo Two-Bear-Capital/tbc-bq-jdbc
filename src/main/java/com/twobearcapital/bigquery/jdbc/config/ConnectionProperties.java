@@ -23,6 +23,10 @@ import java.util.Objects;
 /**
  * Connection properties for a BigQuery JDBC connection.
  *
+ * <p>
+ * This record is immutable. The labels map is defensively copied and stored as
+ * an unmodifiable map to prevent external modification.
+ *
  * @param projectId
  *            the Google Cloud project ID (required)
  * @param datasetId
@@ -45,7 +49,7 @@ import java.util.Objects;
  * @param location
  *            BigQuery location (e.g., US, EU) (optional)
  * @param labels
- *            job labels as key-value pairs (optional)
+ *            job labels as key-value pairs (optional, immutable)
  * @param jobCreationMode
  *            job creation mode (default: REQUIRED)
  * @param pageSize
@@ -95,6 +99,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			throw new IllegalArgumentException("projectId cannot be blank");
 		}
 		Objects.requireNonNull(authType, "authType is required");
+		// Defensive copy: create an immutable map to prevent external modification
 		labels = labels == null ? Map.of() : Map.copyOf(labels);
 		if (jobCreationMode == null) {
 			jobCreationMode = JobCreationMode.REQUIRED;
