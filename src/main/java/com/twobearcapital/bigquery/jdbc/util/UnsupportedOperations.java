@@ -64,15 +64,7 @@ public final class UnsupportedOperations {
 				SQLStates.FEATURE_NOT_SUPPORTED);
 	}
 
-	/**
-	 * Creates exception for unsupported multiple result sets.
-	 */
-	public static SQLException multipleResultSets() {
-		return new SQLFeatureNotSupportedException(ErrorMessages.MULTIPLE_RESULT_SETS_NOT_SUPPORTED,
-				SQLStates.FEATURE_NOT_SUPPORTED);
-	}
-
-	/**
+    /**
 	 * Creates exception for unsupported named cursors.
 	 */
 	public static SQLException namedCursors() {

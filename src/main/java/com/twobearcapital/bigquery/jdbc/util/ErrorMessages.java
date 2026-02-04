@@ -31,8 +31,7 @@ public final class ErrorMessages {
 	public static final String CALLABLE_STATEMENTS_NOT_SUPPORTED = "Callable statements not supported";
 	public static final String SAVEPOINTS_NOT_SUPPORTED = "Savepoints not supported";
 	public static final String GENERATED_KEYS_NOT_SUPPORTED = "Generated keys not supported";
-	public static final String MULTIPLE_RESULT_SETS_NOT_SUPPORTED = "Multiple result sets not supported";
-	public static final String CURSORS_NOT_SUPPORTED = "Named cursors not supported";
+    public static final String CURSORS_NOT_SUPPORTED = "Named cursors not supported";
 	public static final String HOLDABILITY_NOT_SUPPORTED = "Result set holdability configuration not supported";
 
 	// Parameter validation messages
