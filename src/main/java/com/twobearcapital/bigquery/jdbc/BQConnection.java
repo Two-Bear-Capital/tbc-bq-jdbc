@@ -49,6 +49,7 @@ public final class BQConnection extends AbstractBQConnection {
 	private final ConnectionProperties properties;
 	private final Set<BQStatement> runningStatements = ConcurrentHashMap.newKeySet();
 	private final SessionManager sessionManager;
+	private BQDatabaseMetaData metadata;
 	private boolean autoCommit = true;
 	private boolean readOnly = false;
 	private int networkTimeout = 0;
@@ -260,6 +261,11 @@ public final class BQConnection extends AbstractBQConnection {
 			sessionManager.close();
 		}
 
+		// Clear metadata cache
+		if (metadata != null) {
+			metadata.clearCache();
+		}
+
 		logger.info("BigQuery connection closed");
 	}
 
@@ -271,7 +277,10 @@ public final class BQConnection extends AbstractBQConnection {
 	@Override
 	public DatabaseMetaData getMetaData() throws SQLException {
 		checkClosed();
-		return new BQDatabaseMetaData(this);
+		if (metadata == null) {
+			metadata = new BQDatabaseMetaData(this);
+		}
+		return metadata;
 	}
 
 	@Override

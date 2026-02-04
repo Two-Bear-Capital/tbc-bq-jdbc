@@ -126,7 +126,7 @@ public final class MetadataCache {
 	 * <p>
 	 * This method removes all cached metadata results immediately.
 	 */
-	void clear() {
+	public void clear() {
 		int size = cache.size();
 		cache.clear();
 		logger.debug("Cache cleared ({} entries removed)", size);
@@ -142,7 +142,7 @@ public final class MetadataCache {
 	 * @param keyPrefix
 	 *            the prefix to match
 	 */
-	void invalidate(String keyPrefix) {
+	public void invalidate(String keyPrefix) {
 		int removed = (int) cache.keySet().stream().filter(key -> key.startsWith(keyPrefix)).count();
 
 		cache.keySet().removeIf(key -> key.startsWith(keyPrefix));
@@ -154,7 +154,7 @@ public final class MetadataCache {
 	 *
 	 * @return the cache size
 	 */
-	int size() {
+	public int size() {
 		return cache.size();
 	}
 
@@ -163,7 +163,7 @@ public final class MetadataCache {
 	 *
 	 * @return cache statistics as a string
 	 */
-	String getStats() {
+	public String getStats() {
 		long expired = cache.values().stream().filter(CacheEntry::isExpired).count();
 		return String.format("Cache size: %d, Expired: %d, TTL: %s", cache.size(), expired, ttl);
 	}

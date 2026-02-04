@@ -1637,4 +1637,27 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return value.matches(regex);
 	}
 
+	/**
+	 * Clears the metadata cache.
+	 *
+	 * <p>
+	 * This method is called when the connection is closed to release cached
+	 * metadata. It can also be called manually to force a refresh of metadata.
+	 */
+	public void clearCache() {
+		if (cache != null) {
+			cache.clear();
+			logger.debug("Metadata cache cleared");
+		}
+	}
+
+	/**
+	 * Gets cache statistics for monitoring and debugging.
+	 *
+	 * @return cache statistics string, or null if cache is disabled
+	 */
+	public String getCacheStats() {
+		return cache != null ? cache.getStats() : null;
+	}
+
 }
