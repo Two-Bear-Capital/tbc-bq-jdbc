@@ -59,7 +59,7 @@ This driver is designed as a superior alternative to JetBrains' built-in BigQuer
 
 1. **Download Driver JAR**
    ```bash
-   wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.2/tbc-bq-jdbc-1.0.2-shaded.jar
+   wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.4/tbc-bq-jdbc-1.0.4.jar
    ```
 
 2. **Add Driver in IntelliJ**
@@ -95,7 +95,7 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 <dependency>
     <groupId>com.twobearcapital</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.4</version>
 </dependency>
 ```
 
@@ -103,7 +103,7 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ```gradle
 dependencies {
-    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.2'
+    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.4'
 }
 ```
 
@@ -111,7 +111,7 @@ dependencies {
 
 ```bash
 # Download shaded JAR with all dependencies included
-wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.2/tbc-bq-jdbc-1.0.2-shaded.jar
+wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.4/tbc-bq-jdbc-1.0.4.jar
 ```
 
 ### Basic Usage
@@ -345,8 +345,8 @@ mvn verify -Pintegration-tests
 ### Build Artifacts
 
 After building:
-- **Slim JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT.jar` (60K)
-- **Shaded JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT-shaded.jar` (51M)
+- **Slim JAR:** `target/tbc-bq-jdbc-1.0.4.jar` (60K)
+- **Shaded JAR:** `target/tbc-bq-jdbc-1.0.4-shaded.jar` (51M)
 - **Sources JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT-sources.jar` (41K)
 - **Javadoc JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT-javadoc.jar` (267K)
 
