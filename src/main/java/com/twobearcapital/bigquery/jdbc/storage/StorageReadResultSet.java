@@ -77,9 +77,10 @@ public class StorageReadResultSet extends BQResultSet {
 
 		this.tableId = tableId;
 
+		BigQueryReadClient tempClient = null;
 		try {
 			// Create Storage Read API client
-			this.readClient = BigQueryReadClient.create();
+			tempClient = BigQueryReadClient.create();
 
 			// Create read session
 			this.readSession = createReadSession();
@@ -91,10 +92,22 @@ public class StorageReadResultSet extends BQResultSet {
 			if (readSession.getStreamsCount() > 0) {
 				String streamName = readSession.getStreams(0).getName();
 				ReadRowsRequest request = ReadRowsRequest.newBuilder().setReadStream(streamName).build();
-				this.currentStream = readClient.readRowsCallable().call(request);
+				this.currentStream = tempClient.readRowsCallable().call(request);
 			}
 
+			// Only assign to field after successful initialization
+			this.readClient = tempClient;
+
 		} catch (IOException e) {
+			// Clean up on failure to prevent resource leak
+			if (tempClient != null) {
+				try {
+					tempClient.close();
+				} catch (Exception closeEx) {
+					// Log but don't mask original exception
+					e.addSuppressed(closeEx);
+				}
+			}
 			throw new SQLException("Failed to initialize Storage API read session", e);
 		}
 	}

@@ -154,19 +154,49 @@ public class BQResultSet extends BaseCloseable implements ReadOnlyResultSetMixin
 	@Override
 	public byte getByte(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? 0 : (byte) value.getLongValue();
+		if (value.isNull()) {
+			return 0;
+		}
+		long longValue = value.getLongValue();
+		if (longValue < Byte.MIN_VALUE || longValue > Byte.MAX_VALUE) {
+			throw new BQSQLException(
+				String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "byte", longValue),
+				BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE
+			);
+		}
+		return (byte) longValue;
 	}
 
 	@Override
 	public short getShort(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? 0 : (short) value.getLongValue();
+		if (value.isNull()) {
+			return 0;
+		}
+		long longValue = value.getLongValue();
+		if (longValue < Short.MIN_VALUE || longValue > Short.MAX_VALUE) {
+			throw new BQSQLException(
+				String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "short", longValue),
+				BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE
+			);
+		}
+		return (short) longValue;
 	}
 
 	@Override
 	public int getInt(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? 0 : (int) value.getLongValue();
+		if (value.isNull()) {
+			return 0;
+		}
+		long longValue = value.getLongValue();
+		if (longValue < Integer.MIN_VALUE || longValue > Integer.MAX_VALUE) {
+			throw new BQSQLException(
+				String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "int", longValue),
+				BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE
+			);
+		}
+		return (int) longValue;
 	}
 
 	@Override

@@ -16,6 +16,7 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
+import com.twobearcapital.bigquery.jdbc.metadata.MetadataColumns;
 import java.sql.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -693,12 +694,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			logger.info("Lazy loading enabled: returning empty table list (no patterns specified) - catalog: [{}]",
 					catalog);
 			return createResultSet(
-					new String[]{"TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "TABLE_TYPE", "REMARKS", "TYPE_CAT",
-							"TYPE_SCHEM", "TYPE_NAME", "SELF_REFERENCING_COL_NAME", "REF_GENERATION"},
-					new int[]{java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR,
-							java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR,
-							java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR,
-							java.sql.Types.VARCHAR},
+					MetadataColumns.Tables.COLUMN_NAMES,
+					MetadataColumns.Tables.COLUMN_TYPES,
 					new java.util.ArrayList<>());
 		}
 
@@ -731,11 +728,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		logger.info("getTables() returning {} table(s)", rows.size());
 
 		return createResultSet(
-				new String[]{"TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "TABLE_TYPE", "REMARKS", "TYPE_CAT",
-						"TYPE_SCHEM", "TYPE_NAME", "SELF_REFERENCING_COL_NAME", "REF_GENERATION"},
-				new int[]{java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR,
-						java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR,
-						java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR},
+				MetadataColumns.Tables.COLUMN_NAMES,
+				MetadataColumns.Tables.COLUMN_TYPES,
 				rows);
 	}
 
@@ -860,7 +854,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			java.util.List<Object[]> rows = new java.util.ArrayList<>();
 			rows.add(new Object[]{projectId});
 
-			return createResultSet(new String[]{"TABLE_CAT"}, new int[]{java.sql.Types.VARCHAR}, rows);
+			return createResultSet(MetadataColumns.Catalogs.COLUMN_NAMES, MetadataColumns.Catalogs.COLUMN_TYPES, rows);
 		});
 	}
 
@@ -874,7 +868,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			rows.add(new Object[]{"VIEW"});
 			rows.add(new Object[]{"MATERIALIZED VIEW"});
 
-			return createResultSet(new String[]{"TABLE_TYPE"}, new int[]{java.sql.Types.VARCHAR}, rows);
+			return createResultSet(MetadataColumns.TableTypes.COLUMN_NAMES, MetadataColumns.TableTypes.COLUMN_TYPES, rows);
 		});
 	}
 
@@ -1034,36 +1028,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 					"Lazy loading enabled: returning empty column list (no table pattern specified) - catalog: [{}], schemaPattern: [{}]",
 					catalog, schemaPattern);
 			return createResultSet(
-					new String[]{"TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME", "DATA_TYPE", "TYPE_NAME",
-							"COLUMN_SIZE", "BUFFER_LENGTH", "DECIMAL_DIGITS", "NUM_PREC_RADIX", "NULLABLE", "REMARKS",
-							"COLUMN_DEF", "SQL_DATA_TYPE", "SQL_DATETIME_SUB", "CHAR_OCTET_LENGTH", "ORDINAL_POSITION",
-							"IS_NULLABLE", "SCOPE_CATALOG", "SCOPE_SCHEMA", "SCOPE_TABLE", "SOURCE_DATA_TYPE",
-							"IS_AUTOINCREMENT", "IS_GENERATEDCOLUMN"},
-					new int[]{java.sql.Types.VARCHAR, // TABLE_CAT
-							java.sql.Types.VARCHAR, // TABLE_SCHEM
-							java.sql.Types.VARCHAR, // TABLE_NAME
-							java.sql.Types.VARCHAR, // COLUMN_NAME
-							java.sql.Types.INTEGER, // DATA_TYPE
-							java.sql.Types.VARCHAR, // TYPE_NAME
-							java.sql.Types.INTEGER, // COLUMN_SIZE
-							java.sql.Types.INTEGER, // BUFFER_LENGTH
-							java.sql.Types.INTEGER, // DECIMAL_DIGITS
-							java.sql.Types.INTEGER, // NUM_PREC_RADIX
-							java.sql.Types.INTEGER, // NULLABLE
-							java.sql.Types.VARCHAR, // REMARKS
-							java.sql.Types.VARCHAR, // COLUMN_DEF
-							java.sql.Types.INTEGER, // SQL_DATA_TYPE
-							java.sql.Types.INTEGER, // SQL_DATETIME_SUB
-							java.sql.Types.INTEGER, // CHAR_OCTET_LENGTH
-							java.sql.Types.INTEGER, // ORDINAL_POSITION
-							java.sql.Types.VARCHAR, // IS_NULLABLE
-							java.sql.Types.VARCHAR, // SCOPE_CATALOG
-							java.sql.Types.VARCHAR, // SCOPE_SCHEMA
-							java.sql.Types.VARCHAR, // SCOPE_TABLE
-							java.sql.Types.SMALLINT, // SOURCE_DATA_TYPE
-							java.sql.Types.VARCHAR, // IS_AUTOINCREMENT
-							java.sql.Types.VARCHAR // IS_GENERATEDCOLUMN
-					}, new java.util.ArrayList<>());
+					MetadataColumns.Columns.COLUMN_NAMES,
+					MetadataColumns.Columns.COLUMN_TYPES,
+					new java.util.ArrayList<>());
 		}
 
 		// Get datasets matching schema pattern
@@ -1090,36 +1057,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		}
 
 		return createResultSet(
-				new String[]{"TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME", "DATA_TYPE", "TYPE_NAME",
-						"COLUMN_SIZE", "BUFFER_LENGTH", "DECIMAL_DIGITS", "NUM_PREC_RADIX", "NULLABLE", "REMARKS",
-						"COLUMN_DEF", "SQL_DATA_TYPE", "SQL_DATETIME_SUB", "CHAR_OCTET_LENGTH", "ORDINAL_POSITION",
-						"IS_NULLABLE", "SCOPE_CATALOG", "SCOPE_SCHEMA", "SCOPE_TABLE", "SOURCE_DATA_TYPE",
-						"IS_AUTOINCREMENT", "IS_GENERATEDCOLUMN"},
-				new int[]{java.sql.Types.VARCHAR, // TABLE_CAT
-						java.sql.Types.VARCHAR, // TABLE_SCHEM
-						java.sql.Types.VARCHAR, // TABLE_NAME
-						java.sql.Types.VARCHAR, // COLUMN_NAME
-						java.sql.Types.INTEGER, // DATA_TYPE
-						java.sql.Types.VARCHAR, // TYPE_NAME
-						java.sql.Types.INTEGER, // COLUMN_SIZE
-						java.sql.Types.INTEGER, // BUFFER_LENGTH
-						java.sql.Types.INTEGER, // DECIMAL_DIGITS
-						java.sql.Types.INTEGER, // NUM_PREC_RADIX
-						java.sql.Types.INTEGER, // NULLABLE
-						java.sql.Types.VARCHAR, // REMARKS
-						java.sql.Types.VARCHAR, // COLUMN_DEF
-						java.sql.Types.INTEGER, // SQL_DATA_TYPE
-						java.sql.Types.INTEGER, // SQL_DATETIME_SUB
-						java.sql.Types.INTEGER, // CHAR_OCTET_LENGTH
-						java.sql.Types.INTEGER, // ORDINAL_POSITION
-						java.sql.Types.VARCHAR, // IS_NULLABLE
-						java.sql.Types.VARCHAR, // SCOPE_CATALOG
-						java.sql.Types.VARCHAR, // SCOPE_SCHEMA
-						java.sql.Types.VARCHAR, // SCOPE_TABLE
-						java.sql.Types.SMALLINT, // SOURCE_DATA_TYPE
-						java.sql.Types.VARCHAR, // IS_AUTOINCREMENT
-						java.sql.Types.VARCHAR // IS_GENERATEDCOLUMN
-				}, rows);
+				MetadataColumns.Columns.COLUMN_NAMES,
+				MetadataColumns.Columns.COLUMN_TYPES,
+				rows);
 	}
 
 	@Override
@@ -1153,9 +1093,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		// BigQuery doesn't have traditional primary keys, return empty result set
 		return createResultSet(
-				new String[]{"TABLE_CAT", "TABLE_SCHEM", "TABLE_NAME", "COLUMN_NAME", "KEY_SEQ", "PK_NAME"},
-				new int[]{java.sql.Types.VARCHAR, java.sql.Types.VARCHAR, java.sql.Types.VARCHAR,
-						java.sql.Types.VARCHAR, java.sql.Types.SMALLINT, java.sql.Types.VARCHAR},
+				MetadataColumns.PrimaryKeys.COLUMN_NAMES,
+				MetadataColumns.PrimaryKeys.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
 
@@ -1167,24 +1106,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		// BigQuery doesn't have foreign keys, return empty result set
 		return createResultSet(
-				new String[]{"PKTABLE_CAT", "PKTABLE_SCHEM", "PKTABLE_NAME", "PKCOLUMN_NAME", "FKTABLE_CAT",
-						"FKTABLE_SCHEM", "FKTABLE_NAME", "FKCOLUMN_NAME", "KEY_SEQ", "UPDATE_RULE", "DELETE_RULE",
-						"FK_NAME", "PK_NAME", "DEFERRABILITY"},
-				new int[]{java.sql.Types.VARCHAR, // PKTABLE_CAT
-						java.sql.Types.VARCHAR, // PKTABLE_SCHEM
-						java.sql.Types.VARCHAR, // PKTABLE_NAME
-						java.sql.Types.VARCHAR, // PKCOLUMN_NAME
-						java.sql.Types.VARCHAR, // FKTABLE_CAT
-						java.sql.Types.VARCHAR, // FKTABLE_SCHEM
-						java.sql.Types.VARCHAR, // FKTABLE_NAME
-						java.sql.Types.VARCHAR, // FKCOLUMN_NAME
-						java.sql.Types.SMALLINT, // KEY_SEQ
-						java.sql.Types.SMALLINT, // UPDATE_RULE
-						java.sql.Types.SMALLINT, // DELETE_RULE
-						java.sql.Types.VARCHAR, // FK_NAME
-						java.sql.Types.VARCHAR, // PK_NAME
-						java.sql.Types.SMALLINT // DEFERRABILITY
-				}, new java.util.ArrayList<>());
+				MetadataColumns.ForeignKeys.COLUMN_NAMES,
+				MetadataColumns.ForeignKeys.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -1197,24 +1121,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// as
 		// getImportedKeys)
 		return createResultSet(
-				new String[]{"PKTABLE_CAT", "PKTABLE_SCHEM", "PKTABLE_NAME", "PKCOLUMN_NAME", "FKTABLE_CAT",
-						"FKTABLE_SCHEM", "FKTABLE_NAME", "FKCOLUMN_NAME", "KEY_SEQ", "UPDATE_RULE", "DELETE_RULE",
-						"FK_NAME", "PK_NAME", "DEFERRABILITY"},
-				new int[]{java.sql.Types.VARCHAR, // PKTABLE_CAT
-						java.sql.Types.VARCHAR, // PKTABLE_SCHEM
-						java.sql.Types.VARCHAR, // PKTABLE_NAME
-						java.sql.Types.VARCHAR, // PKCOLUMN_NAME
-						java.sql.Types.VARCHAR, // FKTABLE_CAT
-						java.sql.Types.VARCHAR, // FKTABLE_SCHEM
-						java.sql.Types.VARCHAR, // FKTABLE_NAME
-						java.sql.Types.VARCHAR, // FKCOLUMN_NAME
-						java.sql.Types.SMALLINT, // KEY_SEQ
-						java.sql.Types.SMALLINT, // UPDATE_RULE
-						java.sql.Types.SMALLINT, // DELETE_RULE
-						java.sql.Types.VARCHAR, // FK_NAME
-						java.sql.Types.VARCHAR, // PK_NAME
-						java.sql.Types.SMALLINT // DEFERRABILITY
-				}, new java.util.ArrayList<>());
+				MetadataColumns.ForeignKeys.COLUMN_NAMES,
+				MetadataColumns.ForeignKeys.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -1565,8 +1474,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 			logger.info("getSchemas() returning {} schema(s)", rows.size());
 
-			return createResultSet(new String[]{"TABLE_SCHEM", "TABLE_CATALOG"},
-					new int[]{java.sql.Types.VARCHAR, java.sql.Types.VARCHAR}, rows);
+			return createResultSet(MetadataColumns.Schemas.COLUMN_NAMES, MetadataColumns.Schemas.COLUMN_TYPES, rows);
 		});
 	}
 

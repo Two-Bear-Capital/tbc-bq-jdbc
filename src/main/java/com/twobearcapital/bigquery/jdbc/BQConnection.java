@@ -163,23 +163,34 @@ public final class BQConnection extends BaseCloseable implements Connection {
 	public void setAutoCommit(boolean autoCommit) throws SQLException {
 		checkClosed();
 
-		// If sessions are enabled, allow turning off auto-commit
-		if (!autoCommit && !properties.enableSessions()) {
-			throw new BQSQLFeatureNotSupportedException("BigQuery does not support transactions outside of sessions. "
-					+ "Enable sessions with: enableSessions=true");
-		}
+		// Thread-safe and atomic transaction state change
+		synchronized (this) {
+			// If already in the desired state, nothing to do
+			if (this.autoCommit == autoCommit) {
+				return;
+			}
 
-		// Begin transaction when turning off auto-commit in session mode
-		if (!autoCommit && properties.enableSessions() && this.autoCommit) {
-			sessionManager.beginTransaction();
-		}
+			// Sessions required for transaction support
+			if (!autoCommit && !properties.enableSessions()) {
+				throw new BQSQLFeatureNotSupportedException("BigQuery does not support transactions outside of sessions. "
+						+ "Enable sessions with: enableSessions=true");
+			}
 
-		// Commit pending transaction when turning on auto-commit
-		if (autoCommit && properties.enableSessions() && !this.autoCommit) {
-			sessionManager.commit();
-		}
+			// Change state atomically - only update flag if operations succeed
+			if (autoCommit) {
+				// Switching to auto-commit: commit pending transaction first
+				if (properties.enableSessions()) {
+					sessionManager.commit();
+				}
+				this.autoCommit = true;
+			} else {
+				// Switching to manual commit: begin transaction
+				sessionManager.beginTransaction();
+				this.autoCommit = false;
+			}
 
-		this.autoCommit = autoCommit;
+			logger.debug("Auto-commit set to: {}", autoCommit);
+		}
 	}
 
 	@Override
@@ -444,11 +455,29 @@ public final class BQConnection extends BaseCloseable implements Connection {
 
 	@Override
 	public boolean isValid(int timeout) throws SQLException {
+		if (timeout < 0) {
+			throw new BQSQLException(
+				ErrorMessages.NEGATIVE_TIMEOUT,
+				BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE
+			);
+		}
+
 		if (closed) {
 			return false;
 		}
-		// Could implement a simple query like SELECT 1 to verify connection
-		return true;
+
+		// Validate connection by executing a simple query
+		try (Statement stmt = createStatement()) {
+			if (timeout > 0) {
+				stmt.setQueryTimeout(timeout);
+			}
+			try (ResultSet rs = stmt.executeQuery("SELECT 1")) {
+				return rs.next();
+			}
+		} catch (SQLException e) {
+			logger.debug("Connection validation failed", e);
+			return false;
+		}
 	}
 
 	@Override

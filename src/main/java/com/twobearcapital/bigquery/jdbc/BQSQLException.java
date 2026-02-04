@@ -42,6 +42,12 @@ public class BQSQLException extends SQLException {
 	/** SQLState for feature not supported. */
 	public static final String SQLSTATE_FEATURE_NOT_SUPPORTED = "0A000";
 
+	/** SQLState for invalid parameter value. */
+	public static final String SQLSTATE_INVALID_PARAMETER_VALUE = "22023";
+
+	/** SQLState for numeric value out of range. */
+	public static final String SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE = "22003";
+
 	public BQSQLException(String reason) {
 		super(reason);
 	}

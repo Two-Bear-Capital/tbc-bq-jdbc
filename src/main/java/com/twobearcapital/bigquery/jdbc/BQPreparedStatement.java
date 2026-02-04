@@ -16,6 +16,7 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.*;
+import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -48,10 +49,26 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
 		this.sqlTemplate = sql;
 	}
 
+	private void validateParameterIndex(int parameterIndex) throws SQLException {
+		if (parameterIndex < 1) {
+			throw new BQSQLException(
+				String.format(ErrorMessages.INVALID_PARAMETER_INDEX, parameterIndex),
+				BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE
+			);
+		}
+	}
+
 	private void ensureCapacity(int parameterIndex) {
 		while (parameters.size() < parameterIndex) {
 			parameters.add(null);
 		}
+	}
+
+	private void setParameter(int parameterIndex, QueryParameterValue value) throws SQLException {
+		checkClosed();
+		validateParameterIndex(parameterIndex);
+		ensureCapacity(parameterIndex);
+		parameters.set(parameterIndex - 1, value);
 	}
 
 	@Override
@@ -79,100 +96,84 @@ public final class BQPreparedStatement extends BQStatement implements PreparedSt
 
 	@Override
 	public void setNull(int parameterIndex, int sqlType) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.string(null));
+		setParameter(parameterIndex, QueryParameterValue.string(null));
 	}
 
 	@Override
 	public void setBoolean(int parameterIndex, boolean x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.bool(x));
+		setParameter(parameterIndex, QueryParameterValue.bool(x));
 	}
 
 	@Override
 	public void setByte(int parameterIndex, byte x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.int64((long) x));
+		setParameter(parameterIndex, QueryParameterValue.int64((long) x));
 	}
 
 	@Override
 	public void setShort(int parameterIndex, short x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.int64((long) x));
+		setParameter(parameterIndex, QueryParameterValue.int64((long) x));
 	}
 
 	@Override
 	public void setInt(int parameterIndex, int x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.int64((long) x));
+		setParameter(parameterIndex, QueryParameterValue.int64((long) x));
 	}
 
 	@Override
 	public void setLong(int parameterIndex, long x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.int64(x));
+		setParameter(parameterIndex, QueryParameterValue.int64(x));
 	}
 
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.float64((double) x));
+		setParameter(parameterIndex, QueryParameterValue.float64((double) x));
 	}
 
 	@Override
 	public void setDouble(int parameterIndex, double x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.float64(x));
+		setParameter(parameterIndex, QueryParameterValue.float64(x));
 	}
 
 	@Override
 	public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.numeric(x));
+		setParameter(parameterIndex, QueryParameterValue.numeric(x));
 	}
 
 	@Override
 	public void setString(int parameterIndex, String x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.string(x));
+		setParameter(parameterIndex, QueryParameterValue.string(x));
 	}
 
 	@Override
 	public void setBytes(int parameterIndex, byte[] x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.bytes(x));
+		setParameter(parameterIndex, QueryParameterValue.bytes(x));
 	}
 
 	@Override
 	public void setDate(int parameterIndex, Date x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.date(x.toString()));
+		if (x == null) {
+			setNull(parameterIndex, Types.DATE);
+		} else {
+			setParameter(parameterIndex, QueryParameterValue.date(x.toString()));
+		}
 	}
 
 	@Override
 	public void setTime(int parameterIndex, Time x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.time(x.toString()));
+		if (x == null) {
+			setNull(parameterIndex, Types.TIME);
+		} else {
+			setParameter(parameterIndex, QueryParameterValue.time(x.toString()));
+		}
 	}
 
 	@Override
 	public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
-		checkClosed();
-		ensureCapacity(parameterIndex);
-		parameters.set(parameterIndex - 1, QueryParameterValue.timestamp(x.toInstant().toString()));
+		if (x == null) {
+			setNull(parameterIndex, Types.TIMESTAMP);
+		} else {
+			setParameter(parameterIndex, QueryParameterValue.timestamp(x.toInstant().toString()));
+		}
 	}
 
 	@Override
