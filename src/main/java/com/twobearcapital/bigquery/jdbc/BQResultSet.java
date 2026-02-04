@@ -19,6 +19,7 @@ import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.TableResult;
 import com.twobearcapital.bigquery.jdbc.base.BaseCloseable;
+import com.twobearcapital.bigquery.jdbc.base.ReadOnlyResultSetMixin;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.io.InputStream;
 import java.io.Reader;
@@ -40,7 +41,7 @@ import org.slf4j.LoggerFactory;
  *
  * @since 1.0.0
  */
-public class BQResultSet extends BaseCloseable implements ResultSet {
+public class BQResultSet extends BaseCloseable implements ReadOnlyResultSetMixin {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQResultSet.class);
 

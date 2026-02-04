@@ -16,6 +16,7 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.twobearcapital.bigquery.jdbc.base.BaseCloseable;
+import com.twobearcapital.bigquery.jdbc.base.ReadOnlyResultSetMixin;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.io.InputStream;
 import java.io.Reader;
@@ -34,7 +35,7 @@ import java.util.*;
  *
  * @since 1.0.0
  */
-final class MetadataResultSet extends BaseCloseable implements ResultSet {
+final class MetadataResultSet extends BaseCloseable implements ReadOnlyResultSetMixin {
 
 	private final String[] columnNames;
 	private final int[] columnTypes;
