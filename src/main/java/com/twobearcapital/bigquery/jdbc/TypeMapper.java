@@ -86,7 +86,7 @@ public final class TypeMapper {
 		}
 
 		return switch (bqType) {
-			case STRING -> String.class.getName();
+			case STRING, GEOGRAPHY, JSON, INTERVAL -> String.class.getName();
 			case BYTES -> byte[].class.getName();
 			case INT64 -> Long.class.getName();
 			case FLOAT64 -> Double.class.getName();
@@ -95,8 +95,7 @@ public final class TypeMapper {
 			case TIMESTAMP, DATETIME -> java.sql.Timestamp.class.getName();
 			case DATE -> java.sql.Date.class.getName();
 			case TIME -> java.sql.Time.class.getName();
-			case GEOGRAPHY, JSON, INTERVAL -> String.class.getName();
-			case STRUCT -> java.util.Map.class.getName();
+            case STRUCT -> java.util.Map.class.getName();
 			case ARRAY -> java.util.List.class.getName();
 			default -> Object.class.getName();
 		};
@@ -159,12 +158,9 @@ public final class TypeMapper {
 	 */
 	public static StandardSQLTypeName toBigQueryType(int jdbcType) {
 		return switch (jdbcType) {
-			case Types.VARCHAR, Types.CHAR, Types.LONGVARCHAR, Types.NVARCHAR, Types.NCHAR ->
-				StandardSQLTypeName.STRING;
-			case Types.VARBINARY, Types.BINARY, Types.LONGVARBINARY -> StandardSQLTypeName.BYTES;
-			case Types.BIGINT -> StandardSQLTypeName.INT64;
-			case Types.INTEGER, Types.SMALLINT, Types.TINYINT -> StandardSQLTypeName.INT64;
-			case Types.DOUBLE, Types.FLOAT, Types.REAL -> StandardSQLTypeName.FLOAT64;
+            case Types.VARBINARY, Types.BINARY, Types.LONGVARBINARY -> StandardSQLTypeName.BYTES;
+			case Types.BIGINT, Types.INTEGER, Types.SMALLINT, Types.TINYINT -> StandardSQLTypeName.INT64;
+            case Types.DOUBLE, Types.FLOAT, Types.REAL -> StandardSQLTypeName.FLOAT64;
 			case Types.NUMERIC, Types.DECIMAL -> StandardSQLTypeName.NUMERIC;
 			case Types.BOOLEAN, Types.BIT -> StandardSQLTypeName.BOOL;
 			case Types.TIMESTAMP, Types.TIMESTAMP_WITH_TIMEZONE -> StandardSQLTypeName.TIMESTAMP;
