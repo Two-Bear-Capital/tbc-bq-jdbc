@@ -15,6 +15,8 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
+import com.twobearcapital.bigquery.jdbc.util.NumberParser;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -58,9 +60,9 @@ public final class DriverVersion {
 		Properties versionProps = loadVersionProperties();
 		VERSION_STRING = parseVersionString(versionProps.getProperty("driver.version", "0.0.0"));
 		String[] parts = parseVersionParts(VERSION_STRING);
-		MAJOR_VERSION = Integer.parseInt(parts[0]);
-		MINOR_VERSION = Integer.parseInt(parts[1]);
-		PATCH_VERSION = Integer.parseInt(parts[2]);
+		MAJOR_VERSION = NumberParser.parseInt(parts[0], 0);
+		MINOR_VERSION = NumberParser.parseInt(parts[1], 0);
+		PATCH_VERSION = NumberParser.parseInt(parts[2], 0);
 		logger.debug("Loaded driver version: {}", VERSION_STRING);
 
 		// Load Git build information

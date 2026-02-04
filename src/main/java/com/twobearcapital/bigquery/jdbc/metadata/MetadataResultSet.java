@@ -17,6 +17,7 @@ package com.twobearcapital.bigquery.jdbc.metadata;
 
 import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
+import com.twobearcapital.bigquery.jdbc.util.NumberParser;
 
 import java.math.BigDecimal;
 import java.sql.*;
@@ -169,74 +170,39 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 
 	@Override
 	public byte getByte(int columnIndex) throws SQLException {
-		Object value = getValue(columnIndex);
-		if (value == null)
-			return 0;
-		if (value instanceof Number)
-			return ((Number) value).byteValue();
-		return Byte.parseByte(value.toString());
+		return NumberParser.toByte(getValue(columnIndex), columnIndex);
 	}
 
 	@Override
 	public short getShort(int columnIndex) throws SQLException {
-		Object value = getValue(columnIndex);
-		if (value == null)
-			return 0;
-		if (value instanceof Number)
-			return ((Number) value).shortValue();
-		return Short.parseShort(value.toString());
+		return NumberParser.toShort(getValue(columnIndex), columnIndex);
 	}
 
 	@Override
 	public int getInt(int columnIndex) throws SQLException {
-		Object value = getValue(columnIndex);
-		if (value == null)
-			return 0;
-		if (value instanceof Number)
-			return ((Number) value).intValue();
-		return Integer.parseInt(value.toString());
+		return NumberParser.toInt(getValue(columnIndex), columnIndex);
 	}
 
 	@Override
 	public long getLong(int columnIndex) throws SQLException {
-		Object value = getValue(columnIndex);
-		if (value == null)
-			return 0;
-		if (value instanceof Number)
-			return ((Number) value).longValue();
-		return Long.parseLong(value.toString());
+		return NumberParser.toLong(getValue(columnIndex), columnIndex);
 	}
 
 	@Override
 	public float getFloat(int columnIndex) throws SQLException {
-		Object value = getValue(columnIndex);
-		if (value == null)
-			return 0;
-		if (value instanceof Number)
-			return ((Number) value).floatValue();
-		return Float.parseFloat(value.toString());
+		return NumberParser.toFloat(getValue(columnIndex), columnIndex);
 	}
 
 	@Override
 	public double getDouble(int columnIndex) throws SQLException {
-		Object value = getValue(columnIndex);
-		if (value == null)
-			return 0;
-		if (value instanceof Number)
-			return ((Number) value).doubleValue();
-		return Double.parseDouble(value.toString());
+		return NumberParser.toDouble(getValue(columnIndex), columnIndex);
 	}
 
 	@Deprecated
 	@SuppressWarnings("deprecation")
 	@Override
 	public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
-		Object value = getValue(columnIndex);
-		if (value == null)
-			return null;
-		if (value instanceof BigDecimal)
-			return (BigDecimal) value;
-		return new BigDecimal(value.toString());
+		return NumberParser.toBigDecimal(getValue(columnIndex), columnIndex);
 	}
 
 	@Override

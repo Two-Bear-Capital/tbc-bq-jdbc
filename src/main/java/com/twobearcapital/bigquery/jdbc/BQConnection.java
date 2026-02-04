@@ -146,25 +146,30 @@ public final class BQConnection extends AbstractBQConnection {
 		runningStatements.remove(statement);
 	}
 
+	@Override
 	protected String getClosedErrorMessage() {
 		return ErrorMessages.CONNECTION_CLOSED;
 	}
 
+	@Override
 	public Statement createStatement() throws SQLException {
 		checkClosed();
 		return new BQStatement(this);
 	}
 
+	@Override
 	public PreparedStatement prepareStatement(String sql) throws SQLException {
 		checkClosed();
 		return new BQPreparedStatement(this, sql);
 	}
 
+	@Override
 	public String nativeSQL(String sql) throws SQLException {
 		checkClosed();
 		return sql;
 	}
 
+	@Override
 	public void setAutoCommit(boolean autoCommit) throws SQLException {
 		checkClosed();
 
@@ -199,11 +204,13 @@ public final class BQConnection extends AbstractBQConnection {
 		}
 	}
 
+	@Override
 	public boolean getAutoCommit() throws SQLException {
 		checkClosed();
 		return autoCommit;
 	}
 
+	@Override
 	public void commit() throws SQLException {
 		checkClosed();
 
@@ -217,6 +224,7 @@ public final class BQConnection extends AbstractBQConnection {
 				+ "Enable sessions with: enableSessions=true");
 	}
 
+	@Override
 	public void rollback() throws SQLException {
 		checkClosed();
 
@@ -230,6 +238,7 @@ public final class BQConnection extends AbstractBQConnection {
 				+ "Enable sessions with: enableSessions=true");
 	}
 
+	@Override
 	protected void doClose() throws SQLException {
 		logger.debug("Closing BigQuery connection");
 
@@ -253,36 +262,43 @@ public final class BQConnection extends AbstractBQConnection {
 		logger.info("BigQuery connection closed");
 	}
 
+	@Override
 	public boolean isClosed() {
 		return closed;
 	}
 
+	@Override
 	public DatabaseMetaData getMetaData() throws SQLException {
 		checkClosed();
 		return new BQDatabaseMetaData(this);
 	}
 
+	@Override
 	public void setReadOnly(boolean readOnly) throws SQLException {
 		checkClosed();
 		this.readOnly = readOnly;
 	}
 
+	@Override
 	public boolean isReadOnly() throws SQLException {
 		checkClosed();
 		return readOnly;
 	}
 
+	@Override
 	public void setCatalog(String catalog) throws SQLException {
 		checkClosed();
 		// BigQuery uses project as catalog, but we don't allow changing it
 		logger.debug("setCatalog called with: {} (ignored)", catalog);
 	}
 
+	@Override
 	public String getCatalog() throws SQLException {
 		checkClosed();
 		return properties.projectId();
 	}
 
+	@Override
 	public void setTransactionIsolation(int level) throws SQLException {
 		checkClosed();
 		if (level != Connection.TRANSACTION_NONE) {
@@ -290,20 +306,24 @@ public final class BQConnection extends AbstractBQConnection {
 		}
 	}
 
+	@Override
 	public int getTransactionIsolation() throws SQLException {
 		checkClosed();
 		return Connection.TRANSACTION_NONE;
 	}
 
+	@Override
 	public SQLWarning getWarnings() throws SQLException {
 		checkClosed();
 		return null;
 	}
 
+	@Override
 	public void clearWarnings() throws SQLException {
 		checkClosed();
 	}
 
+	@Override
 	public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
 		checkClosed();
 		if (resultSetType != ResultSet.TYPE_FORWARD_ONLY) {
@@ -315,6 +335,7 @@ public final class BQConnection extends AbstractBQConnection {
 		return createStatement();
 	}
 
+	@Override
 	public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
 			throws SQLException {
 		checkClosed();
@@ -327,11 +348,13 @@ public final class BQConnection extends AbstractBQConnection {
 		return prepareStatement(sql);
 	}
 
+	@Override
 	public Map<String, Class<?>> getTypeMap() throws SQLException {
 		checkClosed();
 		return Map.of();
 	}
 
+	@Override
 	public void setHoldability(int holdability) throws SQLException {
 		checkClosed();
 		if (holdability != ResultSet.CLOSE_CURSORS_AT_COMMIT) {
@@ -339,11 +362,13 @@ public final class BQConnection extends AbstractBQConnection {
 		}
 	}
 
+	@Override
 	public int getHoldability() throws SQLException {
 		checkClosed();
 		return ResultSet.CLOSE_CURSORS_AT_COMMIT;
 	}
 
+	@Override
 	public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
 			throws SQLException {
 		checkClosed();
@@ -353,6 +378,7 @@ public final class BQConnection extends AbstractBQConnection {
 		return createStatement(resultSetType, resultSetConcurrency);
 	}
 
+	@Override
 	public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
 			int resultSetHoldability) throws SQLException {
 		checkClosed();
@@ -362,6 +388,7 @@ public final class BQConnection extends AbstractBQConnection {
 		return prepareStatement(sql, resultSetType, resultSetConcurrency);
 	}
 
+	@Override
 	public boolean isValid(int timeout) throws SQLException {
 		if (timeout < 0) {
 			throw new BQSQLException(ErrorMessages.NEGATIVE_TIMEOUT, BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
@@ -385,24 +412,29 @@ public final class BQConnection extends AbstractBQConnection {
 		}
 	}
 
+	@Override
 	public void setClientInfo(String name, String value) throws SQLClientInfoException {
 		// Silently ignore
 	}
 
+	@Override
 	public void setClientInfo(Properties properties) throws SQLClientInfoException {
 		// Silently ignore
 	}
 
+	@Override
 	public String getClientInfo(String name) throws SQLException {
 		checkClosed();
 		return null;
 	}
 
+	@Override
 	public Properties getClientInfo() throws SQLException {
 		checkClosed();
 		return new Properties();
 	}
 
+	@Override
 	public void setSchema(String schema) throws SQLException {
 		checkClosed();
 		// BigQuery uses dataset as schema, but we don't allow changing it after
@@ -410,11 +442,13 @@ public final class BQConnection extends AbstractBQConnection {
 		logger.debug("setSchema called with: {} (ignored)", schema);
 	}
 
+	@Override
 	public String getSchema() throws SQLException {
 		checkClosed();
 		return properties.datasetId();
 	}
 
+	@Override
 	public void abort(Executor executor) throws SQLException {
 		if (closed) {
 			return;
@@ -422,11 +456,13 @@ public final class BQConnection extends AbstractBQConnection {
 		close();
 	}
 
+	@Override
 	public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException {
 		checkClosed();
 		this.networkTimeout = milliseconds;
 	}
 
+	@Override
 	public int getNetworkTimeout() throws SQLException {
 		checkClosed();
 		return networkTimeout;
@@ -434,11 +470,13 @@ public final class BQConnection extends AbstractBQConnection {
 
 	// JDBC 4.3 methods
 
+	@Override
 	public void beginRequest() throws SQLException {
 		checkClosed();
 		logger.debug("beginRequest called");
 	}
 
+	@Override
 	public void endRequest() throws SQLException {
 		checkClosed();
 		logger.debug("endRequest called");
