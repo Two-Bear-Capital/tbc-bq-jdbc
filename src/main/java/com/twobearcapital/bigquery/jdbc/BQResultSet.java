@@ -20,7 +20,6 @@ import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.TableResult;
 import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
-import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
 import com.twobearcapital.bigquery.jdbc.metadata.BQResultSetMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 
@@ -174,7 +173,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public boolean getBoolean(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? false : value.getBooleanValue();
+		return !value.isNull() && value.getBooleanValue();
 	}
 
 	@Override
@@ -293,7 +292,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public boolean getBoolean(String columnLabel) throws SQLException {
 		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? false : value.getBooleanValue();
+		return !value.isNull() && value.getBooleanValue();
 	}
 
 	@Override

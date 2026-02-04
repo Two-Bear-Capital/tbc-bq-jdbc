@@ -260,9 +260,9 @@ class TypeMappingTest extends AbstractBigQueryIntegrationTest {
 			assertNotNull(strObj);
 			assertNotNull(boolObj);
 
-			assertTrue(intObj instanceof Number);
-			assertTrue(strObj instanceof String);
-			assertTrue(boolObj instanceof Boolean);
+			assertInstanceOf(Number.class, intObj);
+			assertInstanceOf(String.class, strObj);
+			assertInstanceOf(Boolean.class, boolObj);
 		}
 	}
 

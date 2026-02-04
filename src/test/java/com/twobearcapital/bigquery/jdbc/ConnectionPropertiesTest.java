@@ -231,14 +231,17 @@ class ConnectionPropertiesTest {
 	void testRecordEquality() {
 		// Given: Two identical ConnectionProperties
 		AuthType auth = new ApplicationDefaultAuth();
-		ConnectionProperties props1 = new ConnectionProperties("my-project", null, null, auth, null, null, null, null,
-				false, null, null, null, null, null, false, null, null, null, null, null, null);
-		ConnectionProperties props2 = new ConnectionProperties("my-project", null, null, auth, null, null, null, null,
-				false, null, null, null, null, null, false, null, null, null, null, null, null);
+		ConnectionProperties props1 = createMinimalProps("my-project", auth);
+		ConnectionProperties props2 = createMinimalProps("my-project", auth);
 
 		// Then: They should be equal
 		assertEquals(props1, props2);
 		assertEquals(props1.hashCode(), props2.hashCode());
+	}
+
+	private ConnectionProperties createMinimalProps(String projectId, AuthType auth) {
+		return new ConnectionProperties(projectId, null, null, auth, null, null, null, null,
+				false, null, null, null, null, null, false, null, null, null, null, null, null);
 	}
 
 	@Test

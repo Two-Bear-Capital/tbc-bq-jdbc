@@ -37,14 +37,10 @@ public final class ErrorMessages {
 
 	// Parameter validation messages
 	public static final String INVALID_PARAMETER_INDEX = "Invalid parameter index: %d";
-	public static final String PARAMETER_NOT_SET = "Parameter %d has not been set";
-	public static final String INVALID_COLUMN_INDEX = "Invalid column index: %d";
-	public static final String INVALID_COLUMN_LABEL = "Invalid column label: %s";
 	public static final String NEGATIVE_TIMEOUT = "Timeout value must be non-negative";
 
 	// Type conversion messages
 	public static final String VALUE_OUT_OF_RANGE = "Value out of range for type %s: %s";
-	public static final String INVALID_TYPE_CONVERSION = "Cannot convert value to type %s";
 
 	private ErrorMessages() {
 		throw new AssertionError("Utility class should not be instantiated");

@@ -180,7 +180,7 @@ public final class BQResultSetMetaData extends BaseJdbcWrapper implements Result
 			return "STRUCT<" + formatStructFields(field.getSubFields()) + ">";
 		} else if (type == StandardSQLTypeName.ARRAY) {
 			// For ARRAY, return the element type
-			Field elementField = field.getSubFields().get(0);
+			Field elementField = field.getSubFields().getFirst();
 			return "ARRAY<" + elementField.getType().getStandardType().name() + ">";
 		}
 

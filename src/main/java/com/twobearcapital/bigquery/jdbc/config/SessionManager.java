@@ -55,7 +55,6 @@ public class SessionManager {
 	private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
 
 	private final BigQuery bigquery;
-	private final ConnectionProperties properties;
 	private final ReentrantLock lock = new ReentrantLock();
 	private String sessionId;
 	private boolean closed = false;
@@ -70,7 +69,6 @@ public class SessionManager {
 	 */
 	public SessionManager(BigQuery bigquery, ConnectionProperties properties) {
 		this.bigquery = bigquery;
-		this.properties = properties;
 	}
 
 	/**

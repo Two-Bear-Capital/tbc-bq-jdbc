@@ -187,26 +187,20 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		checkClosed();
 		if (x == null) {
 			setNull(parameterIndex, Types.NULL);
-		} else if (x instanceof String) {
-			setString(parameterIndex, (String) x);
-		} else if (x instanceof Integer) {
-			setInt(parameterIndex, (Integer) x);
-		} else if (x instanceof Long) {
-			setLong(parameterIndex, (Long) x);
-		} else if (x instanceof Double) {
-			setDouble(parameterIndex, (Double) x);
-		} else if (x instanceof Boolean) {
-			setBoolean(parameterIndex, (Boolean) x);
-		} else if (x instanceof BigDecimal) {
-			setBigDecimal(parameterIndex, (BigDecimal) x);
-		} else if (x instanceof Timestamp) {
-			setTimestamp(parameterIndex, (Timestamp) x);
-		} else if (x instanceof Date) {
-			setDate(parameterIndex, (Date) x);
-		} else if (x instanceof Time) {
-			setTime(parameterIndex, (Time) x);
-		} else {
-			throw new SQLException("Unsupported parameter type: " + x.getClass().getName());
+			return;
+		}
+
+		switch (x) {
+			case String s -> setString(parameterIndex, s);
+			case Integer i -> setInt(parameterIndex, i);
+			case Long l -> setLong(parameterIndex, l);
+			case Double d -> setDouble(parameterIndex, d);
+			case Boolean b -> setBoolean(parameterIndex, b);
+			case BigDecimal bd -> setBigDecimal(parameterIndex, bd);
+			case Timestamp ts -> setTimestamp(parameterIndex, ts);
+			case Date dt -> setDate(parameterIndex, dt);
+			case Time t -> setTime(parameterIndex, t);
+			default -> throw new SQLException("Unsupported parameter type: " + x.getClass().getName());
 		}
 	}
 

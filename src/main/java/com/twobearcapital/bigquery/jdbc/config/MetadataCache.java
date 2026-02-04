@@ -105,12 +105,10 @@ public final class MetadataCache {
 	 *             if an error occurs reading the ResultSet
 	 */
 	public void put(String key, ResultSet resultSet) throws SQLException {
-		if (!(resultSet instanceof MetadataResultSet)) {
+		if (!(resultSet instanceof MetadataResultSet metadataResultSet)) {
 			logger.warn("Cannot cache non-MetadataResultSet: {}", resultSet.getClass().getName());
 			return;
 		}
-
-		MetadataResultSet metadataResultSet = (MetadataResultSet) resultSet;
 
 		// Extract the data from MetadataResultSet
 		String[] columnNames = metadataResultSet.getColumnNames();

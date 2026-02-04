@@ -47,16 +47,12 @@ public final class TypeMapper {
 			case BYTES -> Types.VARBINARY;
 			case INT64 -> Types.BIGINT;
 			case FLOAT64 -> Types.DOUBLE;
-			case NUMERIC -> Types.NUMERIC;
-			case BIGNUMERIC -> Types.NUMERIC;
+			case NUMERIC, BIGNUMERIC -> Types.NUMERIC;
 			case BOOL -> Types.BOOLEAN;
-			case TIMESTAMP -> Types.TIMESTAMP;
+			case TIMESTAMP, DATETIME -> Types.TIMESTAMP;
 			case DATE -> Types.DATE;
 			case TIME -> Types.TIME;
-			case DATETIME -> Types.TIMESTAMP;
-			case GEOGRAPHY -> Types.VARCHAR; // Represented as WKT string
-			case JSON -> Types.VARCHAR; // Represented as JSON string
-			case INTERVAL -> Types.VARCHAR; // Represented as string
+			case GEOGRAPHY, JSON, INTERVAL -> Types.VARCHAR; // Represented as WKT/JSON/string
 			case STRUCT -> Types.STRUCT;
 			case ARRAY -> Types.ARRAY;
 			default -> Types.OTHER;
@@ -96,10 +92,9 @@ public final class TypeMapper {
 			case FLOAT64 -> Double.class.getName();
 			case NUMERIC, BIGNUMERIC -> java.math.BigDecimal.class.getName();
 			case BOOL -> Boolean.class.getName();
-			case TIMESTAMP -> java.sql.Timestamp.class.getName();
+			case TIMESTAMP, DATETIME -> java.sql.Timestamp.class.getName();
 			case DATE -> java.sql.Date.class.getName();
 			case TIME -> java.sql.Time.class.getName();
-			case DATETIME -> java.sql.Timestamp.class.getName();
 			case GEOGRAPHY, JSON, INTERVAL -> String.class.getName();
 			case STRUCT -> java.util.Map.class.getName();
 			case ARRAY -> java.util.List.class.getName();
@@ -129,8 +124,7 @@ public final class TypeMapper {
 			case BOOL -> 1;
 			case DATE -> 10; // YYYY-MM-DD
 			case TIME -> 12; // HH:MM:SS.FFF
-			case DATETIME -> 26; // YYYY-MM-DD HH:MM:SS.FFFFFF
-			case TIMESTAMP -> 26; // YYYY-MM-DD HH:MM:SS.FFFFFF
+			case DATETIME, TIMESTAMP -> 26; // YYYY-MM-DD HH:MM:SS.FFFFFF
 			case GEOGRAPHY, JSON, INTERVAL -> 2097152; // Max string size
 			default -> 0;
 		};

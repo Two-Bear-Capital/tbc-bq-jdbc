@@ -59,7 +59,6 @@ public class StorageReadResultSet extends BQResultSet {
 
 	private final BigQueryReadClient readClient;
 	private final TableId tableId;
-	private final ReadSession readSession;
 	private ServerStream<ReadRowsResponse> currentStream;
 
 	/**
@@ -83,7 +82,7 @@ public class StorageReadResultSet extends BQResultSet {
 			tempClient = BigQueryReadClient.create();
 
 			// Create read session
-			this.readSession = createReadSession();
+			ReadSession readSession = createReadSession();
 
 			logger.info("Created Storage API read session: {} with {} streams", readSession.getName(),
 					readSession.getStreamsCount());
