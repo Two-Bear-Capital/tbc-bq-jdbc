@@ -18,6 +18,9 @@ package com.twobearcapital.bigquery.jdbc;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.google.cloud.bigquery.DatasetId;
+import com.twobearcapital.bigquery.jdbc.auth.*;
+import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
+import com.twobearcapital.bigquery.jdbc.config.JobCreationMode;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 

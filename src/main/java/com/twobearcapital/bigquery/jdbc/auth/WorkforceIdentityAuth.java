@@ -13,30 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
+package com.twobearcapital.bigquery.jdbc.auth;
 
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ExternalAccountCredentials;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Objects;
 
 /**
- * Application Default Credentials (ADC) authentication.
+ * Workforce Identity Federation authentication.
  *
- * <p>
- * This will use credentials from:
- *
- * <ol>
- * <li>GOOGLE_APPLICATION_CREDENTIALS environment variable
- * <li>Google Cloud SDK credentials (gcloud auth application-default login)
- * <li>Compute Engine/GKE metadata server
- * </ol>
- *
+ * @param credentialConfigFile
+ *            path to the credential configuration file
  * @since 1.0.0
  */
-public record ApplicationDefaultAuth() implements AuthType {
+public record WorkforceIdentityAuth(String credentialConfigFile) implements AuthType {
+
+	public WorkforceIdentityAuth {
+		Objects.requireNonNull(credentialConfigFile, "credentialConfigFile cannot be null");
+		if (credentialConfigFile.isBlank()) {
+			throw new IllegalArgumentException("credentialConfigFile cannot be blank");
+		}
+	}
 
 	@Override
 	public Credentials toCredentials() throws IOException {
-		return GoogleCredentials.getApplicationDefault();
+		return ExternalAccountCredentials.fromStream(new FileInputStream(credentialConfigFile));
 	}
 }

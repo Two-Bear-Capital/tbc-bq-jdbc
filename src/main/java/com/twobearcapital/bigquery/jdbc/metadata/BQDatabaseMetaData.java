@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
+package com.twobearcapital.bigquery.jdbc.metadata;
 
+import com.twobearcapital.bigquery.jdbc.BQConnection;
 import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
-import com.twobearcapital.bigquery.jdbc.metadata.MetadataColumns;
+import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
+import com.twobearcapital.bigquery.jdbc.config.MetadataCache;
 import java.sql.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -13,35 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
+package com.twobearcapital.bigquery.jdbc.auth;
 
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.UserCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Objects;
 
 /**
- * User OAuth authentication.
+ * Service account authentication using a JSON key file.
  *
- * @param clientId
- *            OAuth client ID
- * @param clientSecret
- *            OAuth client secret
- * @param refreshToken
- *            OAuth refresh token
+ * @param jsonKeyPath
+ *            path to the service account JSON key file
  * @since 1.0.0
  */
-public record UserOAuthAuth(String clientId, String clientSecret, String refreshToken) implements AuthType {
+public record ServiceAccountAuth(String jsonKeyPath) implements AuthType {
 
-	public UserOAuthAuth {
-		Objects.requireNonNull(clientId, "clientId cannot be null");
-		Objects.requireNonNull(clientSecret, "clientSecret cannot be null");
-		Objects.requireNonNull(refreshToken, "refreshToken cannot be null");
+	public ServiceAccountAuth {
+		Objects.requireNonNull(jsonKeyPath, "jsonKeyPath cannot be null");
+		if (jsonKeyPath.isBlank()) {
+			throw new IllegalArgumentException("jsonKeyPath cannot be blank");
+		}
 	}
 
 	@Override
 	public Credentials toCredentials() throws IOException {
-		return UserCredentials.newBuilder().setClientId(clientId).setClientSecret(clientSecret)
-				.setRefreshToken(refreshToken).build();
+		return ServiceAccountCredentials.fromStream(new FileInputStream(jsonKeyPath));
 	}
 }

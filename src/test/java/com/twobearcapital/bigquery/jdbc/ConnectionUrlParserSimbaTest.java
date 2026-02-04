@@ -17,6 +17,9 @@ package com.twobearcapital.bigquery.jdbc;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.twobearcapital.bigquery.jdbc.auth.*;
+import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
+import com.twobearcapital.bigquery.jdbc.config.ConnectionUrlParser;
 import java.sql.SQLException;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;

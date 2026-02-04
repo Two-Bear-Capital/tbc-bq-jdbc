@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
+package com.twobearcapital.bigquery.jdbc.metadata;
 
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.Schema;

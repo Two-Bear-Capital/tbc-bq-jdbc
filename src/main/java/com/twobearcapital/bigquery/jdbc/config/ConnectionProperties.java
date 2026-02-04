@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
+package com.twobearcapital.bigquery.jdbc.config;
 
 import com.google.cloud.bigquery.DatasetId;
+import com.twobearcapital.bigquery.jdbc.auth.AuthType;
 import java.util.Map;
 import java.util.Objects;
 

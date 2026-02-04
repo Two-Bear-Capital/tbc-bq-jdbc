@@ -19,6 +19,8 @@ import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.TableResult;
 import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
+import com.twobearcapital.bigquery.jdbc.metadata.BQResultSetMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 
 import java.math.BigDecimal;

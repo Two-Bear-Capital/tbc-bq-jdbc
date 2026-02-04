@@ -17,6 +17,8 @@ package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.*;
 import com.twobearcapital.bigquery.jdbc.base.AbstractBQPreparedStatement;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
+import com.twobearcapital.bigquery.jdbc.metadata.BQParameterMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import java.math.BigDecimal;
 import java.net.URL;

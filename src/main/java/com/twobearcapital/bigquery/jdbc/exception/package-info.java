@@ -13,22 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
-
-import java.sql.SQLFeatureNotSupportedException;
 
 /**
- * Exception thrown when a JDBC feature is not supported by BigQuery.
+ * Custom exception types for BigQuery JDBC operations.
+ *
+ * <p>
+ * This package provides specialized SQLException implementations for BigQuery-specific errors:
+ * <ul>
+ * <li>{@link com.twobearcapital.bigquery.jdbc.exception.BQSQLException} - General BigQuery SQL exceptions with SQL state codes
+ * <li>{@link com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException} - Unsupported JDBC features
+ * </ul>
  *
  * @since 1.0.0
  */
-public class BQSQLFeatureNotSupportedException extends SQLFeatureNotSupportedException {
-
-	public BQSQLFeatureNotSupportedException(String reason) {
-		super(reason, BQSQLException.SQLSTATE_FEATURE_NOT_SUPPORTED);
-	}
-
-	public BQSQLFeatureNotSupportedException(String reason, Throwable cause) {
-		super(reason, BQSQLException.SQLSTATE_FEATURE_NOT_SUPPORTED, cause);
-	}
-}
+package com.twobearcapital.bigquery.jdbc.exception;

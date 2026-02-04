@@ -13,10 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
+package com.twobearcapital.bigquery.jdbc.base;
 
 import com.google.cloud.bigquery.*;
-import com.twobearcapital.bigquery.jdbc.base.BaseCloseable;
+import com.twobearcapital.bigquery.jdbc.BQConnection;
+import com.twobearcapital.bigquery.jdbc.BQResultSet;
+import com.twobearcapital.bigquery.jdbc.BQStatement;
+import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
+import com.twobearcapital.bigquery.jdbc.config.SessionManager;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;

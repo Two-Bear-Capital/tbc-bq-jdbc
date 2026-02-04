@@ -16,6 +16,9 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.*;
+import com.twobearcapital.bigquery.jdbc.base.AbstractBQStatement;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import com.twobearcapital.bigquery.jdbc.util.UnsupportedOperations;
 import java.sql.*;

@@ -15,6 +15,8 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
+import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
+import com.twobearcapital.bigquery.jdbc.config.ConnectionUrlParser;
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;

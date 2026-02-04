@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.google.cloud.bigquery.BigQuery;
+import com.twobearcapital.bigquery.jdbc.auth.ApplicationDefaultAuth;
+import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
 import java.sql.SQLException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

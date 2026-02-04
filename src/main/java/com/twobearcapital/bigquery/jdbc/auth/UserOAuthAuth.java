@@ -13,32 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.twobearcapital.bigquery.jdbc;
+package com.twobearcapital.bigquery.jdbc.auth;
 
 import com.google.auth.Credentials;
-import com.google.auth.oauth2.ExternalAccountCredentials;
-import java.io.FileInputStream;
+import com.google.auth.oauth2.UserCredentials;
 import java.io.IOException;
 import java.util.Objects;
 
 /**
- * Workforce Identity Federation authentication.
+ * User OAuth authentication.
  *
- * @param credentialConfigFile
- *            path to the credential configuration file
+ * @param clientId
+ *            OAuth client ID
+ * @param clientSecret
+ *            OAuth client secret
+ * @param refreshToken
+ *            OAuth refresh token
  * @since 1.0.0
  */
-public record WorkforceIdentityAuth(String credentialConfigFile) implements AuthType {
+public record UserOAuthAuth(String clientId, String clientSecret, String refreshToken) implements AuthType {
 
-	public WorkforceIdentityAuth {
-		Objects.requireNonNull(credentialConfigFile, "credentialConfigFile cannot be null");
-		if (credentialConfigFile.isBlank()) {
-			throw new IllegalArgumentException("credentialConfigFile cannot be blank");
-		}
+	public UserOAuthAuth {
+		Objects.requireNonNull(clientId, "clientId cannot be null");
+		Objects.requireNonNull(clientSecret, "clientSecret cannot be null");
+		Objects.requireNonNull(refreshToken, "refreshToken cannot be null");
 	}
 
 	@Override
 	public Credentials toCredentials() throws IOException {
-		return ExternalAccountCredentials.fromStream(new FileInputStream(credentialConfigFile));
+		return UserCredentials.newBuilder().setClientId(clientId).setClientSecret(clientSecret)
+				.setRefreshToken(refreshToken).build();
 	}
 }

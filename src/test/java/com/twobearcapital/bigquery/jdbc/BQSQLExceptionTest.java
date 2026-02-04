@@ -17,6 +17,7 @@ package com.twobearcapital.bigquery.jdbc;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
