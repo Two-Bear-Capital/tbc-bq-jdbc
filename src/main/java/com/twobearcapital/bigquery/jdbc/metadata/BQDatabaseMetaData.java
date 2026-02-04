@@ -41,10 +41,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private static final int STATS_LOG_INTERVAL = 10; // Log stats every N cache operations
 
 	/**
-	 * Static cache shared across all connections to the same project.
-	 * Cache key format: "projectId:ttlSeconds"
-	 * This allows the cache to persist across connection open/close cycles,
-	 * which is critical for IntelliJ IDEA that frequently reopens connections.
+	 * Static cache shared across all connections to the same project. Cache key
+	 * format: "projectId:ttlSeconds" This allows the cache to persist across
+	 * connection open/close cycles, which is critical for IntelliJ IDEA that
+	 * frequently reopens connections.
 	 */
 	private static final java.util.concurrent.ConcurrentHashMap<String, MetadataCache> SHARED_CACHES = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -73,13 +73,13 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 			// Get or create shared cache instance
 			this.cache = SHARED_CACHES.computeIfAbsent(cacheKey, k -> {
-				logger.info("Creating new shared metadata cache for project: {} with TTL: {}",
-					properties.projectId(), cacheTtl);
+				logger.info("Creating new shared metadata cache for project: {} with TTL: {}", properties.projectId(),
+						cacheTtl);
 				return new MetadataCache(cacheTtl);
 			});
 
-			logger.debug("Using shared metadata cache for project: {} (cache instances: {})",
-				properties.projectId(), SHARED_CACHES.size());
+			logger.debug("Using shared metadata cache for project: {} (cache instances: {})", properties.projectId(),
+					SHARED_CACHES.size());
 		} else {
 			this.cache = null;
 			this.cacheKey = null;
@@ -1686,14 +1686,14 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * Clears the metadata cache for this project.
 	 *
 	 * <p>
-	 * This method clears the shared cache for the current project, affecting
-	 * all connections to this project. Use this to force a refresh of metadata
-	 * after schema changes (DDL operations).
+	 * This method clears the shared cache for the current project, affecting all
+	 * connections to this project. Use this to force a refresh of metadata after
+	 * schema changes (DDL operations).
 	 *
 	 * <p>
-	 * Note: The cache is shared across connections and persists based on TTL.
-	 * This method should only be called when you need to force an immediate
-	 * cache refresh, not during normal connection close operations.
+	 * Note: The cache is shared across connections and persists based on TTL. This
+	 * method should only be called when you need to force an immediate cache
+	 * refresh, not during normal connection close operations.
 	 */
 	public void clearCache() {
 		if (cache != null) {
@@ -1746,8 +1746,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * </ul>
 	 *
 	 * <p>
-	 * Under normal operation, you should not need to call this method as the
-	 * cache expires entries based on TTL automatically.
+	 * Under normal operation, you should not need to call this method as the cache
+	 * expires entries based on TTL automatically.
 	 */
 	public static void clearAllSharedCaches() {
 		int clearedCount = 0;
@@ -1762,8 +1762,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * Gets the number of shared cache instances currently active.
 	 *
 	 * <p>
-	 * This is primarily useful for monitoring and debugging to understand
-	 * how many distinct project caches are being maintained.
+	 * This is primarily useful for monitoring and debugging to understand how many
+	 * distinct project caches are being maintained.
 	 *
 	 * @return the number of shared cache instances
 	 */
