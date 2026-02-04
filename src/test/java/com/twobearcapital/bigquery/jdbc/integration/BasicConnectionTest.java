@@ -142,7 +142,7 @@ class BasicConnectionTest extends AbstractBigQueryIntegrationTest {
 		assertTrue(conn.isClosed());
 
 		// And: Operations should throw exception
-		assertThrows(SQLException.class, () -> conn.createStatement());
+		assertThrows(SQLException.class, conn::createStatement);
 	}
 
 	@Test

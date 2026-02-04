@@ -703,17 +703,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		}
 
 		// Get datasets matching schema pattern
-		var datasets = bigquery.listDatasets(projectId);
-		java.util.List<String> datasetIds = new java.util.ArrayList<>();
-
-		for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
-			String datasetId = dataset.getDatasetId().getDataset();
-
-			// Apply schema pattern filter
-			if (schemaPattern == null || matchesPattern(datasetId, schemaPattern)) {
-				datasetIds.add(datasetId);
-			}
-		}
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
 
 		logger.info("Found {} dataset(s) matching pattern [{}]: {}", datasetIds.size(), schemaPattern,
 				datasetIds.size() <= 10 ? datasetIds : datasetIds.subList(0, 10) + "...");
@@ -1033,17 +1023,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		}
 
 		// Get datasets matching schema pattern
-		var datasets = bigquery.listDatasets(projectId);
-		java.util.List<String> datasetIds = new java.util.ArrayList<>();
-
-		for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
-			String datasetId = dataset.getDatasetId().getDataset();
-
-			// Apply schema pattern filter
-			if (schemaPattern == null || matchesPattern(datasetId, schemaPattern)) {
-				datasetIds.add(datasetId);
-			}
-		}
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
 
 		// Use parallel loading if there are multiple datasets (5+)
 		java.util.List<Object[]> rows;
@@ -1506,21 +1486,6 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return false;
 	}
 
-	@Override
-	public long getMaxLogicalLobSize() throws SQLException {
-		return 0;
-	}
-
-	@Override
-	public boolean supportsRefCursors() throws SQLException {
-		return false;
-	}
-
-	@Override
-	public boolean supportsSharding() throws SQLException {
-		return false;
-	}
-
 	private void checkClosed() throws SQLException {
 		if (connection.isClosed()) {
 			throw new BQSQLException("Connection is closed", BQSQLException.SQLSTATE_CONNECTION_CLOSED);
@@ -1582,6 +1547,32 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private ResultSet createResultSet(String[] columnNames, int[] columnTypes, java.util.List<Object[]> rows)
 			throws SQLException {
 		return new MetadataResultSet(columnNames, columnTypes, rows);
+	}
+
+	/**
+	 * Lists all datasets for a project that match the given schema pattern.
+	 *
+	 * @param projectId
+	 *            the project ID
+	 * @param schemaPattern
+	 *            the schema pattern to match (or null for all)
+	 * @return list of dataset IDs matching the pattern
+	 */
+	private java.util.List<String> listDatasetsForProject(com.google.cloud.bigquery.BigQuery bigQuery, String projectId,
+			String schemaPattern) {
+		var datasets = bigQuery.listDatasets(projectId);
+		java.util.List<String> datasetIds = new java.util.ArrayList<>();
+
+		for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
+			String datasetId = dataset.getDatasetId().getDataset();
+
+			// Apply schema pattern filter
+			if (schemaPattern == null || matchesPattern(datasetId, schemaPattern)) {
+				datasetIds.add(datasetId);
+			}
+		}
+
+		return datasetIds;
 	}
 
 	/**

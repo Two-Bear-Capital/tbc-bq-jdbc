@@ -395,23 +395,6 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 		return currentRowIndex + 1;
 	}
 
-	@Override
-	public Statement getStatement() throws SQLException {
-		checkClosed();
-		return null;
-	}
-
-	@Override
-	public SQLWarning getWarnings() throws SQLException {
-		checkClosed();
-		return null;
-	}
-
-	@Override
-	public void clearWarnings() throws SQLException {
-		checkClosed();
-	}
-
 	public boolean isFirst() throws SQLException {
 		checkClosed();
 		return currentRowIndex == 0;
@@ -424,14 +407,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	}
 
 	/** Simple ResultSetMetaData implementation for metadata ResultSets. */
-	private static class MetadataResultSetMetaData implements ResultSetMetaData {
-		private final String[] columnNames;
-		private final int[] columnTypes;
-
-		MetadataResultSetMetaData(String[] columnNames, int[] columnTypes) {
-			this.columnNames = columnNames;
-			this.columnTypes = columnTypes;
-		}
+	private record MetadataResultSetMetaData(String[] columnNames, int[] columnTypes) implements ResultSetMetaData {
 
 		@Override
 		public int getColumnCount() {

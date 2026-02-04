@@ -83,6 +83,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	}
 
 	@Override
+	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public int executeUpdate() throws SQLException {
 		executeQuery();
 		return 0;
@@ -210,6 +211,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	}
 
 	@Override
+	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public boolean execute() throws SQLException {
 		executeQuery();
 		return true;

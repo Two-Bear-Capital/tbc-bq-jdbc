@@ -59,7 +59,7 @@ public class StorageReadResultSet extends BQResultSet {
 
 	private final BigQueryReadClient readClient;
 	private final TableId tableId;
-	private ReadSession readSession;
+	private final ReadSession readSession;
 	private ServerStream<ReadRowsResponse> currentStream;
 
 	/**
@@ -73,7 +73,7 @@ public class StorageReadResultSet extends BQResultSet {
 	 *             if initialization fails
 	 */
 	public StorageReadResultSet(BQStatement statement, TableId tableId) throws SQLException {
-		super(statement, null); // Will override iteration logic
+		super(statement, null, true); // Will override iteration logic
 
 		this.tableId = tableId;
 

@@ -88,6 +88,27 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.currentRow = null;
 	}
 
+	/**
+	 * Protected constructor for subclasses that override iteration logic.
+	 *
+	 * <p>
+	 * This constructor allows subclasses like StorageReadResultSet to provide their
+	 * own iteration mechanism without requiring a TableResult.
+	 *
+	 * @param statement
+	 *            the statement that produced this result set
+	 * @param tableResult
+	 *            the BigQuery table result (may be null for subclasses)
+	 * @param allowNullTableResult
+	 *            marker parameter to distinguish this constructor
+	 */
+	protected BQResultSet(BQStatement statement, TableResult tableResult, boolean allowNullTableResult) {
+		this.statement = statement;
+		this.tableResult = tableResult;
+		this.rowIterator = tableResult != null ? tableResult.iterateAll().iterator() : null;
+		this.currentRow = null;
+	}
+
 	@Override
 	protected String getClosedErrorMessage() {
 		return ErrorMessages.RESULTSET_CLOSED;
@@ -358,11 +379,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return new Timestamp(micros / 1000);
 	}
 	@Override
-	public void clearWarnings() throws SQLException {
-		checkClosed();
-	}
-
-	@Override
 	public ResultSetMetaData getMetaData() throws SQLException {
 		checkClosed();
 		return new BQResultSetMetaData(tableResult.getSchema());
@@ -383,8 +399,12 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public int findColumn(String columnLabel) throws SQLException {
 		checkPosition();
+		var schema = tableResult.getSchema();
+		if (schema == null) {
+			throw new BQSQLException("Schema is not available");
+		}
 		for (int i = 0; i < currentRow.size(); i++) {
-			if (tableResult.getSchema().getFields().get(i).getName().equals(columnLabel)) {
+			if (schema.getFields().get(i).getName().equals(columnLabel)) {
 				return i + 1;
 			}
 		}
@@ -413,14 +433,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	public boolean isAfterLast() throws SQLException {
 		checkClosed();
 		return currentRow == null && !rowIterator.hasNext();
-	}
-
-	@Override
-	public void setFetchDirection(int direction) throws SQLException {
-		checkClosed();
-		if (direction != FETCH_FORWARD) {
-			throw new BQSQLFeatureNotSupportedException("Only FETCH_FORWARD is supported");
-		}
 	}
 
 	@Override

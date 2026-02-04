@@ -17,7 +17,6 @@ package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.*;
 import com.twobearcapital.bigquery.jdbc.base.AbstractBQStatement;
-import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
 import com.twobearcapital.bigquery.jdbc.util.UnsupportedOperations;
@@ -59,6 +58,7 @@ public class BQStatement extends AbstractBQStatement {
 	}
 
 	@Override
+	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public int executeUpdate(String sql) throws SQLException {
 		checkClosed();
 		// Execute as DML
@@ -84,6 +84,7 @@ public class BQStatement extends AbstractBQStatement {
 	}
 
 	@Override
+	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public boolean execute(String sql) throws SQLException {
 		executeQuery(sql);
 		return true;

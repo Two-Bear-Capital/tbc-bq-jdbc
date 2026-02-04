@@ -47,6 +47,7 @@ public abstract class AbstractBigQueryIntegrationTest {
 	protected static final String TEST_PROJECT_ID = "test-project";
 	protected static final String TEST_DATASET = "test_dataset";
 
+	@SuppressWarnings("resource") // Container lifecycle managed by JUnit @Container annotation
 	@Container
 	protected static final GenericContainer<?> bigqueryEmulator = new GenericContainer<>(
 			DockerImageName.parse("ghcr.io/goccy/bigquery-emulator:latest")).withExposedPorts(9050)
