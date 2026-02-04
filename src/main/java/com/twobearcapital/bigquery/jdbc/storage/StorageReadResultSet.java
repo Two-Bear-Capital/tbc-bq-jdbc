@@ -74,6 +74,11 @@ public class StorageReadResultSet extends BQResultSet {
 	public StorageReadResultSet(BQStatement statement, TableId tableId) throws SQLException {
 		super(statement, null, true); // Will override iteration logic
 
+		// Validate tableId is not null
+		if (tableId == null) {
+			throw new SQLException("TableId cannot be null for Storage API result set");
+		}
+
 		this.tableId = tableId;
 
 		BigQueryReadClient tempClient = null;
@@ -97,7 +102,7 @@ public class StorageReadResultSet extends BQResultSet {
 			// Only assign to field after successful initialization
 			this.readClient = tempClient;
 
-		} catch (IOException e) {
+		} catch (Exception e) {
 			// Clean up on failure to prevent resource leak
 			if (tempClient != null) {
 				try {

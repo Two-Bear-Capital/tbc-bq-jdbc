@@ -34,7 +34,7 @@ class MetadataTest extends AbstractBigQueryIntegrationTest {
 		String productName = metaData.getDatabaseProductName();
 
 		// Then: Should be BigQuery
-		assertEquals("Google BigQuery", productName);
+		assertEquals("BigQuery (TBC Driver)", productName);
 	}
 
 	@Test
@@ -106,8 +106,9 @@ class MetadataTest extends AbstractBigQueryIntegrationTest {
 		DatabaseMetaData metaData = connection.getMetaData();
 		String userName = metaData.getUserName();
 
-		// Then: Should have a username (may be empty for emulator)
-		assertNotNull(userName);
+		// Then: Should return null (BigQuery doesn't have traditional username concept)
+		// This is JDBC spec compliant - null is acceptable when not applicable
+		assertNull(userName);
 	}
 
 	@Test

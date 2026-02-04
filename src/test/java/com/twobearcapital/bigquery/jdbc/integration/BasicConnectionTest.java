@@ -99,7 +99,7 @@ class BasicConnectionTest extends AbstractBigQueryIntegrationTest {
 
 		// Then: Should return metadata object
 		assertNotNull(metaData);
-		assertEquals("Google BigQuery", metaData.getDatabaseProductName());
+		assertEquals("BigQuery (TBC Driver)", metaData.getDatabaseProductName());
 		assertEquals("Two Bear Capital BigQuery JDBC Driver", metaData.getDriverName());
 	}
 

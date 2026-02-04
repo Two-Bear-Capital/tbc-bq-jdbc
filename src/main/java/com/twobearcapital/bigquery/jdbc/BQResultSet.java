@@ -15,8 +15,11 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
+import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.FieldList;
 import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
+import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.google.cloud.bigquery.TableResult;
 import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
@@ -386,27 +389,71 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public Object getObject(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? null : value.getValue();
+		if (value.isNull()) {
+			return null;
+		}
+
+		// Get field type to return appropriate Java type
+		var schema = tableResult.getSchema();
+		if (schema != null && columnIndex > 0 && columnIndex <= schema.getFields().size()) {
+			Field field = schema.getFields().get(columnIndex - 1);
+			StandardSQLTypeName type = field.getType().getStandardType();
+
+			// Return appropriate Java type based on BigQuery type
+			return switch (type) {
+				case BOOL -> value.getBooleanValue();
+				case INT64 -> value.getLongValue();
+				case FLOAT64 -> value.getDoubleValue();
+				case NUMERIC, BIGNUMERIC -> value.getNumericValue();
+				case STRING -> value.getStringValue();
+				case BYTES -> value.getBytesValue();
+				case DATE -> {
+					String dateStr = value.getStringValue();
+					yield java.sql.Date.valueOf(dateStr);
+				}
+				case TIME -> {
+					String timeStr = value.getStringValue();
+					yield java.sql.Time.valueOf(timeStr);
+				}
+				case DATETIME, TIMESTAMP -> {
+					long micros = value.getTimestampValue();
+					yield new java.sql.Timestamp(micros / 1000);
+				}
+				default -> value.getValue(); // Fallback to raw value
+			};
+		}
+
+		return value.getValue();
 	}
 
 	@Override
 	public Object getObject(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? null : value.getValue();
+		return getObject(findColumn(columnLabel));
 	}
 
 	@Override
 	public int findColumn(String columnLabel) throws SQLException {
-		checkPosition();
+		checkClosed();
 		var schema = tableResult.getSchema();
 		if (schema == null) {
 			throw new BQSQLException("Schema is not available");
 		}
-		for (int i = 0; i < currentRow.size(); i++) {
-			if (schema.getFields().get(i).getName().equals(columnLabel)) {
+
+		// Find column by exact name match
+		FieldList fields = schema.getFields();
+		for (int i = 0; i < fields.size(); i++) {
+			if (fields.get(i).getName().equals(columnLabel)) {
 				return i + 1;
 			}
 		}
+
+		// Try case-insensitive match
+		for (int i = 0; i < fields.size(); i++) {
+			if (fields.get(i).getName().equalsIgnoreCase(columnLabel)) {
+				return i + 1;
+			}
+		}
+
 		throw new BQSQLException("Column not found: " + columnLabel);
 	}
 

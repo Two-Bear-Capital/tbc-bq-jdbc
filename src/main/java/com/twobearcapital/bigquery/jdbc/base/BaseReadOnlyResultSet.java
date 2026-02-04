@@ -16,6 +16,7 @@
 package com.twobearcapital.bigquery.jdbc.base;
 
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
+import com.twobearcapital.bigquery.jdbc.util.NumberParser;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -398,13 +399,79 @@ public abstract class BaseReadOnlyResultSet extends BaseCloseable implements Res
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
 	public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getObject with type not supported");
+		checkClosed();
+
+		if (type == null) {
+			throw new SQLException("Type parameter cannot be null");
+		}
+
+		// Get the value as Object first
+		Object value = getObject(columnIndex);
+		if (value == null) {
+			return null;
+		}
+
+		// If value is already the correct type, return it
+		if (type.isInstance(value)) {
+			return type.cast(value);
+		}
+
+		// Use NumberParser for numeric conversions (DRY principle)
+		if (type == Long.class || type == long.class) {
+			return (T) Long.valueOf(NumberParser.toLong(value, columnIndex));
+		}
+
+		if (type == Integer.class || type == int.class) {
+			return (T) Integer.valueOf(NumberParser.toInt(value, columnIndex));
+		}
+
+		if (type == Double.class || type == double.class) {
+			return (T) Double.valueOf(NumberParser.toDouble(value, columnIndex));
+		}
+
+		if (type == Float.class || type == float.class) {
+			return (T) Float.valueOf(NumberParser.toFloat(value, columnIndex));
+		}
+
+		if (type == Short.class || type == short.class) {
+			return (T) Short.valueOf(NumberParser.toShort(value, columnIndex));
+		}
+
+		if (type == Byte.class || type == byte.class) {
+			return (T) Byte.valueOf(NumberParser.toByte(value, columnIndex));
+		}
+
+		if (type == java.math.BigDecimal.class) {
+			return (T) NumberParser.toBigDecimal(value, columnIndex);
+		}
+
+		// String conversion
+		if (type == String.class) {
+			return (T) value.toString();
+		}
+
+		// Boolean conversion
+		if (type == Boolean.class || type == boolean.class) {
+			if (value instanceof Boolean) {
+				return (T) value;
+			}
+			return (T) Boolean.valueOf(value.toString());
+		}
+
+		// Date/Time conversions - these are already the correct types or incompatible
+		if (type == java.sql.Date.class || type == java.sql.Time.class || type == java.sql.Timestamp.class) {
+			throw new SQLException("Cannot convert " + value.getClass().getName() + " to " + type.getName());
+		}
+
+		// If we can't convert, throw exception
+		throw new SQLException("Cannot convert " + value.getClass().getName() + " to " + type.getName());
 	}
 
 	@Override
 	public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getObject with type not supported");
+		return getObject(findColumn(columnLabel), type);
 	}
 
 	// =================================================================

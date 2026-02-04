@@ -104,6 +104,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	@Override
 	public String getUserName() throws SQLException {
+		// BigQuery doesn't have a traditional username concept
+		// Return null as per JDBC spec when username is not applicable
 		return null;
 	}
 

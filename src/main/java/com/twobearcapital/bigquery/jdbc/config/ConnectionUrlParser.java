@@ -275,6 +275,7 @@ public final class ConnectionUrlParser {
 				case "UseLegacySQL" -> properties.put("useLegacySql", value);
 				case "Location" -> properties.put("location", value);
 				case "DatasetProjectId" -> properties.put("datasetProjectId", value);
+				case "UseDestinationTables" -> properties.put("useDestinationTables", value);
 				default -> {
 					// Unknown properties are ignored for forward compatibility
 					// Could add DEBUG logging here if needed
@@ -348,11 +349,12 @@ public final class ConnectionUrlParser {
 		Integer metadataCacheTtl = parseInteger(properties, "metadataCacheTtl");
 		Boolean metadataCacheEnabled = parseBooleanObject(properties, "metadataCacheEnabled");
 		Boolean metadataLazyLoad = parseBooleanObject(properties, "metadataLazyLoad");
+		Boolean useDestinationTables = parseBooleanObject(properties, "useDestinationTables");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, jobCreationMode, pageSize, useStorageApi, enableSessions,
 				connectionTimeout, retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled,
-				metadataLazyLoad);
+				metadataLazyLoad, useDestinationTables);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {

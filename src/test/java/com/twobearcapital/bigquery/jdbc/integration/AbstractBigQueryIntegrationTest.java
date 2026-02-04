@@ -93,10 +93,11 @@ public abstract class AbstractBigQueryIntegrationTest {
 	protected Connection createTestConnection() throws SQLException {
 		// For emulator testing, connect directly to the emulator
 		// When a custom host is provided, authType automatically defaults to EMULATOR
+		// UseDestinationTables=true is required for emulator compatibility
 		String host = bigqueryEmulator.getHost();
 		int port = bigqueryEmulator.getMappedPort(9050);
-		String url = String.format("jdbc:bigquery://%s:%d;ProjectId=%s;DefaultDataset=%s", host, port, TEST_PROJECT_ID,
-				TEST_DATASET);
+		String url = String.format("jdbc:bigquery://%s:%d;ProjectId=%s;DefaultDataset=%s;UseDestinationTables=true",
+				host, port, TEST_PROJECT_ID, TEST_DATASET);
 		return DriverManager.getConnection(url);
 	}
 

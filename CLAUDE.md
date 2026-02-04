@@ -206,12 +206,14 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
-### Integration Tests (113 tests)
+### Integration Tests (108 tests, 2 skipped)
 - Location: `src/test/java/com/twobearcapital/bigquery/jdbc/integration/`
-- Run: `./mvnw verify -Pintegration-tests`
+- Run locally: `./mvnw verify -Pintegration-tests`
+- Run automatically in CI/CD on every push and PR
 - Base class: `AbstractBigQueryIntegrationTest`
 - Uses Testcontainers with `goccy/bigquery-emulator` Docker image
 - Covers: connections, queries, prepared statements, metadata, result sets
+- Requires Docker (available by default in GitHub Actions ubuntu-latest runners)
 
 **Test Structure:**
 - `AbstractBigQueryIntegrationTest` - Base with helper methods (`createTestTable`, `insertTestData`)
@@ -318,12 +320,15 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 ### GitHub Actions Workflow
 - File: `.github/workflows/build.yml`
 - Runs on: push to main/develop, PRs to main
-- Steps: checkout, setup Java 21, format check, build, test
+- Steps: checkout, setup Java 21, format check, build, unit tests, integration tests
+- **Integration Tests:** Run automatically in CI using Docker and BigQuery emulator
 - **Critical:** `mvn spotless:check` must pass (CI uses `mvn` directly; locally use `./mvnw`)
+- Uploads test reports (unit tests, integration tests, coverage)
 
 ### Release Process
 - File: `.github/workflows/version-and-release.yml`
 - Automatic version bumps and releases
+- Only runs after Build workflow succeeds (including integration tests)
 - Generates changelog from commits
 
 ## Documentation

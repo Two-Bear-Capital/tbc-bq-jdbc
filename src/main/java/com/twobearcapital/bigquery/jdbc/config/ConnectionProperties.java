@@ -70,13 +70,17 @@ import java.util.Objects;
  *            whether to enable metadata caching (default: true)
  * @param metadataLazyLoad
  *            whether to use lazy loading for metadata (default: false)
+ * @param useDestinationTables
+ *            whether to use destination tables for SELECT queries (default:
+ *            false). Useful for BigQuery emulator compatibility.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
 		String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
 		Map<String, String> labels, JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi,
 		boolean enableSessions, Integer connectionTimeout, Integer retryCount, Long maxBillingBytes,
-		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad) {
+		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad,
+		Boolean useDestinationTables) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -127,6 +131,9 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		}
 		if (metadataLazyLoad == null) {
 			metadataLazyLoad = false;
+		}
+		if (useDestinationTables == null) {
+			useDestinationTables = false;
 		}
 	}
 

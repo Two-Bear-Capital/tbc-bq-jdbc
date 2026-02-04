@@ -176,6 +176,21 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected abstract String getLogPrefix();
 
 	/**
+	 * Checks if a SQL statement is a SELECT query (vs DDL/DML).
+	 *
+	 * @param sql
+	 *            the SQL statement
+	 * @return true if the statement is a SELECT query
+	 */
+	private boolean isSelectQuery(String sql) {
+		if (sql == null) {
+			return false;
+		}
+		String trimmed = sql.trim().toUpperCase();
+		return trimmed.startsWith("SELECT") || trimmed.startsWith("WITH");
+	}
+
+	/**
 	 * Common query execution logic with resource leak fix. Closes previous
 	 * ResultSet before creating new one. Thread-safe access to currentJob for
 	 * cancel operations.
@@ -212,6 +227,18 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		SessionManager sessionManager = connection.getSessionManager();
 		if (sessionManager != null && sessionManager.hasSession()) {
 			configBuilder = sessionManager.addSessionProperty(configBuilder);
+		}
+
+		// Set destination table for SELECT queries when configured
+		// Useful for BigQuery emulator compatibility (set UseDestinationTables=true)
+		// Only applies to SELECT queries; DDL/DML don't need destination tables
+		if (properties.useDestinationTables() && properties.datasetId() != null && isSelectQuery(sql)) {
+			// Generate unique temp table name
+			String tempTableName = "_jdbc_temp_" + System.currentTimeMillis() + "_" + Thread.currentThread().getId();
+			TableId destinationTable = TableId.of(properties.projectId(), properties.datasetId(), tempTableName);
+			configBuilder.setDestinationTable(destinationTable)
+					.setCreateDisposition(JobInfo.CreateDisposition.CREATE_IF_NEEDED)
+					.setWriteDisposition(JobInfo.WriteDisposition.WRITE_TRUNCATE);
 		}
 
 		QueryJobConfiguration queryConfig = configBuilder.build();

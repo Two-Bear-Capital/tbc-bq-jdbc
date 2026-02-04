@@ -33,12 +33,22 @@ jobs:
       - name: Run tests
         run: mvn test -B
 
+      - name: Run integration tests
+        run: mvn verify -Pintegration-tests -B
+
       - name: Upload test reports
         uses: actions/upload-artifact@v6
         if: always()
         with:
           name: test-reports
           path: target/surefire-reports/
+
+      - name: Upload integration test reports
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: integration-test-reports
+          path: target/failsafe-reports/
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v6
