@@ -64,10 +64,8 @@ public class SessionManager {
 	 *
 	 * @param bigquery
 	 *            the BigQuery client
-	 * @param properties
-	 *            the connection properties
 	 */
-	public SessionManager(BigQuery bigquery, ConnectionProperties properties) {
+	public SessionManager(BigQuery bigquery) {
 		this.bigquery = bigquery;
 	}
 

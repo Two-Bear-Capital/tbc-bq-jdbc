@@ -263,7 +263,7 @@ public final class ConnectionUrlParser {
 				case "ProjectId" -> properties.put("projectId", value);
 				case "DefaultDataset" -> properties.put("datasetId", value);
 				case "OAuthType" -> {
-					String authType = parseOAuthType(value, simbaProperties);
+					String authType = parseOAuthType(value);
 					properties.put("authType", authType);
 				}
 				case "OAuthPvtKeyPath" -> properties.put("credentials", value);
@@ -288,15 +288,18 @@ public final class ConnectionUrlParser {
 	/**
 	 * Converts Simba OAuthType numeric value to tbc-bq-jdbc authType string.
 	 *
+	 * <p>
+	 * Note: OAuthType=4 (External Account) is mapped to WORKLOAD identity federation.
+	 * Users requiring WORKFORCE identity should override via Properties:
+	 * {@code info.setProperty("authType", "WORKFORCE")}
+	 *
 	 * @param oauthType
 	 *            the Simba OAuthType value
-	 * @param simbaProperties
-	 *            all Simba properties (for context-dependent mapping)
 	 * @return the tbc-bq-jdbc authType string
 	 * @throws SQLException
 	 *             if the OAuthType is invalid or unsupported
 	 */
-	private static String parseOAuthType(String oauthType, Map<String, String> simbaProperties) throws SQLException {
+	private static String parseOAuthType(String oauthType) throws SQLException {
 		return switch (oauthType) {
 			case "0" -> "SERVICE_ACCOUNT"; // Service Account
 			case "1" -> "USER_OAUTH"; // User Account

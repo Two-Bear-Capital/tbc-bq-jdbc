@@ -149,26 +149,4 @@ public final class TypeMapper {
 		};
 	}
 
-	/**
-	 * Maps a JDBC type to a BigQuery StandardSQLTypeName.
-	 *
-	 * @param jdbcType
-	 *            the JDBC type constant
-	 * @return the BigQuery StandardSQLTypeName
-	 */
-	public static StandardSQLTypeName toBigQueryType(int jdbcType) {
-		return switch (jdbcType) {
-            case Types.VARBINARY, Types.BINARY, Types.LONGVARBINARY -> StandardSQLTypeName.BYTES;
-			case Types.BIGINT, Types.INTEGER, Types.SMALLINT, Types.TINYINT -> StandardSQLTypeName.INT64;
-            case Types.DOUBLE, Types.FLOAT, Types.REAL -> StandardSQLTypeName.FLOAT64;
-			case Types.NUMERIC, Types.DECIMAL -> StandardSQLTypeName.NUMERIC;
-			case Types.BOOLEAN, Types.BIT -> StandardSQLTypeName.BOOL;
-			case Types.TIMESTAMP, Types.TIMESTAMP_WITH_TIMEZONE -> StandardSQLTypeName.TIMESTAMP;
-			case Types.DATE -> StandardSQLTypeName.DATE;
-			case Types.TIME, Types.TIME_WITH_TIMEZONE -> StandardSQLTypeName.TIME;
-			case Types.STRUCT -> StandardSQLTypeName.STRUCT;
-			case Types.ARRAY -> StandardSQLTypeName.ARRAY;
-			default -> StandardSQLTypeName.STRING;
-		};
-	}
 }

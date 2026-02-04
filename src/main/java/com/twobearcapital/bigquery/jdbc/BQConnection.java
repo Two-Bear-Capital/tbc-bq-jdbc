@@ -85,7 +85,7 @@ public final class BQConnection extends AbstractBQConnection {
 			logger.info("Connected to BigQuery project: {}", properties.projectId());
 
 			// Initialize session manager
-			this.sessionManager = new SessionManager(bigquery, properties);
+			this.sessionManager = new SessionManager(bigquery);
 
 			// Initialize session if enabled
 			if (properties.enableSessions()) {

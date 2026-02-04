@@ -101,7 +101,68 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @return the JDBC ResultSet
 	 */
 	protected ResultSet createResultSet(TableResult result) {
+		return createResultSet(result, null);
+	}
+
+	/**
+	 * Creates a ResultSet for the given query result and job. Determines whether
+	 * to use Storage API based on configuration and result size.
+	 *
+	 * @param result
+	 *            the table result from BigQuery
+	 * @param job
+	 *            the completed query job (may be null)
+	 * @return the JDBC ResultSet
+	 */
+	protected ResultSet createResultSet(TableResult result, Job job) {
+		// Check if we should use Storage API
+		String useStorageApiSetting = properties.useStorageApi();
+		if (useStorageApiSetting != null &&
+		    com.twobearcapital.bigquery.jdbc.storage.StorageReadResultSet.shouldUseStorageApi(result, useStorageApiSetting)) {
+
+			// Extract destination table from job
+			TableId tableId = extractTableId(job);
+
+			if (tableId != null) {
+				try {
+					logger.debug("Using Storage API for result set (table: {})", tableId);
+					return new com.twobearcapital.bigquery.jdbc.storage.StorageReadResultSet((BQStatement) this, tableId);
+				} catch (SQLException e) {
+					// Fallback to standard result set on Storage API failure
+					logger.warn("Storage API initialization failed, falling back to standard ResultSet: {}", e.getMessage());
+				}
+			} else {
+				logger.debug("Cannot use Storage API: no destination table found in job");
+			}
+		}
+
+		// Default: use standard BQResultSet
 		return new BQResultSet((BQStatement) this, result);
+	}
+
+	/**
+	 * Extracts the destination TableId from a completed query job.
+	 *
+	 * @param job
+	 *            the query job (may be null)
+	 * @return the destination table ID, or null if not available
+	 */
+	private TableId extractTableId(Job job) {
+		if (job == null) {
+			return null;
+		}
+
+		try {
+			JobConfiguration configuration = job.getConfiguration();
+			if (configuration instanceof QueryJobConfiguration) {
+				QueryJobConfiguration queryConfig = (QueryJobConfiguration) configuration;
+				return queryConfig.getDestinationTable();
+			}
+		} catch (Exception e) {
+			logger.debug("Failed to extract destination table from job: {}", e.getMessage());
+		}
+
+		return null;
 	}
 
 	/**
@@ -156,7 +217,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 
 		try {
 			// Submit job asynchronously with timeout enforcement
-			CompletableFuture<TableResult> future = CompletableFuture.supplyAsync(() -> {
+			CompletableFuture<JobResultPair> future = CompletableFuture.supplyAsync(() -> {
 				try {
 					Job job = bigquery.create(JobInfo.of(queryConfig));
 
@@ -180,7 +241,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 						throw new RuntimeException("Query failed (job: " + job.getJobId() + "): " + error.getMessage());
 					}
 
-					return job.getQueryResults();
+					return new JobResultPair(job, job.getQueryResults());
 
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
@@ -189,8 +250,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			});
 
 			// Wait with timeout
-			TableResult result = future.get(timeoutSeconds, TimeUnit.SECONDS);
-			currentResultSet = createResultSet(result);
+			JobResultPair pair = future.get(timeoutSeconds, TimeUnit.SECONDS);
+			currentResultSet = createResultSet(pair.result, pair.job);
 			return currentResultSet;
 
 		} catch (TimeoutException e) {
@@ -305,5 +366,18 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	public BQConnection getConnection() throws SQLException {
 		checkClosed();
 		return connection;
+	}
+
+	/**
+	 * Helper class to hold both Job and TableResult from async execution.
+	 */
+	private static class JobResultPair {
+		final Job job;
+		final TableResult result;
+
+		JobResultPair(Job job, TableResult result) {
+			this.job = job;
+			this.result = result;
+		}
 	}
 }
