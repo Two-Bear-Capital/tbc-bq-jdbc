@@ -46,10 +46,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 	private void validateParameterIndex(int parameterIndex) throws SQLException {
 		if (parameterIndex < 1) {
-			throw new BQSQLException(
-				String.format(ErrorMessages.INVALID_PARAMETER_INDEX, parameterIndex),
-				BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE
-			);
+			throw new BQSQLException(String.format(ErrorMessages.INVALID_PARAMETER_INDEX, parameterIndex),
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
 		}
 	}
 
@@ -68,9 +66,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 	@Override
 	protected QueryJobConfiguration.Builder buildQueryConfig(String sql) {
-		return QueryJobConfiguration.newBuilder(sql)
-			.setUseLegacySql(properties.useLegacySql())
-			.setPositionalParameters(parameters);
+		return QueryJobConfiguration.newBuilder(sql).setUseLegacySql(properties.useLegacySql())
+				.setPositionalParameters(parameters);
 	}
 
 	@Override
@@ -171,7 +168,6 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
-
 	@Override
 	public void clearParameters() throws SQLException {
 		checkClosed();
@@ -217,7 +213,6 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		return true;
 	}
 
-
 	@Override
 	public ResultSetMetaData getMetaData() throws SQLException {
 		if (currentResultSet != null) {
@@ -257,18 +252,15 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		return new BQParameterMetaData(parameters.size());
 	}
 
-
 	@Override
 	public void setNString(int parameterIndex, String value) throws SQLException {
 		setString(parameterIndex, value);
 	}
 
-
 	@Override
 	public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
 		setObject(parameterIndex, x);
 	}
-
 
 	@Override
 	public void setObject(int parameterIndex, Object x, SQLType targetSqlType, int scaleOrLength) throws SQLException {

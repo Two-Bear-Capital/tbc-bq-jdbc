@@ -42,8 +42,7 @@ public class BQStatement extends AbstractBQStatement {
 
 	@Override
 	protected QueryJobConfiguration.Builder buildQueryConfig(String sql) {
-		return QueryJobConfiguration.newBuilder(sql)
-			.setUseLegacySql(properties.useLegacySql());
+		return QueryJobConfiguration.newBuilder(sql).setUseLegacySql(properties.useLegacySql());
 	}
 
 	@Override
@@ -86,7 +85,6 @@ public class BQStatement extends AbstractBQStatement {
 		executeQuery(sql);
 		return true;
 	}
-
 
 	@Override
 	public void setFetchDirection(int direction) throws SQLException {

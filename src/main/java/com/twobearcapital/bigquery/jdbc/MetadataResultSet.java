@@ -397,13 +397,11 @@ final class MetadataResultSet extends BaseReadOnlyResultSet {
 		return currentRowIndex + 1;
 	}
 
-
 	@Override
 	public Statement getStatement() throws SQLException {
 		checkClosed();
 		return null;
 	}
-
 
 	@Override
 	public SQLWarning getWarnings() throws SQLException {

@@ -19,10 +19,12 @@ import com.twobearcapital.bigquery.jdbc.BQSQLFeatureNotSupportedException;
 import java.sql.*;
 
 /**
- * Base Connection implementation that provides default exception-throwing implementations
- * for all unsupported Connection methods.
+ * Base Connection implementation that provides default exception-throwing
+ * implementations for all unsupported Connection methods.
  *
- * <p>Subclasses should override only the methods they actually support.</p>
+ * <p>
+ * Subclasses should override only the methods they actually support.
+ * </p>
  *
  * @since 1.0.0
  */

@@ -163,10 +163,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		}
 		long longValue = value.getLongValue();
 		if (longValue < Byte.MIN_VALUE || longValue > Byte.MAX_VALUE) {
-			throw new BQSQLException(
-				String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "byte", longValue),
-				BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE
-			);
+			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "byte", longValue),
+					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
 		}
 		return (byte) longValue;
 	}
@@ -179,10 +177,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		}
 		long longValue = value.getLongValue();
 		if (longValue < Short.MIN_VALUE || longValue > Short.MAX_VALUE) {
-			throw new BQSQLException(
-				String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "short", longValue),
-				BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE
-			);
+			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "short", longValue),
+					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
 		}
 		return (short) longValue;
 	}
@@ -195,10 +191,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		}
 		long longValue = value.getLongValue();
 		if (longValue < Integer.MIN_VALUE || longValue > Integer.MAX_VALUE) {
-			throw new BQSQLException(
-				String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "int", longValue),
-				BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE
-			);
+			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "int", longValue),
+					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
 		}
 		return (int) longValue;
 	}
@@ -428,7 +422,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		}
 	}
 
-
 	@Override
 	public Statement getStatement() throws SQLException {
 		checkClosed();
@@ -474,7 +467,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	public Timestamp getTimestamp(String columnLabel, Calendar cal) throws SQLException {
 		return getTimestamp(columnLabel);
 	}
-
 
 	public String getNString(int columnIndex) throws SQLException {
 		return getString(columnIndex);

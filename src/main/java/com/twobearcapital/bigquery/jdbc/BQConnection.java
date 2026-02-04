@@ -145,7 +145,6 @@ public final class BQConnection extends AbstractBQConnection {
 		return new BQPreparedStatement(this, sql);
 	}
 
-
 	public String nativeSQL(String sql) throws SQLException {
 		checkClosed();
 		return sql;
@@ -163,8 +162,9 @@ public final class BQConnection extends AbstractBQConnection {
 
 			// Sessions required for transaction support
 			if (!autoCommit && !properties.enableSessions()) {
-				throw new BQSQLFeatureNotSupportedException("BigQuery does not support transactions outside of sessions. "
-						+ "Enable sessions with: enableSessions=true");
+				throw new BQSQLFeatureNotSupportedException(
+						"BigQuery does not support transactions outside of sessions. "
+								+ "Enable sessions with: enableSessions=true");
 			}
 
 			// Change state atomically - only update flag if operations succeed
@@ -312,12 +312,10 @@ public final class BQConnection extends AbstractBQConnection {
 		return prepareStatement(sql);
 	}
 
-
 	public Map<String, Class<?>> getTypeMap() throws SQLException {
 		checkClosed();
 		return Map.of();
 	}
-
 
 	public void setHoldability(int holdability) throws SQLException {
 		checkClosed();
@@ -330,7 +328,6 @@ public final class BQConnection extends AbstractBQConnection {
 		checkClosed();
 		return ResultSet.CLOSE_CURSORS_AT_COMMIT;
 	}
-
 
 	public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
 			throws SQLException {
@@ -350,15 +347,9 @@ public final class BQConnection extends AbstractBQConnection {
 		return prepareStatement(sql, resultSetType, resultSetConcurrency);
 	}
 
-
-
-
 	public boolean isValid(int timeout) throws SQLException {
 		if (timeout < 0) {
-			throw new BQSQLException(
-				ErrorMessages.NEGATIVE_TIMEOUT,
-				BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE
-			);
+			throw new BQSQLException(ErrorMessages.NEGATIVE_TIMEOUT, BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
 		}
 
 		if (closed) {
@@ -396,7 +387,6 @@ public final class BQConnection extends AbstractBQConnection {
 		checkClosed();
 		return new Properties();
 	}
-
 
 	public void setSchema(String schema) throws SQLException {
 		checkClosed();

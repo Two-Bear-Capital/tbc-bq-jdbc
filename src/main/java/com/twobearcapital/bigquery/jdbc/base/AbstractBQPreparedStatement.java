@@ -23,10 +23,13 @@ import java.io.Reader;
 import java.sql.*;
 
 /**
- * Base PreparedStatement implementation that provides default exception-throwing implementations
- * for all unsupported PreparedStatement methods.
+ * Base PreparedStatement implementation that provides default
+ * exception-throwing implementations for all unsupported PreparedStatement
+ * methods.
  *
- * <p>Subclasses should override only the methods they actually support.</p>
+ * <p>
+ * Subclasses should override only the methods they actually support.
+ * </p>
  *
  * @since 1.0.0
  */

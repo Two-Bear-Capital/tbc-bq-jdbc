@@ -693,9 +693,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		if (lazyLoad && schemaPattern == null && tableNamePattern == null) {
 			logger.info("Lazy loading enabled: returning empty table list (no patterns specified) - catalog: [{}]",
 					catalog);
-			return createResultSet(
-					MetadataColumns.Tables.COLUMN_NAMES,
-					MetadataColumns.Tables.COLUMN_TYPES,
+			return createResultSet(MetadataColumns.Tables.COLUMN_NAMES, MetadataColumns.Tables.COLUMN_TYPES,
 					new java.util.ArrayList<>());
 		}
 
@@ -727,10 +725,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		logger.info("getTables() returning {} table(s)", rows.size());
 
-		return createResultSet(
-				MetadataColumns.Tables.COLUMN_NAMES,
-				MetadataColumns.Tables.COLUMN_TYPES,
-				rows);
+		return createResultSet(MetadataColumns.Tables.COLUMN_NAMES, MetadataColumns.Tables.COLUMN_TYPES, rows);
 	}
 
 	/** Query tables from multiple datasets sequentially. */
@@ -868,7 +863,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			rows.add(new Object[]{"VIEW"});
 			rows.add(new Object[]{"MATERIALIZED VIEW"});
 
-			return createResultSet(MetadataColumns.TableTypes.COLUMN_NAMES, MetadataColumns.TableTypes.COLUMN_TYPES, rows);
+			return createResultSet(MetadataColumns.TableTypes.COLUMN_NAMES, MetadataColumns.TableTypes.COLUMN_TYPES,
+					rows);
 		});
 	}
 
@@ -1027,9 +1023,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			logger.info(
 					"Lazy loading enabled: returning empty column list (no table pattern specified) - catalog: [{}], schemaPattern: [{}]",
 					catalog, schemaPattern);
-			return createResultSet(
-					MetadataColumns.Columns.COLUMN_NAMES,
-					MetadataColumns.Columns.COLUMN_TYPES,
+			return createResultSet(MetadataColumns.Columns.COLUMN_NAMES, MetadataColumns.Columns.COLUMN_TYPES,
 					new java.util.ArrayList<>());
 		}
 
@@ -1056,10 +1050,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			rows = queryColumnsSequential(projectId, datasetIds, tableNamePattern, columnNamePattern);
 		}
 
-		return createResultSet(
-				MetadataColumns.Columns.COLUMN_NAMES,
-				MetadataColumns.Columns.COLUMN_TYPES,
-				rows);
+		return createResultSet(MetadataColumns.Columns.COLUMN_NAMES, MetadataColumns.Columns.COLUMN_TYPES, rows);
 	}
 
 	@Override
@@ -1092,9 +1083,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		logger.info("getPrimaryKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
 		// BigQuery doesn't have traditional primary keys, return empty result set
-		return createResultSet(
-				MetadataColumns.PrimaryKeys.COLUMN_NAMES,
-				MetadataColumns.PrimaryKeys.COLUMN_TYPES,
+		return createResultSet(MetadataColumns.PrimaryKeys.COLUMN_NAMES, MetadataColumns.PrimaryKeys.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
 
@@ -1105,9 +1094,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		logger.info("getImportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
 		// BigQuery doesn't have foreign keys, return empty result set
-		return createResultSet(
-				MetadataColumns.ForeignKeys.COLUMN_NAMES,
-				MetadataColumns.ForeignKeys.COLUMN_TYPES,
+		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
 
@@ -1120,9 +1107,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// BigQuery doesn't have foreign keys, return empty result set (same structure
 		// as
 		// getImportedKeys)
-		return createResultSet(
-				MetadataColumns.ForeignKeys.COLUMN_NAMES,
-				MetadataColumns.ForeignKeys.COLUMN_TYPES,
+		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
 
