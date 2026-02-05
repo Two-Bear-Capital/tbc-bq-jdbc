@@ -20,6 +20,7 @@ import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.metadata.BQResultSetMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
+import com.twobearcapital.bigquery.jdbc.util.TimezoneUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -528,32 +529,35 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 
 	@Override
 	public Date getDate(int columnIndex, Calendar cal) throws SQLException {
-		return getDate(columnIndex);
+		Date date = getDate(columnIndex);
+		return TimezoneUtils.adjustDateToCalendar(date, cal);
 	}
 
 	@Override
 	public Date getDate(String columnLabel, Calendar cal) throws SQLException {
-		return getDate(columnLabel);
+		return getDate(findColumn(columnLabel), cal);
 	}
 
 	@Override
 	public Time getTime(int columnIndex, Calendar cal) throws SQLException {
-		return getTime(columnIndex);
+		Time time = getTime(columnIndex);
+		return TimezoneUtils.adjustTimeToCalendar(time, cal);
 	}
 
 	@Override
 	public Time getTime(String columnLabel, Calendar cal) throws SQLException {
-		return getTime(columnLabel);
+		return getTime(findColumn(columnLabel), cal);
 	}
 
 	@Override
 	public Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
-		return getTimestamp(columnIndex);
+		Timestamp timestamp = getTimestamp(columnIndex);
+		return TimezoneUtils.adjustTimestampToCalendar(timestamp, cal);
 	}
 
 	@Override
 	public Timestamp getTimestamp(String columnLabel, Calendar cal) throws SQLException {
-		return getTimestamp(columnLabel);
+		return getTimestamp(findColumn(columnLabel), cal);
 	}
 
 	@Override

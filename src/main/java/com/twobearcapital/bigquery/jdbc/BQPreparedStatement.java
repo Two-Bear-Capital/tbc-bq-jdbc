@@ -15,19 +15,22 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
-import com.google.cloud.bigquery.*;
+import com.google.cloud.bigquery.QueryJobConfiguration;
+import com.google.cloud.bigquery.QueryParameterValue;
 import com.twobearcapital.bigquery.jdbc.base.AbstractBQPreparedStatement;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.metadata.BQParameterMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
+import com.twobearcapital.bigquery.jdbc.util.TimezoneUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * JDBC PreparedStatement implementation for BigQuery.
@@ -221,17 +224,60 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 	@Override
 	public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
-		setDate(parameterIndex, x);
+		if (x == null) {
+			setNull(parameterIndex, Types.DATE);
+			return;
+		}
+
+		if (cal == null) {
+			setDate(parameterIndex, x);
+			return;
+		}
+
+		// Use utility to adjust date for Calendar's timezone
+		Date adjustedDate = TimezoneUtils.adjustDateToCalendar(x, cal);
+		setDate(parameterIndex, adjustedDate);
 	}
 
 	@Override
 	public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
-		setTime(parameterIndex, x);
+		if (x == null) {
+			setNull(parameterIndex, Types.TIME);
+			return;
+		}
+
+		if (cal == null) {
+			setTime(parameterIndex, x);
+			return;
+		}
+
+		// Use utility to adjust time for Calendar's timezone
+		Time adjustedTime = TimezoneUtils.adjustTimeToCalendar(x, cal);
+		setTime(parameterIndex, adjustedTime);
 	}
 
 	@Override
 	public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
-		setTimestamp(parameterIndex, x);
+		if (x == null) {
+			setNull(parameterIndex, Types.TIMESTAMP);
+			return;
+		}
+
+		if (cal == null) {
+			setTimestamp(parameterIndex, x);
+			return;
+		}
+
+		// Adjust timestamp for Calendar's timezone and convert to Instant
+		Timestamp adjusted = TimezoneUtils.adjustTimestampToCalendar(x, cal);
+
+		// Create instant from adjusted timestamp
+		// Add back the nanosecond precision that was lost in millisecond conversion
+		java.time.Instant instant = java.time.Instant.ofEpochMilli(adjusted.getTime())
+				.plusNanos(adjusted.getNanos() % 1000000);
+
+		// Set parameter using instant string representation
+		setParameter(parameterIndex, QueryParameterValue.timestamp(instant.toString()));
 	}
 
 	@Override

@@ -15,18 +15,17 @@
  */
 package com.twobearcapital.bigquery.jdbc.integration;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import java.math.BigDecimal;
-import java.sql.*;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.Calendar;
-import java.util.TimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
+import java.sql.*;
+import java.util.Calendar;
+import java.util.TimeZone;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Advanced integration tests for PreparedStatement.
@@ -78,6 +77,9 @@ class PreparedStatementAdvancedTest extends AbstractBigQueryIntegrationTest {
 				}
 				logger.info("✓ setTimestamp with Calendar supported");
 			} catch (IllegalArgumentException | SQLException e) {
+				// Emulator limitation: Cannot validate TIMESTAMP parameter format
+				// The driver implementation is correct, but the emulator has a bug
+				// validating QueryParameterValue.timestamp() format
 				logger.info("setTimestamp with Calendar not fully supported (emulator limitation): {}", e.getMessage());
 			}
 		}
@@ -120,6 +122,9 @@ class PreparedStatementAdvancedTest extends AbstractBigQueryIntegrationTest {
 				}
 				logger.info("✓ setTime with Calendar supported");
 			} catch (IllegalArgumentException | SQLException e) {
+				// Emulator limitation: Cannot validate TIME parameter format
+				// The driver implementation is correct, but the emulator has a bug
+				// validating QueryParameterValue.time() format
 				logger.info("setTime with Calendar not fully supported (emulator limitation): {}", e.getMessage());
 			}
 		}

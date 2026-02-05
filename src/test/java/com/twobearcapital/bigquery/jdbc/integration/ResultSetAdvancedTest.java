@@ -15,16 +15,17 @@
  */
 package com.twobearcapital.bigquery.jdbc.integration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.Calendar;
 import java.util.TimeZone;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Advanced integration tests for ResultSet getter methods.
@@ -137,23 +138,19 @@ class ResultSetAdvancedTest extends AbstractBigQueryIntegrationTest {
 
 	@Test
 	void testGetTimestampWithCalendar() throws SQLException {
-		// Given: A query returning timestamp/date values
-		String sql = "SELECT created_date FROM " + TEST_TABLE + " WHERE name = 'Alice'";
+		// Given: A query returning timestamp values (cast DATE to TIMESTAMP for
+		// testing)
+		String sql = "SELECT CAST(created_date AS TIMESTAMP) as ts FROM " + TEST_TABLE + " WHERE name = 'Alice'";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
 			assertTrue(rs.next(), "Should have result");
 
-			try {
-				// When: Getting timestamp with calendar
-				Calendar utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-				Timestamp ts = rs.getTimestamp("created_date", utcCal);
+			// When: Getting timestamp with calendar
+			Calendar utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+			Timestamp ts = rs.getTimestamp("ts", utcCal);
 
-				// Then: Should get timestamp
-				assertNotNull(ts, "Timestamp should not be null");
-				logger.info("✓ getTimestamp with Calendar supported");
-			} catch (SQLException | NumberFormatException e) {
-				logger.info("getTimestamp with Calendar not fully supported (emulator limitation): {}", e.getMessage());
-			}
+			// Then: Should get timestamp
+			assertNotNull(ts, "Timestamp should not be null");
 		}
 	}
 
@@ -165,39 +162,29 @@ class ResultSetAdvancedTest extends AbstractBigQueryIntegrationTest {
 
 			assertTrue(rs.next(), "Should have result");
 
-			try {
-				// When: Getting date with calendar
-				Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"));
-				Date date = rs.getDate("created_date", cal);
+			// When: Getting date with calendar
+			Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"));
+			Date date = rs.getDate("created_date", cal);
 
-				// Then: Should get date
-				assertNotNull(date, "Date should not be null");
-				logger.info("✓ getDate with Calendar supported");
-			} catch (SQLException e) {
-				logger.info("getDate with Calendar not fully supported (emulator limitation): {}", e.getMessage());
-			}
+			// Then: Should get date
+			assertNotNull(date, "Date should not be null");
 		}
 	}
 
 	@Test
 	void testGetTimeWithCalendar() throws SQLException {
 		// Given: A query that can return time
-		String sql = "SELECT CURRENT_TIME() as time_value";
+		String sql = "SELECT TIME '10:30:00' as time_value";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 
 			assertTrue(rs.next(), "Should have result");
 
-			try {
-				// When: Getting time with calendar
-				Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-				Time time = rs.getTime(1, cal);
+			// When: Getting time with calendar
+			Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+			Time time = rs.getTime(1, cal);
 
-				// Then: Should get time
-				assertNotNull(time, "Time should not be null");
-				logger.info("✓ getTime with Calendar supported");
-			} catch (SQLException | NumberFormatException e) {
-				logger.info("getTime with Calendar not fully supported (emulator limitation): {}", e.getMessage());
-			}
+			// Then: Should get time
+			assertNotNull(time, "Time should not be null");
 		}
 	}
 
