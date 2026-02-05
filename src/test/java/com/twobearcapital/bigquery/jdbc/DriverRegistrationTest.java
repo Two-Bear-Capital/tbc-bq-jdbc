@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -102,5 +102,28 @@ class DriverRegistrationTest {
 		// Then: getParentLogger should throw SQLFeatureNotSupportedException
 		assertThrows(java.sql.SQLFeatureNotSupportedException.class, driver::getParentLogger,
 				"getParentLogger should throw SQLFeatureNotSupportedException");
+	}
+
+	@Test
+	void testGetPropertyInfoReturnsEmptyArray() throws Exception {
+		// Given: A BQDriver instance
+		BQDriver driver = new BQDriver();
+
+		// When: Getting property info
+		var propertyInfo = driver.getPropertyInfo("jdbc:bigquery:my-project/my-dataset", new java.util.Properties());
+
+		// Then: Should return empty array
+		assertNotNull(propertyInfo, "Property info should not be null");
+		assertEquals(0, propertyInfo.length, "Property info should be empty");
+	}
+
+	@Test
+	void testAcceptsSimbaFormatUrl() throws Exception {
+		// Given: A BQDriver instance
+		BQDriver driver = new BQDriver();
+
+		// Then: It should accept Simba format URLs
+		assertTrue(driver.acceptsURL(
+				"jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3"));
 	}
 }
