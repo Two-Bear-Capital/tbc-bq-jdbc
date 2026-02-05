@@ -21,7 +21,7 @@ Add to your `pom.xml`:
 <dependency>
     <groupId>com.twobearcapital</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.22</version>
+    <version>1.0.23</version>
 </dependency>
 ```
 
@@ -31,7 +31,7 @@ Add to your `build.gradle`:
 
 ```gradle
 dependencies {
-    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.22'
+    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.23'
 }
 ```
 
@@ -41,7 +41,7 @@ Download the shaded JAR that includes all dependencies:
 
 ```bash
 # Download from Maven Central or GitHub Releases
-wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.22/tbc-bq-jdbc-1.0.22.jar
+wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.23/tbc-bq-jdbc-1.0.23.jar
 ```
 
 ## Basic Usage
@@ -243,7 +243,7 @@ For production applications, use a connection pool:
 <dependency>
     <groupId>com.zaxxer</groupId>
     <artifactId>HikariCP</artifactId>
-    <version>1.0.22</version>
+    <version>1.0.23</version>
 </dependency>
 ```
 
