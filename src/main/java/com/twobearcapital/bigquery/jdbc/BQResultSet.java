@@ -15,24 +15,19 @@
  */
 package com.twobearcapital.bigquery.jdbc;
 
-import com.google.cloud.bigquery.Field;
-import com.google.cloud.bigquery.FieldList;
-import com.google.cloud.bigquery.FieldValue;
-import com.google.cloud.bigquery.FieldValueList;
-import com.google.cloud.bigquery.StandardSQLTypeName;
-import com.google.cloud.bigquery.TableResult;
+import com.google.cloud.bigquery.*;
 import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.metadata.BQResultSetMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.sql.*;
 import java.util.Calendar;
 import java.util.Iterator;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * JDBC ResultSet implementation for BigQuery.
@@ -180,7 +175,19 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public String getString(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? null : value.getStringValue();
+		if (value.isNull()) {
+			return null;
+		}
+
+		// Complex types (ARRAY, STRUCT) are returned as JSON strings
+		// This prevents IntelliJ IDEA crashes when using JDBC Array/Struct objects
+		if (value.getAttribute() == FieldValue.Attribute.REPEATED
+				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
+			// Convert to JSON representation
+			return value.getValue().toString();
+		}
+
+		return value.getStringValue();
 	}
 
 	@Override
@@ -299,7 +306,19 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public String getString(String columnLabel) throws SQLException {
 		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? null : value.getStringValue();
+		if (value.isNull()) {
+			return null;
+		}
+
+		// Complex types (ARRAY, STRUCT) are returned as JSON strings
+		// This prevents IntelliJ IDEA crashes when using JDBC Array/Struct objects
+		if (value.getAttribute() == FieldValue.Attribute.REPEATED
+				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
+			// Convert to JSON representation
+			return value.getValue().toString();
+		}
+
+		return value.getStringValue();
 	}
 
 	@Override
