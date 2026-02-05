@@ -55,7 +55,8 @@ class BQResultSetMetaDataTest {
 		lenient().when(field.getMode()).thenReturn(mode);
 		lenient().when(schema.getFields()).thenReturn(fieldList);
 		lenient().when(fieldList.size()).thenReturn(1);
-		lenient().when(fieldList.get(0)).thenReturn(field);
+		lenient().when(fieldList.getFirst()).thenReturn(field);
+		lenient().when(fieldList.get(0)).thenReturn(field); // Add this for getField(1) to work
 		return new BQResultSetMetaData(schema);
 	}
 
@@ -569,6 +570,7 @@ class BQResultSetMetaDataTest {
 
 		lenient().when(schema.getFields()).thenReturn(fieldList);
 		lenient().when(fieldList.size()).thenReturn(1);
+		lenient().when(fieldList.getFirst()).thenReturn(field);
 		lenient().when(fieldList.get(0)).thenReturn(field);
 
 		BQResultSetMetaData metaData = new BQResultSetMetaData(schema);
@@ -597,6 +599,7 @@ class BQResultSetMetaDataTest {
 
 		lenient().when(schema.getFields()).thenReturn(fieldList);
 		lenient().when(fieldList.size()).thenReturn(1);
+		lenient().when(fieldList.getFirst()).thenReturn(field);
 		lenient().when(fieldList.get(0)).thenReturn(field);
 
 		BQResultSetMetaData metaData = new BQResultSetMetaData(schema);

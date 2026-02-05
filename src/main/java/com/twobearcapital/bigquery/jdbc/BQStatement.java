@@ -33,6 +33,9 @@ public class BQStatement extends AbstractBQStatement {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQStatement.class);
 
+	/** Fetch size for result pagination. 0 means use connection default. */
+	private int fetchSize = 0;
+
 	public BQStatement(BQConnection connection) {
 		super(connection);
 	}
@@ -107,12 +110,21 @@ public class BQStatement extends AbstractBQStatement {
 	@Override
 	public void setFetchSize(int rows) throws SQLException {
 		checkClosed();
+		if (rows < 0) {
+			throw new SQLException("Fetch size must be non-negative");
+		}
+		this.fetchSize = rows;
 	}
 
 	@Override
 	public int getFetchSize() throws SQLException {
 		checkClosed();
-		return properties.pageSize();
+		return fetchSize > 0 ? fetchSize : properties.pageSize();
+	}
+
+	@Override
+	protected int getEffectiveFetchSize() {
+		return fetchSize > 0 ? fetchSize : properties.pageSize();
 	}
 
 	@Override

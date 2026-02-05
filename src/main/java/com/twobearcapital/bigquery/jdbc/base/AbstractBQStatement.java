@@ -93,6 +93,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected abstract QueryJobConfiguration.Builder buildQueryConfig(String sql);
 
 	/**
+	 * Gets the effective fetch size for pagination. Subclasses should return the
+	 * configured fetch size or connection default.
+	 *
+	 * @return effective fetch size (never 0)
+	 */
+	protected abstract int getEffectiveFetchSize();
+
+	/**
 	 * Creates a ResultSet from the query result. Template method for subclasses to
 	 * customize result set creation.
 	 *
@@ -156,8 +164,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 
 		try {
 			JobConfiguration configuration = job.getConfiguration();
-			if (configuration instanceof QueryJobConfiguration) {
-				QueryJobConfiguration queryConfig = (QueryJobConfiguration) configuration;
+			if (configuration instanceof QueryJobConfiguration queryConfig) {
 				return queryConfig.getDestinationTable();
 			}
 		} catch (Exception e) {
@@ -221,6 +228,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		// Set labels
 		if (!properties.labels().isEmpty()) {
 			configBuilder.setLabels(properties.labels());
+		}
+
+		// Apply fetchSize for pagination (JDBC Statement.setFetchSize)
+		// Note: maxRows is enforced at ResultSet level, not at query level
+		int effectiveFetchSize = getEffectiveFetchSize();
+		if (effectiveFetchSize > 0) {
+			configBuilder.setMaxResults((long) effectiveFetchSize);
 		}
 
 		// Add session property if sessions are enabled
@@ -400,13 +414,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	/**
 	 * Helper class to hold both Job and TableResult from async execution.
 	 */
-	private static class JobResultPair {
-		final Job job;
-		final TableResult result;
-
-		JobResultPair(Job job, TableResult result) {
-			this.job = job;
-			this.result = result;
-		}
+	private record JobResultPair(Job job, TableResult result) {
 	}
 }

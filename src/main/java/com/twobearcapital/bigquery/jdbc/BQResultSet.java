@@ -57,6 +57,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	private final Iterator<FieldValueList> rowIterator;
 	private FieldValueList currentRow;
 	private boolean wasNull = false;
+	private int rowCount = 0; // Track rows returned for maxRows enforcement
 
 	/**
 	 * Creates a new BigQuery ResultSet.
@@ -147,8 +148,17 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public boolean next() throws SQLException {
 		checkClosed();
+
+		// Check if maxRows limit has been reached (JDBC Statement.setMaxRows)
+		int maxRows = statement.getMaxRows();
+		if (maxRows > 0 && rowCount >= maxRows) {
+			currentRow = null;
+			return false;
+		}
+
 		if (rowIterator.hasNext()) {
 			currentRow = rowIterator.next();
+			rowCount++;
 			return true;
 		}
 		currentRow = null;
