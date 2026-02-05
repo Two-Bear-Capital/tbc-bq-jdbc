@@ -152,9 +152,8 @@ class SessionTest extends AbstractBigQueryIntegrationTest {
 
 				// Then: Temp table should NOT be accessible from connection 2
 				try (Statement stmt2 = conn2.createStatement()) {
-					assertThrows(SQLException.class, () -> {
-						stmt2.executeQuery("SELECT * FROM temp_isolated");
-					}, "Temp table should not be accessible from different connection");
+					assertThrows(SQLException.class, () -> stmt2.executeQuery("SELECT * FROM temp_isolated"),
+							"Temp table should not be accessible from different connection");
 
 					logger.info("✓ Sessions are isolated between connections");
 				}
@@ -187,9 +186,8 @@ class SessionTest extends AbstractBigQueryIntegrationTest {
 		assertTrue(sessionConn.isClosed(), "Connection should be closed");
 
 		// And: Operations should fail on closed connection
-		assertThrows(SQLException.class, () -> {
-			sessionConn.createStatement();
-		}, "Should not create statement on closed connection");
+		assertThrows(SQLException.class, sessionConn::createStatement,
+				"Should not create statement on closed connection");
 	}
 
 	@Test

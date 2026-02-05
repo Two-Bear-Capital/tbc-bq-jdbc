@@ -1038,10 +1038,10 @@ class MetadataResultSetTest {
 		rs.close();
 
 		// Then: Operations should throw SQLException
-		assertThrows(SQLException.class, () -> rs.next());
+		assertThrows(SQLException.class, rs::next);
 		assertThrows(SQLException.class, () -> rs.getString(1));
-		assertThrows(SQLException.class, () -> rs.getMetaData());
-		assertThrows(SQLException.class, () -> rs.isBeforeFirst());
+		assertThrows(SQLException.class, rs::getMetaData);
+		assertThrows(SQLException.class, rs::isBeforeFirst);
 	}
 
 	@Test

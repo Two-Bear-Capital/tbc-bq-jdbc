@@ -40,7 +40,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should return SQLFeatureNotSupportedException
 		assertNotNull(exception);
-		assertTrue(exception instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
 	}
 
 	@Test
@@ -72,7 +72,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should return SQLFeatureNotSupportedException
 		assertNotNull(exception);
-		assertTrue(exception instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
 	}
 
 	@Test
@@ -104,7 +104,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should return SQLFeatureNotSupportedException
 		assertNotNull(exception);
-		assertTrue(exception instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
 	}
 
 	@Test
@@ -136,7 +136,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should return SQLFeatureNotSupportedException
 		assertNotNull(exception);
-		assertTrue(exception instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
 	}
 
 	@Test
@@ -168,7 +168,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should return SQLFeatureNotSupportedException
 		assertNotNull(exception);
-		assertTrue(exception instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
 	}
 
 	@Test
@@ -200,7 +200,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should return SQLFeatureNotSupportedException
 		assertNotNull(exception);
-		assertTrue(exception instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
 	}
 
 	@Test
@@ -232,7 +232,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should return SQLFeatureNotSupportedException
 		assertNotNull(exception);
-		assertTrue(exception instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
 	}
 
 	@Test
@@ -278,7 +278,7 @@ class UnsupportedOperationsTest {
 		// AssertionError
 		constructor.setAccessible(true);
 		var exception = assertThrows(java.lang.reflect.InvocationTargetException.class, constructor::newInstance);
-		assertTrue(exception.getCause() instanceof AssertionError);
+		assertInstanceOf(AssertionError.class, exception.getCause());
 	}
 
 	@Test
@@ -289,7 +289,7 @@ class UnsupportedOperationsTest {
 
 		// Then: Should throw InvocationTargetException with AssertionError cause
 		var exception = assertThrows(java.lang.reflect.InvocationTargetException.class, constructor::newInstance);
-		assertTrue(exception.getCause() instanceof AssertionError);
+		assertInstanceOf(AssertionError.class, exception.getCause());
 		assertEquals("Utility class should not be instantiated", exception.getCause().getMessage());
 	}
 
@@ -308,12 +308,12 @@ class UnsupportedOperationsTest {
 	@Test
 	void testAllMethodsReturnSQLFeatureNotSupportedException() {
 		// Then: All factory methods should return SQLFeatureNotSupportedException
-		assertTrue(UnsupportedOperations.resultSetUpdates() instanceof SQLFeatureNotSupportedException);
-		assertTrue(UnsupportedOperations.batchUpdates() instanceof SQLFeatureNotSupportedException);
-		assertTrue(UnsupportedOperations.callableStatements() instanceof SQLFeatureNotSupportedException);
-		assertTrue(UnsupportedOperations.savepoints() instanceof SQLFeatureNotSupportedException);
-		assertTrue(UnsupportedOperations.generatedKeys() instanceof SQLFeatureNotSupportedException);
-		assertTrue(UnsupportedOperations.namedCursors() instanceof SQLFeatureNotSupportedException);
-		assertTrue(UnsupportedOperations.holdability() instanceof SQLFeatureNotSupportedException);
+		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.resultSetUpdates());
+		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.batchUpdates());
+		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.callableStatements());
+		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.savepoints());
+		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.generatedKeys());
+		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.namedCursors());
+		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.holdability());
 	}
 }

@@ -223,7 +223,7 @@ class ErrorMessagesTest {
 		// AssertionError
 		constructor.setAccessible(true);
 		var exception = assertThrows(java.lang.reflect.InvocationTargetException.class, constructor::newInstance);
-		assertTrue(exception.getCause() instanceof AssertionError);
+		assertInstanceOf(AssertionError.class, exception.getCause());
 	}
 
 	@Test
@@ -234,7 +234,7 @@ class ErrorMessagesTest {
 
 		// Then: Should throw InvocationTargetException with AssertionError cause
 		var exception = assertThrows(java.lang.reflect.InvocationTargetException.class, constructor::newInstance);
-		assertTrue(exception.getCause() instanceof AssertionError);
+		assertInstanceOf(AssertionError.class, exception.getCause());
 		assertEquals("Utility class should not be instantiated", exception.getCause().getMessage());
 	}
 

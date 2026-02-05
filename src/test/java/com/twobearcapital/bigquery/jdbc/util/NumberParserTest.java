@@ -108,7 +108,7 @@ class NumberParserTest {
 	@Test
 	void testToByteWithIntegerNumber() throws SQLException {
 		// When: Converting Integer object
-		byte result = NumberParser.toByte(Integer.valueOf(100), 1);
+		byte result = NumberParser.toByte(100, 1);
 
 		// Then: Should convert to byte
 		assertEquals(100, result);
@@ -183,7 +183,7 @@ class NumberParserTest {
 	@Test
 	void testToIntWithIntegerNumber() throws SQLException {
 		// When: Converting Integer object
-		int result = NumberParser.toInt(Integer.valueOf(123456), 1);
+		int result = NumberParser.toInt(123456, 1);
 
 		// Then: Should return value
 		assertEquals(123456, result);
@@ -221,7 +221,7 @@ class NumberParserTest {
 	@Test
 	void testToLongWithLongNumber() throws SQLException {
 		// When: Converting Long object
-		long result = NumberParser.toLong(Long.valueOf(123456789L), 1);
+		long result = NumberParser.toLong(123456789L, 1);
 
 		// Then: Should return value
 		assertEquals(123456789L, result);
@@ -259,7 +259,7 @@ class NumberParserTest {
 	@Test
 	void testToFloatWithFloatNumber() throws SQLException {
 		// When: Converting Float object
-		float result = NumberParser.toFloat(Float.valueOf(3.14f), 1);
+		float result = NumberParser.toFloat(3.14f, 1);
 
 		// Then: Should return value
 		assertEquals(3.14f, result, 0.0001f);
@@ -305,7 +305,7 @@ class NumberParserTest {
 	@Test
 	void testToDoubleWithDoubleNumber() throws SQLException {
 		// When: Converting Double object
-		double result = NumberParser.toDouble(Double.valueOf(3.14159), 1);
+		double result = NumberParser.toDouble(3.14159, 1);
 
 		// Then: Should return value
 		assertEquals(3.14159, result, 0.00001);
@@ -522,7 +522,7 @@ class NumberParserTest {
 		assertTrue(ex.getMessage().contains("Cannot convert 'not an int' to int"));
 		assertTrue(ex.getMessage().contains("column 5"));
 		assertNotNull(ex.getCause());
-		assertTrue(ex.getCause() instanceof NumberFormatException);
+		assertInstanceOf(NumberFormatException.class, ex.getCause());
 	}
 
 	@Test
