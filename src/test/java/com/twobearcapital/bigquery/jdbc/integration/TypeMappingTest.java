@@ -302,4 +302,87 @@ class TypeMappingTest extends AbstractBigQueryIntegrationTest {
 			assertEquals("bool_col", metaData.getColumnName(4));
 		}
 	}
+
+	@Test
+	void testArrayOfStrings() throws SQLException {
+		// Given: An ARRAY of STRING values
+		String sql = "SELECT ['Selector', 'Option', 'Value'] as string_array";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as JSON array string
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("string_array");
+			assertNotNull(arrayValue);
+
+			// Should be a JSON array, not FieldValue toString representation
+			assertTrue(arrayValue.startsWith("["), "Array should start with [");
+			assertTrue(arrayValue.endsWith("]"), "Array should end with ]");
+			assertFalse(arrayValue.contains("FieldValue"), "Should not contain FieldValue object representation");
+
+			// Should contain the actual values
+			assertTrue(arrayValue.contains("Selector"), "Should contain 'Selector'");
+			assertTrue(arrayValue.contains("Option"), "Should contain 'Option'");
+			assertTrue(arrayValue.contains("Value"), "Should contain 'Value'");
+		}
+	}
+
+	@Test
+	void testArrayOfNumbers() throws SQLException {
+		// Given: An ARRAY of INT64 values
+		String sql = "SELECT [1, 2, 3, 42] as int_array";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as JSON array string
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("int_array");
+			assertNotNull(arrayValue);
+
+			// Should be a JSON array
+			assertTrue(arrayValue.startsWith("["), "Array should start with [");
+			assertTrue(arrayValue.endsWith("]"), "Array should end with ]");
+
+			// Should contain the numbers (not quoted)
+			assertTrue(arrayValue.contains("1"));
+			assertTrue(arrayValue.contains("42"));
+		}
+	}
+
+	@Test
+	void testEmptyArray() throws SQLException {
+		// Given: An empty ARRAY
+		String sql = "SELECT ARRAY<STRING>[] as empty_array";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as empty JSON array
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("empty_array");
+			assertEquals("[]", arrayValue, "Empty array should be []");
+		}
+	}
+
+	@Test
+	void testArrayWithNulls() throws SQLException {
+		// Given: An ARRAY with NULL values
+		String sql = "SELECT ['first', NULL, 'third'] as array_with_nulls";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as JSON array with null
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("array_with_nulls");
+			assertNotNull(arrayValue);
+
+			// Should contain null as JSON null
+			assertTrue(arrayValue.contains("null"), "Should contain JSON null");
+			assertTrue(arrayValue.contains("first"));
+			assertTrue(arrayValue.contains("third"));
+		}
+	}
 }

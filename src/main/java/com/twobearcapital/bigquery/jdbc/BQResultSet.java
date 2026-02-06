@@ -20,6 +20,7 @@ import com.twobearcapital.bigquery.jdbc.base.BaseReadOnlyResultSet;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.metadata.BQResultSetMetaData;
 import com.twobearcapital.bigquery.jdbc.util.ErrorMessages;
+import com.twobearcapital.bigquery.jdbc.util.FieldValueConverter;
 import com.twobearcapital.bigquery.jdbc.util.TimezoneUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,19 +177,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public String getString(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		if (value.isNull()) {
-			return null;
-		}
-
-		// Complex types (ARRAY, STRUCT) are returned as JSON strings
-		// This prevents IntelliJ IDEA crashes when using JDBC Array/Struct objects
-		if (value.getAttribute() == FieldValue.Attribute.REPEATED
-				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
-			// Convert to JSON representation
-			return value.getValue().toString();
-		}
-
-		return value.getStringValue();
+		// FieldValueConverter handles null checks and complex type conversion
+		return FieldValueConverter.toString(value);
 	}
 
 	@Override
@@ -307,19 +297,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public String getString(String columnLabel) throws SQLException {
 		FieldValue value = getFieldValue(columnLabel);
-		if (value.isNull()) {
-			return null;
-		}
-
-		// Complex types (ARRAY, STRUCT) are returned as JSON strings
-		// This prevents IntelliJ IDEA crashes when using JDBC Array/Struct objects
-		if (value.getAttribute() == FieldValue.Attribute.REPEATED
-				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
-			// Convert to JSON representation
-			return value.getValue().toString();
-		}
-
-		return value.getStringValue();
+		// FieldValueConverter handles null checks and complex type conversion
+		return FieldValueConverter.toString(value);
 	}
 
 	@Override
