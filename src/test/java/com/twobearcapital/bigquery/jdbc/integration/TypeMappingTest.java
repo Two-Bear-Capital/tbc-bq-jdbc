@@ -15,11 +15,12 @@
  */
 package com.twobearcapital.bigquery.jdbc.integration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.sql.*;
-import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests for BigQuery to JDBC type mapping.

@@ -18,6 +18,7 @@ package com.twobearcapital.bigquery.jdbc.util;
 import com.google.cloud.bigquery.FieldValue;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
