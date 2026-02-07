@@ -402,6 +402,14 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 			return null;
 		}
 
+		// Check FieldValue attribute FIRST - this is the source of truth
+		// Array literals may be reported as STRING in schema but have REPEATED
+		// attribute
+		if (value.getAttribute() == FieldValue.Attribute.REPEATED
+				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
+			return FieldValueConverter.toString(value);
+		}
+
 		// Get field type to return appropriate Java type
 		var schema = tableResult.getSchema();
 		if (schema != null && columnIndex > 0 && columnIndex <= schema.getFields().size()) {

@@ -386,4 +386,30 @@ class TypeMappingTest extends AbstractBigQueryIntegrationTest {
 			assertTrue(arrayValue.contains("third"));
 		}
 	}
+
+	@Test
+	void testArrayGetObject() throws SQLException {
+		// Given: An ARRAY of STRING values
+		String sql = "SELECT ['Alpha', 'Beta', 'Gamma'] as string_array";
+
+		// When: Using getObject() instead of getString()
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as JSON string, not FieldValue representation
+			assertTrue(rs.next());
+			Object arrayValue = rs.getObject("string_array");
+			assertNotNull(arrayValue);
+			assertInstanceOf(String.class, arrayValue, "getObject() should return String for arrays");
+
+			String arrayStr = (String) arrayValue;
+			assertTrue(arrayStr.startsWith("["), "Array should start with [");
+			assertTrue(arrayStr.endsWith("]"), "Array should end with ]");
+			assertFalse(arrayStr.contains("FieldValue"), "Should not contain FieldValue object representation");
+
+			// Should contain the actual values
+			assertTrue(arrayStr.contains("Alpha"));
+			assertTrue(arrayStr.contains("Beta"));
+			assertTrue(arrayStr.contains("Gamma"));
+		}
+	}
 }
