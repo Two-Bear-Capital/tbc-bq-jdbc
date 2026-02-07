@@ -124,7 +124,12 @@ public final class FieldValueConverter {
 				List<FieldValue> fields = fieldValue.getRecordValue();
 				yield fields.stream().map(FieldValueConverter::extractValue).collect(Collectors.toList());
 			}
-			default -> fieldValue.getValue(); // Returns the actual primitive value
+			default -> {
+				// For primitive values, use getStringValue() which always works
+				// Gson will handle proper JSON encoding (numbers stay unquoted, strings are
+				// quoted)
+				yield fieldValue.getStringValue();
+			}
 		};
 	}
 }
