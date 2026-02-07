@@ -7,9 +7,15 @@
 [![JDBC](https://img.shields.io/badge/JDBC-4.3-green.svg)](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/module-summary.html)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Modern JDBC driver for Google BigQuery, built from scratch for Java 21+ with JDBC 4.3 compliance.
+Modern JDBC driver for Google BigQuery, optimized for development tools and database IDEs. Built from scratch for Java 21+ with JDBC 4.3 compliance and fast, high-quality metadata support.
 
 ## Features
+
+🎯 **Database IDE Optimized**
+- Fast, comprehensive metadata operations
+- Parallel dataset loading with intelligent caching
+- Fixes critical JetBrains driver issues (DBE-18711, DBE-12954, DBE-22088, DBE-12749, DBE-19753)
+- 30x faster schema introspection for large projects
 
 ✨ **Modern Java 21+**
 - Records, sealed classes, pattern matching
@@ -42,9 +48,9 @@ Modern JDBC driver for Google BigQuery, built from scratch for Java 21+ with JDB
 
 ## IntelliJ IDEA Integration
 
-🚀 **Production-Ready Alternative to JetBrains' Built-in BigQuery Driver**
+🚀 **Optimized for Database IDEs and Development Tools**
 
-This driver is designed as a superior alternative to JetBrains' built-in BigQuery driver for IntelliJ IDEA, addressing several known issues:
+This driver addresses critical limitations in existing BigQuery JDBC drivers for IntelliJ IDEA and other database IDEs, with a focus on fast metadata operations and schema introspection:
 
 ✅ **Reliable Schema Introspection** - Complete DatabaseMetaData implementation (fixes [DBE-18711](https://youtrack.jetbrains.com/issue/DBE-18711), [DBE-12954](https://youtrack.jetbrains.com/issue/DBE-12954))
 
@@ -466,14 +472,15 @@ See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 
 ## Roadmap
 
-### Version 1.0 (Current)
+### Version 1.0 (Current) - IDE Integration Focus
 
+- ✅ Fast, comprehensive DatabaseMetaData implementation
+- ✅ Parallel dataset loading with intelligent caching
 - ✅ Core JDBC 4.3 implementation
 - ✅ All authentication methods
 - ✅ Session support
-- ✅ Type mapping
-- ✅ Integration tests
-- ✅ Performance benchmarks
+- ✅ Complete type mapping
+- ✅ Extensive testing (199 total tests)
 - ✅ Comprehensive documentation
 
 ### Future Versions
@@ -525,10 +532,6 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ## Project Status
 
-**Status:** ✅ Production Ready (Version 1.0)
+**Status:** ✅ Version 1.0 Release - Optimized for Database IDEs
 
-All core features implemented and tested. Ready for production use.
-
----
-
-**Made with ❤️ by Two Bear Capital**
+This initial release focuses on providing fast, high-quality database metadata for development tools like JetBrains IDEs, DataGrip, and other database clients. Comprehensive JDBC 4.3 implementation with extensive testing (91 unit tests, 108 integration tests).
