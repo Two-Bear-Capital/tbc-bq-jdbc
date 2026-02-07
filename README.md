@@ -514,9 +514,11 @@ Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guideli
 ./mvnw spotless:apply
 ```
 
-## License
+## License & Disclaimer
 
 Apache License 2.0 - see [LICENSE](LICENSE) file for details.
+
+**Use at your own risk.** This software is provided "as is" without warranties of any kind. See LICENSE for complete disclaimer.
 
 ## Support
 
