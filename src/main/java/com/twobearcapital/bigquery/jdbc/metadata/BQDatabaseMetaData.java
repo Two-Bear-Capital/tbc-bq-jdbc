@@ -22,9 +22,10 @@ import com.twobearcapital.bigquery.jdbc.config.ConnectionProperties;
 import com.twobearcapital.bigquery.jdbc.config.MetadataCache;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.exception.BQSQLFeatureNotSupportedException;
-import java.sql.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.sql.*;
 
 /**
  * JDBC DatabaseMetaData implementation for BigQuery.
@@ -933,8 +934,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			}
 
 			com.google.cloud.bigquery.StandardSQLTypeName type = field.getType().getStandardType();
-			int jdbcType = TypeMapper.toJdbcType(type);
-			String typeName = type != null ? type.name() : "UNKNOWN";
+			int jdbcType = TypeMapper.toJdbcType(field); // Use field to detect REPEATED mode
+			String typeName = TypeMapper.getTypeName(field); // Use utility method for type name
 
 			int columnSize = TypeMapper.getColumnSize(type);
 			int decimalDigits = TypeMapper.getDecimalDigits(type);

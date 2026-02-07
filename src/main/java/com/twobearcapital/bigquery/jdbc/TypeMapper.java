@@ -17,6 +17,7 @@ package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.StandardSQLTypeName;
+
 import java.sql.Types;
 
 /**
@@ -156,6 +157,72 @@ public final class TypeMapper {
 			case FLOAT64 -> 15;
 			default -> 0;
 		};
+	}
+
+	/**
+	 * Gets the type name for a BigQuery field.
+	 *
+	 * <p>
+	 * This method handles:
+	 * <ul>
+	 * <li>REPEATED mode (legacy array representation) - returns ARRAY&lt;type&gt;
+	 * <li>STRUCT types - returns full STRUCT definition
+	 * <li>ARRAY types - returns ARRAY&lt;element_type&gt;
+	 * <li>All other types - returns the type name
+	 * </ul>
+	 *
+	 * @param field
+	 *            the BigQuery field
+	 * @return the type name string
+	 */
+	public static String getTypeName(Field field) {
+		if (field == null) {
+			return "UNKNOWN";
+		}
+
+		StandardSQLTypeName type = field.getType().getStandardType();
+
+		// Handle REPEATED mode (legacy array representation)
+		if (field.getMode() == Field.Mode.REPEATED) {
+			return "ARRAY<" + (type != null ? type.name() : "UNKNOWN") + ">";
+		}
+
+		if (type == StandardSQLTypeName.STRUCT) {
+			// For STRUCT, return the full type definition
+			return "STRUCT<" + formatStructFields(field.getSubFields()) + ">";
+		} else if (type == StandardSQLTypeName.ARRAY) {
+			// For ARRAY, return the element type
+			if (field.getSubFields() != null && !field.getSubFields().isEmpty()) {
+				Field elementField = field.getSubFields().getFirst();
+				return "ARRAY<" + elementField.getType().getStandardType().name() + ">";
+			}
+			return "ARRAY";
+		}
+
+		return type != null ? type.name() : "UNKNOWN";
+	}
+
+	/**
+	 * Formats STRUCT field definitions for display.
+	 *
+	 * @param fields
+	 *            the fields in the STRUCT
+	 * @return formatted field list
+	 */
+	private static String formatStructFields(com.google.cloud.bigquery.FieldList fields) {
+		if (fields == null || fields.isEmpty()) {
+			return "";
+		}
+
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < fields.size(); i++) {
+			if (i > 0) {
+				sb.append(", ");
+			}
+			Field field = fields.get(i);
+			sb.append(field.getName()).append(" ").append(field.getType().getStandardType().name());
+		}
+		return sb.toString();
 	}
 
 }

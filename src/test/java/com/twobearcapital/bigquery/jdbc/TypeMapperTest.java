@@ -680,6 +680,245 @@ class TypeMapperTest {
 		assertEquals(Types.BIGINT, jdbcType);
 	}
 
+	// toJdbcType(Field) Tests with REPEATED mode
+
+	@Test
+	void testToJdbcTypeWithRepeatedString() {
+		// Given: A REPEATED STRING field (legacy array representation)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRING);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+
+		// When: Mapping field to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should map to ARRAY (not VARCHAR)
+		assertEquals(Types.ARRAY, jdbcType);
+	}
+
+	@Test
+	void testToJdbcTypeWithRepeatedInt64() {
+		// Given: A REPEATED INT64 field (legacy array representation)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.INT64);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+
+		// When: Mapping field to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should map to ARRAY (not BIGINT)
+		assertEquals(Types.ARRAY, jdbcType);
+	}
+
+	@Test
+	void testToJdbcTypeWithRepeatedNumeric() {
+		// Given: A REPEATED NUMERIC field (legacy array representation)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.NUMERIC);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+
+		// When: Mapping field to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should map to ARRAY (not NUMERIC)
+		assertEquals(Types.ARRAY, jdbcType);
+	}
+
+	@Test
+	void testToJdbcTypeWithNullableStringFieldNotArray() {
+		// Given: A NULLABLE (non-repeated) STRING field
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRING);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+
+		// When: Mapping field to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should map to VARCHAR (not ARRAY)
+		assertEquals(Types.VARCHAR, jdbcType);
+	}
+
+	@Test
+	void testToJdbcTypeWithRequiredInt64FieldNotArray() {
+		// Given: A REQUIRED (non-repeated) INT64 field
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.INT64);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REQUIRED);
+
+		// When: Mapping field to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should map to BIGINT (not ARRAY)
+		assertEquals(Types.BIGINT, jdbcType);
+	}
+
+	// getTypeName(Field) Tests
+
+	@Test
+	void testGetTypeNameWithRepeatedString() {
+		// Given: A REPEATED STRING field (legacy array representation)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRING);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return ARRAY<STRING>
+		assertEquals("ARRAY<STRING>", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithRepeatedInt64() {
+		// Given: A REPEATED INT64 field (legacy array representation)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.INT64);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return ARRAY<INT64>
+		assertEquals("ARRAY<INT64>", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithRepeatedNumeric() {
+		// Given: A REPEATED NUMERIC field (legacy array representation)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.NUMERIC);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return ARRAY<NUMERIC>
+		assertEquals("ARRAY<NUMERIC>", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithNullableString() {
+		// Given: A NULLABLE STRING field (non-repeated)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRING);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return STRING (not ARRAY)
+		assertEquals("STRING", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithRequiredInt64() {
+		// Given: A REQUIRED INT64 field (non-repeated)
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.INT64);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.REQUIRED);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return INT64 (not ARRAY)
+		assertEquals("INT64", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithStruct() {
+		// Given: A STRUCT field with sub-fields
+		Field subField1 = Field.of("name", StandardSQLTypeName.STRING);
+		Field subField2 = Field.of("age", StandardSQLTypeName.INT64);
+		FieldList subFields = FieldList.of(subField1, subField2);
+
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRUCT);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+		lenient().when(field.getSubFields()).thenReturn(subFields);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return STRUCT with field definitions
+		assertEquals("STRUCT<name STRING, age INT64>", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithEmptyStruct() {
+		// Given: A STRUCT field with no sub-fields
+		FieldList emptySubFields = FieldList.of();
+
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRUCT);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+		lenient().when(field.getSubFields()).thenReturn(emptySubFields);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return STRUCT<> (empty)
+		assertEquals("STRUCT<>", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithArray() {
+		// Given: An ARRAY field with element type
+		Field elementField = Field.of("element", StandardSQLTypeName.STRING);
+		FieldList subFields = FieldList.of(elementField);
+
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.ARRAY);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+		lenient().when(field.getSubFields()).thenReturn(subFields);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return ARRAY<element_type>
+		assertEquals("ARRAY<STRING>", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithEmptyArray() {
+		// Given: An ARRAY field with no sub-fields
+		FieldList emptySubFields = FieldList.of();
+
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.ARRAY);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+		lenient().when(field.getSubFields()).thenReturn(emptySubFields);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return ARRAY (without element type)
+		assertEquals("ARRAY", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithNullArray() {
+		// Given: An ARRAY field with null sub-fields
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.ARRAY);
+		lenient().when(field.getType()).thenReturn(legacyType);
+		lenient().when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+		lenient().when(field.getSubFields()).thenReturn(null);
+
+		// When: Getting type name
+		String typeName = TypeMapper.getTypeName(field);
+
+		// Then: Should return ARRAY (without element type)
+		assertEquals("ARRAY", typeName);
+	}
+
+	@Test
+	void testGetTypeNameWithNullField() {
+		// When: Getting type name for null field
+		String typeName = TypeMapper.getTypeName(null);
+
+		// Then: Should return UNKNOWN
+		assertEquals("UNKNOWN", typeName);
+	}
+
 	// Class structure tests
 
 	@Test

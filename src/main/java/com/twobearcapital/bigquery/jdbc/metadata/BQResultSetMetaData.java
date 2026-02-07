@@ -19,8 +19,9 @@ import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.twobearcapital.bigquery.jdbc.TypeMapper;
-import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
 import com.twobearcapital.bigquery.jdbc.base.BaseJdbcWrapper;
+import com.twobearcapital.bigquery.jdbc.exception.BQSQLException;
+
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.Objects;
@@ -172,40 +173,7 @@ public final class BQResultSetMetaData extends BaseJdbcWrapper implements Result
 
 	@Override
 	public String getColumnTypeName(int column) throws SQLException {
-		Field field = getField(column);
-		StandardSQLTypeName type = field.getType().getStandardType();
-
-		// Handle REPEATED mode (legacy array representation)
-		if (field.getMode() == Field.Mode.REPEATED) {
-			return "ARRAY<" + type.name() + ">";
-		}
-
-		if (type == StandardSQLTypeName.STRUCT) {
-			// For STRUCT, return the full type definition
-			return "STRUCT<" + formatStructFields(field.getSubFields()) + ">";
-		} else if (type == StandardSQLTypeName.ARRAY) {
-			// For ARRAY, return the element type
-			Field elementField = field.getSubFields().getFirst();
-			return "ARRAY<" + elementField.getType().getStandardType().name() + ">";
-		}
-
-		return type != null ? type.name() : "UNKNOWN";
-	}
-
-	private String formatStructFields(com.google.cloud.bigquery.FieldList fields) {
-		if (fields == null || fields.isEmpty()) {
-			return "";
-		}
-
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < fields.size(); i++) {
-			if (i > 0) {
-				sb.append(", ");
-			}
-			Field field = fields.get(i);
-			sb.append(field.getName()).append(" ").append(field.getType().getStandardType().name());
-		}
-		return sb.toString();
+		return TypeMapper.getTypeName(getField(column));
 	}
 
 	@Override
