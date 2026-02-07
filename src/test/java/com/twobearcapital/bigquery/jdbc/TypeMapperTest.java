@@ -16,6 +16,7 @@
 package com.twobearcapital.bigquery.jdbc;
 
 import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.FieldList;
 import com.google.cloud.bigquery.LegacySQLTypeName;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import java.sql.Types;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for TypeMapper utility class.
@@ -618,6 +620,64 @@ class TypeMapperTest {
 
 		// Then: Should return 0
 		assertEquals(0, digits);
+	}
+
+	// REPEATED Mode Tests (Legacy Array Representation)
+
+	@Test
+	void testToJdbcTypeWithRepeatedStringField() {
+		// Given: A REPEATED STRING field (legacy array representation)
+		when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRING);
+		lenient().when(field.getType()).thenReturn(legacyType);
+
+		// When: Mapping to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should return ARRAY type (not VARCHAR)
+		assertEquals(Types.ARRAY, jdbcType);
+	}
+
+	@Test
+	void testToJdbcTypeWithRepeatedInt64Field() {
+		// Given: A REPEATED INT64 field
+		when(field.getMode()).thenReturn(Field.Mode.REPEATED);
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.INT64);
+		lenient().when(field.getType()).thenReturn(legacyType);
+
+		// When: Mapping to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should return ARRAY type (not BIGINT)
+		assertEquals(Types.ARRAY, jdbcType);
+	}
+
+	@Test
+	void testToJdbcTypeWithNullableField() {
+		// Given: A NULLABLE (non-repeated) STRING field
+		when(field.getMode()).thenReturn(Field.Mode.NULLABLE);
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.STRING);
+		lenient().when(field.getType()).thenReturn(legacyType);
+
+		// When: Mapping to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should return VARCHAR (not ARRAY)
+		assertEquals(Types.VARCHAR, jdbcType);
+	}
+
+	@Test
+	void testToJdbcTypeWithRequiredField() {
+		// Given: A REQUIRED (non-repeated) INT64 field
+		when(field.getMode()).thenReturn(Field.Mode.REQUIRED);
+		lenient().when(legacyType.getStandardType()).thenReturn(StandardSQLTypeName.INT64);
+		lenient().when(field.getType()).thenReturn(legacyType);
+
+		// When: Mapping to JDBC type
+		int jdbcType = TypeMapper.toJdbcType(field);
+
+		// Then: Should return BIGINT (not ARRAY)
+		assertEquals(Types.BIGINT, jdbcType);
 	}
 
 	// Class structure tests

@@ -175,6 +175,11 @@ public final class BQResultSetMetaData extends BaseJdbcWrapper implements Result
 		Field field = getField(column);
 		StandardSQLTypeName type = field.getType().getStandardType();
 
+		// Handle REPEATED mode (legacy array representation)
+		if (field.getMode() == Field.Mode.REPEATED) {
+			return "ARRAY<" + type.name() + ">";
+		}
+
 		if (type == StandardSQLTypeName.STRUCT) {
 			// For STRUCT, return the full type definition
 			return "STRUCT<" + formatStructFields(field.getSubFields()) + ">";

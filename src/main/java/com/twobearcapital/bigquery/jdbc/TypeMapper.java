@@ -62,6 +62,9 @@ public final class TypeMapper {
 	/**
 	 * Maps a BigQuery Field to a JDBC type constant.
 	 *
+	 * <p>
+	 * This method handles both modern ARRAY types and legacy REPEATED mode fields.
+	 *
 	 * @param field
 	 *            the BigQuery field
 	 * @return the JDBC type constant
@@ -70,6 +73,12 @@ public final class TypeMapper {
 		if (field == null) {
 			return Types.OTHER;
 		}
+
+		// Check if this is a REPEATED field (legacy array representation)
+		if (field.getMode() == Field.Mode.REPEATED) {
+			return Types.ARRAY;
+		}
+
 		return toJdbcType(field.getType().getStandardType());
 	}
 
