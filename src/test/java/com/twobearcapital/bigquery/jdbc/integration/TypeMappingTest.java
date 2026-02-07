@@ -412,4 +412,97 @@ class TypeMappingTest extends AbstractBigQueryIntegrationTest {
 			assertTrue(arrayStr.contains("Gamma"));
 		}
 	}
+
+	@Test
+	void testArrayOfIntegers() throws SQLException {
+		// Given: An ARRAY of INT64 values
+		String sql = "SELECT [10, 20, 30, 100] as int_array";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as JSON array with unquoted numbers
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("int_array");
+			assertNotNull(arrayValue);
+
+			// Verify proper JSON format
+			assertTrue(arrayValue.startsWith("["));
+			assertTrue(arrayValue.endsWith("]"));
+			assertFalse(arrayValue.contains("FieldValue"));
+
+			// Numbers should be present (as strings in the JSON)
+			assertTrue(arrayValue.contains("10"));
+			assertTrue(arrayValue.contains("20"));
+			assertTrue(arrayValue.contains("100"));
+		}
+	}
+
+	@Test
+	void testArrayOfBooleans() throws SQLException {
+		// Given: An ARRAY of BOOL values
+		String sql = "SELECT [true, false, true] as bool_array";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as JSON array with boolean values
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("bool_array");
+			assertNotNull(arrayValue);
+
+			assertTrue(arrayValue.startsWith("["));
+			assertTrue(arrayValue.endsWith("]"));
+			assertFalse(arrayValue.contains("FieldValue"));
+
+			// Should contain boolean values
+			assertTrue(arrayValue.contains("true"));
+			assertTrue(arrayValue.contains("false"));
+		}
+	}
+
+	@Test
+	void testArrayOfFloats() throws SQLException {
+		// Given: An ARRAY of FLOAT64 values
+		String sql = "SELECT [1.5, 2.7, 3.14] as float_array";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should return as JSON array with float values
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("float_array");
+			assertNotNull(arrayValue);
+
+			assertTrue(arrayValue.startsWith("["));
+			assertTrue(arrayValue.endsWith("]"));
+			assertFalse(arrayValue.contains("FieldValue"));
+
+			// Should contain float values
+			assertTrue(arrayValue.contains("1.5"));
+			assertTrue(arrayValue.contains("3.14"));
+		}
+	}
+
+	@Test
+	void testMixedNullAndValues() throws SQLException {
+		// Given: An ARRAY with various null positions
+		String sql = "SELECT [NULL, 'value', NULL, 'another'] as mixed_array";
+
+		// When: Querying
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			// Then: Should handle nulls properly in JSON
+			assertTrue(rs.next());
+			String arrayValue = rs.getString("mixed_array");
+			assertNotNull(arrayValue);
+
+			assertFalse(arrayValue.contains("FieldValue"));
+
+			// Should contain both null and actual values
+			assertTrue(arrayValue.contains("null"));
+			assertTrue(arrayValue.contains("value"));
+			assertTrue(arrayValue.contains("another"));
+		}
+	}
 }
