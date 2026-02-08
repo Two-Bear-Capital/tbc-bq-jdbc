@@ -61,6 +61,40 @@ public final class TypeMapper {
 	}
 
 	/**
+	 * Maps a JDBC type constant to a BigQuery StandardSQLTypeName.
+	 *
+	 * <p>
+	 * This is used for parameter binding where we need to provide explicit type
+	 * information to BigQuery, especially for NULL values where type cannot be
+	 * inferred.
+	 *
+	 * @param jdbcType
+	 *            the JDBC type constant from {@link java.sql.Types}
+	 * @return the BigQuery StandardSQLTypeName
+	 */
+	public static StandardSQLTypeName toStandardSQLTypeName(int jdbcType) {
+		return switch (jdbcType) {
+			case Types.VARCHAR, Types.CHAR, Types.LONGVARCHAR, Types.NVARCHAR, Types.NCHAR, Types.LONGNVARCHAR,
+					Types.CLOB, Types.NCLOB ->
+				StandardSQLTypeName.STRING;
+			case Types.VARBINARY, Types.BINARY, Types.LONGVARBINARY, Types.BLOB -> StandardSQLTypeName.BYTES;
+			case Types.BIGINT -> StandardSQLTypeName.INT64;
+			case Types.INTEGER, Types.SMALLINT, Types.TINYINT -> StandardSQLTypeName.INT64;
+			case Types.DOUBLE, Types.FLOAT, Types.REAL -> StandardSQLTypeName.FLOAT64;
+			case Types.NUMERIC, Types.DECIMAL -> StandardSQLTypeName.NUMERIC;
+			case Types.BOOLEAN, Types.BIT -> StandardSQLTypeName.BOOL;
+			case Types.TIMESTAMP, Types.TIMESTAMP_WITH_TIMEZONE -> StandardSQLTypeName.TIMESTAMP;
+			case Types.DATE -> StandardSQLTypeName.DATE;
+			case Types.TIME, Types.TIME_WITH_TIMEZONE -> StandardSQLTypeName.TIME;
+			case Types.STRUCT -> StandardSQLTypeName.STRUCT;
+			case Types.ARRAY -> StandardSQLTypeName.ARRAY;
+			// For NULL or OTHER, default to STRING as the most flexible type
+			case Types.NULL, Types.OTHER -> StandardSQLTypeName.STRING;
+			default -> StandardSQLTypeName.STRING; // Fallback to STRING for unknown types
+		};
+	}
+
+	/**
 	 * Maps a BigQuery Field to a JDBC type constant.
 	 *
 	 * <p>

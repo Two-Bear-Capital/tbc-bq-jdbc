@@ -17,6 +17,7 @@ package com.tbc.bq.jdbc;
 
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.QueryParameterValue;
+import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.tbc.bq.jdbc.base.AbstractBQPreparedStatement;
 import com.tbc.bq.jdbc.exception.BQSQLException;
 import com.tbc.bq.jdbc.metadata.BQParameterMetaData;
@@ -94,57 +95,75 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 	@Override
 	public void setNull(int parameterIndex, int sqlType) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.string(null));
+		// Use explicit type information for NULL values
+		// This is critical because BigQuery cannot infer type from a NULL value
+		StandardSQLTypeName bqType = TypeMapper.toStandardSQLTypeName(sqlType);
+		setParameter(parameterIndex, QueryParameterValue.of(null, bqType));
 	}
 
 	@Override
 	public void setBoolean(int parameterIndex, boolean x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.bool(x));
+		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.BOOL));
 	}
 
 	@Override
 	public void setByte(int parameterIndex, byte x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.int64((long) x));
+		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
 	}
 
 	@Override
 	public void setShort(int parameterIndex, short x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.int64((long) x));
+		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
 	}
 
 	@Override
 	public void setInt(int parameterIndex, int x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.int64((long) x));
+		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
 	}
 
 	@Override
 	public void setLong(int parameterIndex, long x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.int64(x));
+		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.INT64));
 	}
 
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.float64((double) x));
+		// Use explicit type for better emulator compatibility
+		setParameter(parameterIndex, QueryParameterValue.of(Double.valueOf(x), StandardSQLTypeName.FLOAT64));
 	}
 
 	@Override
 	public void setDouble(int parameterIndex, double x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.float64(x));
+		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.FLOAT64));
 	}
 
 	@Override
 	public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.numeric(x));
+		if (x == null) {
+			setNull(parameterIndex, Types.NUMERIC);
+		} else {
+			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.NUMERIC));
+		}
 	}
 
 	@Override
 	public void setString(int parameterIndex, String x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.string(x));
+		// Use explicit type for better emulator compatibility
+		if (x == null) {
+			setNull(parameterIndex, Types.VARCHAR);
+		} else {
+			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.STRING));
+		}
 	}
 
 	@Override
 	public void setBytes(int parameterIndex, byte[] x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.bytes(x));
+		// Use explicit type for better emulator compatibility
+		if (x == null) {
+			setNull(parameterIndex, Types.VARBINARY);
+		} else {
+			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.BYTES));
+		}
 	}
 
 	@Override
@@ -152,7 +171,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.DATE);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.date(x.toString()));
+			setParameter(parameterIndex, QueryParameterValue.of(x.toString(), StandardSQLTypeName.DATE));
 		}
 	}
 
@@ -161,7 +180,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIME);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.time(x.toString()));
+			setParameter(parameterIndex, QueryParameterValue.of(x.toString(), StandardSQLTypeName.TIME));
 		}
 	}
 
@@ -170,7 +189,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIMESTAMP);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.timestamp(x.toInstant().toString()));
+			setParameter(parameterIndex,
+					QueryParameterValue.of(x.toInstant().toString(), StandardSQLTypeName.TIMESTAMP));
 		}
 	}
 
@@ -193,16 +213,24 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			return;
 		}
 
+		// Use explicit type information for better compatibility with BigQuery
+		// emulators
 		switch (x) {
-			case String s -> setString(parameterIndex, s);
-			case Integer i -> setInt(parameterIndex, i);
-			case Long l -> setLong(parameterIndex, l);
-			case Double d -> setDouble(parameterIndex, d);
-			case Boolean b -> setBoolean(parameterIndex, b);
-			case BigDecimal bd -> setBigDecimal(parameterIndex, bd);
-			case Timestamp ts -> setTimestamp(parameterIndex, ts);
-			case Date dt -> setDate(parameterIndex, dt);
-			case Time t -> setTime(parameterIndex, t);
+			case String s -> setParameter(parameterIndex, QueryParameterValue.of(s, StandardSQLTypeName.STRING));
+			case Integer i ->
+				setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(i), StandardSQLTypeName.INT64));
+			case Long l -> setParameter(parameterIndex, QueryParameterValue.of(l, StandardSQLTypeName.INT64));
+			case Float f ->
+				setParameter(parameterIndex, QueryParameterValue.of(Double.valueOf(f), StandardSQLTypeName.FLOAT64));
+			case Double d -> setParameter(parameterIndex, QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64));
+			case Boolean b -> setParameter(parameterIndex, QueryParameterValue.of(b, StandardSQLTypeName.BOOL));
+			case BigDecimal bd -> setParameter(parameterIndex, QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC));
+			case Timestamp ts -> setParameter(parameterIndex,
+					QueryParameterValue.of(ts.toInstant().toString(), StandardSQLTypeName.TIMESTAMP));
+			case Date dt ->
+				setParameter(parameterIndex, QueryParameterValue.of(dt.toString(), StandardSQLTypeName.DATE));
+			case Time t -> setParameter(parameterIndex, QueryParameterValue.of(t.toString(), StandardSQLTypeName.TIME));
+			case byte[] bytes -> setParameter(parameterIndex, QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
 			default -> throw new SQLException("Unsupported parameter type: " + x.getClass().getName());
 		}
 	}
@@ -276,8 +304,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		java.time.Instant instant = java.time.Instant.ofEpochMilli(adjusted.getTime())
 				.plusNanos(adjusted.getNanos() % 1000000);
 
-		// Set parameter using instant string representation
-		setParameter(parameterIndex, QueryParameterValue.timestamp(instant.toString()));
+		// Set parameter using instant string representation with explicit type
+		setParameter(parameterIndex, QueryParameterValue.of(instant.toString(), StandardSQLTypeName.TIMESTAMP));
 	}
 
 	@Override
