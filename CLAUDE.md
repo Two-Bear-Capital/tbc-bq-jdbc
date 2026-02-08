@@ -211,7 +211,7 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Run locally: `./mvnw verify -Pintegration-tests`
 - Run automatically in CI/CD on every push and PR
 - Base class: `AbstractBigQueryIntegrationTest`
-- Uses Testcontainers with `goccy/bigquery-emulator` Docker image
+- Uses Testcontainers with `recidiviz/bigquery-emulator` Docker image
 - Covers: connections, queries, prepared statements, metadata, result sets
 - Requires Docker (available by default in GitHub Actions ubuntu-latest runners)
 

@@ -29,7 +29,7 @@ src/test/java/com/twobearcapital/bigquery/jdbc/integration/
 
 ### Option 1: Using BigQuery Emulator (Recommended for Local Testing)
 
-The integration tests are configured to use the **goccy/bigquery-emulator** Docker container.
+The integration tests are configured to use the **recidiviz/bigquery-emulator** Docker container.
 
 **Requirements:**
 - Docker installed and running
@@ -117,7 +117,7 @@ The `AbstractBigQueryIntegrationTest` base class automatically:
 **Default Settings:**
 - Project ID: `test-project`
 - Dataset: `test_dataset`
-- Emulator image: `ghcr.io/goccy/bigquery-emulator:latest`
+- Emulator image: `ghcr.io/recidiviz/bigquery-emulator:latest`
 - Emulator port: 9050
 
 ### Custom Configuration (Real BigQuery)
@@ -229,13 +229,13 @@ Error: Could not find a valid Docker environment
 ### Emulator Pull Fails
 
 ```
-Error: Failed to pull image ghcr.io/goccy/bigquery-emulator:latest
+Error: Failed to pull image ghcr.io/recidiviz/bigquery-emulator:latest
 ```
 
 **Solutions**:
 1. Check internet connection
 2. Verify Docker has internet access
-3. Try pulling manually: `docker pull ghcr.io/goccy/bigquery-emulator:latest`
+3. Try pulling manually: `docker pull ghcr.io/recidiviz/bigquery-emulator:latest`
 
 ### Connection Timeout
 
