@@ -21,7 +21,7 @@ Add to your `pom.xml`:
 <dependency>
     <groupId>com.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.37</version>
+    <version>1.0.38</version>
 </dependency>
 ```
 
@@ -31,7 +31,7 @@ Add to your `build.gradle`:
 
 ```gradle
 dependencies {
-    implementation 'com.tbc:tbc-bq-jdbc:1.0.37'
+    implementation 'com.tbc:tbc-bq-jdbc:1.0.38'
 }
 ```
 
@@ -41,7 +41,7 @@ Download the shaded JAR that includes all dependencies:
 
 ```bash
 # Download from Maven Central or GitHub Releases
-wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.37/tbc-bq-jdbc-1.0.37.jar
+wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.38/tbc-bq-jdbc-1.0.38.jar
 ```
 
 **Note:** The shaded JAR is ~38 MB due to platform-specific native libraries required for gRPC SSL/TLS support. This is competitive with other enterprise JDBC drivers (e.g., Simba's BigQuery driver is 41.7 MB). See [JAR Size Optimization](JAR_SIZE_OPTIMIZATION.md) for details.
@@ -245,7 +245,7 @@ For production applications, use a connection pool:
 <dependency>
     <groupId>com.zaxxer</groupId>
     <artifactId>HikariCP</artifactId>
-    <version>1.0.37</version>
+    <version>1.0.38</version>
 </dependency>
 ```
 
