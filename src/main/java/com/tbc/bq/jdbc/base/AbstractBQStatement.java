@@ -248,7 +248,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		// Only applies to SELECT queries; DDL/DML don't need destination tables
 		if (properties.useDestinationTables() && properties.datasetId() != null && isSelectQuery(sql)) {
 			// Generate unique temp table name
-			String tempTableName = "_jdbc_temp_" + System.currentTimeMillis() + "_" + Thread.currentThread().getId();
+			String tempTableName = "_jdbc_temp_" + System.currentTimeMillis() + "_" + Thread.currentThread().threadId();
 			TableId destinationTable = TableId.of(properties.projectId(), properties.datasetId(), tempTableName);
 			configBuilder.setDestinationTable(destinationTable)
 					.setCreateDisposition(JobInfo.CreateDisposition.CREATE_IF_NEEDED)

@@ -97,6 +97,7 @@ class ReadOnlyResultSetMixinTest {
 		}
 
 		@Override
+		@SuppressWarnings("deprecation")
 		public BigDecimal getBigDecimal(int columnIndex, int scale) {
 			return null;
 		}
@@ -127,6 +128,7 @@ class ReadOnlyResultSetMixinTest {
 		}
 
 		@Override
+		@SuppressWarnings("deprecation")
 		public InputStream getUnicodeStream(int columnIndex) {
 			return null;
 		}
@@ -177,6 +179,7 @@ class ReadOnlyResultSetMixinTest {
 		}
 
 		@Override
+		@SuppressWarnings("deprecation")
 		public BigDecimal getBigDecimal(String columnLabel, int scale) {
 			return null;
 		}
@@ -207,6 +210,7 @@ class ReadOnlyResultSetMixinTest {
 		}
 
 		@Override
+		@SuppressWarnings("deprecation")
 		public InputStream getUnicodeStream(String columnLabel) {
 			return null;
 		}
