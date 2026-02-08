@@ -81,7 +81,7 @@ java -jar target/benchmarks.jar
 
 ### Core Package Structure
 ```
-src/main/java/com/twobearcapital/bigquery/jdbc/
+src/main/java/com/tbc/bq/jdbc/
 ├── BQDriver.java              # JDBC Driver entry point, URL parsing
 ├── BQConnection.java          # Connection implementation with session management
 ├── BQStatement.java           # Statement execution
@@ -201,13 +201,13 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 ## Testing Architecture
 
 ### Unit Tests (91 tests)
-- Location: `src/test/java/com/twobearcapital/bigquery/jdbc/`
+- Location: `src/test/java/com/tbc/bq/jdbc/`
 - Run: `./mvnw test`
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
 ### Integration Tests (108 tests, 2 skipped)
-- Location: `src/test/java/com/twobearcapital/bigquery/jdbc/integration/`
+- Location: `src/test/java/com/tbc/bq/jdbc/integration/`
 - Run locally: `./mvnw verify -Pintegration-tests`
 - Run automatically in CI/CD on every push and PR
 - Base class: `AbstractBigQueryIntegrationTest`
