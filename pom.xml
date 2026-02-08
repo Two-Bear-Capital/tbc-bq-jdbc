@@ -652,7 +652,7 @@
                             <arguments>
                                 <argument>-c</argument>
                                 <argument>
-                                    ln -sf ${project.version} ${settings.localRepository}/com/twobearcapital/${project.artifactId}/latest
+                                    ln -sf ${project.version} ${settings.localRepository}/com/tbc/${project.artifactId}/latest
                                 </argument>
                             </arguments>
                         </configuration>
