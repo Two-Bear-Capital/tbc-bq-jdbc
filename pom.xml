@@ -512,6 +512,8 @@
                                         <exclude>META-INF/versions/*/module-info.class</exclude>
                                         <!-- Exclude logback.xml from standard shaded jar -->
                                         <exclude>logback.xml</exclude>
+                                        <!-- Exclude protocol buffer definition files (not needed at runtime) -->
+                                        <exclude>**/*.proto</exclude>
                                     </excludes>
                                 </filter>
                                 <!-- Exclude logback from standard shaded jar -->
@@ -574,6 +576,8 @@
                                         <exclude>arrow-git.properties</exclude>
                                         <exclude>module-info.class</exclude>
                                         <exclude>META-INF/versions/*/module-info.class</exclude>
+                                        <!-- Exclude protocol buffer definition files (not needed at runtime) -->
+                                        <exclude>**/*.proto</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
