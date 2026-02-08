@@ -70,7 +70,7 @@ To write logs to a different location, create a custom `logback.xml`:
         </encoder>
     </appender>
 
-    <logger name="com.twobearcapital.bigquery.jdbc" level="DEBUG">
+    <logger name="com.tbc.bq.jdbc" level="DEBUG">
         <appender-ref ref="FILE"/>
     </logger>
 
@@ -88,7 +88,7 @@ To reduce verbosity, change the log level from DEBUG to INFO or WARN:
 
 ```xml
 <!-- Less verbose -->
-<logger name="com.twobearcapital.bigquery.jdbc" level="INFO">
+<logger name="com.tbc.bq.jdbc" level="INFO">
     <appender-ref ref="FILE"/>
 </logger>
 ```
@@ -104,7 +104,7 @@ To also see logs in IntelliJ's console:
     </encoder>
 </appender>
 
-<logger name="com.twobearcapital.bigquery.jdbc" level="DEBUG">
+<logger name="com.tbc.bq.jdbc" level="DEBUG">
     <appender-ref ref="FILE"/>
     <appender-ref ref="CONSOLE"/>
 </logger>

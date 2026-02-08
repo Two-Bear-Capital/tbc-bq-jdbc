@@ -73,7 +73,7 @@ Create `src/main/resources/logback.xml`:
     </appender>
 
     <!-- Less verbose: only INFO level -->
-    <logger name="com.twobearcapital.bigquery.jdbc" level="INFO">
+    <logger name="com.tbc.bq.jdbc" level="INFO">
         <appender-ref ref="FILE"/>
     </logger>
 
@@ -92,7 +92,7 @@ When using the standard JAR, add an SLF4J implementation:
 <dependencies>
     <!-- BigQuery JDBC Driver -->
     <dependency>
-        <groupId>com.twobearcapital</groupId>
+        <groupId>com.tbc</groupId>
         <artifactId>tbc-bq-jdbc</artifactId>
         <version>1.0.31</version>
     </dependency>
@@ -109,7 +109,7 @@ When using the standard JAR, add an SLF4J implementation:
 ### Gradle
 ```groovy
 dependencies {
-    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.31'
+    implementation 'com.tbc:tbc-bq-jdbc:1.0.31'
     implementation 'ch.qos.logback:logback-classic:1.4.14'
 }
 ```
@@ -159,7 +159,7 @@ If you don't want any driver logs:
 ### Option 2: Set log level to OFF
 In `logback.xml`:
 ```xml
-<logger name="com.twobearcapital.bigquery.jdbc" level="OFF"/>
+<logger name="com.tbc.bq.jdbc" level="OFF"/>
 ```
 
 ## Suppressing IntelliJ Warnings
@@ -181,7 +181,7 @@ To suppress them:
 ### Too much logging?
 Change the log level from DEBUG to INFO or WARN:
 ```xml
-<logger name="com.twobearcapital.bigquery.jdbc" level="INFO"/>
+<logger name="com.tbc.bq.jdbc" level="INFO"/>
 ```
 
 ### Want to see Google Cloud API calls?

@@ -19,7 +19,7 @@ Add to your `pom.xml`:
 
 ```xml
 <dependency>
-    <groupId>com.twobearcapital</groupId>
+    <groupId>com.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
     <version>1.0.31</version>
 </dependency>
@@ -31,7 +31,7 @@ Add to your `build.gradle`:
 
 ```gradle
 dependencies {
-    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.31'
+    implementation 'com.tbc:tbc-bq-jdbc:1.0.31'
 }
 ```
 

@@ -14,12 +14,21 @@
     </appender>
 
     <!-- Logger for BigQuery JDBC driver -->
-    <logger name="com.twobearcapital.bigquery.jdbc" level="DEBUG" additivity="false">
+    <logger name="com.tbc.bq.jdbc" level="DEBUG" additivity="false">
         <appender-ref ref="CONSOLE"/>
     </logger>
 
     <!-- Logger for Google Cloud BigQuery API (less verbose) -->
     <logger name="com.google.cloud.bigquery" level="WARN" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- Suppress Testcontainers architecture mismatch warning (expected on Apple Silicon) -->
+    <logger name="tc" level="ERROR" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="org.testcontainers" level="ERROR" additivity="false">
         <appender-ref ref="CONSOLE"/>
     </logger>
 

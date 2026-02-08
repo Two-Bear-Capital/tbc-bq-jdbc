@@ -76,7 +76,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
    - Click **+** to add new driver
    - Name: `BigQuery (tbc-bq-jdbc)`
    - Driver Files: Select downloaded JAR
-   - Class: `com.twobearcapital.bigquery.jdbc.BQDriver`
+   - Class: `com.tbc.bq.jdbc.BQDriver`
 
 3. **Connect to BigQuery**
    ```
@@ -102,7 +102,7 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ```xml
 <dependency>
-    <groupId>com.twobearcapital</groupId>
+    <groupId>com.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
     <version>1.0.31</version>
 </dependency>
@@ -112,7 +112,7 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ```gradle
 dependencies {
-    implementation 'com.twobearcapital:tbc-bq-jdbc:1.0.31'
+    implementation 'com.tbc:tbc-bq-jdbc:1.0.31'
 }
 ```
 

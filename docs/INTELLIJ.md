@@ -78,7 +78,7 @@ tbc-bq-jdbc-1.0.31.jar
 3. Click **+** to add a new driver
 4. Name it "BigQuery (tbc-bq-jdbc)"
 5. Add the downloaded JAR file
-6. Set **Class**: `com.twobearcapital.bigquery.jdbc.BQDriver`
+6. Set **Class**: `com.tbc.bq.jdbc.BQDriver`
 7. Click **OK**
 
 ### 3. Create a Data Source
@@ -100,7 +100,7 @@ Choose one of these methods:
 **Option A: Maven Central** (when available)
 ```xml
 <dependency>
-    <groupId>com.twobearcapital</groupId>
+    <groupId>com.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
     <version>1.0.31</version>
     <classifier>shaded</classifier>
@@ -137,7 +137,7 @@ cd tbc-bq-jdbc
 4. **Configure Driver Settings**
    - **Name**: `BigQuery (tbc-bq-jdbc)`
    - **Driver Files**: Click **+** → Add the downloaded JAR
-   - **Class**: `com.twobearcapital.bigquery.jdbc.BQDriver`
+   - **Class**: `com.tbc.bq.jdbc.BQDriver`
 
 5. **URL Template** (optional):
    ```
@@ -402,7 +402,7 @@ java.sql.SQLException: No suitable driver found for jdbc:bigquery:...
 
 **Solution**:
 1. Verify driver JAR is added to IntelliJ
-2. Check driver class: `com.twobearcapital.bigquery.jdbc.BQDriver`
+2. Check driver class: `com.tbc.bq.jdbc.BQDriver`
 3. Ensure URL starts with `jdbc:bigquery:`
 
 #### Problem: Authentication fails

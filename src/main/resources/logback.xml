@@ -16,7 +16,7 @@
 <configuration>
 
     <!-- File appender for BigQuery JDBC driver -->
-    <appender name="FILE" class="com.twobearcapital.bigquery.jdbc.shaded.logback.core.rolling.RollingFileAppender">
+    <appender name="FILE" class="com.tbc.bq.jdbc.shaded.logback.core.rolling.RollingFileAppender">
         <!--
             Log file location: ${user.home}/.bigquery-jdbc/logs/bigquery-jdbc.log
 
@@ -25,7 +25,7 @@
         -->
         <file>${user.home}/.bigquery-jdbc/logs/bigquery-jdbc.log</file>
 
-        <rollingPolicy class="com.twobearcapital.bigquery.jdbc.shaded.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="com.tbc.bq.jdbc.shaded.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- Daily rollover -->
             <fileNamePattern>${user.home}/.bigquery-jdbc/logs/bigquery-jdbc.%d{yyyy-MM-dd}.log</fileNamePattern>
             <!-- Keep 30 days of history -->
@@ -40,14 +40,14 @@
     </appender>
 
     <!-- Console appender (disabled by default) -->
-    <appender name="CONSOLE" class="com.twobearcapital.bigquery.jdbc.shaded.logback.core.ConsoleAppender">
+    <appender name="CONSOLE" class="com.tbc.bq.jdbc.shaded.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
     <!-- Logger for BigQuery JDBC driver -->
-    <logger name="com.twobearcapital.bigquery.jdbc" level="DEBUG" additivity="false">
+    <logger name="com.tbc.bq.jdbc" level="DEBUG" additivity="false">
         <appender-ref ref="FILE"/>
         <!-- Uncomment to also log to console -->
         <!-- <appender-ref ref="CONSOLE"/> -->

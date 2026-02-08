@@ -4,7 +4,7 @@
          xsi:schemaLocation="https://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.twobearcapital</groupId>
+    <groupId>com.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
     <version>1.0.31</version>
     <packaging>jar</packaging>
@@ -116,7 +116,7 @@
             <version>${slf4j.version}</version>
         </dependency>
 
-        <!-- Logback (optional, included only in with-logging variant) -->
+        <!-- Logback (optional, included only in with-logging variant; also used for tests) -->
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
@@ -129,13 +129,6 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>${slf4j.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -337,7 +330,7 @@
                 <configuration>
                     <archive>
                         <manifestEntries>
-                            <Automatic-Module-Name>com.twobearcapital.bigquery.jdbc</Automatic-Module-Name>
+                            <Automatic-Module-Name>com.tbc.bq.jdbc</Automatic-Module-Name>
                         </manifestEntries>
                     </archive>
                 </configuration>
@@ -415,10 +408,6 @@
                 <configuration>
                     <!-- Use @{argLine} to preserve JaCoCo's agent configuration -->
                     <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
-                    <classpathDependencyExcludes>
-                        <!-- Exclude logback from test classpath to avoid SLF4J multiple bindings -->
-                        <classpathDependencyExclude>ch.qos.logback:logback-classic</classpathDependencyExclude>
-                    </classpathDependencyExcludes>
                     <excludes>
                         <!-- Exclude integration tests from unit test phase -->
                         <exclude>**/*IntegrationTest.java</exclude>
@@ -432,6 +421,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
+                    <!-- Use @{argLine} to preserve JaCoCo's agent configuration -->
+                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
                     <includes>
                         <include>**/*IntegrationTest.java</include>
                         <include>**/integration/**/*Test.java</include>
@@ -490,7 +481,7 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
-                                        <Automatic-Module-Name>com.twobearcapital.bigquery.jdbc</Automatic-Module-Name>
+                                        <Automatic-Module-Name>com.tbc.bq.jdbc</Automatic-Module-Name>
                                     </manifestEntries>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
@@ -501,7 +492,7 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.google</pattern>
-                                    <shadedPattern>com.twobearcapital.bigquery.jdbc.shaded.google</shadedPattern>
+                                    <shadedPattern>com.tbc.bq.jdbc.shaded.google</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
@@ -549,7 +540,7 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
-                                        <Automatic-Module-Name>com.twobearcapital.bigquery.jdbc</Automatic-Module-Name>
+                                        <Automatic-Module-Name>com.tbc.bq.jdbc</Automatic-Module-Name>
                                     </manifestEntries>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
@@ -560,12 +551,12 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.google</pattern>
-                                    <shadedPattern>com.twobearcapital.bigquery.jdbc.shaded.google</shadedPattern>
+                                    <shadedPattern>com.tbc.bq.jdbc.shaded.google</shadedPattern>
                                 </relocation>
                                 <!-- Relocate Logback to avoid conflicts -->
                                 <relocation>
                                     <pattern>ch.qos.logback</pattern>
-                                    <shadedPattern>com.twobearcapital.bigquery.jdbc.shaded.logback</shadedPattern>
+                                    <shadedPattern>com.tbc.bq.jdbc.shaded.logback</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
