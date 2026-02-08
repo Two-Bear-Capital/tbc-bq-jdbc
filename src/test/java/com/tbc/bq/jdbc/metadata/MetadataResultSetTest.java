@@ -59,7 +59,7 @@ class MetadataResultSetTest {
 	// Construction Tests
 
 	@Test
-	void testConstructionWithValidData() {
+	void testConstructionWithValidData() throws SQLException {
 		// Given: Valid columns, types, and rows
 		String[] columns = {"COL1", "COL2"};
 		int[] types = {Types.INTEGER, Types.VARCHAR};
@@ -67,13 +67,13 @@ class MetadataResultSetTest {
 		rows.add(new Object[]{1, "test"});
 
 		// When: Creating MetadataResultSet
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-
-		// Then: Should be created successfully
-		assertNotNull(rs);
-		assertArrayEquals(columns, rs.getColumnNames());
-		assertArrayEquals(types, rs.getColumnTypes());
-		assertEquals(rows, rs.getRows());
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			// Then: Should be created successfully
+			assertNotNull(rs);
+			assertArrayEquals(columns, rs.getColumnNames());
+			assertArrayEquals(types, rs.getColumnTypes());
+			assertEquals(rows, rs.getRows());
+		}
 	}
 
 	@Test
@@ -122,161 +122,161 @@ class MetadataResultSetTest {
 	@Test
 	void testNextWithData() throws SQLException {
 		// Given: A result set with data
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When: Calling next()
+			boolean hasNext = rs.next();
 
-		// When: Calling next()
-		boolean hasNext = rs.next();
-
-		// Then: Should return true and position on first row
-		assertTrue(hasNext);
-		assertEquals(1, rs.getInt(1));
+			// Then: Should return true and position on first row
+			assertTrue(hasNext);
+			assertEquals(1, rs.getInt(1));
+		}
 	}
 
 	@Test
 	void testNextReturnsFalseWhenNoMoreRows() throws SQLException {
 		// Given: A single row result set
-		MetadataResultSet rs = createSingleRowResultSet();
+		try (MetadataResultSet rs = createSingleRowResultSet()) {
+			// When: Calling next() twice
+			assertTrue(rs.next());
+			boolean hasNext = rs.next();
 
-		// When: Calling next() twice
-		assertTrue(rs.next());
-		boolean hasNext = rs.next();
-
-		// Then: Should return false
-		assertFalse(hasNext);
+			// Then: Should return false
+			assertFalse(hasNext);
+		}
 	}
 
 	@Test
 	void testNextOnEmptyResultSet() throws SQLException {
 		// Given: An empty result set
-		MetadataResultSet rs = createEmptyResultSet();
+		try (MetadataResultSet rs = createEmptyResultSet()) {
+			// When: Calling next()
+			boolean hasNext = rs.next();
 
-		// When: Calling next()
-		boolean hasNext = rs.next();
-
-		// Then: Should return false
-		assertFalse(hasNext);
+			// Then: Should return false
+			assertFalse(hasNext);
+		}
 	}
 
 	@Test
 	void testMultipleNextCalls() throws SQLException {
 		// Given: A result set with 3 rows
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When: Calling next() three times
+			assertTrue(rs.next());
+			assertEquals(1, rs.getInt(1));
+			assertTrue(rs.next());
+			assertEquals(2, rs.getInt(1));
+			assertTrue(rs.next());
+			assertEquals(3, rs.getInt(1));
 
-		// When: Calling next() three times
-		assertTrue(rs.next());
-		assertEquals(1, rs.getInt(1));
-		assertTrue(rs.next());
-		assertEquals(2, rs.getInt(1));
-		assertTrue(rs.next());
-		assertEquals(3, rs.getInt(1));
-
-		// Then: Fourth call should return false
-		assertFalse(rs.next());
+			// Then: Fourth call should return false
+			assertFalse(rs.next());
+		}
 	}
 
 	@Test
 	void testIsBeforeFirst() throws SQLException {
 		// Given: A result set
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// Then: Should be before first row initially
+			assertTrue(rs.isBeforeFirst());
 
-		// Then: Should be before first row initially
-		assertTrue(rs.isBeforeFirst());
+			// When: Moving to first row
+			rs.next();
 
-		// When: Moving to first row
-		rs.next();
-
-		// Then: Should not be before first anymore
-		assertFalse(rs.isBeforeFirst());
+			// Then: Should not be before first anymore
+			assertFalse(rs.isBeforeFirst());
+		}
 	}
 
 	@Test
 	void testIsBeforeFirstOnEmptyResultSet() throws SQLException {
 		// Given: An empty result set
-		MetadataResultSet rs = createEmptyResultSet();
-
-		// Then: Should not be before first (empty set)
-		assertFalse(rs.isBeforeFirst());
+		try (MetadataResultSet rs = createEmptyResultSet()) {
+			// Then: Should not be before first (empty set)
+			assertFalse(rs.isBeforeFirst());
+		}
 	}
 
 	@Test
 	void testIsAfterLast() throws SQLException {
 		// Given: A single row result set
-		MetadataResultSet rs = createSingleRowResultSet();
+		try (MetadataResultSet rs = createSingleRowResultSet()) {
+			// Then: Should not be after last initially
+			assertFalse(rs.isAfterLast());
 
-		// Then: Should not be after last initially
-		assertFalse(rs.isAfterLast());
+			// When: Moving past the last row
+			rs.next();
+			rs.next();
 
-		// When: Moving past the last row
-		rs.next();
-		rs.next();
-
-		// Then: Should be after last
-		assertTrue(rs.isAfterLast());
+			// Then: Should be after last
+			assertTrue(rs.isAfterLast());
+		}
 	}
 
 	@Test
 	void testIsAfterLastOnEmptyResultSet() throws SQLException {
 		// Given: An empty result set
-		MetadataResultSet rs = createEmptyResultSet();
-
-		// Then: Should not be after last (empty set)
-		assertFalse(rs.isAfterLast());
+		try (MetadataResultSet rs = createEmptyResultSet()) {
+			// Then: Should not be after last (empty set)
+			assertFalse(rs.isAfterLast());
+		}
 	}
 
 	@Test
 	void testIsFirst() throws SQLException {
 		// Given: A result set with data
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// Then: Should not be on first row initially
+			assertFalse(rs.isFirst());
 
-		// Then: Should not be on first row initially
-		assertFalse(rs.isFirst());
+			// When: Moving to first row
+			rs.next();
 
-		// When: Moving to first row
-		rs.next();
+			// Then: Should be on first row
+			assertTrue(rs.isFirst());
 
-		// Then: Should be on first row
-		assertTrue(rs.isFirst());
+			// When: Moving to second row
+			rs.next();
 
-		// When: Moving to second row
-		rs.next();
-
-		// Then: Should not be on first row
-		assertFalse(rs.isFirst());
+			// Then: Should not be on first row
+			assertFalse(rs.isFirst());
+		}
 	}
 
 	@Test
 	void testIsLast() throws SQLException {
 		// Given: A result set with 3 rows
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When: Moving through rows
+			rs.next(); // Row 1
+			assertFalse(rs.isLast());
 
-		// When: Moving through rows
-		rs.next(); // Row 1
-		assertFalse(rs.isLast());
+			rs.next(); // Row 2
+			assertFalse(rs.isLast());
 
-		rs.next(); // Row 2
-		assertFalse(rs.isLast());
-
-		rs.next(); // Row 3
-		assertTrue(rs.isLast());
+			rs.next(); // Row 3
+			assertTrue(rs.isLast());
+		}
 	}
 
 	@Test
 	void testGetRow() throws SQLException {
 		// Given: A result set with data
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// Then: Initial row number should be 0
+			assertEquals(0, rs.getRow());
 
-		// Then: Initial row number should be 0
-		assertEquals(0, rs.getRow());
+			// When: Moving through rows
+			rs.next();
+			assertEquals(1, rs.getRow());
 
-		// When: Moving through rows
-		rs.next();
-		assertEquals(1, rs.getRow());
+			rs.next();
+			assertEquals(2, rs.getRow());
 
-		rs.next();
-		assertEquals(2, rs.getRow());
-
-		rs.next();
-		assertEquals(3, rs.getRow());
+			rs.next();
+			assertEquals(3, rs.getRow());
+		}
 	}
 
 	// Data Retrieval by Index Tests
@@ -284,55 +284,59 @@ class MetadataResultSetTest {
 	@Test
 	void testGetStringByIndex() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting string value
-		String name = rs.getString(2);
+			// When: Getting string value
+			String name = rs.getString(2);
 
-		// Then: Should return the value
-		assertEquals("Alice", name);
+			// Then: Should return the value
+			assertEquals("Alice", name);
+		}
 	}
 
 	@Test
 	void testGetStringWithNullValue() throws SQLException {
 		// Given: A result set positioned on row with null
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
-		rs.next();
-		rs.next(); // Row with null NAME
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
+			rs.next();
+			rs.next(); // Row with null NAME
 
-		// When: Getting null string
-		String name = rs.getString(2);
+			// When: Getting null string
+			String name = rs.getString(2);
 
-		// Then: Should return null
-		assertNull(name);
+			// Then: Should return null
+			assertNull(name);
+		}
 	}
 
 	@Test
 	void testGetIntByIndex() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting int value
-		int id = rs.getInt(1);
+			// When: Getting int value
+			int id = rs.getInt(1);
 
-		// Then: Should return the value
-		assertEquals(1, id);
+			// Then: Should return the value
+			assertEquals(1, id);
+		}
 	}
 
 	@Test
 	void testGetBooleanByIndex() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting boolean value
-		boolean active = rs.getBoolean(4);
+			// When: Getting boolean value
+			boolean active = rs.getBoolean(4);
 
-		// Then: Should return the value
-		assertTrue(active);
+			// Then: Should return the value
+			assertTrue(active);
+		}
 	}
 
 	@Test
@@ -342,14 +346,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.BOOLEAN};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{null});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting null boolean
-		boolean flag = rs.getBoolean(1);
+			// When: Getting null boolean
+			boolean flag = rs.getBoolean(1);
 
-		// Then: Should return false
-		assertFalse(flag);
+			// Then: Should return false
+			assertFalse(flag);
+		}
 	}
 
 	@Test
@@ -359,14 +364,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.VARCHAR};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{"true"});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting boolean from string
-		boolean flag = rs.getBoolean(1);
+			// When: Getting boolean from string
+			boolean flag = rs.getBoolean(1);
 
-		// Then: Should parse correctly
-		assertTrue(flag);
+			// Then: Should parse correctly
+			assertTrue(flag);
+		}
 	}
 
 	@Test
@@ -376,14 +382,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.TINYINT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{(byte) 42});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting byte value
-		byte num = rs.getByte(1);
+			// When: Getting byte value
+			byte num = rs.getByte(1);
 
-		// Then: Should return the value
-		assertEquals(42, num);
+			// Then: Should return the value
+			assertEquals(42, num);
+		}
 	}
 
 	@Test
@@ -393,14 +400,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.SMALLINT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{(short) 1000});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting short value
-		short num = rs.getShort(1);
+			// When: Getting short value
+			short num = rs.getShort(1);
 
-		// Then: Should return the value
-		assertEquals(1000, num);
+			// Then: Should return the value
+			assertEquals(1000, num);
+		}
 	}
 
 	@Test
@@ -410,14 +418,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.BIGINT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{1234567890L});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting long value
-		long num = rs.getLong(1);
+			// When: Getting long value
+			long num = rs.getLong(1);
 
-		// Then: Should return the value
-		assertEquals(1234567890L, num);
+			// Then: Should return the value
+			assertEquals(1234567890L, num);
+		}
 	}
 
 	@Test
@@ -427,14 +436,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.FLOAT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{3.14f});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting float value
-		float num = rs.getFloat(1);
+			// When: Getting float value
+			float num = rs.getFloat(1);
 
-		// Then: Should return the value
-		assertEquals(3.14f, num, 0.001f);
+			// Then: Should return the value
+			assertEquals(3.14f, num, 0.001f);
+		}
 	}
 
 	@Test
@@ -444,14 +454,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.DOUBLE};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{3.14159});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting double value
-		double num = rs.getDouble(1);
+			// When: Getting double value
+			double num = rs.getDouble(1);
 
-		// Then: Should return the value
-		assertEquals(3.14159, num, 0.00001);
+			// Then: Should return the value
+			assertEquals(3.14159, num, 0.00001);
+		}
 	}
 
 	@Test
@@ -461,14 +472,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.NUMERIC};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{new BigDecimal("123.45")});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting BigDecimal value
-		BigDecimal num = rs.getBigDecimal(1);
+			// When: Getting BigDecimal value
+			BigDecimal num = rs.getBigDecimal(1);
 
-		// Then: Should return the value
-		assertEquals(new BigDecimal("123.45"), num);
+			// Then: Should return the value
+			assertEquals(new BigDecimal("123.45"), num);
+		}
 	}
 
 	@Test
@@ -479,14 +491,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.NUMERIC};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{new BigDecimal("123.456")});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting BigDecimal with scale
-		BigDecimal num = rs.getBigDecimal(1, 2);
+			// When: Getting BigDecimal with scale
+			BigDecimal num = rs.getBigDecimal(1, 2);
 
-		// Then: Should return the value (scale not enforced in implementation)
-		assertNotNull(num);
+			// Then: Should return the value (scale not enforced in implementation)
+			assertNotNull(num);
+		}
 	}
 
 	@Test
@@ -497,14 +510,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.BINARY};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{data});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting byte array
-		byte[] result = rs.getBytes(1);
+			// When: Getting byte array
+			byte[] result = rs.getBytes(1);
 
-		// Then: Should return the value
-		assertArrayEquals(data, result);
+			// Then: Should return the value
+			assertArrayEquals(data, result);
+		}
 	}
 
 	@Test
@@ -514,14 +528,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.VARCHAR};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{"test"});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting bytes from string
-		byte[] result = rs.getBytes(1);
+			// When: Getting bytes from string
+			byte[] result = rs.getBytes(1);
 
-		// Then: Should convert to bytes
-		assertArrayEquals("test".getBytes(), result);
+			// Then: Should convert to bytes
+			assertArrayEquals("test".getBytes(), result);
+		}
 	}
 
 	@Test
@@ -532,14 +547,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.DATE};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{date});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting date value
-		Date result = rs.getDate(1);
+			// When: Getting date value
+			Date result = rs.getDate(1);
 
-		// Then: Should return the value
-		assertEquals(date, result);
+			// Then: Should return the value
+			assertEquals(date, result);
+		}
 	}
 
 	@Test
@@ -549,14 +565,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.VARCHAR};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{"2024-01-15"});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting date from string
-		Date result = rs.getDate(1);
+			// When: Getting date from string
+			Date result = rs.getDate(1);
 
-		// Then: Should parse correctly
-		assertEquals(Date.valueOf("2024-01-15"), result);
+			// Then: Should parse correctly
+			assertEquals(Date.valueOf("2024-01-15"), result);
+		}
 	}
 
 	@Test
@@ -567,14 +584,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.TIME};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{time});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting time value
-		Time result = rs.getTime(1);
+			// When: Getting time value
+			Time result = rs.getTime(1);
 
-		// Then: Should return the value
-		assertEquals(time, result);
+			// Then: Should return the value
+			assertEquals(time, result);
+		}
 	}
 
 	@Test
@@ -585,47 +603,50 @@ class MetadataResultSetTest {
 		int[] types = {Types.TIMESTAMP};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{ts});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting timestamp value
-		Timestamp result = rs.getTimestamp(1);
+			// When: Getting timestamp value
+			Timestamp result = rs.getTimestamp(1);
 
-		// Then: Should return the value
-		assertEquals(ts, result);
+			// Then: Should return the value
+			assertEquals(ts, result);
+		}
 	}
 
 	@Test
 	void testGetObjectByIndex() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting object value
-		Object name = rs.getObject(2);
+			// When: Getting object value
+			Object name = rs.getObject(2);
 
-		// Then: Should return the value
-		assertEquals("Alice", name);
+			// Then: Should return the value
+			assertEquals("Alice", name);
+		}
 	}
 
 	@Test
 	void testGetValueWithInvalidIndexThrows() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// Then: Invalid index should throw SQLException
-		assertThrows(SQLException.class, () -> rs.getString(0));
-		assertThrows(SQLException.class, () -> rs.getString(5));
+			// Then: Invalid index should throw SQLException
+			assertThrows(SQLException.class, () -> rs.getString(0));
+			assertThrows(SQLException.class, () -> rs.getString(5));
+		}
 	}
 
 	@Test
 	void testGetValueBeforeNextThrows() throws SQLException {
 		// Given: A result set not positioned on a row
-		MetadataResultSet rs = createTestResultSet();
-
-		// Then: Should throw SQLException
-		assertThrows(SQLException.class, () -> rs.getString(1));
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// Then: Should throw SQLException
+			assertThrows(SQLException.class, () -> rs.getString(1));
+		}
 	}
 
 	// Data Retrieval by Label Tests
@@ -633,53 +654,57 @@ class MetadataResultSetTest {
 	@Test
 	void testGetStringByLabel() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting value by label
-		String name = rs.getString("NAME");
+			// When: Getting value by label
+			String name = rs.getString("NAME");
 
-		// Then: Should return the value
-		assertEquals("Alice", name);
+			// Then: Should return the value
+			assertEquals("Alice", name);
+		}
 	}
 
 	@Test
 	void testGetStringByLabelCaseInsensitive() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting value by label (different case)
-		String name = rs.getString("name");
+			// When: Getting value by label (different case)
+			String name = rs.getString("name");
 
-		// Then: Should return the value
-		assertEquals("Alice", name);
+			// Then: Should return the value
+			assertEquals("Alice", name);
+		}
 	}
 
 	@Test
 	void testGetIntByLabel() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting value by label
-		int age = rs.getInt("AGE");
+			// When: Getting value by label
+			int age = rs.getInt("AGE");
 
-		// Then: Should return the value
-		assertEquals(30, age);
+			// Then: Should return the value
+			assertEquals(30, age);
+		}
 	}
 
 	@Test
 	void testGetBooleanByLabel() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting value by label
-		boolean active = rs.getBoolean("ACTIVE");
+			// When: Getting value by label
+			boolean active = rs.getBoolean("ACTIVE");
 
-		// Then: Should return the value
-		assertTrue(active);
+			// Then: Should return the value
+			assertTrue(active);
+		}
 	}
 
 	@Test
@@ -689,14 +714,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.TINYINT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{(byte) 42});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		byte num = rs.getByte("NUM");
+			// When: Getting value by label
+			byte num = rs.getByte("NUM");
 
-		// Then: Should return the value
-		assertEquals(42, num);
+			// Then: Should return the value
+			assertEquals(42, num);
+		}
 	}
 
 	@Test
@@ -706,14 +732,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.SMALLINT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{(short) 1000});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		short num = rs.getShort("NUM");
+			// When: Getting value by label
+			short num = rs.getShort("NUM");
 
-		// Then: Should return the value
-		assertEquals(1000, num);
+			// Then: Should return the value
+			assertEquals(1000, num);
+		}
 	}
 
 	@Test
@@ -723,14 +750,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.BIGINT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{1234567890L});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		long num = rs.getLong("NUM");
+			// When: Getting value by label
+			long num = rs.getLong("NUM");
 
-		// Then: Should return the value
-		assertEquals(1234567890L, num);
+			// Then: Should return the value
+			assertEquals(1234567890L, num);
+		}
 	}
 
 	@Test
@@ -740,14 +768,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.FLOAT};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{3.14f});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		float num = rs.getFloat("NUM");
+			// When: Getting value by label
+			float num = rs.getFloat("NUM");
 
-		// Then: Should return the value
-		assertEquals(3.14f, num, 0.001f);
+			// Then: Should return the value
+			assertEquals(3.14f, num, 0.001f);
+		}
 	}
 
 	@Test
@@ -757,14 +786,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.DOUBLE};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{3.14159});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		double num = rs.getDouble("NUM");
+			// When: Getting value by label
+			double num = rs.getDouble("NUM");
 
-		// Then: Should return the value
-		assertEquals(3.14159, num, 0.00001);
+			// Then: Should return the value
+			assertEquals(3.14159, num, 0.00001);
+		}
 	}
 
 	@Test
@@ -774,14 +804,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.NUMERIC};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{new BigDecimal("123.45")});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		BigDecimal num = rs.getBigDecimal("NUM");
+			// When: Getting value by label
+			BigDecimal num = rs.getBigDecimal("NUM");
 
-		// Then: Should return the value
-		assertEquals(new BigDecimal("123.45"), num);
+			// Then: Should return the value
+			assertEquals(new BigDecimal("123.45"), num);
+		}
 	}
 
 	@Test
@@ -792,14 +823,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.NUMERIC};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{new BigDecimal("123.456")});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label with scale
-		BigDecimal num = rs.getBigDecimal("NUM", 2);
+			// When: Getting value by label with scale
+			BigDecimal num = rs.getBigDecimal("NUM", 2);
 
-		// Then: Should return the value
-		assertNotNull(num);
+			// Then: Should return the value
+			assertNotNull(num);
+		}
 	}
 
 	@Test
@@ -810,14 +842,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.BINARY};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{data});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		byte[] result = rs.getBytes("DATA");
+			// When: Getting value by label
+			byte[] result = rs.getBytes("DATA");
 
-		// Then: Should return the value
-		assertArrayEquals(data, result);
+			// Then: Should return the value
+			assertArrayEquals(data, result);
+		}
 	}
 
 	@Test
@@ -828,14 +861,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.DATE};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{date});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		Date result = rs.getDate("DATE_COL");
+			// When: Getting value by label
+			Date result = rs.getDate("DATE_COL");
 
-		// Then: Should return the value
-		assertEquals(date, result);
+			// Then: Should return the value
+			assertEquals(date, result);
+		}
 	}
 
 	@Test
@@ -846,14 +880,15 @@ class MetadataResultSetTest {
 		int[] types = {Types.TIME};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{time});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		Time result = rs.getTime("TIME_COL");
+			// When: Getting value by label
+			Time result = rs.getTime("TIME_COL");
 
-		// Then: Should return the value
-		assertEquals(time, result);
+			// Then: Should return the value
+			assertEquals(time, result);
+		}
 	}
 
 	@Test
@@ -864,61 +899,64 @@ class MetadataResultSetTest {
 		int[] types = {Types.TIMESTAMP};
 		List<Object[]> rows = new ArrayList<>();
 		rows.add(new Object[]{ts});
-		MetadataResultSet rs = new MetadataResultSet(columns, types, rows);
-		rs.next();
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			rs.next();
 
-		// When: Getting value by label
-		Timestamp result = rs.getTimestamp("TS_COL");
+			// When: Getting value by label
+			Timestamp result = rs.getTimestamp("TS_COL");
 
-		// Then: Should return the value
-		assertEquals(ts, result);
+			// Then: Should return the value
+			assertEquals(ts, result);
+		}
 	}
 
 	@Test
 	void testGetObjectByLabel() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting object by label
-		Object name = rs.getObject("NAME");
+			// When: Getting object by label
+			Object name = rs.getObject("NAME");
 
-		// Then: Should return the value
-		assertEquals("Alice", name);
+			// Then: Should return the value
+			assertEquals("Alice", name);
+		}
 	}
 
 	@Test
 	void testGetValueWithInvalidLabelThrows() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// Then: Invalid label should throw SQLException
-		assertThrows(SQLException.class, () -> rs.getString("NONEXISTENT"));
+			// Then: Invalid label should throw SQLException
+			assertThrows(SQLException.class, () -> rs.getString("NONEXISTENT"));
+		}
 	}
 
 	@Test
 	void testFindColumn() throws SQLException {
 		// Given: A result set
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When: Finding column index
+			int index = rs.findColumn("NAME");
 
-		// When: Finding column index
-		int index = rs.findColumn("NAME");
-
-		// Then: Should return correct index (1-based)
-		assertEquals(2, index);
+			// Then: Should return correct index (1-based)
+			assertEquals(2, index);
+		}
 	}
 
 	@Test
 	void testFindColumnCaseInsensitive() throws SQLException {
 		// Given: A result set
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When: Finding column with different case
+			int index = rs.findColumn("name");
 
-		// When: Finding column with different case
-		int index = rs.findColumn("name");
-
-		// Then: Should return correct index
-		assertEquals(2, index);
+			// Then: Should return correct index
+			assertEquals(2, index);
+		}
 	}
 
 	// wasNull() Tests
@@ -926,50 +964,53 @@ class MetadataResultSetTest {
 	@Test
 	void testWasNullWithNullValue() throws SQLException {
 		// Given: A result set positioned on row with null
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
-		rs.next();
-		rs.next(); // Row with null NAME
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
+			rs.next();
+			rs.next(); // Row with null NAME
 
-		// When: Getting null value
-		String name = rs.getString(2);
+			// When: Getting null value
+			String name = rs.getString(2);
 
-		// Then: wasNull() should return true
-		assertNull(name);
-		assertTrue(rs.wasNull());
+			// Then: wasNull() should return true
+			assertNull(name);
+			assertTrue(rs.wasNull());
+		}
 	}
 
 	@Test
 	void testWasNullWithNonNullValue() throws SQLException {
 		// Given: A result set positioned on first row
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
 
-		// When: Getting non-null value
-		String name = rs.getString(2);
+			// When: Getting non-null value
+			String name = rs.getString(2);
 
-		// Then: wasNull() should return false
-		assertEquals("Alice", name);
-		assertFalse(rs.wasNull());
+			// Then: wasNull() should return false
+			assertEquals("Alice", name);
+			assertFalse(rs.wasNull());
+		}
 	}
 
 	@Test
 	void testWasNullAfterMultipleGets() throws SQLException {
 		// Given: A result set positioned on row with mixed null/non-null
-		MetadataResultSet rs = createTestResultSet();
-		rs.next();
-		rs.next();
-		rs.next(); // Row with null NAME
+		try (MetadataResultSet rs = createTestResultSet()) {
+			rs.next();
+			rs.next();
+			rs.next(); // Row with null NAME
 
-		// When: Getting non-null then null values
-		int id = rs.getInt(1);
-		assertFalse(rs.wasNull());
+			// When: Getting non-null then null values
+			int id = rs.getInt(1);
+			assertFalse(rs.wasNull());
 
-		String name = rs.getString(2);
-		assertTrue(rs.wasNull());
+			String name = rs.getString(2);
+			assertTrue(rs.wasNull());
 
-		int age = rs.getInt(3);
-		assertFalse(rs.wasNull());
+			int age = rs.getInt(3);
+			assertFalse(rs.wasNull());
+		}
 	}
 
 	// ResultSetMetaData Tests
@@ -977,44 +1018,46 @@ class MetadataResultSetTest {
 	@Test
 	void testGetMetaData() throws SQLException {
 		// Given: A result set
-		MetadataResultSet rs = createTestResultSet();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When: Getting metadata
+			ResultSetMetaData metaData = rs.getMetaData();
 
-		// When: Getting metadata
-		ResultSetMetaData metaData = rs.getMetaData();
-
-		// Then: Should return metadata
-		assertNotNull(metaData);
-		assertEquals(4, metaData.getColumnCount());
+			// Then: Should return metadata
+			assertNotNull(metaData);
+			assertEquals(4, metaData.getColumnCount());
+		}
 	}
 
 	@Test
 	void testMetaDataColumnNames() throws SQLException {
 		// Given: A result set
-		MetadataResultSet rs = createTestResultSet();
-		ResultSetMetaData metaData = rs.getMetaData();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			ResultSetMetaData metaData = rs.getMetaData();
 
-		// When: Getting column names
-		String col1 = metaData.getColumnName(1);
-		String col2 = metaData.getColumnName(2);
+			// When: Getting column names
+			String col1 = metaData.getColumnName(1);
+			String col2 = metaData.getColumnName(2);
 
-		// Then: Should return correct names
-		assertEquals("ID", col1);
-		assertEquals("NAME", col2);
+			// Then: Should return correct names
+			assertEquals("ID", col1);
+			assertEquals("NAME", col2);
+		}
 	}
 
 	@Test
 	void testMetaDataColumnTypes() throws SQLException {
 		// Given: A result set
-		MetadataResultSet rs = createTestResultSet();
-		ResultSetMetaData metaData = rs.getMetaData();
+		try (MetadataResultSet rs = createTestResultSet()) {
+			ResultSetMetaData metaData = rs.getMetaData();
 
-		// When: Getting column types
-		int type1 = metaData.getColumnType(1);
-		int type2 = metaData.getColumnType(2);
+			// When: Getting column types
+			int type1 = metaData.getColumnType(1);
+			int type2 = metaData.getColumnType(2);
 
-		// Then: Should return correct types
-		assertEquals(Types.INTEGER, type1);
-		assertEquals(Types.VARCHAR, type2);
+			// Then: Should return correct types
+			assertEquals(Types.INTEGER, type1);
+			assertEquals(Types.VARCHAR, type2);
+		}
 	}
 
 	// Lifecycle Tests
