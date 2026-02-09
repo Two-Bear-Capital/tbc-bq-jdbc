@@ -5,7 +5,7 @@ This guide explains how to use the BigQuery JDBC Driver with IntelliJ IDEA's Dat
 ## Quick Start
 
 1. **Download the right JAR:**
-   - Use `tbc-bq-jdbc-1.0.45-with-logging.jar` from the releases
+   - Use `tbc-bq-jdbc-1.0.46-with-logging.jar` from the releases
    - This variant includes built-in logging support
 
 2. **Add to IntelliJ:**
