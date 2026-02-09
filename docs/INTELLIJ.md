@@ -68,7 +68,7 @@ Download the latest shaded JAR from the [releases page](https://github.com/Two-B
 
 ```bash
 # Example filename
-tbc-bq-jdbc-1.0.42.jar
+tbc-bq-jdbc-1.0.43.jar
 ```
 
 ### 2. Add Driver to IntelliJ
@@ -102,7 +102,7 @@ Choose one of these methods:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.42</version>
+    <version>1.0.43</version>
     <classifier>shaded</classifier>
 </dependency>
 ```
@@ -112,7 +112,7 @@ Choose one of these methods:
 git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
 cd tbc-bq-jdbc
 ./mvnw clean package
-# JAR will be in target/tbc-bq-jdbc-1.0.42.jar
+# JAR will be in target/tbc-bq-jdbc-1.0.43.jar
 ```
 
 **Option C: Download Release**
@@ -694,5 +694,5 @@ For introspection performance issues:
 ---
 
 **Last Updated**: 2026-02-09
-**Driver Version**: 1.0.42
+**Driver Version**: 1.0.43
 **IntelliJ Version Tested**: 2025.3.x
