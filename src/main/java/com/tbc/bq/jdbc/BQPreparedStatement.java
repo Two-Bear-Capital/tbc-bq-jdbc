@@ -93,6 +93,21 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		return 0;
 	}
 
+	/**
+	 * Sets the designated parameter to SQL NULL with explicit type information.
+	 *
+	 * <p>
+	 * BigQuery requires explicit type information for NULL values because it cannot
+	 * infer the type from NULL alone. The SQL type is mapped to the corresponding
+	 * BigQuery StandardSQLTypeName.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param sqlType
+	 *            the SQL type code from {@link java.sql.Types}
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setNull(int parameterIndex, int sqlType) throws SQLException {
 		// Use explicit type information for NULL values
@@ -101,42 +116,153 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		setParameter(parameterIndex, QueryParameterValue.of(null, bqType));
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java boolean value.
+	 *
+	 * <p>
+	 * Maps to BigQuery BOOL type. The value is converted to a QueryParameterValue
+	 * with explicit type information for optimal BigQuery compatibility.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setBoolean(int parameterIndex, boolean x) throws SQLException {
 		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.BOOL));
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java byte value.
+	 *
+	 * <p>
+	 * Maps to BigQuery INT64 type. The byte value is widened to long for BigQuery
+	 * storage.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setByte(int parameterIndex, byte x) throws SQLException {
 		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java short value.
+	 *
+	 * <p>
+	 * Maps to BigQuery INT64 type. The short value is widened to long for BigQuery
+	 * storage.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setShort(int parameterIndex, short x) throws SQLException {
 		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java int value.
+	 *
+	 * <p>
+	 * Maps to BigQuery INT64 type. The int value is widened to long for BigQuery
+	 * storage.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setInt(int parameterIndex, int x) throws SQLException {
 		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java long value.
+	 *
+	 * <p>
+	 * Maps to BigQuery INT64 type with direct conversion.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setLong(int parameterIndex, long x) throws SQLException {
 		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.INT64));
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java float value.
+	 *
+	 * <p>
+	 * Maps to BigQuery FLOAT64 type. The float value is widened to double for
+	 * BigQuery storage.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
 		// Use explicit type for better emulator compatibility
 		setParameter(parameterIndex, QueryParameterValue.of(Double.valueOf(x), StandardSQLTypeName.FLOAT64));
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java double value.
+	 *
+	 * <p>
+	 * Maps to BigQuery FLOAT64 type with direct conversion.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setDouble(int parameterIndex, double x) throws SQLException {
 		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.FLOAT64));
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.math.BigDecimal}
+	 * value.
+	 *
+	 * <p>
+	 * Maps to BigQuery NUMERIC type. If the value is null, calls
+	 * {@link #setNull(int, int)} with {@link Types#NUMERIC}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
 		if (x == null) {
@@ -146,6 +272,20 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java String value.
+	 *
+	 * <p>
+	 * Maps to BigQuery STRING type. If the value is null, calls
+	 * {@link #setNull(int, int)} with {@link Types#VARCHAR}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setString(int parameterIndex, String x) throws SQLException {
 		// Use explicit type for better emulator compatibility
@@ -156,6 +296,20 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java byte array value.
+	 *
+	 * <p>
+	 * Maps to BigQuery BYTES type. If the value is null, calls
+	 * {@link #setNull(int, int)} with {@link Types#VARBINARY}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setBytes(int parameterIndex, byte[] x) throws SQLException {
 		// Use explicit type for better emulator compatibility
@@ -166,6 +320,21 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.sql.Date} value.
+	 *
+	 * <p>
+	 * Maps to BigQuery DATE type. The date is converted to ISO-8601 format
+	 * (yyyy-MM-dd). If the value is null, calls {@link #setNull(int, int)} with
+	 * {@link Types#DATE}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setDate(int parameterIndex, Date x) throws SQLException {
 		if (x == null) {
@@ -175,6 +344,21 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.sql.Time} value.
+	 *
+	 * <p>
+	 * Maps to BigQuery TIME type. The time is converted to ISO-8601 format
+	 * (HH:mm:ss[.SSS]). If the value is null, calls {@link #setNull(int, int)} with
+	 * {@link Types#TIME}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setTime(int parameterIndex, Time x) throws SQLException {
 		if (x == null) {
@@ -184,6 +368,21 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.sql.Timestamp} value.
+	 *
+	 * <p>
+	 * Maps to BigQuery TIMESTAMP type. The timestamp is converted to an Instant in
+	 * UTC and formatted as ISO-8601 (yyyy-MM-dd'T'HH:mm:ss[.SSS]'Z'). If the value
+	 * is null, calls {@link #setNull(int, int)} with {@link Types#TIMESTAMP}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
 		if (x == null) {
@@ -194,17 +393,74 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
+	/**
+	 * Clears all previously set parameter values.
+	 *
+	 * <p>
+	 * After calling this method, all parameters must be set again before executing
+	 * the prepared statement.
+	 *
+	 * @throws SQLException
+	 *             if the statement is closed
+	 */
 	@Override
 	public void clearParameters() throws SQLException {
 		checkClosed();
 		parameters.clear();
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java object value with target SQL
+	 * type.
+	 *
+	 * <p>
+	 * The targetSqlType parameter is ignored; this method delegates to
+	 * {@link #setObject(int, Object)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @param targetSqlType
+	 *            the SQL type (ignored)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid, the statement is closed, or the
+	 *             object type is unsupported
+	 */
 	@Override
 	public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
 		setObject(parameterIndex, x);
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java object value.
+	 *
+	 * <p>
+	 * The driver infers the BigQuery type from the Java object type:
+	 * <ul>
+	 * <li>{@link String} → STRING
+	 * <li>{@link Integer}, {@link Long} → INT64
+	 * <li>{@link Float}, {@link Double} → FLOAT64
+	 * <li>{@link Boolean} → BOOL
+	 * <li>{@link BigDecimal} → NUMERIC
+	 * <li>{@link Timestamp} → TIMESTAMP (converted to UTC Instant)
+	 * <li>{@link Date} → DATE
+	 * <li>{@link Time} → TIME
+	 * <li>{@code byte[]} → BYTES
+	 * </ul>
+	 *
+	 * <p>
+	 * If the value is null, calls {@link #setNull(int, int)} with
+	 * {@link Types#NULL}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid, the statement is closed, or the
+	 *             object type is unsupported
+	 */
 	@Override
 	public void setObject(int parameterIndex, Object x) throws SQLException {
 		checkClosed();
@@ -250,6 +506,25 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		return null;
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.sql.Date} value using
+	 * the specified Calendar.
+	 *
+	 * <p>
+	 * The Calendar is used to interpret the date in a specific timezone. The date
+	 * is adjusted from the Calendar's timezone to UTC before storing in BigQuery.
+	 * If the Calendar is null, this method behaves the same as
+	 * {@link #setDate(int, Date)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @param cal
+	 *            the Calendar to use for timezone interpretation (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
 		if (x == null) {
@@ -267,6 +542,25 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		setDate(parameterIndex, adjustedDate);
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.sql.Time} value using
+	 * the specified Calendar.
+	 *
+	 * <p>
+	 * The Calendar is used to interpret the time in a specific timezone. The time
+	 * is adjusted from the Calendar's timezone to UTC before storing in BigQuery.
+	 * If the Calendar is null, this method behaves the same as
+	 * {@link #setTime(int, Time)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @param cal
+	 *            the Calendar to use for timezone interpretation (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
 		if (x == null) {
@@ -284,6 +578,26 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		setTime(parameterIndex, adjustedTime);
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.sql.Timestamp} value
+	 * using the specified Calendar.
+	 *
+	 * <p>
+	 * The Calendar is used to interpret the timestamp in a specific timezone. The
+	 * timestamp is adjusted from the Calendar's timezone to UTC before storing in
+	 * BigQuery. Nanosecond precision is preserved during the conversion. If the
+	 * Calendar is null, this method behaves the same as
+	 * {@link #setTimestamp(int, Timestamp)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @param cal
+	 *            the Calendar to use for timezone interpretation (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
 		if (x == null) {
@@ -308,11 +622,41 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		setParameter(parameterIndex, QueryParameterValue.of(instant.toString(), StandardSQLTypeName.TIMESTAMP));
 	}
 
+	/**
+	 * Sets the designated parameter to SQL NULL with type name.
+	 *
+	 * <p>
+	 * The typeName parameter is ignored; this method delegates to
+	 * {@link #setNull(int, int)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param sqlType
+	 *            the SQL type code from {@link java.sql.Types}
+	 * @param typeName
+	 *            the fully-qualified name of an SQL user-defined type (ignored)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
 		setNull(parameterIndex, sqlType);
 	}
 
+	/**
+	 * Sets the designated parameter to the given {@link java.net.URL} value.
+	 *
+	 * <p>
+	 * The URL is converted to a string representation and stored as a BigQuery
+	 * STRING type.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setURL(int parameterIndex, URL x) throws SQLException {
 		setString(parameterIndex, x.toString());
@@ -324,21 +668,92 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		return new BQParameterMetaData(parameters.size());
 	}
 
+	/**
+	 * Sets the designated parameter to the given String value (NCHAR support).
+	 *
+	 * <p>
+	 * This method behaves identically to {@link #setString(int, String)} since
+	 * BigQuery STRING type natively supports Unicode characters.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param value
+	 *            the parameter value (may be null)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid or the statement is closed
+	 */
 	@Override
 	public void setNString(int parameterIndex, String value) throws SQLException {
 		setString(parameterIndex, value);
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java object with target SQL type
+	 * and scale/length.
+	 *
+	 * <p>
+	 * The targetSqlType and scaleOrLength parameters are ignored; this method
+	 * delegates to {@link #setObject(int, Object)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @param targetSqlType
+	 *            the SQL type (ignored)
+	 * @param scaleOrLength
+	 *            the scale or length (ignored)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid, the statement is closed, or the
+	 *             object type is unsupported
+	 */
 	@Override
 	public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
 		setObject(parameterIndex, x);
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java object with target SQLType
+	 * and scale/length.
+	 *
+	 * <p>
+	 * The targetSqlType and scaleOrLength parameters are ignored; this method
+	 * delegates to {@link #setObject(int, Object)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @param targetSqlType
+	 *            the SQLType (ignored)
+	 * @param scaleOrLength
+	 *            the scale or length (ignored)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid, the statement is closed, or the
+	 *             object type is unsupported
+	 */
 	@Override
 	public void setObject(int parameterIndex, Object x, SQLType targetSqlType, int scaleOrLength) throws SQLException {
 		setObject(parameterIndex, x);
 	}
 
+	/**
+	 * Sets the designated parameter to the given Java object with target SQLType.
+	 *
+	 * <p>
+	 * The targetSqlType parameter is ignored; this method delegates to
+	 * {@link #setObject(int, Object)}.
+	 *
+	 * @param parameterIndex
+	 *            the first parameter is 1, the second is 2, ...
+	 * @param x
+	 *            the parameter value (may be null)
+	 * @param targetSqlType
+	 *            the SQLType (ignored)
+	 * @throws SQLException
+	 *             if parameterIndex is invalid, the statement is closed, or the
+	 *             object type is unsupported
+	 */
 	@Override
 	public void setObject(int parameterIndex, Object x, SQLType targetSqlType) throws SQLException {
 		setObject(parameterIndex, x);

@@ -40,6 +40,33 @@ import java.util.concurrent.Executor;
 /**
  * JDBC Connection implementation for BigQuery.
  *
+ * <p>
+ * This connection provides access to BigQuery through standard JDBC interfaces.
+ * It supports:
+ * <ul>
+ * <li>Statement and PreparedStatement execution
+ * <li>Transaction support (requires session mode with
+ * {@code enableSessions=true})
+ * <li>Metadata queries through {@link DatabaseMetaData}
+ * <li>Multiple authentication methods (ADC, service account, OAuth, etc.)
+ * </ul>
+ *
+ * <p>
+ * <b>Thread Safety:</b> This connection implementation is thread-safe. Multiple
+ * statements can be created and executed concurrently from the same connection.
+ * However, transaction operations ({@link #commit()}, {@link #rollback()})
+ * affect all statements on the connection and should be coordinated
+ * appropriately.
+ *
+ * <p>
+ * <b>Session Mode:</b> BigQuery sessions are required for:
+ * <ul>
+ * <li>Transaction support (BEGIN, COMMIT, ROLLBACK)
+ * <li>Temporary tables
+ * <li>Multi-statement SQL execution
+ * </ul>
+ * Enable sessions with connection property: {@code enableSessions=true}
+ *
  * @since 1.0.0
  */
 public final class BQConnection extends AbstractBQConnection {
@@ -154,12 +181,62 @@ public final class BQConnection extends AbstractBQConnection {
 		return ErrorMessages.CONNECTION_CLOSED;
 	}
 
+	/**
+	 * Creates a new Statement for executing SQL queries.
+	 *
+	 * <p>
+	 * The returned statement can be used multiple times to execute different SQL
+	 * queries. Each statement maintains its own result set and query execution
+	 * state.
+	 *
+	 * <p>
+	 * <b>Concurrency:</b> Multiple statements can be created and executed
+	 * concurrently on the same connection. Each statement operates independently.
+	 *
+	 * <p>
+	 * <b>Lifecycle:</b> The statement should be closed when no longer needed to
+	 * free resources. Closing the connection automatically closes all associated
+	 * statements.
+	 *
+	 * @return a new Statement object
+	 * @throws SQLException
+	 *             if the connection is closed
+	 */
 	@Override
 	public Statement createStatement() throws SQLException {
 		checkClosed();
 		return new BQStatement(this);
 	}
 
+	/**
+	 * Creates a PreparedStatement for executing parameterized SQL queries.
+	 *
+	 * <p>
+	 * Prepared statements use positional parameter placeholders ({@code ?}) in the
+	 * SQL. Parameters are bound using setter methods like
+	 * {@link PreparedStatement#setString(int, String)} before execution.
+	 *
+	 * <p>
+	 * <b>Example:</b>
+	 * 
+	 * <pre>{@code
+	 * PreparedStatement ps = conn.prepareStatement("SELECT * FROM dataset.table WHERE id = ? AND name = ?");
+	 * ps.setInt(1, 42);
+	 * ps.setString(2, "example");
+	 * ResultSet rs = ps.executeQuery();
+	 * }</pre>
+	 *
+	 * <p>
+	 * <b>Performance:</b> BigQuery does not cache query plans like traditional
+	 * databases, so prepared statements primarily provide convenience and SQL
+	 * injection protection rather than performance benefits.
+	 *
+	 * @param sql
+	 *            SQL query with positional parameter placeholders ({@code ?})
+	 * @return a new PreparedStatement object
+	 * @throws SQLException
+	 *             if the connection is closed
+	 */
 	@Override
 	public PreparedStatement prepareStatement(String sql) throws SQLException {
 		checkClosed();
@@ -405,6 +482,34 @@ public final class BQConnection extends AbstractBQConnection {
 		return prepareStatement(sql, resultSetType, resultSetConcurrency);
 	}
 
+	/**
+	 * Checks if the connection is valid by executing a simple query.
+	 *
+	 * <p>
+	 * This method validates the connection by executing {@code SELECT 1} against
+	 * BigQuery. If the query succeeds within the timeout, the connection is
+	 * considered valid.
+	 *
+	 * <p>
+	 * <b>Validation Approach:</b>
+	 * <ul>
+	 * <li>Returns {@code false} immediately if the connection is closed
+	 * <li>Executes a lightweight query to verify BigQuery connectivity
+	 * <li>Returns {@code false} if the query fails or times out
+	 * </ul>
+	 *
+	 * <p>
+	 * <b>Usage in Connection Pools:</b> Connection pool implementations (e.g.,
+	 * HikariCP) use this method to validate connections before handing them to
+	 * applications. Set a reasonable timeout (e.g., 5-10 seconds) to avoid blocking
+	 * pool operations.
+	 *
+	 * @param timeout
+	 *            maximum time in seconds to wait for validation (0 = no timeout)
+	 * @return {@code true} if the connection is valid, {@code false} otherwise
+	 * @throws SQLException
+	 *             if timeout is negative
+	 */
 	@Override
 	public boolean isValid(int timeout) throws SQLException {
 		if (timeout < 0) {

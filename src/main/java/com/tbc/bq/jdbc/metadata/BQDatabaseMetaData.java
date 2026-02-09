@@ -696,6 +696,57 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		throw new BQSQLFeatureNotSupportedException("getProcedureColumns not yet implemented");
 	}
 
+	/**
+	 * Retrieves table metadata for the specified catalog, schema, and table
+	 * patterns.
+	 *
+	 * <p>
+	 * This method returns a ResultSet with the following columns:
+	 * <ol>
+	 * <li>TABLE_CAT (String) - Project ID
+	 * <li>TABLE_SCHEM (String) - Dataset ID
+	 * <li>TABLE_NAME (String) - Table name
+	 * <li>TABLE_TYPE (String) - "TABLE", "VIEW", or "MATERIALIZED VIEW"
+	 * <li>REMARKS (String) - Table description
+	 * <li>TYPE_CAT (String) - null (not used)
+	 * <li>TYPE_SCHEM (String) - null (not used)
+	 * <li>TYPE_NAME (String) - null (not used)
+	 * <li>SELF_REFERENCING_COL_NAME (String) - null (not used)
+	 * <li>REF_GENERATION (String) - null (not used)
+	 * </ol>
+	 *
+	 * <p>
+	 * <b>Pattern Matching:</b> Patterns support SQL LIKE syntax with wildcards:
+	 * <ul>
+	 * <li>{@code %} - matches any sequence of zero or more characters
+	 * <li>{@code _} - matches any single character
+	 * <li>{@code null} - matches all (no filtering)
+	 * </ul>
+	 *
+	 * <p>
+	 * <b>Performance:</b> Uses virtual threads to parallelize dataset fetching for
+	 * projects with many datasets. Results are cached based on
+	 * {@code metadataCacheTtl} connection property (default: 300 seconds).
+	 *
+	 * <p>
+	 * <b>Lazy Loading:</b> If {@code metadataLazyLoad=true} and no patterns are
+	 * specified, returns an empty ResultSet to improve IntelliJ IDEA performance.
+	 * IntelliJ will load tables on-demand as users expand the database tree.
+	 *
+	 * @param catalog
+	 *            project ID (null = current project)
+	 * @param schemaPattern
+	 *            dataset pattern (supports SQL LIKE: % and _)
+	 * @param tableNamePattern
+	 *            table name pattern (supports SQL LIKE: % and _)
+	 * @param types
+	 *            array of table types to include (e.g., ["TABLE", "VIEW"]) or null
+	 *            for all types
+	 * @return ResultSet with table metadata, sorted by TABLE_TYPE, TABLE_SCHEM, and
+	 *         TABLE_NAME
+	 * @throws SQLException
+	 *             if connection is closed or query fails
+	 */
 	@Override
 	public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types)
 			throws SQLException {
@@ -846,6 +897,77 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		});
 	}
 
+	/**
+	 * Retrieves column metadata for tables matching the specified patterns.
+	 *
+	 * <p>
+	 * This method returns a ResultSet with the following columns:
+	 * <ol>
+	 * <li>TABLE_CAT (String) - Project ID
+	 * <li>TABLE_SCHEM (String) - Dataset ID
+	 * <li>TABLE_NAME (String) - Table name
+	 * <li>COLUMN_NAME (String) - Column name
+	 * <li>DATA_TYPE (int) - SQL type from {@link java.sql.Types}
+	 * <li>TYPE_NAME (String) - BigQuery type name (e.g., "INT64", "STRING",
+	 * "ARRAY&lt;STRING&gt;")
+	 * <li>COLUMN_SIZE (int) - Column size (precision for numeric types)
+	 * <li>BUFFER_LENGTH (int) - null (not used)
+	 * <li>DECIMAL_DIGITS (int) - Decimal digits (scale for numeric types)
+	 * <li>NUM_PREC_RADIX (int) - 10 (radix for numeric types)
+	 * <li>NULLABLE (int) - {@link DatabaseMetaData#columnNoNulls} or
+	 * {@link DatabaseMetaData#columnNullable}
+	 * <li>REMARKS (String) - Column description
+	 * <li>COLUMN_DEF (String) - null (default value not supported)
+	 * <li>SQL_DATA_TYPE (int) - null (not used)
+	 * <li>SQL_DATETIME_SUB (int) - null (not used)
+	 * <li>CHAR_OCTET_LENGTH (int) - Maximum bytes for character types
+	 * <li>ORDINAL_POSITION (int) - Column index starting at 1
+	 * <li>IS_NULLABLE (String) - "YES" or "NO"
+	 * <li>SCOPE_CATALOG (String) - null (not used)
+	 * <li>SCOPE_SCHEMA (String) - null (not used)
+	 * <li>SCOPE_TABLE (String) - null (not used)
+	 * <li>SOURCE_DATA_TYPE (short) - null (not used)
+	 * <li>IS_AUTOINCREMENT (String) - "NO" (BigQuery doesn't support
+	 * auto-increment)
+	 * <li>IS_GENERATEDCOLUMN (String) - "NO" (generated columns not yet supported)
+	 * </ol>
+	 *
+	 * <p>
+	 * <b>Pattern Matching:</b> All pattern parameters support SQL LIKE syntax:
+	 * <ul>
+	 * <li>{@code %} - matches any sequence of zero or more characters
+	 * <li>{@code _} - matches any single character
+	 * <li>{@code null} - matches all (no filtering)
+	 * </ul>
+	 *
+	 * <p>
+	 * <b>Performance:</b> Uses nested virtual thread parallelization:
+	 * <ul>
+	 * <li>Parallel across datasets (schemas)
+	 * <li>Parallel across tables within each dataset
+	 * </ul>
+	 * Results are cached based on {@code metadataCacheTtl} connection property
+	 * (default: 300 seconds).
+	 *
+	 * <p>
+	 * <b>Lazy Loading:</b> If {@code metadataLazyLoad=true} and no tableNamePattern
+	 * is specified, returns an empty ResultSet to improve IntelliJ IDEA
+	 * performance. IntelliJ will load columns on-demand as users expand the table
+	 * nodes.
+	 *
+	 * @param catalog
+	 *            project ID (null = current project)
+	 * @param schemaPattern
+	 *            dataset pattern (supports SQL LIKE: % and _)
+	 * @param tableNamePattern
+	 *            table name pattern (supports SQL LIKE: % and _)
+	 * @param columnNamePattern
+	 *            column name pattern (supports SQL LIKE: % and _)
+	 * @return ResultSet with column metadata, sorted by TABLE_CAT, TABLE_SCHEM,
+	 *         TABLE_NAME, and ORDINAL_POSITION
+	 * @throws SQLException
+	 *             if connection is closed or query fails
+	 */
 	@Override
 	public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)
 			throws SQLException {
@@ -1389,6 +1511,51 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return RowIdLifetime.ROWID_UNSUPPORTED;
 	}
 
+	/**
+	 * Retrieves schema (dataset) metadata for the specified catalog and pattern.
+	 *
+	 * <p>
+	 * In BigQuery terminology, schemas correspond to datasets. This method returns
+	 * a ResultSet with the following columns:
+	 * <ol>
+	 * <li>TABLE_SCHEM (String) - Dataset ID
+	 * <li>TABLE_CATALOG (String) - Project ID
+	 * </ol>
+	 *
+	 * <p>
+	 * <b>Pattern Matching:</b> The schemaPattern supports SQL LIKE syntax:
+	 * <ul>
+	 * <li>{@code %} - matches any sequence of zero or more characters
+	 * <li>{@code _} - matches any single character
+	 * <li>{@code null} - matches all datasets (no filtering)
+	 * </ul>
+	 *
+	 * <p>
+	 * <b>Performance:</b> Results are cached based on {@code metadataCacheTtl}
+	 * connection property (default: 300 seconds). The cache is shared across
+	 * connections to the same project and persists across connection open/close
+	 * cycles.
+	 *
+	 * <p>
+	 * <b>Example:</b>
+	 * 
+	 * <pre>{@code
+	 * ResultSet rs = metadata.getSchemas(null, "prod_%");
+	 * while (rs.next()) {
+	 * 	String datasetId = rs.getString("TABLE_SCHEM");
+	 * 	String projectId = rs.getString("TABLE_CATALOG");
+	 * }
+	 * }</pre>
+	 *
+	 * @param catalog
+	 *            project ID (null = current project)
+	 * @param schemaPattern
+	 *            dataset pattern (supports SQL LIKE: % and _)
+	 * @return ResultSet with schema metadata, sorted by TABLE_CATALOG and
+	 *         TABLE_SCHEM
+	 * @throws SQLException
+	 *             if connection is closed or query fails
+	 */
 	@Override
 	public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException {
 		checkClosed();

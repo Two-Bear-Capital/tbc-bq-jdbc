@@ -49,6 +49,12 @@ import java.util.concurrent.locks.ReentrantLock;
  * stmt.execute("SELECT * FROM temp_data");
  * }</pre>
  *
+ * <p>
+ * <b>Thread Safety:</b> This class is thread-safe. All session state
+ * modifications (initialization, commit, rollback, close) are protected by a
+ * {@link ReentrantLock}. Multiple threads can safely call session methods
+ * concurrently.
+ *
  * @since 1.0.0
  */
 public class SessionManager {
@@ -198,10 +204,26 @@ public class SessionManager {
 	}
 
 	/**
-	 * Commits the current transaction.
+	 * Commits the current transaction within the active BigQuery session.
+	 *
+	 * <p>
+	 * All DML and DDL statements executed since the transaction began (via
+	 * {@link #beginTransaction()}) are committed atomically. After commit, a new
+	 * transaction must be started before executing additional transactional
+	 * statements.
+	 *
+	 * <p>
+	 * <b>Example:</b>
+	 * 
+	 * <pre>{@code
+	 * connection.setAutoCommit(false);
+	 * stmt.executeUpdate("INSERT INTO table VALUES (1)");
+	 * stmt.executeUpdate("INSERT INTO table VALUES (2)");
+	 * connection.commit(); // Both inserts committed atomically
+	 * }</pre>
 	 *
 	 * @throws SQLException
-	 *             if commit fails
+	 *             if no active session exists or commit fails
 	 */
 	public void commit() throws SQLException {
 		if (!hasSession()) {
@@ -213,10 +235,30 @@ public class SessionManager {
 	}
 
 	/**
-	 * Rolls back the current transaction.
+	 * Rolls back the current transaction within the active BigQuery session.
+	 *
+	 * <p>
+	 * All DML and DDL statements executed since the transaction began (via
+	 * {@link #beginTransaction()}) are rolled back. The session remains active and
+	 * a new transaction can be started afterwards.
+	 *
+	 * <p>
+	 * <b>Rollback Scope:</b> Only statements executed within the current
+	 * transaction are affected. Statements from previous committed transactions are
+	 * not affected.
+	 *
+	 * <p>
+	 * <b>Example:</b>
+	 * 
+	 * <pre>{@code
+	 * connection.setAutoCommit(false);
+	 * stmt.executeUpdate("INSERT INTO table VALUES (1)");
+	 * // Error detected, rollback
+	 * connection.rollback(); // Insert is rolled back
+	 * }</pre>
 	 *
 	 * @throws SQLException
-	 *             if rollback fails
+	 *             if no active session exists or rollback fails
 	 */
 	public void rollback() throws SQLException {
 		if (!hasSession()) {

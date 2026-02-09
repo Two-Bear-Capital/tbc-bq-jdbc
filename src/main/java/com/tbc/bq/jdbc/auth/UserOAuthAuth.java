@@ -22,14 +22,59 @@ import java.io.IOException;
 import java.util.Objects;
 
 /**
- * User OAuth authentication.
+ * User OAuth 2.0 authentication with refresh token.
+ *
+ * <p>
+ * This authentication method uses OAuth 2.0 credentials obtained through the
+ * OAuth consent flow. It requires three components:
+ * <ul>
+ * <li><b>Client ID:</b> OAuth 2.0 client identifier from Google Cloud Console
+ * <li><b>Client Secret:</b> OAuth 2.0 client secret (confidential)
+ * <li><b>Refresh Token:</b> Long-lived token for obtaining access tokens
+ * </ul>
+ *
+ * <p>
+ * <b>Obtaining Credentials:</b>
+ * <ol>
+ * <li>Navigate to Google Cloud Console &rarr; APIs &amp; Services &rarr;
+ * Credentials
+ * <li>Create OAuth 2.0 Client ID (Desktop app or Web application)
+ * <li>Download client configuration JSON
+ * <li>Run OAuth consent flow using gcloud or OAuth 2.0 Playground:
+ * 
+ * <pre>{@code
+ * gcloud auth application-default login --client-id-file=client_secrets.json
+ *     }</pre>
+ * 
+ * <li>Extract refresh_token from
+ * {@code ~/.config/gcloud/application_default_credentials.json}
+ * </ol>
+ *
+ * <p>
+ * <b>Security Best Practices:</b>
+ * <ul>
+ * <li>Never hardcode client secrets or refresh tokens in source code
+ * <li>Store credentials in environment variables or secure vaults
+ * <li>Use OAuth scopes that grant only necessary permissions
+ * <li>Regenerate refresh tokens if compromised
+ * </ul>
+ *
+ * <p>
+ * <b>Usage Example:</b>
+ * 
+ * <pre>{@code
+ * String url = "jdbc:bigquery:my-project/my_dataset?" + "authType=USER_OAUTH&"
+ * 		+ "oauthClientId=123456789.apps.googleusercontent.com&" + "oauthClientSecret=GOCSPX-abcdefghijk&"
+ * 		+ "oauthRefreshToken=1//0abcdefghijk";
+ * Connection conn = DriverManager.getConnection(url);
+ * }</pre>
  *
  * @param clientId
- *            OAuth client ID
+ *            OAuth 2.0 client ID from Google Cloud Console
  * @param clientSecret
- *            OAuth client secret
+ *            OAuth 2.0 client secret (treat as sensitive)
  * @param refreshToken
- *            OAuth refresh token
+ *            OAuth 2.0 refresh token for obtaining access tokens
  * @since 1.0.0
  */
 public record UserOAuthAuth(String clientId, String clientSecret, String refreshToken) implements AuthType {

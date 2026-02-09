@@ -58,11 +58,65 @@ public class BQStatement extends AbstractBQStatement {
 		return "Query";
 	}
 
+	/**
+	 * Executes the given SQL statement and returns the results as a ResultSet.
+	 *
+	 * <p>
+	 * The SQL is submitted to BigQuery as a query job. This method blocks until the
+	 * query completes or the query timeout (configured via
+	 * {@link #setQueryTimeout(int)}) is reached.
+	 *
+	 * <p>
+	 * <b>SQL Dialect:</b> BigQuery supports standard SQL by default. Legacy SQL can
+	 * be enabled via connection property {@code useLegacySql=true}.
+	 *
+	 * <p>
+	 * <b>Blocking Behavior:</b> This method waits for the entire query to complete
+	 * before returning. For large result sets, consider using the Storage Read API
+	 * by configuring {@code useStorageApi=true} connection property.
+	 *
+	 * @param sql
+	 *            the SQL query to execute (must be a SELECT or other query
+	 *            statement)
+	 * @return a ResultSet containing the query results
+	 * @throws SQLException
+	 *             if the statement is closed, the SQL is invalid, or query
+	 *             execution fails
+	 */
 	@Override
 	public ResultSet executeQuery(String sql) throws SQLException {
 		return executeQueryInternal(sql);
 	}
 
+	/**
+	 * Executes the given SQL DML statement (INSERT, UPDATE, DELETE, MERGE).
+	 *
+	 * <p>
+	 * The SQL is submitted to BigQuery as a query job. This method blocks until the
+	 * DML statement completes or the query timeout is reached.
+	 *
+	 * <p>
+	 * <b>Return Value:</b> This method always returns 0 because BigQuery does not
+	 * provide row counts in the standard JDBC way. To determine the number of
+	 * affected rows, query the DML statistics from the job metadata or use
+	 * BigQuery's @@row_count session variable (requires session support).
+	 *
+	 * <p>
+	 * <b>Usage Example:</b>
+	 * 
+	 * <pre>{@code
+	 * stmt.executeUpdate("INSERT INTO dataset.table (id, name) VALUES (1, 'Alice')");
+	 * stmt.executeUpdate("UPDATE dataset.table SET name = 'Bob' WHERE id = 1");
+	 * stmt.executeUpdate("DELETE FROM dataset.table WHERE id = 1");
+	 * }</pre>
+	 *
+	 * @param sql
+	 *            the SQL DML statement to execute
+	 * @return always returns 0 (BigQuery limitation)
+	 * @throws SQLException
+	 *             if the statement is closed, the SQL is invalid, or execution
+	 *             fails
+	 */
 	@Override
 	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public int executeUpdate(String sql) throws SQLException {
@@ -89,6 +143,26 @@ public class BQStatement extends AbstractBQStatement {
 		throw UnsupportedOperations.namedCursors();
 	}
 
+	/**
+	 * Executes the given SQL statement, which may return multiple types of results.
+	 *
+	 * <p>
+	 * <b>Return Value:</b> This method always returns {@code true} because BigQuery
+	 * queries always produce a ResultSet, even for DML statements (which return an
+	 * empty result set). Use {@link #getResultSet()} to retrieve the ResultSet
+	 * after calling this method.
+	 *
+	 * <p>
+	 * The SQL is submitted to BigQuery as a query job. This method blocks until the
+	 * query completes or the query timeout is reached.
+	 *
+	 * @param sql
+	 *            the SQL statement to execute
+	 * @return always {@code true} indicating a ResultSet is available
+	 * @throws SQLException
+	 *             if the statement is closed, the SQL is invalid, or execution
+	 *             fails
+	 */
 	@Override
 	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public boolean execute(String sql) throws SQLException {

@@ -37,7 +37,13 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>
  * The cache stores metadata query results with a configurable time-to-live
- * (TTL). All operations are thread-safe.
+ * (TTL). Expired entries are automatically removed during get operations.
+ *
+ * <p>
+ * <b>Thread Safety:</b> This class is thread-safe. The underlying storage uses
+ * {@link ConcurrentHashMap} which provides concurrent access without external
+ * synchronization. All cache operations (get, put, clear) can be safely called
+ * from multiple threads.
  *
  * @since 1.0.0
  */
