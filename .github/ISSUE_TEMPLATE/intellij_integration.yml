@@ -1,0 +1,112 @@
+name: 🔌 IntelliJ / IDE Integration Issue
+description: Report issues specific to IntelliJ IDEA, DataGrip, or other IDE integrations
+title: "[IDE]: "
+labels: ["ide-integration", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for issues specific to IDE integrations (IntelliJ IDEA, DataGrip, etc.).
+        For general driver bugs, please use the Bug Report template.
+
+  - type: dropdown
+    id: ide
+    attributes:
+      label: IDE
+      description: Which IDE are you using?
+      options:
+        - IntelliJ IDEA Ultimate
+        - IntelliJ IDEA Community
+        - DataGrip
+        - PyCharm
+        - Other JetBrains IDE
+        - DBeaver
+        - Other (specify below)
+    validations:
+      required: true
+
+  - type: input
+    id: ide-version
+    attributes:
+      label: IDE Version
+      description: IDE version and build number
+      placeholder: "e.g., IntelliJ IDEA 2024.3 (Build #IU-243.21565.193)"
+    validations:
+      required: true
+
+  - type: input
+    id: driver-version
+    attributes:
+      label: Driver Version
+      description: Which tbc-bq-jdbc JAR variant are you using?
+      placeholder: "e.g., tbc-bq-jdbc-1.0.42-with-logging.jar"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      description: What kind of IDE integration issue?
+      options:
+        - Slow Performance / Hangs
+        - Connection Failed
+        - Schema/Table Not Showing
+        - Query Execution Error
+        - Data Display Issue
+        - Autocomplete / IntelliSense
+        - Driver Not Recognized
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Issue Description
+      description: Describe the IDE-specific issue you're experiencing
+      placeholder: When I try to... in IntelliJ, ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: connection-config
+    attributes:
+      label: IDE Connection Configuration
+      description: How did you configure the connection in the IDE? (redact sensitive info)
+      placeholder: |
+        Host:
+        Port:
+        Database:
+        URL: jdbc:bigquery:...
+        Properties: enableSessions=true, metadataCacheEnabled=true, ...
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior in the IDE
+      placeholder: |
+        1. Open Database tool window
+        2. Add new BigQuery data source
+        3. Configure connection with...
+        4. See error when...
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: IDE Logs / Error Messages
+      description: |
+        IDE error messages or logs. In IntelliJ: Help → Show Log in Finder/Explorer
+        Include relevant sections showing the error.
+      render: text
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: |
+        - Number of datasets in your BigQuery project
+        - Connection properties you've configured
+        - Whether metadata caching is enabled
+        - Any performance metrics (time to load schemas, etc.)

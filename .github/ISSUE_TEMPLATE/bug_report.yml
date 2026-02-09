@@ -1,0 +1,110 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior with the BigQuery JDBC driver
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us diagnose and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Configure connection with URL '...'
+        2. Execute query '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: code
+    attributes:
+      label: Code Sample
+      description: Minimal code snippet that demonstrates the issue
+      render: java
+      placeholder: |
+        Connection conn = DriverManager.getConnection("jdbc:bigquery:...", props);
+        // your code here
+
+  - type: textarea
+    id: connection-url
+    attributes:
+      label: Connection URL (redacted)
+      description: Your JDBC connection URL with sensitive info removed
+      placeholder: "jdbc:bigquery:my-project/my_dataset?authType=ADC&enableSessions=true"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Where are you using the driver?
+      options:
+        - IntelliJ IDEA
+        - DBeaver
+        - DataGrip
+        - Custom Java Application
+        - Other (specify in description)
+    validations:
+      required: true
+
+  - type: input
+    id: driver-version
+    attributes:
+      label: Driver Version
+      description: Which version of tbc-bq-jdbc are you using?
+      placeholder: "e.g., 1.0.42"
+    validations:
+      required: true
+
+  - type: input
+    id: java-version
+    attributes:
+      label: Java Version
+      description: Output of `java -version`
+      placeholder: "e.g., OpenJDK 21.0.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth-type
+    attributes:
+      label: Authentication Type
+      description: Which authentication method are you using?
+      options:
+        - Application Default Credentials (ADC)
+        - Service Account
+        - User OAuth
+        - Workload Identity
+        - Workforce Identity
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-logs
+    attributes:
+      label: Error Messages / Stack Trace
+      description: Complete error messages and stack traces
+      render: text
+      placeholder: Paste full error output here
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem (BigQuery region, dataset size, query complexity, etc.)

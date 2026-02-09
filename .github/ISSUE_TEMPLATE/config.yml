@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Questions & Discussions
+    url: https://github.com/timveil/tbc-bq-jdbc/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 📚 Documentation
+    url: https://github.com/timveil/tbc-bq-jdbc/tree/main/docs
+    about: View comprehensive driver documentation
