@@ -51,7 +51,7 @@ public abstract class AbstractBigQueryIntegrationTest {
 	@SuppressWarnings("resource") // Container lifecycle managed by JUnit @Container annotation
 	@Container
 	protected static final GenericContainer<?> bigqueryEmulator = new GenericContainer<>(
-			DockerImageName.parse("ghcr.io/recidiviz/bigquery-emulator:latest")).withExposedPorts(9050)
+			DockerImageName.parse("ghcr.io/recidiviz/bigquery-emulator:0.6.6-recidiviz.3.4")).withExposedPorts(9050)
 			.withCommand("--project=" + TEST_PROJECT_ID, "--dataset=" + TEST_DATASET);
 
 	protected Connection connection;
@@ -59,6 +59,17 @@ public abstract class AbstractBigQueryIntegrationTest {
 	@BeforeAll
 	static void setupClass() {
 		logger.info("BigQuery emulator started on port: {}", bigqueryEmulator.getMappedPort(9050));
+		logger.info("BigQuery emulator image: {}", bigqueryEmulator.getDockerImageName());
+
+		// Log the actual image digest to see exact version
+		try {
+			String imageInfo = bigqueryEmulator.execInContainer("sh", "-c",
+					"echo 'Emulator version info:' && ls -la /app 2>/dev/null || echo 'No version info available'")
+					.getStdout();
+			logger.info("Emulator container info: {}", imageInfo);
+		} catch (Exception e) {
+			logger.debug("Could not retrieve emulator version info: {}", e.getMessage());
+		}
 	}
 
 	@BeforeEach
