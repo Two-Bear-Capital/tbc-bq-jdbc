@@ -151,7 +151,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setByte(int parameterIndex, byte x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -170,7 +170,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setShort(int parameterIndex, short x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -189,7 +189,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setInt(int parameterIndex, int x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(x), StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -227,7 +227,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
 		// Use explicit type for better emulator compatibility
-		setParameter(parameterIndex, QueryParameterValue.of(Double.valueOf(x), StandardSQLTypeName.FLOAT64));
+		setParameter(parameterIndex, QueryParameterValue.of((double) x, StandardSQLTypeName.FLOAT64));
 	}
 
 	/**
