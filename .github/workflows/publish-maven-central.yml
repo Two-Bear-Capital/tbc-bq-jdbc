@@ -1,0 +1,73 @@
+name: Publish to Maven Central
+
+# Trigger manually or on release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty to use POM version)'
+        required: false
+        default: ''
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: GPG_PASSPHRASE
+
+      - name: Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Using manual version: $VERSION"
+            mvn versions:set -DnewVersion=$VERSION -DgenerateBackupPoms=false
+          else
+            VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+            echo "Using POM version: $VERSION"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build and verify
+        run: |
+          mvn clean verify -DskipTests -B
+
+      - name: Publish to Maven Central
+        run: |
+          mvn deploy -Prelease -DskipTests -B
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Summary
+        run: |
+          echo "## Published to Maven Central 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Group ID:** vc.tbc" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifact ID:** tbc-bq-jdbc" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts will be available at:" >> $GITHUB_STEP_SUMMARY
+          echo "https://central.sonatype.com/artifact/vc.tbc/tbc-bq-jdbc" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Note: It may take up to 2 hours for the release to sync to Maven Central." >> $GITHUB_STEP_SUMMARY

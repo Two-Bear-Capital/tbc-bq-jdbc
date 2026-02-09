@@ -68,7 +68,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
 
 1. **Download Driver JAR**
    ```bash
-   wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.40/tbc-bq-jdbc-1.0.40.jar
+   wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.39/tbc-bq-jdbc-1.0.39.jar
    ```
 
 2. **Add Driver in IntelliJ**
@@ -76,7 +76,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
    - Click **+** to add new driver
    - Name: `BigQuery (tbc-bq-jdbc)`
    - Driver Files: Select downloaded JAR
-   - Class: `com.tbc.bq.jdbc.BQDriver`
+   - Class: `vc.tbc.bq.jdbc.BQDriver`
 
 3. **Connect to BigQuery**
    ```
@@ -102,9 +102,9 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ```xml
 <dependency>
-    <groupId>com.tbc</groupId>
+    <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.40</version>
+    <version>1.0.39</version>
 </dependency>
 ```
 
@@ -112,7 +112,7 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ```gradle
 dependencies {
-    implementation 'com.tbc:tbc-bq-jdbc:1.0.40'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.39'
 }
 ```
 
@@ -120,7 +120,7 @@ dependencies {
 
 ```bash
 # Download shaded JAR with all dependencies included
-wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.40/tbc-bq-jdbc-1.0.40.jar
+wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.39/tbc-bq-jdbc-1.0.39.jar
 ```
 
 ### Basic Usage
@@ -354,8 +354,8 @@ See [Authentication Guide](docs/AUTHENTICATION.md) for all methods.
 ### Build Artifacts
 
 After building:
-- **Slim JAR:** `target/tbc-bq-jdbc-1.0.40.jar` (60K)
-- **Shaded JAR:** `target/tbc-bq-jdbc-1.0.40.jar` (51M)
+- **Slim JAR:** `target/tbc-bq-jdbc-1.0.39.jar` (60K)
+- **Shaded JAR:** `target/tbc-bq-jdbc-1.0.39.jar` (51M)
 - **Sources JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT-sources.jar` (41K)
 - **Javadoc JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT-javadoc.jar` (267K)
 

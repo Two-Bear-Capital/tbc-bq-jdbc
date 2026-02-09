@@ -8,7 +8,7 @@ This document explains how to run the integration tests for the tbc-bq-jdbc driv
 
 Integration tests are located in:
 ```
-src/test/java/com/tbc/bq/jdbc/integration/
+src/test/java/vc/tbc/bq/jdbc/integration/
 ```
 
 ### Test Classes

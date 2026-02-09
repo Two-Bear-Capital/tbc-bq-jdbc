@@ -81,7 +81,7 @@ The Maven shade plugin configuration already implements:
 
 ### 3. Dependency Relocation (Already in Place)
 
-All Google Cloud libraries are relocated to `com.tbc.bq.jdbc.shaded.google` to prevent classpath conflicts. This increases size slightly but prevents version conflicts with user applications.
+All Google Cloud libraries are relocated to `vc.tbc.bq.jdbc.shaded.google` to prevent classpath conflicts. This increases size slightly but prevents version conflicts with user applications.
 
 ## Competitive Analysis: Simba BigQuery JDBC Driver
 

@@ -344,7 +344,7 @@ wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.40/tbc-bq
 2. Click **+** to add new driver
 3. Name: `BigQuery (tbc-bq-jdbc)`
 4. Driver Files: Select downloaded JAR
-5. Class: `com.tbc.bq.jdbc.BQDriver`
+5. Class: `vc.tbc.bq.jdbc.BQDriver`
 6. URL Template: `jdbc:bigquery:{project}[/{dataset}][?{:parameters}]`
 
 **Step 3: Create Connection**

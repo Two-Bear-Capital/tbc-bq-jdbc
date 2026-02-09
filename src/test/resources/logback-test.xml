@@ -14,7 +14,7 @@
     </appender>
 
     <!-- Logger for BigQuery JDBC driver -->
-    <logger name="com.tbc.bq.jdbc" level="DEBUG" additivity="false">
+    <logger name="vc.tbc.bq.jdbc" level="DEBUG" additivity="false">
         <appender-ref ref="CONSOLE"/>
     </logger>
 
