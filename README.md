@@ -68,7 +68,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
 
 1. **Download Driver JAR**
    ```bash
-   wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.41/tbc-bq-jdbc-1.0.41.jar
+   wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.41/tbc-bq-jdbc-1.0.41.jar
    ```
 
 2. **Add Driver in IntelliJ**
@@ -120,7 +120,7 @@ dependencies {
 
 ```bash
 # Download shaded JAR with all dependencies included
-wget https://repo1.maven.org/maven2/com/twobearcapital/tbc-bq-jdbc/1.0.41/tbc-bq-jdbc-1.0.41.jar
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.41/tbc-bq-jdbc-1.0.41.jar
 ```
 
 ### Basic Usage
