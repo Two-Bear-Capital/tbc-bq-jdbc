@@ -174,7 +174,7 @@ After proto file exclusion, verify with:
 ls -lh target/*.jar
 
 # Verify proto files excluded (should return 0)
-unzip -l target/tbc-bq-jdbc-1.0.46.jar | grep "\.proto$" | wc -l
+unzip -l target/tbc-bq-jdbc-1.0.47.jar | grep "\.proto$" | wc -l
 
 # Run tests
 ./mvnw verify -Pintegration-tests
