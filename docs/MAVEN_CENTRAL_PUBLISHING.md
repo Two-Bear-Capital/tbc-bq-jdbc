@@ -176,11 +176,11 @@ Published artifacts:
 
 | Artifact | Classifier | Description |
 |----------|-----------|-------------|
-| `tbc-bq-jdbc-1.0.39.jar` | *(none)* | Slim JAR (60KB, requires dependencies) |
-| `tbc-bq-jdbc-1.0.39-shaded.jar` | `shaded` | Fat JAR with all dependencies (38MB) |
-| `tbc-bq-jdbc-1.0.39-with-logging.jar` | `with-logging` | Fat JAR + Logback for IntelliJ (39MB) |
-| `tbc-bq-jdbc-1.0.39-sources.jar` | `sources` | Source code |
-| `tbc-bq-jdbc-1.0.39-javadoc.jar` | `javadoc` | Javadoc |
+| `tbc-bq-jdbc-1.0.41.jar` | *(none)* | Slim JAR (60KB, requires dependencies) |
+| `tbc-bq-jdbc-1.0.41.jar` | `shaded` | Fat JAR with all dependencies (38MB) |
+| `tbc-bq-jdbc-1.0.41-with-logging.jar` | `with-logging` | Fat JAR + Logback for IntelliJ (39MB) |
+| `tbc-bq-jdbc-1.0.41.jar` | `sources` | Source code |
+| `tbc-bq-jdbc-1.0.41.jar` | `javadoc` | Javadoc |
 
 Each artifact is signed with GPG (`.asc` signature files).
 
@@ -206,14 +206,14 @@ Once published, users can add the driver as a Maven dependency:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.39</version>
+    <version>1.0.41</version>
 </dependency>
 
 <!-- Or use the shaded variant (includes all dependencies) -->
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.39</version>
+    <version>1.0.41</version>
     <classifier>shaded</classifier>
 </dependency>
 ```
@@ -221,10 +221,10 @@ Once published, users can add the driver as a Maven dependency:
 ### Gradle
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.39'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.41'
 
     // Or shaded variant
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.39:shaded'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.41:shaded'
 }
 ```
 

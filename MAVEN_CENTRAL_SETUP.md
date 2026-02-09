@@ -204,14 +204,14 @@ Once published, users can add the dependency:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.39</version>
+    <version>1.0.41</version>
 </dependency>
 ```
 
 ### Gradle
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.39'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.41'
 }
 ```
 
