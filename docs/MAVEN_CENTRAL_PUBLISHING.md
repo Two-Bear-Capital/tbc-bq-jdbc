@@ -1,275 +1,501 @@
 # Publishing to Maven Central
 
-This document describes how to publish the **tbc-bq-jdbc** driver to Maven Central.
+This document describes how to publish the **tbc-bq-jdbc** driver to Maven Central using the modern Central Portal publishing method.
+
+## Overview
+
+Maven Central publishing has been modernized with the **Central Portal** and simplified plugin. The old OSSRH/Nexus Staging approach is now legacy.
+
+**Key Changes:**
+- ✅ Single plugin: `central-publishing-maven-plugin`
+- ✅ Automated bundle creation and validation
+- ✅ Optional auto-publishing for CI/CD
+- ✅ Simpler configuration
+
+**Official Documentation:** https://central.sonatype.org/publish/publish-portal-maven/
 
 ## Prerequisites
 
-### 1. Sonatype OSSRH Account
+### 1. Central Portal Account
 
-Register for a Sonatype account and create a namespace claim:
+Register for a Sonatype Central Portal account:
 
 1. Visit [Sonatype Central Portal](https://central.sonatype.com/)
-2. Sign up for an account
-3. Create a namespace for `vc.tbc`
-   - Option A: Verify GitHub ownership (recommended)
-   - Option B: Verify domain ownership for `tbc.com`
-4. Wait for namespace approval (usually within 1-2 business days)
+2. Sign up using GitHub, Google, or email
+3. Verify your email address
 
-**Documentation:** https://central.sonatype.org/register/central-portal/
+### 2. Namespace Verification
 
-### 2. GPG Key for Signing
+Claim the `vc.tbc` namespace:
 
-Maven Central requires all artifacts to be cryptographically signed with GPG.
+**Option A: GitHub Organization Verification (Recommended)**
+1. Go to [Namespaces](https://central.sonatype.com/publishing/namespaces) in Central Portal
+2. Click **Add Namespace**
+3. Enter `vc.tbc` as namespace
+4. Select verification method: **GitHub**
+5. Follow instructions to add verification repository
+6. Wait for automatic verification (typically instant)
+
+**Option B: Domain Verification**
+1. Go to [Namespaces](https://central.sonatype.com/publishing/namespaces)
+2. Click **Add Namespace**
+3. Enter `vc.tbc`
+4. Select verification method: **DNS TXT Record**
+5. Add the provided TXT record to `tbc.vc` domain DNS
+6. Click **Verify** (usually takes a few minutes)
+
+### 3. Generate User Token
+
+Generate a deployment token:
+
+1. Log in to [Central Portal](https://central.sonatype.com/)
+2. Click your username → **View Account**
+3. Click **Generate User Token**
+4. Save both the **username** and **token** (password)
+   - Format: `username` (not your email) and random token string
+   - You'll need these for GitHub Secrets
+
+### 4. GPG Key for Signing
+
+Maven Central requires all artifacts to be cryptographically signed.
 
 #### Generate GPG Key
 
 ```bash
-# Generate a new GPG key (use RSA 4096-bit)
+# Generate a new GPG key (4096-bit RSA recommended)
 gpg --full-generate-key
 
-# Follow prompts:
-# - Key type: (1) RSA and RSA
+# Prompts:
+# - Type: (1) RSA and RSA
 # - Key size: 4096
-# - Expiration: 0 (never expires) or set expiration
-# - Real name: Two Bear Capital
-# - Email: use email associated with Sonatype account
-# - Passphrase: strong passphrase (save this!)
+# - Expiration: 0 = never, or 2y = 2 years
+# - Name: Two Bear Capital
+# - Email: (email associated with Central Portal account)
+# - Passphrase: (strong passphrase - save securely!)
 
-# List keys to verify
+# Verify key creation
 gpg --list-secret-keys --keyid-format=long
 ```
 
 #### Publish GPG Public Key
 
 ```bash
-# Get your key ID from the output above (e.g., 3AA5C34371567BD2)
-gpg --keyserver keys.openpgp.org --send-keys YOUR_KEY_ID
+# Get your key ID from the output above
+# Example: sec   rsa4096/3AA5C34371567BD2
+#                          ^^^^^^^^^^^^^^^^ (your KEY_ID)
 
-# Also send to other keyservers for redundancy
+# Publish to multiple keyservers
+gpg --keyserver keys.openpgp.org --send-keys YOUR_KEY_ID
 gpg --keyserver keyserver.ubuntu.com --send-keys YOUR_KEY_ID
 ```
 
-#### Export GPG Private Key
+#### Export GPG Private Key for GitHub Actions
 
 ```bash
-# Export private key (needed for GitHub Actions)
+# Export ASCII-armored private key
 gpg --export-secret-keys -a YOUR_KEY_ID > gpg-private.key
 
-# The exported key should start with:
+# The file should start with:
 # -----BEGIN PGP PRIVATE KEY BLOCK-----
 ```
 
-**IMPORTANT:** Keep the `gpg-private.key` file secure and delete it after adding to GitHub Secrets!
+**IMPORTANT:** Delete this file after adding to GitHub Secrets!
 
-### 3. GitHub Secrets Configuration
+## GitHub Secrets Configuration
 
-Add these secrets to your GitHub repository:
+Configure these secrets in your repository:
 
-Go to: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+**Settings → Secrets and variables → Actions → New repository secret**
 
 | Secret Name | Description | How to Get |
 |------------|-------------|------------|
-| `OSSRH_USERNAME` | Sonatype account username | From Sonatype Central Portal account |
-| `OSSRH_TOKEN` | Sonatype account token | Generate at https://central.sonatype.com/account → Generate User Token |
+| `MAVEN_CENTRAL_USERNAME` | Central Portal token username | From "Generate User Token" (NOT your email) |
+| `MAVEN_CENTRAL_TOKEN` | Central Portal token password | From "Generate User Token" (random string) |
 | `GPG_PRIVATE_KEY` | GPG private key (ASCII-armored) | Contents of `gpg-private.key` file |
-| `GPG_PASSPHRASE` | GPG key passphrase | Passphrase used when creating GPG key |
-
-**Security Note:** These secrets are never exposed in logs and are only accessible to GitHub Actions.
-
-## Publishing Process
-
-### Automatic Publishing (Recommended)
-
-The project is configured to publish to **both** GitHub Packages and Maven Central.
-
-#### GitHub Packages (Automatic)
-- Triggered on every successful build on `main` branch
-- Workflow: `.github/workflows/version-and-release.yml`
-- No manual intervention required
-
-#### Maven Central (Manual Trigger)
-- Triggered manually via GitHub Actions
-- Workflow: `.github/workflows/publish-maven-central.yml`
-
-**To publish to Maven Central:**
-
-1. Go to **Actions** tab in GitHub
-2. Select **Publish to Maven Central** workflow
-3. Click **Run workflow**
-4. Optionally specify a version (or leave empty to use POM version)
-5. Click **Run workflow** button
-
-The workflow will:
-1. Build and verify the project
-2. Sign all artifacts with GPG
-3. Deploy to Sonatype OSSRH
-4. Automatically release to Maven Central (staged and promoted)
-
-### Manual Local Publishing
-
-For testing or manual release:
-
-```bash
-# Ensure you have GPG set up locally
-gpg --list-secret-keys
-
-# Configure Maven settings.xml with OSSRH credentials
-# Location: ~/.m2/settings.xml
-
-cat > ~/.m2/settings.xml << 'EOF'
-<settings>
-  <servers>
-    <server>
-      <id>ossrh</id>
-      <username>YOUR_OSSRH_USERNAME</username>
-      <password>YOUR_OSSRH_TOKEN</password>
-    </server>
-  </servers>
-</settings>
-EOF
-
-# Build and deploy to Maven Central
-./mvnw clean deploy -Prelease
-
-# Or with specific GPG key
-./mvnw clean deploy -Prelease -Dgpg.keyname=YOUR_KEY_ID
-```
+| `GPG_PASSPHRASE` | GPG key passphrase | Passphrase from GPG key creation |
 
 ## POM Configuration
 
-The POM is configured with all required Maven Central metadata:
+The POM is configured with the modern `central-publishing-maven-plugin`:
 
-### Required Metadata ✅
-- [x] `groupId`: `vc.tbc`
-- [x] `artifactId`: `tbc-bq-jdbc`
-- [x] `version`: `1.0.39` (incremented automatically)
-- [x] `name`: BigQuery JDBC Driver
-- [x] `description`: Modern JDBC driver for Google BigQuery
-- [x] `url`: https://github.com/Two-Bear-Capital/tbc-bq-jdbc
-- [x] `licenses`: Apache 2.0
-- [x] `developers`: Two Bear Capital
-- [x] `scm`: Git connection and URL
-
-### Required Artifacts ✅
-- [x] Main JAR
-- [x] Sources JAR (`-sources.jar`)
-- [x] Javadoc JAR (`-javadoc.jar`)
-- [x] GPG signatures (`.asc` files for all JARs)
-- [x] Shaded JAR variants (optional, for convenience)
-
-## Release Profile
-
-The `release` profile activates when deploying to Maven Central:
-
-```bash
-./mvnw clean deploy -Prelease
+```xml
+<plugin>
+    <groupId>org.sonatype.central</groupId>
+    <artifactId>central-publishing-maven-plugin</artifactId>
+    <version>0.9.0</version>
+    <extensions>true</extensions>
+    <configuration>
+        <publishingServerId>central</publishingServerId>
+        <autoPublish>true</autoPublish>
+        <waitUntil>published</waitUntil>
+    </configuration>
+</plugin>
 ```
 
-This profile:
-- Enables GPG signing of all artifacts
-- Configures Nexus Staging plugin for OSSRH
-- Sets `autoReleaseAfterClose=true` (automatic promotion)
+**Configuration Options:**
+- `publishingServerId`: Server ID in settings.xml (uses `central`)
+- `autoPublish`: Automatically publish after validation (true for CI/CD)
+- `waitUntil`: Wait until artifacts are `published` (or `validated` for manual approval)
+
+## Publishing Process
+
+### Automatic Publishing via GitHub Actions
+
+The easiest way to publish is using the GitHub Actions workflow:
+
+1. Go to **Actions** tab in GitHub repository
+2. Select **Publish to Maven Central** workflow
+3. Click **Run workflow**
+4. Optionally specify version (or leave empty to use POM version)
+5. Click **Run workflow** button
+
+The workflow will:
+1. ✅ Build and verify the project
+2. ✅ Sign all artifacts with GPG
+3. ✅ Create deployment bundle
+4. ✅ Upload to Central Portal
+5. ✅ Automatically validate and publish
+6. ✅ Wait until published to Maven Central
+
+**Expected Timeline:**
+- Upload and validation: 1-5 minutes
+- Publishing to Maven Central: 10-30 minutes
+- Maven Central search indexing: 1-2 hours
+
+### Manual Local Publishing
+
+For testing or manual deployment:
+
+#### Configure Maven Settings
+
+Create or edit `~/.m2/settings.xml`:
+
+```xml
+<settings>
+  <servers>
+    <server>
+      <id>central</id>
+      <username>YOUR_TOKEN_USERNAME</username>
+      <password>YOUR_TOKEN_PASSWORD</password>
+    </server>
+  </servers>
+</settings>
+```
+
+#### Deploy to Maven Central
+
+```bash
+# Ensure GPG key is available
+gpg --list-secret-keys
+
+# Build and deploy
+./mvnw clean deploy -Prelease
+
+# Or specify GPG key
+./mvnw clean deploy -Prelease -Dgpg.keyname=YOUR_KEY_ID
+```
+
+The `release` profile activates:
+- GPG signing of all artifacts
+- Central Publishing plugin with auto-publish
 
 ## Artifact Variants
 
-Published artifacts:
+Published artifacts for version `1.0.43`:
 
-| Artifact | Classifier | Description |
-|----------|-----------|-------------|
-| `tbc-bq-jdbc-1.0.44.jar` | *(none)* | Slim JAR (60KB, requires dependencies) |
-| `tbc-bq-jdbc-1.0.44.jar` | `shaded` | Fat JAR with all dependencies (38MB) |
-| `tbc-bq-jdbc-1.0.44-with-logging.jar` | `with-logging` | Fat JAR + Logback for IntelliJ (39MB) |
-| `tbc-bq-jdbc-1.0.44.jar` | `sources` | Source code |
-| `tbc-bq-jdbc-1.0.44.jar` | `javadoc` | Javadoc |
+| Artifact | Classifier | Size | Description |
+|----------|-----------|------|-------------|
+| `tbc-bq-jdbc-1.0.43.jar` | *(none)* | ~60KB | Slim JAR (requires dependencies) |
+| `tbc-bq-jdbc-1.0.43-shaded.jar` | `shaded` | ~38MB | Fat JAR with all dependencies |
+| `tbc-bq-jdbc-1.0.43-with-logging.jar` | `with-logging` | ~39MB | Fat JAR + Logback (for IntelliJ) |
+| `tbc-bq-jdbc-1.0.43-sources.jar` | `sources` | ~200KB | Source code |
+| `tbc-bq-jdbc-1.0.43-javadoc.jar` | `javadoc` | ~500KB | Javadoc |
 
-Each artifact is signed with GPG (`.asc` signature files).
+Each artifact includes:
+- `.md5` - MD5 checksum
+- `.sha1` - SHA-1 checksum
+- `.sha256` - SHA-256 checksum
+- `.sha512` - SHA-512 checksum
+- `.asc` - GPG signature
 
-## Maven Central Sync Timeline
+All checksums and signatures are generated automatically by the plugin.
 
-1. **Deploy** → Artifacts uploaded to OSSRH staging repository
-2. **Stage** → Artifacts validated (POM, signatures, required files)
-3. **Release** → Promoted from staging to Maven Central
-4. **Sync** → Synced to Maven Central (can take 15 minutes to 2 hours)
-5. **Search Index** → Available in Maven Central search (up to 4 hours)
+## Required Metadata (POM)
 
-**Check status:**
-- Sonatype: https://s01.oss.sonatype.org/#stagingRepositories
-- Maven Central: https://central.sonatype.com/artifact/vc.tbc/tbc-bq-jdbc
-- Maven Search: https://search.maven.org/artifact/vc.tbc/tbc-bq-jdbc
+Maven Central requires these fields in your POM:
+
+- ✅ `groupId`: `vc.tbc`
+- ✅ `artifactId`: `tbc-bq-jdbc`
+- ✅ `version`: `1.0.43` (no SNAPSHOT for releases)
+- ✅ `name`: BigQuery JDBC Driver
+- ✅ `description`: Modern JDBC driver for Google BigQuery, built for Java 21+
+- ✅ `url`: https://github.com/Two-Bear-Capital/tbc-bq-jdbc
+- ✅ `licenses`: Apache License 2.0
+- ✅ `developers`: Developer information
+- ✅ `scm`: Source control management URLs
+- ✅ Source JAR (`-sources.jar`)
+- ✅ Javadoc JAR (`-javadoc.jar`)
+- ✅ GPG signatures (`.asc` files)
+
+All requirements are already configured in the POM.
+
+## Deployment Timeline
+
+1. **Build & Sign** (local or CI): 1-2 minutes
+2. **Upload to Central Portal**: 30 seconds - 2 minutes
+3. **Validation**: 1-3 minutes (automatic)
+4. **Publishing** (if autoPublish=true): 5-15 minutes
+5. **Maven Central Sync**: 10-30 minutes after publishing
+6. **Search Index Update**: 1-2 hours
+
+**Total time to availability:** ~15-45 minutes
+**Total time to search visibility:** 1-2 hours
+
+## Verification
+
+### Check Deployment Status
+
+1. **Central Portal Deployments:**
+   - https://central.sonatype.com/publishing/deployments
+   - View validation status and publishing progress
+
+2. **Central Portal Artifact Page:**
+   - https://central.sonatype.com/artifact/vc.tbc/tbc-bq-jdbc
+   - Shows published versions and download stats
+
+3. **Maven Central Search:**
+   - https://search.maven.org/artifact/vc.tbc/tbc-bq-jdbc
+   - Available after search index updates (~2 hours)
+
+4. **Direct Maven Central URL:**
+   - https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/
+   - Browse directory of published artifacts
+
+### Test Installation
+
+After publishing, test that users can download:
+
+```bash
+# Create test POM
+cat > pom.xml << 'EOF'
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>test</groupId>
+  <artifactId>test</artifactId>
+  <version>1.0</version>
+  <dependencies>
+    <dependency>
+      <groupId>vc.tbc</groupId>
+      <artifactId>tbc-bq-jdbc</artifactId>
+      <version>1.0.43</version>
+    </dependency>
+  </dependencies>
+</project>
+EOF
+
+# Test download
+mvn dependency:resolve
+```
 
 ## Usage After Publishing
 
-Once published, users can add the driver as a Maven dependency:
+Once published to Maven Central, users can add the driver as a dependency:
 
 ### Maven
+
 ```xml
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.44</version>
+    <version>1.0.43</version>
 </dependency>
 
-<!-- Or use the shaded variant (includes all dependencies) -->
+<!-- Or use shaded JAR (includes all dependencies) -->
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.44</version>
+    <version>1.0.43</version>
     <classifier>shaded</classifier>
 </dependency>
 ```
 
 ### Gradle
+
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.44'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.43'
 
     // Or shaded variant
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.44:shaded'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.43:shaded'
 }
+```
+
+### Direct JAR Download
+
+```bash
+# Download from Maven Central
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.43/tbc-bq-jdbc-1.0.43-shaded.jar
 ```
 
 ## Troubleshooting
 
-### GPG Signing Fails
+### Common Issues
 
+#### 1. "401 Unauthorized" Error
+
+**Cause:** Invalid or expired token credentials
+
+**Solution:**
 ```bash
-# Verify GPG is installed
-gpg --version
+# Regenerate token at https://central.sonatype.com/account
+# Update MAVEN_CENTRAL_USERNAME and MAVEN_CENTRAL_TOKEN secrets
+```
 
-# List available keys
+#### 2. "Invalid Signature" or GPG Errors
+
+**Cause:** GPG key not found or passphrase incorrect
+
+**Solution:**
+```bash
+# Verify GPG key exists
 gpg --list-secret-keys
 
 # Test signing
 echo "test" | gpg --clearsign
 
-# If pinentry fails in CI, ensure gpgArguments includes --pinentry-mode loopback
+# Verify GitHub Secrets:
+# - GPG_PRIVATE_KEY contains full ASCII-armored key
+# - GPG_PASSPHRASE is correct
 ```
 
-### Sonatype Deployment Fails
+#### 3. "Namespace not verified" Error
 
-Common issues:
-1. **Invalid credentials**: Check `OSSRH_USERNAME` and `OSSRH_TOKEN` secrets
-2. **Namespace not approved**: Verify namespace claim at https://central.sonatype.com/
-3. **Missing signatures**: Ensure GPG signing is enabled (`-Prelease` profile)
-4. **Invalid POM**: All required fields must be present (license, developers, scm)
+**Cause:** Namespace `vc.tbc` not claimed or verified
 
-### Artifacts Not Appearing in Maven Central
+**Solution:**
+- Visit https://central.sonatype.com/publishing/namespaces
+- Verify namespace claim is approved
+- Check verification status (GitHub or DNS)
 
-1. Check OSSRH staging repository: https://s01.oss.sonatype.org/
-2. Verify automatic release succeeded (check workflow logs)
-3. Wait up to 2 hours for sync to complete
-4. Check for validation errors in OSSRH UI
+#### 4. "Validation Failed" Error
 
-## References
+**Cause:** Missing required POM elements or artifacts
 
-- [Sonatype Central Portal Guide](https://central.sonatype.org/register/central-portal/)
-- [Publishing via GitHub Actions](https://central.sonatype.org/publish/publish-portal-github-actions/)
-- [Requirements for Maven Central](https://central.sonatype.org/publish/requirements/)
-- [GPG Signing Guide](https://central.sonatype.org/publish/requirements/gpg/)
+**Solution:**
+- Check Central Portal deployment details for specific errors
+- Common issues:
+  - Missing `-sources.jar` or `-javadoc.jar`
+  - Missing GPG signatures
+  - Invalid POM metadata (license, developers, scm)
 
-## Support
+#### 5. Artifacts Not Appearing in Search
 
-For issues with:
-- **Publishing process**: Open issue on GitHub
-- **Sonatype account**: Contact https://central.sonatype.org/support/
-- **Maven Central availability**: Check https://status.maven.org/
+**Cause:** Maven Central search index not yet updated
+
+**Solution:**
+- Wait up to 2 hours for search indexing
+- Artifacts are available for download immediately after publishing
+- Use direct URL: https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/
+
+## Development Workflow
+
+### Standard Release Process
+
+1. **Develop and test locally**
+   ```bash
+   git checkout develop
+   # ... make changes ...
+   ./mvnw clean verify
+   git commit -m "Add feature"
+   git push origin develop
+   ```
+
+2. **Merge to main (triggers GitHub Packages publish)**
+   ```bash
+   gh pr create --base main --head develop
+   gh pr merge --auto
+   # Automatic version bump triggered by CI
+   ```
+
+3. **Publish to Maven Central**
+   - Go to **Actions → Publish to Maven Central**
+   - Click **Run workflow**
+   - Artifacts published to both GitHub Packages and Maven Central
+
+### Dual Publishing Strategy
+
+The project publishes to **two repositories**:
+
+| Repository | Trigger | Timeline | Audience |
+|-----------|---------|----------|----------|
+| **GitHub Packages** | Automatic on push to `main` | Immediate | Internal, CI/CD |
+| **Maven Central** | Manual GitHub Action | 15-45 min | Public, production |
+
+This provides:
+- ✅ Fast internal artifact availability
+- ✅ Stable public releases
+- ✅ Redundancy and backup
+
+## Security Best Practices
+
+1. **Never commit secrets** to repository
+2. **Use GitHub Secrets** for all credentials
+3. **Rotate tokens annually** or when compromised
+4. **Use strong GPG passphrases** (20+ characters)
+5. **Limit repository access** to trusted maintainers
+6. **Enable branch protection** on `main` branch
+7. **Review deployment logs** for anomalies
+
+## Cleanup After Setup
+
+After configuring GitHub Secrets:
+
+```bash
+# Securely delete exported GPG key
+shred -u gpg-private.key  # Linux
+srm gpg-private.key        # macOS with srm
+rm -P gpg-private.key      # macOS native
+
+# Your GPG key remains in local keyring
+gpg --list-secret-keys
+```
+
+## Support and Resources
+
+### Official Documentation
+- [Maven Central Publishing](https://central.sonatype.org/publish/)
+- [Central Portal Guide](https://central.sonatype.org/publish/publish-portal-maven/)
+- [Requirements](https://central.sonatype.org/publish/requirements/)
+- [GPG Signing](https://central.sonatype.org/publish/requirements/gpg/)
+
+### Help and Support
+- **Central Portal Issues:** https://central.sonatype.org/support/
+- **Plugin Issues:** https://github.com/sonatype/central-publishing-maven-plugin
+- **Driver Issues:** https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues
+- **Status Page:** https://status.maven.org/
+
+## Appendix: Plugin Configuration Options
+
+```xml
+<configuration>
+    <!-- Required: Server ID in settings.xml -->
+    <publishingServerId>central</publishingServerId>
+
+    <!-- Auto-publish after validation (true for CI/CD) -->
+    <autoPublish>true</autoPublish>
+
+    <!-- Wait until validation or publishing completes -->
+    <waitUntil>published</waitUntil>  <!-- or 'validated' -->
+
+    <!-- Maximum wait time (default: 60 minutes) -->
+    <waitMaxTime>60</waitMaxTime>
+
+    <!-- Retry configuration -->
+    <retryAttempts>3</retryAttempts>
+</configuration>
+```
+
+**Recommended Settings:**
+- **CI/CD:** `autoPublish=true`, `waitUntil=published`
+- **Manual Approval:** `autoPublish=false`, `waitUntil=validated`
+- **Quick Deploy:** `waitUntil=validated` (don't wait for publishing)
