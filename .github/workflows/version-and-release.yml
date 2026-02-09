@@ -171,8 +171,9 @@ jobs:
             See [CHANGELOG.md](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/blob/main/CHANGELOG.md) for details.
 
             ## Artifacts
-            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}.jar` - Slim JAR (requires dependencies)
-            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-shaded.jar` - Fat JAR (all dependencies included)
+            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}.jar` - Slim JAR (60K, requires dependencies on classpath)
+            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-shaded.jar` - Shaded JAR with all dependencies included (38M)
+            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-with-logging.jar` - Shaded JAR + Logback for IntelliJ IDEA (39M)
             - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-sources.jar` - Source code
             - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-javadoc.jar` - Javadoc
         env:
