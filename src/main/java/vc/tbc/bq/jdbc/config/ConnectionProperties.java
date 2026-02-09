@@ -74,14 +74,17 @@ import java.util.Objects;
  * @param useDestinationTables
  *            whether to use destination tables for SELECT queries (default:
  *            false). Useful for BigQuery emulator compatibility.
+ * @param enableQueryCostEstimation
+ *            whether to run dry-run before each query to estimate cost
+ *            (default: false). Cost estimates are attached as SQLWarnings.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
 		String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
 		Map<String, String> labels, JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi,
 		boolean enableSessions, Integer connectionTimeout, Integer retryCount, Long maxBillingBytes,
-		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad,
-		Boolean useDestinationTables) {
+		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean useDestinationTables,
+		Boolean enableQueryCostEstimation) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -135,6 +138,9 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		}
 		if (useDestinationTables == null) {
 			useDestinationTables = false;
+		}
+		if (enableQueryCostEstimation == null) {
+			enableQueryCostEstimation = false;
 		}
 	}
 

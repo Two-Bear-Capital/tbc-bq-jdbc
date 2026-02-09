@@ -130,12 +130,13 @@ public class BQStatement extends AbstractBQStatement {
 	@Override
 	public SQLWarning getWarnings() throws SQLException {
 		checkClosed();
-		return null;
+		return queryWarnings;
 	}
 
 	@Override
 	public void clearWarnings() throws SQLException {
 		checkClosed();
+		queryWarnings = null;
 	}
 
 	@Override

@@ -48,9 +48,9 @@ class StatementEnquoteTest {
 	@BeforeEach
 	void setUp() {
 		when(connection.getBigQuery()).thenReturn(bigquery);
-		when(connection.getProperties()).thenReturn(
-				new ConnectionProperties("test-project", null, null, new ApplicationDefaultAuth(), null, null, null,
-						null, false, null, null, null, null, null, false, null, null, null, null, null, null, null));
+		when(connection.getProperties()).thenReturn(new ConnectionProperties("test-project", null, null,
+				new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, null, false, null,
+				null, null, null, null, null, null, null));
 
 		statement = new BQStatement(connection);
 	}

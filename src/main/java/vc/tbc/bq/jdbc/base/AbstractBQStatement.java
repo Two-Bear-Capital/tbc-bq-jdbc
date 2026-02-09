@@ -25,11 +25,9 @@ import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
+import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLTimeoutException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -68,6 +66,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * Current result set. Closed before creating new one to prevent resource leak.
 	 */
 	protected ResultSet currentResultSet;
+
+	/**
+	 * Query warnings (e.g., cost estimates from dry-run).
+	 */
+	protected SQLWarning queryWarnings = null;
 
 	protected AbstractBQStatement(BQConnection connection) {
 		this.connection = connection;
@@ -198,6 +201,42 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	}
 
 	/**
+	 * Runs a dry-run query to estimate cost without executing.
+	 *
+	 * @param sql
+	 *            the SQL query to estimate
+	 * @return the cost estimate
+	 * @throws SQLException
+	 *             if dry-run fails
+	 */
+	protected QueryCostEstimate runDryRun(String sql) throws SQLException {
+		try {
+			QueryJobConfiguration.Builder dryRunConfigBuilder = buildQueryConfig(sql).setDryRun(true)
+					.setUseQueryCache(false);
+
+			// Set default dataset if configured
+			if (properties.getDatasetId() != null) {
+				dryRunConfigBuilder.setDefaultDataset(properties.getDatasetId());
+			}
+
+			QueryJobConfiguration dryRunConfig = dryRunConfigBuilder.build();
+
+			Job dryRunJob = bigquery.create(JobInfo.of(dryRunConfig));
+			JobStatistics.QueryStatistics stats = dryRunJob.getStatistics();
+
+			Long bytesProcessed = stats.getTotalBytesProcessed();
+			Long bytesBilled = stats.getTotalBytesBilled();
+			Long estimatedBytes = stats.getEstimatedBytesProcessed();
+
+			return new QueryCostEstimate(bytesProcessed, estimatedBytes, bytesBilled,
+					QueryCostEstimate.calculateCost(bytesBilled));
+
+		} catch (BigQueryException e) {
+			throw new BQSQLException("Dry-run failed: " + e.getMessage(), e);
+		}
+	}
+
+	/**
 	 * Common query execution logic with resource leak fix. Closes previous
 	 * ResultSet before creating new one. Thread-safe access to currentJob for
 	 * cancel operations.
@@ -216,6 +255,31 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		if (currentResultSet != null) {
 			currentResultSet.close();
 			currentResultSet = null;
+		}
+
+		// Clear previous warnings
+		queryWarnings = null;
+
+		// Run dry-run if cost estimation is enabled
+		if (properties.enableQueryCostEstimation()) {
+			try {
+				QueryCostEstimate estimate = runDryRun(sql);
+
+				// Create warning with cost information
+				String message = String.format("Query will process %s (%.2f MB), estimated cost: $%s",
+						QueryCostEstimate.formatBytes(estimate.totalBytesProcessed()),
+						estimate.totalBytesProcessed() / 1_000_000.0, estimate.estimatedCostUSD());
+
+				queryWarnings = new SQLWarning(message, "01000", // Standard warning SQL state
+						estimate.getMegabytes() // MB as vendor code
+				);
+
+				logger.info("Dry-run estimate: {}", message);
+
+			} catch (Exception e) {
+				// Don't fail query if dry-run fails - log and continue
+				logger.warn("Dry-run estimation failed: {}", e.getMessage());
+			}
 		}
 
 		QueryJobConfiguration.Builder configBuilder = buildQueryConfig(sql);
