@@ -1,0 +1,24 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# Types: feat, fix, perf, docs, test, refactor, style, chore, ci, build
+# Scopes: auth, metadata, connection, resultset, statement, types, cache, session, ci, deps, docs
+#
+# Examples:
+#   feat(auth): add workforce identity federation support
+#   fix(metadata): correct precision for NUMERIC columns
+#   perf(cache): optimize parallel dataset loading with virtual threads
+#   docs(readme): add troubleshooting section for IntelliJ IDEA
+#   test(integration): add PreparedStatement parameter tests
+#   refactor(connection): simplify session lifecycle management
+#   chore(deps): upgrade BigQuery SDK to 2.40.0
+#
+# Remember:
+# - Use imperative mood: "add" not "added"
+# - Keep subject line under 72 characters
+# - Separate subject from body with blank line
+# - Wrap body at 72 characters
+# - Use body to explain what and why vs. how

@@ -145,6 +145,53 @@ jobs:
             echo "No documentation changes detected"
           fi
 
+      - name: Install git-cliff
+        if: steps.check_bump.outputs.skip == 'false'
+        run: |
+          # Download and install git-cliff
+          wget -q https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
+          sudo mv git-cliff-2.7.0/git-cliff /usr/local/bin/
+          chmod +x /usr/local/bin/git-cliff
+          git-cliff --version
+
+      - name: Update CHANGELOG.md
+        if: steps.check_bump.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+          echo "==> Updating CHANGELOG.md for version $NEW_VERSION"
+
+          # Create a temporary tag for the unreleased changes
+          git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
+
+          # Generate complete changelog (all releases including new one)
+          git-cliff --config cliff.toml --output CHANGELOG.md
+
+          # Remove the temporary tag (will be recreated later)
+          git tag -d "v${NEW_VERSION}"
+
+          # Show what changed
+          echo "==> CHANGELOG.md diff:"
+          git diff CHANGELOG.md || true
+
+      - name: Commit CHANGELOG.md
+        if: steps.check_bump.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+
+          # Check if CHANGELOG.md was updated
+          if ! git diff --quiet CHANGELOG.md; then
+            git add CHANGELOG.md
+            git commit -m "chore: update CHANGELOG.md for version $NEW_VERSION
+
+          Automated changelog update by GitHub Actions
+
+          Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+            echo "CHANGELOG.md updated and committed"
+          else
+            echo "No changelog changes detected"
+          fi
+
       - name: Create and push tag
         if: steps.check_bump.outputs.skip == 'false'
         id: create_tag
@@ -159,6 +206,22 @@ jobs:
         if: steps.check_bump.outputs.skip == 'false'
         run: mvn clean package -DskipTests -B
 
+      - name: Extract changelog for this release
+        if: steps.check_bump.outputs.skip == 'false'
+        id: changelog
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+
+          # Extract just this release's changelog section
+          CHANGELOG_CONTENT=$(git-cliff --config cliff.toml --unreleased --strip all)
+
+          # Save to file for use in release
+          echo "$CHANGELOG_CONTENT" > /tmp/release-notes.md
+
+          # Also save to output for debugging
+          echo "Changelog content for v${NEW_VERSION}:"
+          cat /tmp/release-notes.md
+
       - name: Create GitHub Release
         if: steps.check_bump.outputs.skip == 'false'
         uses: softprops/action-gh-release@v2
@@ -166,16 +229,32 @@ jobs:
           tag_name: ${{ steps.create_tag.outputs.tag }}
           files: |
             target/tbc-bq-jdbc-*.jar
-          generate_release_notes: true
-          body: |
-            See [CHANGELOG.md](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/blob/main/CHANGELOG.md) for details.
+          body_path: /tmp/release-notes.md
+          append_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            ## Artifacts
-            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}.jar` - Slim JAR (60K, requires dependencies on classpath)
-            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-shaded.jar` - Shaded JAR with all dependencies included (38M)
-            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-with-logging.jar` - Shaded JAR + Logback for IntelliJ IDEA (39M)
-            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-sources.jar` - Source code
-            - `tbc-bq-jdbc-${{ steps.new_version.outputs.new_version }}-javadoc.jar` - Javadoc
+      - name: Add artifacts section to release
+        if: steps.check_bump.outputs.skip == 'false'
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+
+          # Append artifacts section to release notes
+          gh release edit "v${NEW_VERSION}" --notes-file - << EOF
+          $(gh release view "v${NEW_VERSION}" --json body -q .body)
+
+          ---
+
+          ## 📦 Artifacts
+
+          - **tbc-bq-jdbc-${NEW_VERSION}.jar** - Slim JAR (60K, requires dependencies on classpath)
+          - **tbc-bq-jdbc-${NEW_VERSION}-shaded.jar** - Shaded JAR with all dependencies included (38M)
+          - **tbc-bq-jdbc-${NEW_VERSION}-with-logging.jar** - Shaded JAR + Logback for IntelliJ IDEA (39M)
+          - **tbc-bq-jdbc-${NEW_VERSION}-sources.jar** - Source code
+          - **tbc-bq-jdbc-${NEW_VERSION}-javadoc.jar** - Javadoc
+
+          📖 **Full Changelog**: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/blob/main/CHANGELOG.md#${NEW_VERSION//.}---$(date +%Y-%m-%d)
+          EOF
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

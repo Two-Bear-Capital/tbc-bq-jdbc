@@ -329,7 +329,26 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - File: `.github/workflows/version-and-release.yml`
 - Automatic version bumps and releases
 - Only runs after Build workflow succeeds (including integration tests)
-- Generates changelog from commits
+- **Automated Changelog Generation:**
+  - Uses [git-cliff](https://git-cliff.org/) for changelog generation
+  - Automatically updates CHANGELOG.md on each release
+  - Extracts changelog entry for GitHub Release notes
+  - Configuration: `cliff.toml` in project root
+  - Scripts: `scripts/backfill-changelog.sh`, `scripts/preview-changelog.sh`
+  - Follows [Conventional Commits](https://www.conventionalcommits.org/) format
+  - Categorizes changes: Features, Bug Fixes, Performance, Documentation, Testing, etc.
+
+### Commit Message Conventions
+For optimal changelog generation, use Conventional Commits format:
+- `feat(scope): description` - New features
+- `fix(scope): description` - Bug fixes
+- `perf(scope): description` - Performance improvements
+- `docs(scope): description` - Documentation changes
+- `test(scope): description` - Test additions/changes
+- `refactor(scope): description` - Code refactoring
+- `chore(scope): description` - Maintenance tasks
+
+Example: `feat(auth): add workforce identity federation support`
 
 ## Documentation
 
