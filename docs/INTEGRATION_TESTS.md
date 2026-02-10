@@ -45,6 +45,7 @@ The integration tests are configured to use the **recidiviz/bigquery-emulator** 
 - Emulator may not support all BigQuery features
 - Some advanced queries may fail
 - Not 100% identical to production BigQuery
+- See [EMULATOR_LIMITATIONS.md](EMULATOR_LIMITATIONS.md) for detailed list of known limitations and how tests compensate
 
 ### Option 2: Using Real BigQuery (For Production Validation)
 
