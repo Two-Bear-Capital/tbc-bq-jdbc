@@ -24,6 +24,7 @@ import vc.tbc.bq.jdbc.base.AbstractBQPreparedStatement;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.metadata.BQParameterMetaData;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
+import vc.tbc.bq.jdbc.util.ParameterConverter;
 import vc.tbc.bq.jdbc.util.TimezoneUtils;
 
 import java.math.BigDecimal;
@@ -414,22 +415,52 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 * type.
 	 *
 	 * <p>
-	 * The targetSqlType parameter is ignored; this method delegates to
-	 * {@link #setObject(int, Object)}.
+	 * When a targetSqlType is provided, the driver attempts to convert the object
+	 * to the target type before setting the parameter. This allows type conversions
+	 * such as String to Integer. Type conversion is handled by
+	 * {@link ParameterConverter}.
 	 *
 	 * @param parameterIndex
 	 *            the first parameter is 1, the second is 2, ...
 	 * @param x
 	 *            the parameter value (may be null)
 	 * @param targetSqlType
-	 *            the SQL type (ignored)
+	 *            the SQL type from {@link java.sql.Types}
 	 * @throws SQLException
-	 *             if parameterIndex is invalid, the statement is closed, or the
-	 *             object type is unsupported
+	 *             if parameterIndex is invalid, the statement is closed, or type
+	 *             conversion fails
 	 */
 	@Override
 	public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
-		setObject(parameterIndex, x);
+		checkClosed();
+		if (x == null) {
+			setNull(parameterIndex, targetSqlType);
+			return;
+		}
+
+		// Convert the object to the target SQL type using ParameterConverter utility
+		switch (targetSqlType) {
+			case Types.BIT, Types.BOOLEAN ->
+				setBoolean(parameterIndex, ParameterConverter.toBoolean(x, parameterIndex));
+			case Types.TINYINT -> setByte(parameterIndex, ParameterConverter.toByte(x, parameterIndex));
+			case Types.SMALLINT -> setShort(parameterIndex, ParameterConverter.toShort(x, parameterIndex));
+			case Types.INTEGER -> setInt(parameterIndex, ParameterConverter.toInt(x, parameterIndex));
+			case Types.BIGINT -> setLong(parameterIndex, ParameterConverter.toLong(x, parameterIndex));
+			case Types.REAL -> setFloat(parameterIndex, ParameterConverter.toFloat(x, parameterIndex));
+			case Types.FLOAT, Types.DOUBLE -> setDouble(parameterIndex, ParameterConverter.toDouble(x, parameterIndex));
+			case Types.DECIMAL, Types.NUMERIC ->
+				setBigDecimal(parameterIndex, ParameterConverter.toBigDecimal(x, parameterIndex));
+			case Types.CHAR, Types.VARCHAR, Types.LONGVARCHAR, Types.NCHAR, Types.NVARCHAR, Types.LONGNVARCHAR ->
+				setString(parameterIndex, ParameterConverter.toString(x, parameterIndex));
+			case Types.BINARY, Types.VARBINARY, Types.LONGVARBINARY ->
+				setBytes(parameterIndex, ParameterConverter.toBytes(x, parameterIndex));
+			case Types.DATE -> setDate(parameterIndex, ParameterConverter.toDate(x, parameterIndex));
+			case Types.TIME, Types.TIME_WITH_TIMEZONE ->
+				setTime(parameterIndex, ParameterConverter.toTime(x, parameterIndex));
+			case Types.TIMESTAMP, Types.TIMESTAMP_WITH_TIMEZONE ->
+				setTimestamp(parameterIndex, ParameterConverter.toTimestamp(x, parameterIndex));
+			default -> setObject(parameterIndex, x);
+		}
 	}
 
 	/**

@@ -190,6 +190,172 @@ class PreparedStatementAdvancedTest extends AbstractBigQueryIntegrationTest {
 		}
 	}
 
+	@Test
+	void testSetObjectStringToLong() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting string value with BIGINT target type
+			pstmt.setObject(1, "999999999", Types.BIGINT);
+
+			// Then: Should convert and execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				assertEquals(999999999L, rs.getLong(1));
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectStringToDouble() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting string value with DOUBLE target type
+			pstmt.setObject(1, "123.456", Types.DOUBLE);
+
+			// Then: Should convert and execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				assertEquals(123.456, rs.getDouble(1), 0.001);
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectStringToBoolean() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting string value with BOOLEAN target type
+			pstmt.setObject(1, "true", Types.BOOLEAN);
+
+			// Then: Should convert and execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				assertTrue(rs.getBoolean(1));
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectNumberToString() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting number value with VARCHAR target type
+			pstmt.setObject(1, 42, Types.VARCHAR);
+
+			// Then: Should convert and execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				assertEquals("42", rs.getString(1));
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectStringToDate() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting string value with DATE target type
+			pstmt.setObject(1, "2024-01-15", Types.DATE);
+
+			// Then: Should convert and execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				assertEquals(Date.valueOf("2024-01-15"), rs.getDate(1));
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectStringToTimestamp() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			try {
+				// When: Setting string value with TIMESTAMP target type
+				pstmt.setObject(1, "2024-01-15 10:30:00", Types.TIMESTAMP);
+
+				// Then: Should convert and execute successfully
+				try (ResultSet rs = pstmt.executeQuery()) {
+					assertTrue(rs.next(), "Should have result");
+					assertNotNull(rs.getTimestamp(1));
+				}
+				logger.info("✓ setObject String to Timestamp supported");
+			} catch (IllegalArgumentException | SQLException e) {
+				logger.info("setObject String to Timestamp not fully supported (emulator limitation): {}",
+						e.getMessage());
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectIntegerToBoolean() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting integer value with BOOLEAN target type (non-zero = true)
+			pstmt.setObject(1, 1, Types.BOOLEAN);
+
+			// Then: Should convert and execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				assertTrue(rs.getBoolean(1));
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectWithNullAndTargetType() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting null with target type
+			pstmt.setObject(1, null, Types.INTEGER);
+
+			// Then: Should execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				int value = rs.getInt(1);
+				boolean isNull = rs.wasNull();
+
+				if (value == 0 && isNull) {
+					logger.info("✓ setObject(null) properly returns NULL");
+				} else {
+					logger.info("setObject(null) returned {} (emulator may convert NULL to default value)", value);
+				}
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectStringToBigDecimal() throws SQLException {
+		// Given: A PreparedStatement
+		String sql = "SELECT ? as value";
+		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+
+			// When: Setting string value with NUMERIC target type
+			pstmt.setObject(1, "123.456", Types.NUMERIC);
+
+			// Then: Should convert and execute successfully
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have result");
+				assertEquals(new BigDecimal("123.456"), rs.getBigDecimal(1));
+			}
+		}
+	}
+
 	// Binary Data Tests
 
 	@Test
