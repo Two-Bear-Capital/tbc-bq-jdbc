@@ -12,6 +12,8 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
+  attestations: write
 
 jobs:
   version-and-release:
@@ -205,6 +207,12 @@ jobs:
       - name: Build and package
         if: steps.check_bump.outputs.skip == 'false'
         run: mvn clean package -DskipTests -B
+
+      - name: Attest build provenance
+        if: steps.check_bump.outputs.skip == 'false'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'target/*.jar'
 
       - name: Extract changelog for this release
         if: steps.check_bump.outputs.skip == 'false'
