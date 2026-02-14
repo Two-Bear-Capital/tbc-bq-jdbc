@@ -90,7 +90,25 @@ We use:
 
 - **Dependabot** for automated dependency updates
 - **GitHub Actions** for CI/CD security
+- **Build Provenance Attestation** for verifiable artifact integrity (SLSA)
 - Regular security audits of dependencies
+
+### Build Attestations
+
+Starting with version 1.0.53, all released JAR artifacts are signed with SLSA build provenance attestations. This provides:
+
+- Cryptographic verification that artifacts were built by our CI/CD pipeline
+- Tamper-proof metadata about the build process
+- Transparent supply chain security
+
+To verify an artifact's provenance:
+
+```bash
+# Install GitHub CLI (gh) if not already installed
+gh attestation verify tbc-bq-jdbc-VERSION.jar --owner Two-Bear-Capital
+```
+
+For more information about build attestations, see [GitHub's documentation on artifact attestations](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
 
 ## Contact
 
