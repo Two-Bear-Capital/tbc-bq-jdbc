@@ -5,11 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.53] - 2026-02-14
+
+### ⚡ Features
+
+- Add build provenance attestation for SLSA compliance
+
+### 🔀 Pull Requests
+
+- Merge pull request #24 from Two-Bear-Capital/copilot/add-attest-build-provenance-action
+
+Add SLSA build provenance attestation for released artifacts
+
+### 📦 Other
+
+- Initial plan
+
 ## [1.0.52] - 2026-02-10
 
 ### ⚙️ Miscellaneous Tasks
 
 - **docs:** Update changelog with latest release details
+- Update CHANGELOG.md for version 1.0.52
 
 ## [1.0.51] - 2026-02-10
 
@@ -1457,6 +1474,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.53]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.52...v1.0.53
 [1.0.52]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.51...v1.0.52
 [1.0.51]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.50...v1.0.51
 [1.0.50]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.49...v1.0.50
