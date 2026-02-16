@@ -40,9 +40,9 @@
         <project.build.outputTimestamp>2026-02-14T00:57:35Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
-        <google.cloud.bom.version>26.75.0</google.cloud.bom.version>
+        <google.cloud.bom.version>26.76.0</google.cloud.bom.version>
         <slf4j.version>2.0.17</slf4j.version>
-        <junit.version>6.0.2</junit.version>
+        <junit.version>6.0.3</junit.version>
         <testcontainers.version>2.0.3</testcontainers.version>
         <arrow.version>18.3.0</arrow.version>
         <jmh.version>1.37</jmh.version>
@@ -122,7 +122,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.29</version>
+            <version>1.5.32</version>
             <optional>true</optional>
         </dependency>
 
