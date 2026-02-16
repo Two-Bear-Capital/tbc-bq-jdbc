@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.54] - 2026-02-16
+
+### 🔀 Pull Requests
+
+- Merge pull request #26 from Two-Bear-Capital/dependabot/maven/maven-dependencies-8e4e21ebfe
+- Merge pull request #25 from Two-Bear-Capital/dependabot/github_actions/github-actions-525090b48c
+
+### 📦 Other
+
+- Bump the maven-dependencies group with 3 updates
+
+Bumps the maven-dependencies group with 3 updates: [com.google.cloud:libraries-bom](https://github.com/googleapis/java-cloud-bom), [ch.qos.logback:logback-classic](https://github.com/qos-ch/logback) and [org.junit.jupiter:junit-jupiter](https://github.com/junit-team/junit-framework).
+
+
+Updates `com.google.cloud:libraries-bom` from 26.75.0 to 26.76.0
+- [Release notes](https://github.com/googleapis/java-cloud-bom/releases)
+- [Changelog](https://github.com/googleapis/java-cloud-bom/blob/main/release-please-config.json)
+- [Commits](https://github.com/googleapis/java-cloud-bom/compare/v26.75.0...v26.76.0)
+
+Updates `ch.qos.logback:logback-classic` from 1.5.29 to 1.5.32
+- [Release notes](https://github.com/qos-ch/logback/releases)
+- [Commits](https://github.com/qos-ch/logback/compare/v_1.5.29...v_1.5.32)
+
+Updates `org.junit.jupiter:junit-jupiter` from 6.0.2 to 6.0.3
+- [Release notes](https://github.com/junit-team/junit-framework/releases)
+- [Commits](https://github.com/junit-team/junit-framework/compare/r6.0.2...r6.0.3)
+
+---
+updated-dependencies:
+- dependency-name: com.google.cloud:libraries-bom
+  dependency-version: 26.76.0
+  dependency-type: direct:production
+  update-type: version-update:semver-minor
+  dependency-group: maven-dependencies
+- dependency-name: ch.qos.logback:logback-classic
+  dependency-version: 1.5.32
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: maven-dependencies
+- dependency-name: org.junit.jupiter:junit-jupiter
+  dependency-version: 6.0.3
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: maven-dependencies
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+- Bump actions/attest-build-provenance in the github-actions group
+
+Bumps the github-actions group with 1 update: [actions/attest-build-provenance](https://github.com/actions/attest-build-provenance).
+
+
+Updates `actions/attest-build-provenance` from 2 to 3
+- [Release notes](https://github.com/actions/attest-build-provenance/releases)
+- [Changelog](https://github.com/actions/attest-build-provenance/blob/main/RELEASE.md)
+- [Commits](https://github.com/actions/attest-build-provenance/compare/v2...v3)
+
+---
+updated-dependencies:
+- dependency-name: actions/attest-build-provenance
+  dependency-version: '3'
+  dependency-type: direct:production
+  update-type: version-update:semver-major
+  dependency-group: github-actions
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
 ## [1.0.53] - 2026-02-14
 
 ### ⚡ Features
@@ -20,6 +88,10 @@ Add SLSA build provenance attestation for released artifacts
 ### 📦 Other
 
 - Initial plan
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.53
 
 ## [1.0.52] - 2026-02-10
 
@@ -1474,6 +1546,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.54]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.53...v1.0.54
 [1.0.53]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.52...v1.0.53
 [1.0.52]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.51...v1.0.52
 [1.0.51]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.50...v1.0.51
