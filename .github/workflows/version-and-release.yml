@@ -210,7 +210,7 @@ jobs:
 
       - name: Attest build provenance
         if: steps.check_bump.outputs.skip == 'false'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: 'target/*.jar'
 
