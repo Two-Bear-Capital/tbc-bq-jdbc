@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.56] - 2026-02-17
+
+### 🔨 Refactoring
+
+- **core:** Remove deprecated methods and unused logging
+
+## [1.0.55] - 2026-02-16
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.55
+
 ## [1.0.54] - 2026-02-16
 
 ### 🔀 Pull Requests
@@ -1550,6 +1562,8 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.56]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.55...v1.0.56
+[1.0.55]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.54...v1.0.55
 [1.0.54]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.53...v1.0.54
 [1.0.53]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.52...v1.0.53
 [1.0.52]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.51...v1.0.52
