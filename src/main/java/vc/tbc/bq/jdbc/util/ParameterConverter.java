@@ -73,13 +73,11 @@ public final class ParameterConverter {
 	 *
 	 * @param value
 	 *            the value to convert
-	 * @param parameterIndex
-	 *            the parameter index (for error messages)
 	 * @return the String value (null if input is null)
 	 * @throws SQLException
 	 *             if conversion fails
 	 */
-	public static String toString(Object value, int parameterIndex) throws SQLException {
+	public static String toString(Object value) throws SQLException {
 		if (value == null) {
 			return null;
 		}

@@ -78,8 +78,7 @@ public final class TypeMapper {
 					Types.CLOB, Types.NCLOB ->
 				StandardSQLTypeName.STRING;
 			case Types.VARBINARY, Types.BINARY, Types.LONGVARBINARY, Types.BLOB -> StandardSQLTypeName.BYTES;
-			case Types.BIGINT -> StandardSQLTypeName.INT64;
-			case Types.INTEGER, Types.SMALLINT, Types.TINYINT -> StandardSQLTypeName.INT64;
+			case Types.BIGINT, Types.INTEGER, Types.SMALLINT, Types.TINYINT -> StandardSQLTypeName.INT64;
 			case Types.DOUBLE, Types.FLOAT, Types.REAL -> StandardSQLTypeName.FLOAT64;
 			case Types.NUMERIC, Types.DECIMAL -> StandardSQLTypeName.NUMERIC;
 			case Types.BOOLEAN, Types.BIT -> StandardSQLTypeName.BOOL;

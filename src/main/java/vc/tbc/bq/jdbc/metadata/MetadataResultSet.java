@@ -200,7 +200,6 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	}
 
 	@Deprecated
-	@SuppressWarnings("deprecation")
 	@Override
 	public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
 		return NumberParser.toBigDecimal(getValue(columnIndex), columnIndex);

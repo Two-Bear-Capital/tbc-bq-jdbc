@@ -102,7 +102,7 @@ class ParameterConverterTest {
 	@Test
 	void testToStringWithString() throws SQLException {
 		// When: Converting String
-		String result = ParameterConverter.toString("test", 1);
+		String result = ParameterConverter.toString("test");
 
 		// Then: Should return same string
 		assertEquals("test", result);
@@ -111,7 +111,7 @@ class ParameterConverterTest {
 	@Test
 	void testToStringWithNumber() throws SQLException {
 		// When: Converting number
-		String result = ParameterConverter.toString(42, 1);
+		String result = ParameterConverter.toString(42);
 
 		// Then: Should return string representation
 		assertEquals("42", result);
@@ -120,7 +120,7 @@ class ParameterConverterTest {
 	@Test
 	void testToStringWithNull() throws SQLException {
 		// When: Converting null
-		String result = ParameterConverter.toString(null, 1);
+		String result = ParameterConverter.toString(null);
 
 		// Then: Should return null
 		assertNull(result);
@@ -129,7 +129,7 @@ class ParameterConverterTest {
 	@Test
 	void testToStringWithBoolean() throws SQLException {
 		// When: Converting boolean
-		String result = ParameterConverter.toString(true, 1);
+		String result = ParameterConverter.toString(true);
 
 		// Then: Should return string representation
 		assertEquals("true", result);

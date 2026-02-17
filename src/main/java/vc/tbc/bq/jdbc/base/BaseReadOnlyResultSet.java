@@ -101,7 +101,6 @@ public abstract class BaseReadOnlyResultSet extends BaseCloseable implements Res
 	 */
 	@Override
 	@Deprecated(since = "JDBC 2.0")
-	@SuppressWarnings("deprecation")
 	public abstract BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException;
 
 	@Override
@@ -459,11 +458,6 @@ public abstract class BaseReadOnlyResultSet extends BaseCloseable implements Res
 				return (T) value;
 			}
 			return (T) Boolean.valueOf(value.toString());
-		}
-
-		// Date/Time conversions - these are already the correct types or incompatible
-		if (type == java.sql.Date.class || type == java.sql.Time.class || type == java.sql.Timestamp.class) {
-			throw new SQLException("Cannot convert " + value.getClass().getName() + " to " + type.getName());
 		}
 
 		// If we can't convert, throw exception

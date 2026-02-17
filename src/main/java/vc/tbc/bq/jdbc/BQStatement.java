@@ -16,8 +16,6 @@
 package vc.tbc.bq.jdbc;
 
 import com.google.cloud.bigquery.QueryJobConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.base.AbstractBQStatement;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
@@ -33,8 +31,6 @@ import java.sql.SQLWarning;
  * @since 1.0.0
  */
 public class BQStatement extends AbstractBQStatement {
-
-	private static final Logger logger = LoggerFactory.getLogger(BQStatement.class);
 
 	/** Fetch size for result pagination. 0 means use connection default. */
 	private int fetchSize = 0;

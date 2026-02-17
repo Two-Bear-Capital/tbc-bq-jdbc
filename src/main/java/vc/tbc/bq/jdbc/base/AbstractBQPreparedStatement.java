@@ -58,7 +58,6 @@ public abstract class AbstractBQPreparedStatement extends BQStatement implements
 	}
 
 	@Deprecated
-	@SuppressWarnings("deprecation")
 	@Override
 	public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
 		throw new BQSQLFeatureNotSupportedException("setUnicodeStream not supported");

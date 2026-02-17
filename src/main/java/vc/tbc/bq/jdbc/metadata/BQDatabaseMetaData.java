@@ -1814,7 +1814,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// Use unique Unicode placeholders that won't be affected by string replacements
 		String escapedUnderscore = "\u0001\u0002\u0003"; // Placeholder for \_
 		String escapedPercent = "\u0004\u0005\u0006"; // Placeholder for \%
-		String escapedBackslash = "\u0007\u0008\u0009"; // Placeholder for \\
+		String escapedBackslash = "\u0007\u0008\t"; // Placeholder for \\
 
 		// Step 1: Replace escaped sequences with placeholders
 		String processed = pattern;

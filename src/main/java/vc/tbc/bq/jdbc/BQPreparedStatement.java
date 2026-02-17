@@ -18,8 +18,6 @@ package vc.tbc.bq.jdbc;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.QueryParameterValue;
 import com.google.cloud.bigquery.StandardSQLTypeName;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.base.AbstractBQPreparedStatement;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.metadata.BQParameterMetaData;
@@ -40,8 +38,6 @@ import java.util.List;
  * @since 1.0.0
  */
 public final class BQPreparedStatement extends AbstractBQPreparedStatement {
-
-	private static final Logger logger = LoggerFactory.getLogger(BQPreparedStatement.class);
 
 	private final String sqlTemplate;
 	private final List<QueryParameterValue> parameters = new ArrayList<>();
@@ -451,7 +447,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			case Types.DECIMAL, Types.NUMERIC ->
 				setBigDecimal(parameterIndex, ParameterConverter.toBigDecimal(x, parameterIndex));
 			case Types.CHAR, Types.VARCHAR, Types.LONGVARCHAR, Types.NCHAR, Types.NVARCHAR, Types.LONGNVARCHAR ->
-				setString(parameterIndex, ParameterConverter.toString(x, parameterIndex));
+				setString(parameterIndex, ParameterConverter.toString(x));
 			case Types.BINARY, Types.VARBINARY, Types.LONGVARBINARY ->
 				setBytes(parameterIndex, ParameterConverter.toBytes(x, parameterIndex));
 			case Types.DATE -> setDate(parameterIndex, ParameterConverter.toDate(x, parameterIndex));

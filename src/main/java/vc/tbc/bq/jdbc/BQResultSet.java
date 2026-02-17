@@ -103,6 +103,9 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	 *            marker parameter to distinguish this constructor
 	 */
 	protected BQResultSet(BQStatement statement, TableResult tableResult, boolean allowNullTableResult) {
+		if (!allowNullTableResult && tableResult == null) {
+			throw new IllegalArgumentException("tableResult cannot be null");
+		}
 		this.statement = statement;
 		this.tableResult = tableResult;
 		this.rowIterator = tableResult != null ? tableResult.iterateAll().iterator() : null;
@@ -248,7 +251,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	}
 
 	@Deprecated
-	@SuppressWarnings("deprecation")
 	@Override
 	public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);

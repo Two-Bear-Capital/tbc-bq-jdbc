@@ -106,18 +106,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected abstract int getEffectiveFetchSize();
 
 	/**
-	 * Creates a ResultSet from the query result. Template method for subclasses to
-	 * customize result set creation.
-	 *
-	 * @param result
-	 *            the table result from BigQuery
-	 * @return the JDBC ResultSet
-	 */
-	protected ResultSet createResultSet(TableResult result) {
-		return createResultSet(result, null);
-	}
-
-	/**
 	 * Creates a ResultSet for the given query result and job. Determines whether to
 	 * use Storage API based on configuration and result size.
 	 *
