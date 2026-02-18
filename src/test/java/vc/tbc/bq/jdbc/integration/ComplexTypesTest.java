@@ -466,6 +466,132 @@ class ComplexTypesTest extends AbstractBigQueryIntegrationTest {
 		}
 	}
 
+	// DBE-17806 Regression Tests
+	//
+	// The JetBrains built-in (Simba) BigQuery driver has a bug where, when a STRUCT
+	// field is NULL, the driver omits that null value and the remaining values
+	// shift
+	// left in the result, causing DataGrip to display values under the wrong
+	// column.
+	//
+	// Our driver avoids this entirely by serializing the whole STRUCT as a named
+	// JSON
+	// object, so nulls are always explicitly present and field names are always
+	// shown.
+
+	@Test
+	void testStructWithNullFieldSerializesAsNamedJsonObject() throws SQLException {
+		// Given: a STRUCT where the middle field (hdp) is NULL — the exact DBE-17806
+		// repro
+		String sql = "SELECT STRUCT('US' as country, CAST(NULL AS STRING) AS hdp, 12 as quantity) as demo";
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+			assertTrue(rs.next(), "Should have result");
+
+			String structValue = rs.getString("demo");
+
+			// Then: result must be a JSON object, not a positional array
+			assertNotNull(structValue, "STRUCT should not be null");
+			String trimmed = structValue.trim();
+			assertTrue(trimmed.startsWith("{") && trimmed.endsWith("}"),
+					"STRUCT must serialize as a JSON object, not an array. Got: " + structValue);
+
+			// All field names must be present, including the null one
+			assertTrue(structValue.contains("\"country\""), "JSON must contain field name 'country'");
+			assertTrue(structValue.contains("\"hdp\""), "JSON must contain field name 'hdp' even when null");
+			assertTrue(structValue.contains("\"quantity\""), "JSON must contain field name 'quantity'");
+
+			// The null must be serialized explicitly — not skipped
+			assertTrue(structValue.contains(":null"), "JSON must serialize null explicitly, not skip it");
+
+			// Non-null values must appear at their correct positions
+			assertTrue(structValue.contains("\"US\""), "country must be 'US'");
+			assertTrue(structValue.contains("12"), "quantity must be 12, not shifted into hdp's position");
+
+			logger.info("DBE-17806 (single row): {}", structValue);
+		}
+	}
+
+	@Test
+	void testStructWithNullFieldMultipleRows() throws SQLException {
+		// Given: multiple rows, each with a NULL hdp — reproduces the full DBE-17806
+		// repro query
+		String sql = """
+				WITH demo AS (
+				  SELECT 'US' as country, CAST(NULL AS STRING) AS hdp, 12 as quantity
+				  UNION ALL
+				  SELECT 'UK' as country, CAST(NULL AS STRING) AS hdp, 56 as quantity
+				  UNION ALL
+				  SELECT 'FR' as country, CAST(NULL AS STRING) AS hdp, 33 as quantity
+				)
+				SELECT STRUCT(demo.country, demo.hdp, demo.quantity) as demo
+				FROM demo
+				ORDER BY demo.country
+				""";
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+
+			int rowCount = 0;
+			while (rs.next()) {
+				rowCount++;
+				String structValue = rs.getString("demo");
+
+				assertNotNull(structValue, "STRUCT should not be null on row " + rowCount);
+				assertTrue(structValue.trim().startsWith("{"),
+						"STRUCT must be a JSON object on row " + rowCount + ". Got: " + structValue);
+
+				// hdp is always null — must be explicit null, never a shifted value
+				assertTrue(structValue.contains("\"hdp\""), "Field name 'hdp' must be present on row " + rowCount);
+				assertTrue(structValue.contains(":null"), "null must be explicit on row " + rowCount);
+
+				// quantity must not have shifted into the hdp position
+				assertFalse(structValue.contains("\"hdp\":\"12\"") || structValue.contains("\"hdp\":12"),
+						"quantity must not shift into hdp's position on row " + rowCount);
+				assertFalse(structValue.contains("\"hdp\":\"56\"") || structValue.contains("\"hdp\":56"),
+						"quantity must not shift into hdp's position on row " + rowCount);
+				assertFalse(structValue.contains("\"hdp\":\"33\"") || structValue.contains("\"hdp\":33"),
+						"quantity must not shift into hdp's position on row " + rowCount);
+
+				logger.info("DBE-17806 (multi-row, row {}): {}", rowCount, structValue);
+			}
+
+			assertEquals(3, rowCount, "Should have 3 rows");
+		}
+	}
+
+	@Test
+	void testNestedStructWithNullInnerStructPreservesFieldNames() throws SQLException {
+		// Given: a nested STRUCT where the entire inner STRUCT is NULL (deeper
+		// DBE-17806 variant)
+		String sql = """
+				SELECT STRUCT(
+				  CAST(NULL AS STRUCT<zone STRING>) as dest_instance,
+				  'reporter1' as reporter
+				) as payload
+				""";
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+			assertTrue(rs.next(), "Should have result");
+
+			String structValue = rs.getString("payload");
+
+			assertNotNull(structValue, "STRUCT should not be null");
+			assertTrue(structValue.trim().startsWith("{"), "STRUCT must be a JSON object. Got: " + structValue);
+
+			// Both field names must be present
+			assertTrue(structValue.contains("\"dest_instance\""),
+					"Field name 'dest_instance' must be present even when null");
+			assertTrue(structValue.contains("\"reporter\""), "Field name 'reporter' must be present");
+
+			// reporter1 must NOT shift into dest_instance's position
+			assertFalse(structValue.contains("\"dest_instance\":\"reporter1\""),
+					"'reporter1' must not shift left into 'dest_instance'. Got: " + structValue);
+
+			// reporter1 must appear under its own key
+			assertTrue(structValue.contains("\"reporter\":\"reporter1\"") || structValue.contains("reporter1"),
+					"'reporter1' must appear under 'reporter'. Got: " + structValue);
+
+			logger.info("DBE-17806 nested variant: {}", structValue);
+		}
+	}
+
 	// Type Conversion Tests
 
 	@Test

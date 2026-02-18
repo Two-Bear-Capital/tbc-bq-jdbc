@@ -145,6 +145,14 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		}
 	}
 
+	private Field getSchemaField(int columnIndex) {
+		var schema = tableResult != null ? tableResult.getSchema() : null;
+		if (schema != null && columnIndex > 0 && columnIndex <= schema.getFields().size()) {
+			return schema.getFields().get(columnIndex - 1);
+		}
+		return null;
+	}
+
 	@Override
 	public boolean next() throws SQLException {
 		checkClosed();
@@ -180,8 +188,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public String getString(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		// FieldValueConverter handles null checks and complex type conversion
-		return FieldValueConverter.toString(value);
+		return FieldValueConverter.toString(value, getSchemaField(columnIndex));
 	}
 
 	@Override
@@ -299,8 +306,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public String getString(String columnLabel) throws SQLException {
 		FieldValue value = getFieldValue(columnLabel);
-		// FieldValueConverter handles null checks and complex type conversion
-		return FieldValueConverter.toString(value);
+		return FieldValueConverter.toString(value, getSchemaField(findColumn(columnLabel)));
 	}
 
 	@Override
@@ -409,13 +415,12 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		// attribute
 		if (value.getAttribute() == FieldValue.Attribute.REPEATED
 				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
-			return FieldValueConverter.toString(value);
+			return FieldValueConverter.toString(value, getSchemaField(columnIndex));
 		}
 
 		// Get field type to return appropriate Java type
-		var schema = tableResult.getSchema();
-		if (schema != null && columnIndex > 0 && columnIndex <= schema.getFields().size()) {
-			Field field = schema.getFields().get(columnIndex - 1);
+		Field field = getSchemaField(columnIndex);
+		if (field != null) {
 			StandardSQLTypeName type = field.getType().getStandardType();
 
 			// Return appropriate Java type based on BigQuery type
