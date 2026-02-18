@@ -41,11 +41,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Build Artifacts
 After `./mvnw clean package`, find these in `target/`:
-- `tbc-bq-jdbc-1.0.56.jar` - Slim JAR (60K, requires dependencies)
-- `tbc-bq-jdbc-1.0.56.jar` - Shaded JAR with all dependencies (38M)
-- `tbc-bq-jdbc-1.0.56-with-logging.jar` - Shaded JAR + Logback for IntelliJ (39M)
-- `tbc-bq-jdbc-1.0.56.jar` - Source JAR
-- `tbc-bq-jdbc-1.0.56.jar` - Javadoc JAR
+- `tbc-bq-jdbc-1.0.57.jar` - Slim JAR (60K, requires dependencies)
+- `tbc-bq-jdbc-1.0.57.jar` - Shaded JAR with all dependencies (38M)
+- `tbc-bq-jdbc-1.0.57-with-logging.jar` - Shaded JAR + Logback for IntelliJ (39M)
+- `tbc-bq-jdbc-1.0.57.jar` - Source JAR
+- `tbc-bq-jdbc-1.0.57.jar` - Javadoc JAR
 
 ### Running Tests
 ```bash
