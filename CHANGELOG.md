@@ -5,11 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.58] - 2026-02-25
+
+### 🔀 Pull Requests
+
+- Merge pull request #27 from Two-Bear-Capital/dependabot/maven/maven-dependencies-27ae35b4de
+
+### 📦 Other
+
+- Bump the maven-dependencies group with 2 updates
+
+Bumps the maven-dependencies group with 2 updates: [org.apache.maven.plugins:maven-surefire-plugin](https://github.com/apache/maven-surefire) and [org.apache.maven.plugins:maven-failsafe-plugin](https://github.com/apache/maven-surefire).
+
+
+Updates `org.apache.maven.plugins:maven-surefire-plugin` from 3.5.4 to 3.5.5
+- [Release notes](https://github.com/apache/maven-surefire/releases)
+- [Commits](https://github.com/apache/maven-surefire/compare/surefire-3.5.4...surefire-3.5.5)
+
+Updates `org.apache.maven.plugins:maven-failsafe-plugin` from 3.5.4 to 3.5.5
+- [Release notes](https://github.com/apache/maven-surefire/releases)
+- [Commits](https://github.com/apache/maven-surefire/compare/surefire-3.5.4...surefire-3.5.5)
+
+---
+updated-dependencies:
+- dependency-name: org.apache.maven.plugins:maven-surefire-plugin
+  dependency-version: 3.5.5
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: maven-dependencies
+- dependency-name: org.apache.maven.plugins:maven-failsafe-plugin
+  dependency-version: 3.5.5
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: maven-dependencies
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
 ## [1.0.57] - 2026-02-18
 
 ### 📦 Other
 
 - Refactor `FieldValueConverter` for named STRUCT serialization and enhance `BQResultSet#getString` to support schema-based conversion. Add regression tests for STRUCT null handling (DBE-17806).
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.57
 
 ## [1.0.56] - 2026-02-17
 
@@ -1572,6 +1613,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.58]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.57...v1.0.58
 [1.0.57]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.56...v1.0.57
 [1.0.56]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.55...v1.0.56
 [1.0.55]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.54...v1.0.55
