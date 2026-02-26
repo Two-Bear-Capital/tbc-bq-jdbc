@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.59] - 2026-02-26
+
+### 🔀 Pull Requests
+
+- Merge pull request #28 from Two-Bear-Capital/dependabot/github_actions/github-actions-18071e69ab
+
+### 📦 Other
+
+- Bump actions/attest-build-provenance in the github-actions group
+
+Bumps the github-actions group with 1 update: [actions/attest-build-provenance](https://github.com/actions/attest-build-provenance).
+
+
+Updates `actions/attest-build-provenance` from 3 to 4
+- [Release notes](https://github.com/actions/attest-build-provenance/releases)
+- [Changelog](https://github.com/actions/attest-build-provenance/blob/main/RELEASE.md)
+- [Commits](https://github.com/actions/attest-build-provenance/compare/v3...v4)
+
+---
+updated-dependencies:
+- dependency-name: actions/attest-build-provenance
+  dependency-version: '4'
+  dependency-type: direct:production
+  update-type: version-update:semver-major
+  dependency-group: github-actions
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
 ## [1.0.58] - 2026-02-25
 
 ### 🔀 Pull Requests
@@ -41,6 +70,10 @@ updated-dependencies:
 ...
 
 Signed-off-by: dependabot[bot] <support@github.com>
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.58
 
 ## [1.0.57] - 2026-02-18
 
@@ -1613,6 +1646,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.59]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.58...v1.0.59
 [1.0.58]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.57...v1.0.58
 [1.0.57]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.56...v1.0.57
 [1.0.56]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.55...v1.0.56
