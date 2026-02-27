@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.60] - 2026-02-27
+
+### 🔀 Pull Requests
+
+- Merge pull request #30 from Two-Bear-Capital/dependabot/maven/maven-dependencies-5250138944
+- Merge pull request #29 from Two-Bear-Capital/dependabot/github_actions/github-actions-674967a53d
+
+### 📦 Other
+
+- Bump the maven-dependencies group with 2 updates
+
+Bumps the maven-dependencies group with 2 updates: [org.mockito:mockito-core](https://github.com/mockito/mockito) and [org.mockito:mockito-junit-jupiter](https://github.com/mockito/mockito).
+
+
+Updates `org.mockito:mockito-core` from 5.21.0 to 5.22.0
+- [Release notes](https://github.com/mockito/mockito/releases)
+- [Commits](https://github.com/mockito/mockito/compare/v5.21.0...v5.22.0)
+
+Updates `org.mockito:mockito-junit-jupiter` from 5.21.0 to 5.22.0
+- [Release notes](https://github.com/mockito/mockito/releases)
+- [Commits](https://github.com/mockito/mockito/compare/v5.21.0...v5.22.0)
+
+---
+updated-dependencies:
+- dependency-name: org.mockito:mockito-core
+  dependency-version: 5.22.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: maven-dependencies
+- dependency-name: org.mockito:mockito-junit-jupiter
+  dependency-version: 5.22.0
+  dependency-type: direct:development
+  update-type: version-update:semver-minor
+  dependency-group: maven-dependencies
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+- Bump actions/upload-artifact from 6 to 7 in the github-actions group
+
+Bumps the github-actions group with 1 update: [actions/upload-artifact](https://github.com/actions/upload-artifact).
+
+
+Updates `actions/upload-artifact` from 6 to 7
+- [Release notes](https://github.com/actions/upload-artifact/releases)
+- [Commits](https://github.com/actions/upload-artifact/compare/v6...v7)
+
+---
+updated-dependencies:
+- dependency-name: actions/upload-artifact
+  dependency-version: '7'
+  dependency-type: direct:production
+  update-type: version-update:semver-major
+  dependency-group: github-actions
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
 ## [1.0.59] - 2026-02-26
 
 ### 🔀 Pull Requests
@@ -33,6 +90,10 @@ updated-dependencies:
 ...
 
 Signed-off-by: dependabot[bot] <support@github.com>
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.59
 
 ## [1.0.58] - 2026-02-25
 
@@ -1646,6 +1707,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.60]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.59...v1.0.60
 [1.0.59]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.58...v1.0.59
 [1.0.58]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.57...v1.0.58
 [1.0.57]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.56...v1.0.57
