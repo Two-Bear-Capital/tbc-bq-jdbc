@@ -62,6 +62,10 @@ updated-dependencies:
 
 Signed-off-by: dependabot[bot] <support@github.com>
 
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.60
+
 ## [1.0.59] - 2026-02-26
 
 ### 🔀 Pull Requests
