@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.62] - 2026-03-03
+
+### 🔀 Pull Requests
+
+- Merge pull request #31 from Two-Bear-Capital/dependabot/maven/maven-dependencies-1955c05a4e
+
+### 📦 Other
+
+- Bump com.diffplug.spotless:spotless-maven-plugin
+
+Bumps the maven-dependencies group with 1 update: [com.diffplug.spotless:spotless-maven-plugin](https://github.com/diffplug/spotless).
+
+
+Updates `com.diffplug.spotless:spotless-maven-plugin` from 3.2.1 to 3.3.0
+- [Release notes](https://github.com/diffplug/spotless/releases)
+- [Changelog](https://github.com/diffplug/spotless/blob/main/CHANGES.md)
+- [Commits](https://github.com/diffplug/spotless/compare/maven/3.2.1...lib/3.3.0)
+
+---
+updated-dependencies:
+- dependency-name: com.diffplug.spotless:spotless-maven-plugin
+  dependency-version: 3.3.0
+  dependency-type: direct:production
+  update-type: version-update:semver-minor
+  dependency-group: maven-dependencies
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+## [1.0.61] - 2026-02-27
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.61
+
 ## [1.0.60] - 2026-02-27
 
 ### 🔀 Pull Requests
@@ -1711,6 +1746,8 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.62]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.61...v1.0.62
+[1.0.61]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.60...v1.0.61
 [1.0.60]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.59...v1.0.60
 [1.0.59]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.58...v1.0.59
 [1.0.58]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.57...v1.0.58
