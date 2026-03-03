@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.63] - 2026-03-03
+
+### 🔨 Refactoring
+
+- **connection:** Improve Simba URL parsing and property handling
+
 ## [1.0.62] - 2026-03-03
 
 ### 🔀 Pull Requests
@@ -33,6 +39,10 @@ updated-dependencies:
 ...
 
 Signed-off-by: dependabot[bot] <support@github.com>
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.62
 
 ## [1.0.61] - 2026-02-27
 
@@ -1746,6 +1756,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.63]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.62...v1.0.63
 [1.0.62]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.61...v1.0.62
 [1.0.61]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.60...v1.0.61
 [1.0.60]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.59...v1.0.60
