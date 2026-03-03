@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.base.AbstractBQConnection;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
+import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
@@ -154,6 +155,27 @@ public final class BQConnection extends AbstractBQConnection {
 	 */
 	public SessionManager getSessionManager() {
 		return sessionManager;
+	}
+
+	/**
+	 * Returns the shared {@link MetadataCache} for this connection's project, or
+	 * {@code null} if metadata caching is disabled.
+	 *
+	 * <p>
+	 * The cache is shared across all connections to the same project so that
+	 * results obtained on one connection are immediately available to the next —
+	 * critical for IntelliJ IDEA, which opens a fresh connection for each
+	 * introspection pass.
+	 *
+	 * @return the shared cache, or {@code null} when caching is disabled
+	 */
+	public MetadataCache getMetadataCache() {
+		if (!properties.metadataCacheEnabled()) {
+			return null;
+		}
+		String cacheKey = properties.projectId() + ":" + properties.metadataCacheTtl();
+		return BQDatabaseMetaData.getOrCreateSharedCache(cacheKey,
+				java.time.Duration.ofSeconds(properties.metadataCacheTtl()), properties.projectId());
 	}
 
 	/**

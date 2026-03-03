@@ -409,45 +409,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return null;
 		}
-
-		// Check FieldValue attribute FIRST - this is the source of truth
-		// Array literals may be reported as STRING in schema but have REPEATED
-		// attribute
-		if (value.getAttribute() == FieldValue.Attribute.REPEATED
-				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
-			return FieldValueConverter.toString(value, getSchemaField(columnIndex));
-		}
-
-		// Get field type to return appropriate Java type
-		Field field = getSchemaField(columnIndex);
-		if (field != null) {
-			StandardSQLTypeName type = field.getType().getStandardType();
-
-			// Return appropriate Java type based on BigQuery type
-			return switch (type) {
-				case BOOL -> value.getBooleanValue();
-				case INT64 -> value.getLongValue();
-				case FLOAT64 -> value.getDoubleValue();
-				case NUMERIC, BIGNUMERIC -> value.getNumericValue();
-				case STRING -> value.getStringValue();
-				case BYTES -> value.getBytesValue();
-				case DATE -> {
-					String dateStr = value.getStringValue();
-					yield java.sql.Date.valueOf(dateStr);
-				}
-				case TIME -> {
-					String timeStr = value.getStringValue();
-					yield java.sql.Time.valueOf(timeStr);
-				}
-				case DATETIME, TIMESTAMP -> {
-					long micros = value.getTimestampValue();
-					yield new java.sql.Timestamp(micros / 1000);
-				}
-				default -> value.getValue(); // Fallback to raw value
-			};
-		}
-
-		return value.getValue();
+		return FieldValueConverter.toObject(value, getSchemaField(columnIndex));
 	}
 
 	@Override

@@ -68,18 +68,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		// Initialize cache if enabled
 		if (properties.metadataCacheEnabled()) {
-			java.time.Duration cacheTtl = java.time.Duration.ofSeconds(properties.metadataCacheTtl());
-
 			// Create cache key based on project and TTL
 			this.cacheKey = properties.projectId() + ":" + properties.metadataCacheTtl();
-
-			// Get or create shared cache instance
-			this.cache = SHARED_CACHES.computeIfAbsent(cacheKey, k -> {
-				logger.info("Creating new shared metadata cache for project: {} with TTL: {}", properties.projectId(),
-						cacheTtl);
-				return new MetadataCache(cacheTtl);
-			});
-
+			this.cache = getOrCreateSharedCache(cacheKey, java.time.Duration.ofSeconds(properties.metadataCacheTtl()),
+					properties.projectId());
 			logger.debug("Using shared metadata cache for project: {} (cache instances: {})", properties.projectId(),
 					SHARED_CACHES.size());
 		} else {
@@ -1997,6 +1989,30 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * Under normal operation, you should not need to call this method as the cache
 	 * expires entries based on TTL automatically.
 	 */
+	/**
+	 * Returns the shared {@link MetadataCache} for the given cache key, creating a
+	 * new instance if none exists yet.
+	 *
+	 * <p>
+	 * The cache is keyed by {@code "projectId:ttlSeconds"} so that connections to
+	 * different projects or with different TTL settings each get their own cache.
+	 *
+	 * @param cacheKey
+	 *            the cache key ({@code "projectId:ttlSeconds"})
+	 * @param ttl
+	 *            the time-to-live for cache entries (used only when creating a new
+	 *            cache)
+	 * @param projectId
+	 *            the project ID, used only for the creation log message
+	 * @return the shared {@link MetadataCache} instance
+	 */
+	public static MetadataCache getOrCreateSharedCache(String cacheKey, java.time.Duration ttl, String projectId) {
+		return SHARED_CACHES.computeIfAbsent(cacheKey, k -> {
+			logger.info("Creating new shared metadata cache for project: {} with TTL: {}", projectId, ttl);
+			return new MetadataCache(ttl);
+		});
+	}
+
 	public static void clearAllSharedCaches() {
 		int clearedCount = 0;
 		for (MetadataCache cache : SHARED_CACHES.values()) {

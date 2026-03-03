@@ -22,12 +22,15 @@ import vc.tbc.bq.jdbc.BQConnection;
 import vc.tbc.bq.jdbc.BQResultSet;
 import vc.tbc.bq.jdbc.BQStatement;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
+import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
 import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 
 import java.sql.*;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -248,6 +251,22 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		// Clear previous warnings
 		queryWarnings = null;
 
+		// Serve INFORMATION_SCHEMA queries from the shared cache when available.
+		// These are read-only catalog views that IntelliJ executes on every
+		// introspection pass; caching them eliminates redundant BigQuery jobs.
+		if (isInformationSchemaQuery(sql)) {
+			MetadataCache cache = connection.getMetadataCache();
+			if (cache != null) {
+				String cacheKey = normalizeSqlCacheKey(sql);
+				Optional<ResultSet> cached = cache.get(cacheKey);
+				if (cached.isPresent()) {
+					logger.debug("Cache hit for INFORMATION_SCHEMA query");
+					currentResultSet = cached.get();
+					return currentResultSet;
+				}
+			}
+		}
+
 		// Run dry-run if cost estimation is enabled
 		if (properties.enableQueryCostEstimation()) {
 			try {
@@ -346,6 +365,20 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 
 			// Wait with timeout
 			JobResultPair pair = future.get(timeoutSeconds, TimeUnit.SECONDS);
+
+			// Store INFORMATION_SCHEMA results in the shared cache and return a
+			// MetadataResultSet so the cached copy can be replayed on future hits.
+			if (isInformationSchemaQuery(sql)) {
+				MetadataCache cache = connection.getMetadataCache();
+				if (cache != null) {
+					String cacheKey = normalizeSqlCacheKey(sql);
+					cache.put(cacheKey, pair.result);
+					// Serve from cache so the cursor state is independent of TableResult
+					currentResultSet = cache.get(cacheKey).orElseGet(() -> createResultSet(pair.result, pair.job));
+					return currentResultSet;
+				}
+			}
+
 			currentResultSet = createResultSet(pair.result, pair.job);
 			return currentResultSet;
 
@@ -461,6 +494,42 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	public BQConnection getConnection() throws SQLException {
 		checkClosed();
 		return connection;
+	}
+
+	/**
+	 * Returns {@code true} if the SQL targets a BigQuery INFORMATION_SCHEMA view.
+	 *
+	 * <p>
+	 * INFORMATION_SCHEMA views are read-only catalog views — their content is safe
+	 * to cache with a TTL because they reflect schema state, not transactional
+	 * data. This check gates both the cache-read and cache-write paths.
+	 *
+	 * @param sql
+	 *            the SQL string to inspect
+	 * @return true when the SQL references INFORMATION_SCHEMA
+	 */
+	private static boolean isInformationSchemaQuery(String sql) {
+		return sql != null && sql.toUpperCase(Locale.ROOT).contains("INFORMATION_SCHEMA");
+	}
+
+	/**
+	 * Produces a stable cache key for an INFORMATION_SCHEMA query by normalising
+	 * all whitespace runs to a single space and trimming leading/trailing
+	 * whitespace.
+	 *
+	 * <p>
+	 * IntelliJ embeds the fully-qualified dataset name in every query (e.g.
+	 * {@code `project`.dataset.INFORMATION_SCHEMA.COLUMNS}), so no additional
+	 * namespace prefix is needed — the SQL itself is already dataset-scoped. The
+	 * {@code "query:"} prefix prevents collisions with the JDBC-metadata keys
+	 * stored in the same {@link MetadataCache}.
+	 *
+	 * @param sql
+	 *            the raw SQL string
+	 * @return the normalised cache key
+	 */
+	private static String normalizeSqlCacheKey(String sql) {
+		return "query:" + sql.strip().replaceAll("\\s+", " ");
 	}
 
 	/**

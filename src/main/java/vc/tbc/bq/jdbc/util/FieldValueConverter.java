@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.util;
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.FieldList;
 import com.google.cloud.bigquery.FieldValue;
+import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -43,6 +44,51 @@ public final class FieldValueConverter {
 
 	private FieldValueConverter() {
 		// Utility class
+	}
+
+	/**
+	 * Converts a BigQuery FieldValue to an appropriate Java object for JDBC.
+	 *
+	 * <p>
+	 * Complex types (ARRAY, STRUCT) are serialised to a JSON string via
+	 * {@link #toString(FieldValue, Field)}. Primitive types are converted to their
+	 * natural Java equivalents (Boolean, Long, Double, etc.) using the provided
+	 * schema Field for type information.
+	 *
+	 * <p>
+	 * The caller is responsible for null-checking {@code value} and
+	 * {@code value.isNull()} before invoking this method.
+	 *
+	 * @param value
+	 *            the FieldValue to convert (must not be null, must not be isNull())
+	 * @param field
+	 *            the schema Field providing type information; may be null
+	 * @return the Java object representation
+	 */
+	public static Object toObject(FieldValue value, Field field) {
+		// Complex types (ARRAY / STRUCT) → JSON string
+		if (value.getAttribute() == FieldValue.Attribute.REPEATED
+				|| value.getAttribute() == FieldValue.Attribute.RECORD) {
+			return toString(value, field);
+		}
+
+		if (field != null) {
+			StandardSQLTypeName type = field.getType().getStandardType();
+			return switch (type) {
+				case BOOL -> value.getBooleanValue();
+				case INT64 -> value.getLongValue();
+				case FLOAT64 -> value.getDoubleValue();
+				case NUMERIC, BIGNUMERIC -> value.getNumericValue();
+				case STRING -> value.getStringValue();
+				case BYTES -> value.getBytesValue();
+				case DATE -> java.sql.Date.valueOf(value.getStringValue());
+				case TIME -> java.sql.Time.valueOf(value.getStringValue());
+				case DATETIME, TIMESTAMP -> new java.sql.Timestamp(value.getTimestampValue() / 1000);
+				default -> value.getValue();
+			};
+		}
+
+		return value.getValue();
 	}
 
 	/**

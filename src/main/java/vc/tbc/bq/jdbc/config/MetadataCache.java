@@ -15,14 +15,19 @@
  */
 package vc.tbc.bq.jdbc.config;
 
+import com.google.cloud.bigquery.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vc.tbc.bq.jdbc.TypeMapper;
 import vc.tbc.bq.jdbc.metadata.MetadataResultSet;
+import vc.tbc.bq.jdbc.util.FieldValueConverter;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -125,6 +130,49 @@ public final class MetadataCache {
 		Instant expiresAt = Instant.now().plus(ttl);
 		cache.put(key, new CacheEntry(columnNames, columnTypes, rows, expiresAt));
 		logger.trace("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
+	}
+
+	/**
+	 * Materialises and stores a BigQuery {@link TableResult} in the cache.
+	 *
+	 * <p>
+	 * Column names are taken directly from the result schema. Column types are
+	 * mapped via {@link TypeMapper#toJdbcType(Field)}. Row values are converted via
+	 * {@link FieldValueConverter#toObject(FieldValue, Field)} — the same converter
+	 * used by {@link vc.tbc.bq.jdbc.BQResultSet#getObject(int)}, ensuring
+	 * consistent type representation.
+	 *
+	 * @param key
+	 *            the cache key
+	 * @param result
+	 *            the BigQuery result to materialise and cache
+	 */
+	public void put(String key, TableResult result) {
+		Schema schema = result.getSchema();
+		FieldList fields = schema.getFields();
+		int fieldCount = fields.size();
+
+		String[] columnNames = new String[fieldCount];
+		int[] columnTypes = new int[fieldCount];
+		for (int i = 0; i < fieldCount; i++) {
+			Field field = fields.get(i);
+			columnNames[i] = field.getName();
+			columnTypes[i] = TypeMapper.toJdbcType(field);
+		}
+
+		List<Object[]> rows = new ArrayList<>();
+		for (FieldValueList row : result.iterateAll()) {
+			Object[] rowData = new Object[fieldCount];
+			for (int i = 0; i < fieldCount; i++) {
+				FieldValue fv = row.get(i);
+				rowData[i] = fv.isNull() ? null : FieldValueConverter.toObject(fv, fields.get(i));
+			}
+			rows.add(rowData);
+		}
+
+		Instant expiresAt = Instant.now().plus(ttl);
+		cache.put(key, new CacheEntry(columnNames, columnTypes, Collections.unmodifiableList(rows), expiresAt));
+		logger.debug("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
 	}
 
 	/**
