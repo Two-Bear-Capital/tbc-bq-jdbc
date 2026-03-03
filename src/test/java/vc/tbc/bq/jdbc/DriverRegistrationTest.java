@@ -106,16 +106,29 @@ class DriverRegistrationTest {
 	}
 
 	@Test
-	void testGetPropertyInfoReturnsEmptyArray() throws Exception {
+	void testGetPropertyInfoReturnsDriverProperties() throws Exception {
 		// Given: A BQDriver instance
 		BQDriver driver = new BQDriver();
 
 		// When: Getting property info
 		var propertyInfo = driver.getPropertyInfo("jdbc:bigquery:my-project/my-dataset", new java.util.Properties());
 
-		// Then: Should return empty array
+		// Then: Should return all supported properties with defaults
 		assertNotNull(propertyInfo, "Property info should not be null");
-		assertEquals(0, propertyInfo.length, "Property info should be empty");
+		assertTrue(propertyInfo.length > 0, "Property info should not be empty");
+
+		// authType must be present, required, with the correct default
+		var authTypeProp = java.util.Arrays.stream(propertyInfo).filter(p -> "authType".equals(p.name)).findFirst();
+		assertTrue(authTypeProp.isPresent(), "authType property must be present");
+		assertTrue(authTypeProp.get().required, "authType should be required");
+		assertEquals("ADC", authTypeProp.get().value, "authType default should be ADC");
+		assertNotNull(authTypeProp.get().choices, "authType should have choices");
+
+		// metadataCacheEnabled must be present with default true
+		var cacheProp = java.util.Arrays.stream(propertyInfo).filter(p -> "metadataCacheEnabled".equals(p.name))
+				.findFirst();
+		assertTrue(cacheProp.isPresent(), "metadataCacheEnabled property must be present");
+		assertEquals("true", cacheProp.get().value, "metadataCacheEnabled default should be true");
 	}
 
 	@Test

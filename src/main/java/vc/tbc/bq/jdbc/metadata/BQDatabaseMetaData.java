@@ -941,11 +941,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * </ul>
 	 *
 	 * <p>
-	 * <b>Performance:</b> Uses nested virtual thread parallelization:
-	 * <ul>
-	 * <li>Parallel across datasets (schemas)
-	 * <li>Parallel across tables within each dataset
-	 * </ul>
+	 * <b>Performance:</b> Uses {@code INFORMATION_SCHEMA.COLUMNS} (one query per
+	 * dataset) instead of individual {@code getTable()} calls, with parallel
+	 * execution across datasets via virtual threads. Falls back to
+	 * {@code getTable()}-per-table if {@code INFORMATION_SCHEMA} is unavailable.
 	 * Results are cached based on {@code metadataCacheTtl} connection property
 	 * (default: 300 seconds).
 	 *
@@ -979,7 +978,13 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				() -> executeGetColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern));
 	}
 
-	/** Query columns from multiple datasets in parallel using virtual threads. */
+	/**
+	 * Query columns from multiple datasets in parallel using virtual threads.
+	 *
+	 * <p>
+	 * Each dataset runs its own {@code INFORMATION_SCHEMA.COLUMNS} query
+	 * concurrently via a virtual thread.
+	 */
 	private java.util.List<Object[]> queryColumnsParallel(String projectId, java.util.List<String> datasetIds,
 			String tableNamePattern, String columnNamePattern) throws SQLException {
 		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
@@ -988,16 +993,84 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	}
 
 	/**
-	 * Query columns for a single dataset with nested parallelization.
+	 * Query columns for a single dataset.
 	 *
 	 * <p>
-	 * Always uses parallel table fetching for better performance with BigQuery API.
+	 * Uses {@code INFORMATION_SCHEMA.COLUMNS} for performance: one query per
+	 * dataset instead of one {@code getTable()} API call per table. Falls back to
+	 * the legacy {@code getTable()} approach if {@code INFORMATION_SCHEMA} is
+	 * unavailable (e.g., BigQuery emulator).
 	 */
 	private java.util.List<Object[]> queryColumnsForDataset(com.google.cloud.bigquery.BigQuery bigquery,
 			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
-		var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
+		try {
+			return queryColumnsViaInformationSchema(bigquery, projectId, datasetId, tableNamePattern,
+					columnNamePattern);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new BQSQLException("INFORMATION_SCHEMA query interrupted for dataset: " + datasetId, e);
+		} catch (Exception e) {
+			logger.debug("INFORMATION_SCHEMA.COLUMNS unavailable for {}.{}, falling back to getTable() API: {}",
+					projectId, datasetId, e.getMessage());
+			return queryColumnsViaGetTable(bigquery, projectId, datasetId, tableNamePattern, columnNamePattern);
+		}
+	}
 
-		// Collect tables that match the pattern
+	/**
+	 * Query columns via a single {@code INFORMATION_SCHEMA.COLUMNS} query per
+	 * dataset.
+	 *
+	 * <p>
+	 * Replaces N individual {@code getTable()} API calls (one per table) with a
+	 * single metadata query, reducing API round-trips by ~50x for typical datasets.
+	 */
+	private java.util.List<Object[]> queryColumnsViaInformationSchema(com.google.cloud.bigquery.BigQuery bigquery,
+			String projectId, String datasetId, String tableNamePattern, String columnNamePattern)
+			throws InterruptedException {
+		String sql = "SELECT table_name, column_name, ordinal_position, is_nullable, data_type" + " FROM `" + projectId
+				+ "." + datasetId + ".INFORMATION_SCHEMA.COLUMNS`" + " ORDER BY table_name, ordinal_position";
+
+		com.google.cloud.bigquery.QueryJobConfiguration queryConfig = com.google.cloud.bigquery.QueryJobConfiguration
+				.newBuilder(sql).setUseLegacySql(false).build();
+
+		com.google.cloud.bigquery.TableResult results = bigquery.query(queryConfig);
+
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+		for (com.google.cloud.bigquery.FieldValueList row : results.iterateAll()) {
+			String tableName = row.get("table_name").getStringValue();
+			if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+				continue;
+			}
+			String columnName = row.get("column_name").getStringValue();
+			if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
+				continue;
+			}
+
+			int ordinalPosition = (int) row.get("ordinal_position").getLongValue();
+			boolean isNullable = "YES".equalsIgnoreCase(row.get("is_nullable").getStringValue());
+			String dataType = row.get("data_type").getStringValue();
+
+			TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+			int nullable = isNullable ? DatabaseMetaData.columnNullable : DatabaseMetaData.columnNoNulls;
+
+			// REMARKS not available in INFORMATION_SCHEMA.COLUMNS
+			rows.add(buildColumnRow(projectId, datasetId, tableName, columnName, typeInfo.jdbcType(), dataType,
+					typeInfo.columnSize(), typeInfo.decimalDigits(), nullable, ordinalPosition, null));
+		}
+		return rows;
+	}
+
+	/**
+	 * Fallback: query columns via {@code listTables()} + {@code getTable()} per
+	 * table.
+	 *
+	 * <p>
+	 * Used when {@code INFORMATION_SCHEMA} is unavailable (e.g., BigQuery
+	 * emulator).
+	 */
+	private java.util.List<Object[]> queryColumnsViaGetTable(com.google.cloud.bigquery.BigQuery bigquery,
+			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
+		var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
 		java.util.List<com.google.cloud.bigquery.Table> tablesToQuery = new java.util.ArrayList<>();
 		for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
 			String tableName = table.getTableId().getTable();
@@ -1005,10 +1078,44 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				tablesToQuery.add(table);
 			}
 		}
-
-		// Always use nested parallel loading for better performance
-		logger.debug("Using nested parallel loading for {} tables in dataset {}", tablesToQuery.size(), datasetId);
 		return fetchAndProcessTablesParallel(bigquery, projectId, datasetId, tablesToQuery, columnNamePattern);
+	}
+
+	/**
+	 * Builds a single JDBC {@code getColumns()} result row.
+	 *
+	 * <p>
+	 * Centralises the 24-column layout so both the {@code INFORMATION_SCHEMA} fast
+	 * path and the {@code getTable()} fallback path stay in sync.
+	 */
+	private static Object[] buildColumnRow(String projectId, String datasetId, String tableName, String columnName,
+			int jdbcType, String typeName, int columnSize, int decimalDigits, int nullable, int ordinalPosition,
+			String remarks) {
+		return new Object[]{projectId, // TABLE_CAT
+				datasetId, // TABLE_SCHEM
+				tableName, // TABLE_NAME
+				columnName, // COLUMN_NAME
+				jdbcType, // DATA_TYPE
+				typeName, // TYPE_NAME
+				columnSize, // COLUMN_SIZE
+				null, // BUFFER_LENGTH (not used)
+				decimalDigits, // DECIMAL_DIGITS
+				10, // NUM_PREC_RADIX
+				nullable, // NULLABLE
+				remarks, // REMARKS
+				null, // COLUMN_DEF
+				null, // SQL_DATA_TYPE (not used)
+				null, // SQL_DATETIME_SUB (not used)
+				columnSize, // CHAR_OCTET_LENGTH
+				ordinalPosition, // ORDINAL_POSITION
+				nullable == DatabaseMetaData.columnNullable ? "YES" : "NO", // IS_NULLABLE
+				null, // SCOPE_CATALOG
+				null, // SCOPE_SCHEMA
+				null, // SCOPE_TABLE
+				null, // SOURCE_DATA_TYPE
+				"NO", // IS_AUTOINCREMENT
+				"NO" // IS_GENERATEDCOLUMN
+		};
 	}
 
 	/**
@@ -1066,31 +1173,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 					? DatabaseMetaData.columnNoNulls
 					: DatabaseMetaData.columnNullable;
 
-			rows.add(new Object[]{projectId, // TABLE_CAT
-					datasetId, // TABLE_SCHEM
-					tableName, // TABLE_NAME
-					columnName, // COLUMN_NAME
-					jdbcType, // DATA_TYPE
-					typeName, // TYPE_NAME
-					columnSize, // COLUMN_SIZE
-					null, // BUFFER_LENGTH (not used)
-					decimalDigits, // DECIMAL_DIGITS
-					10, // NUM_PREC_RADIX
-					nullable, // NULLABLE
-					field.getDescription(), // REMARKS
-					null, // COLUMN_DEF
-					null, // SQL_DATA_TYPE (not used)
-					null, // SQL_DATETIME_SUB (not used)
-					columnSize, // CHAR_OCTET_LENGTH
-					ordinalPosition, // ORDINAL_POSITION
-					nullable == DatabaseMetaData.columnNullable ? "YES" : "NO", // IS_NULLABLE
-					null, // SCOPE_CATALOG
-					null, // SCOPE_SCHEMA
-					null, // SCOPE_TABLE
-					null, // SOURCE_DATA_TYPE
-					"NO", // IS_AUTOINCREMENT
-					"NO" // IS_GENERATEDCOLUMN
-			});
+			rows.add(buildColumnRow(projectId, datasetId, tableName, columnName, jdbcType, typeName, columnSize,
+					decimalDigits, nullable, ordinalPosition, field.getDescription()));
 
 			ordinalPosition++;
 		}
@@ -1566,19 +1650,12 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		return getCachedOrExecute(cacheKey, () -> {
 			String projectId = catalog != null ? catalog : connection.getProperties().projectId();
-
-			// Use BigQuery API to list datasets
 			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-			var datasets = bigquery.listDatasets(projectId);
 
-			java.util.List<Object[]> rows = new java.util.ArrayList<>();
-			for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
-				String datasetId = dataset.getDatasetId().getDataset();
-
-				// Apply schema pattern filter if specified
-				if (schemaPattern == null || matchesPattern(datasetId, schemaPattern)) {
-					rows.add(new Object[]{datasetId, projectId});
-				}
+			java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+			java.util.List<Object[]> rows = new java.util.ArrayList<>(datasetIds.size());
+			for (String datasetId : datasetIds) {
+				rows.add(new Object[]{datasetId, projectId});
 			}
 
 			logger.info("getSchemas() returning {} schema(s)", rows.size());

@@ -258,4 +258,94 @@ public final class TypeMapper {
 		return sb.toString();
 	}
 
+	/**
+	 * Parsed result of an INFORMATION_SCHEMA {@code data_type} string.
+	 *
+	 * @param jdbcType
+	 *            JDBC type constant from {@link Types}
+	 * @param columnSize
+	 *            column precision / max length
+	 * @param decimalDigits
+	 *            scale for numeric types
+	 */
+	public record InfoSchemaTypeInfo(int jdbcType, int columnSize, int decimalDigits) {
+	}
+
+	/**
+	 * Parses a BigQuery INFORMATION_SCHEMA {@code data_type} string once and
+	 * returns all three column-metadata values together.
+	 *
+	 * <p>
+	 * Handles parameterized types ({@code NUMERIC(38,9)}), array types
+	 * ({@code ARRAY<STRING>}), and struct types ({@code STRUCT<field STRING>}).
+	 *
+	 * @param dataType
+	 *            the {@code data_type} value from
+	 *            {@code INFORMATION_SCHEMA.COLUMNS}
+	 * @return an {@link InfoSchemaTypeInfo} with jdbcType, columnSize, and
+	 *         decimalDigits
+	 */
+	public static InfoSchemaTypeInfo parseInfoSchemaTypeInfo(String dataType) {
+		if (dataType == null || dataType.isBlank()) {
+			return new InfoSchemaTypeInfo(Types.OTHER, 0, 0);
+		}
+		String upper = dataType.trim().toUpperCase();
+		if (upper.startsWith("ARRAY")) {
+			return new InfoSchemaTypeInfo(Types.ARRAY, 0, 0);
+		}
+		if (upper.startsWith("STRUCT")) {
+			return new InfoSchemaTypeInfo(Types.STRUCT, 0, 0);
+		}
+
+		int parenIdx = upper.indexOf('(');
+		String base = parenIdx >= 0 ? upper.substring(0, parenIdx).trim() : upper;
+
+		// Extract precision/scale from parameterized numeric types (e.g. NUMERIC(38,9))
+		int precision = 0;
+		int scale = 0;
+		if (parenIdx >= 0) {
+			int closeIdx = upper.indexOf(')');
+			if (closeIdx > parenIdx) {
+				String[] parts = upper.substring(parenIdx + 1, closeIdx).split(",");
+				try {
+					precision = Integer.parseInt(parts[0].trim());
+				} catch (NumberFormatException ignored) {
+					// Leave as 0
+				}
+				if (parts.length >= 2) {
+					try {
+						scale = Integer.parseInt(parts[1].trim());
+					} catch (NumberFormatException ignored) {
+						// Leave as 0
+					}
+				}
+			}
+		}
+
+		// Delegate to existing mapping methods — no duplicate switch needed
+		StandardSQLTypeName stdType = toStandardSQLTypeNameFromString(base);
+		int jdbcType = stdType != null ? toJdbcType(stdType) : Types.OTHER;
+
+		// For parameterized numeric types use extracted precision/scale directly;
+		// otherwise fall back to the StandardSQLTypeName defaults
+		int columnSize = precision > 0 ? precision : (stdType != null ? getColumnSize(stdType) : 0);
+		int decimalDigits = scale > 0 ? scale : (stdType != null ? getDecimalDigits(stdType) : 0);
+		return new InfoSchemaTypeInfo(jdbcType, columnSize, decimalDigits);
+	}
+
+	private static StandardSQLTypeName toStandardSQLTypeNameFromString(String upper) {
+		try {
+			return StandardSQLTypeName.valueOf(upper);
+		} catch (IllegalArgumentException e) {
+			return switch (upper) {
+				case "INTEGER", "INT", "SMALLINT", "TINYINT", "BYTEINT" -> StandardSQLTypeName.INT64;
+				case "FLOAT", "FLOAT32" -> StandardSQLTypeName.FLOAT64;
+				case "BOOLEAN" -> StandardSQLTypeName.BOOL;
+				case "DECIMAL" -> StandardSQLTypeName.NUMERIC;
+				case "BIGDECIMAL" -> StandardSQLTypeName.BIGNUMERIC;
+				default -> null;
+			};
+		}
+	}
+
 }
