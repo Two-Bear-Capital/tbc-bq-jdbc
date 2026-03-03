@@ -5,11 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.64] - 2026-03-03
+
+### ⚡ Features
+
+- **metadata:** Enhance column querying with INFORMATION_SCHEMA usage
+- **metadata:** Introduce metadata caching for INFORMATION_SCHEMA queries
+- **metadata:** Enable adaptive caching with speculative pre-warming
+
+### 🐛 Bug Fixes
+
+- **metadata:** Make authType property optional with default ADC configuration
+
 ## [1.0.63] - 2026-03-03
 
 ### 🔨 Refactoring
 
 - **connection:** Improve Simba URL parsing and property handling
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.63
 
 ## [1.0.62] - 2026-03-03
 
@@ -1756,6 +1772,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.64]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.63...v1.0.64
 [1.0.63]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.62...v1.0.63
 [1.0.62]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.61...v1.0.62
 [1.0.61]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.60...v1.0.61
