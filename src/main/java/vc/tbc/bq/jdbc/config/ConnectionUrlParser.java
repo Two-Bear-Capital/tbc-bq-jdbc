@@ -72,7 +72,7 @@ public final class ConnectionUrlParser {
 	private static final String URL_PREFIX = "jdbc:bigquery:";
 	private static final String SIMBA_URL_PREFIX = "jdbc:bigquery://";
 	private static final Pattern URL_PATTERN = Pattern.compile("^jdbc:bigquery:([^/?]+)(?:/([^?]+))?(?:\\?(.*))?$");
-	private static final Pattern SIMBA_URL_PATTERN = Pattern.compile("^jdbc:bigquery://([^;]+);(.*)$");
+	private static final Pattern SIMBA_URL_PATTERN = Pattern.compile("^jdbc:bigquery://([^;]+)(?:;(.*))?$");
 
 	private ConnectionUrlParser() {
 		// Utility class
@@ -219,19 +219,28 @@ public final class ConnectionUrlParser {
 		// Map Simba properties to tbc-bq-jdbc properties
 		Map<String, String> properties = mapSimbaProperties(simbaProperties);
 
-		// Add host and port to properties
-		if (host != null) {
+		// Add host and port to properties only for non-standard endpoints (e.g.,
+		// emulators).
+		// Standard Simba URLs use "https://www.googleapis.com/bigquery/v2:443" which is
+		// the
+		// Google BigQuery API — the SDK manages that connection natively.
+		if (host != null && !host.startsWith("http://") && !host.startsWith("https://")) {
 			properties.put("host", host);
-		}
-		if (port != null) {
-			properties.put("port", String.valueOf(port));
+			if (port != null) {
+				properties.put("port", String.valueOf(port));
+			}
 		}
 
-		// Merge with Properties object (Properties override URL params)
+		// Merge with Properties object (Properties override URL params).
+		// Apply Simba property mapping so IntelliJ-style info properties (e.g.
+		// ProjectId,
+		// OAuthType) are correctly translated to native names.
 		if (info != null) {
+			Map<String, String> infoProps = new HashMap<>();
 			for (String key : info.stringPropertyNames()) {
-				properties.put(key, info.getProperty(key));
+				infoProps.put(key, info.getProperty(key));
 			}
+			properties.putAll(mapSimbaProperties(infoProps));
 		}
 
 		// Extract projectId and datasetId from properties
@@ -277,10 +286,7 @@ public final class ConnectionUrlParser {
 				case "Location" -> properties.put("location", value);
 				case "DatasetProjectId" -> properties.put("datasetProjectId", value);
 				case "UseDestinationTables" -> properties.put("useDestinationTables", value);
-				default -> {
-					// Unknown properties are ignored for forward compatibility
-					// Could add DEBUG logging here if needed
-				}
+				default -> properties.put(key, value); // Pass through — handles native tbc-bq-jdbc property names
 			}
 		}
 

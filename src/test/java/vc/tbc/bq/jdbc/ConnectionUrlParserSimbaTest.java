@@ -200,12 +200,53 @@ class ConnectionUrlParserSimbaTest {
 	@Test
 	void testParseSimbaUrlInvalidFormat() {
 		// Given: Invalid Simba URL formats
-		String invalidUrl1 = "jdbc:bigquery://no-semicolon";
-		String invalidUrl2 = "jdbc:bigquery://;";
+		String invalidUrl1 = "jdbc:bigquery://no-semicolon"; // valid format, but missing ProjectId
+		String invalidUrl2 = "jdbc:bigquery://;"; // empty host — regex mismatch
 
-		// Then: Should throw SQLException
+		// Then: Should throw SQLException (different reasons, but both invalid)
 		assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(invalidUrl1, null));
 		assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(invalidUrl2, null));
+	}
+
+	@Test
+	void testParseSimbaUrlNoParamsAllPropertiesInInfo() throws SQLException {
+		// Given: The IntelliJ use case — Simba-style URL with no inline params,
+		// all connection properties passed via the Properties object (as IntelliJ does)
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443";
+		Properties info = new Properties();
+		info.setProperty("ProjectId", "my-project");
+		info.setProperty("OAuthType", "3");
+		info.setProperty("DefaultDataset", "my_dataset");
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, info);
+
+		// Then: All properties should be correctly mapped from info
+		assertEquals("my-project", props.projectId());
+		assertEquals("my_dataset", props.datasetId());
+		assertInstanceOf(ApplicationDefaultAuth.class, props.authType());
+		// Standard Google endpoint should NOT be treated as a custom host
+		assertNull(props.host());
+	}
+
+	@Test
+	void testParseSimbaUrlNoParamsServiceAccountInInfo() throws SQLException {
+		// Given: Service account auth passed entirely via info Properties
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443";
+		Properties info = new Properties();
+		info.setProperty("ProjectId", "my-project");
+		info.setProperty("OAuthType", "0");
+		info.setProperty("OAuthPvtKeyPath", "/path/to/key.json");
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, info);
+
+		// Then: Auth type should be ServiceAccount with the key from info
+		assertEquals("my-project", props.projectId());
+		assertInstanceOf(ServiceAccountAuth.class, props.authType());
+		ServiceAccountAuth auth = (ServiceAccountAuth) props.authType();
+		assertEquals("/path/to/key.json", auth.jsonKeyPath());
+		assertNull(props.host());
 	}
 
 	@Test
