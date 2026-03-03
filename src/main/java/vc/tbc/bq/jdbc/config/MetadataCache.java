@@ -74,7 +74,9 @@ public final class MetadataCache {
 		logger.debug("Metadata cache initialized with TTL: {}", this.ttl);
 	}
 
-	/** Creates a new metadata cache with the default TTL of 5 minutes. */
+	/**
+	 * Creates a new metadata cache with the default TTL of 5 minutes.
+	 */
 	public MetadataCache() {
 		this(DEFAULT_TTL);
 	}
@@ -152,6 +154,12 @@ public final class MetadataCache {
 	 */
 	public void put(String key, TableResult result) {
 		Schema schema = result.getSchema();
+
+		if (schema == null) {
+			logger.warn("Cannot cache TableResult without schema: {}", result);
+			return;
+		}
+
 		FieldList fields = schema.getFields();
 		int fieldCount = fields.size();
 
@@ -176,6 +184,7 @@ public final class MetadataCache {
 		Instant expiresAt = Instant.now().plus(ttl);
 		cache.put(key, new CacheEntry(columnNames, columnTypes, Collections.unmodifiableList(rows), expiresAt));
 		logger.debug("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
+
 	}
 
 	/**

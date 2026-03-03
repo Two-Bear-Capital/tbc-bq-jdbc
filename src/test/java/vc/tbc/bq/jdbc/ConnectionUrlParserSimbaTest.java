@@ -22,6 +22,7 @@ import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
 import vc.tbc.bq.jdbc.auth.WorkloadIdentityAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
+import vc.tbc.bq.jdbc.config.JobCreationMode;
 
 import java.sql.SQLException;
 import java.util.Properties;
@@ -403,5 +404,119 @@ class ConnectionUrlParserSimbaTest {
 		// Then: Boolean values should be parsed correctly
 		assertTrue(props1.useLegacySql());
 		assertFalse(props2.useLegacySql());
+	}
+
+	// --- Pass-through properties (native tbc-bq-jdbc names work in Simba format)
+	// ---
+
+	@Test
+	void testParseSimbaUrlWithPageSize() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;pageSize=500";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(500, props.pageSize());
+	}
+
+	@Test
+	void testParseSimbaUrlWithUseStorageApi() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;useStorageApi=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals("true", props.useStorageApi());
+	}
+
+	@Test
+	void testParseSimbaUrlWithJobCreationMode() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;jobCreationMode=OPTIONAL";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(JobCreationMode.OPTIONAL, props.jobCreationMode());
+	}
+
+	@Test
+	void testParseSimbaUrlWithEnableSessions() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;enableSessions=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.enableSessions());
+	}
+
+	@Test
+	void testParseSimbaUrlWithConnectionTimeout() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;connectionTimeout=60";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(60, props.connectionTimeout());
+	}
+
+	@Test
+	void testParseSimbaUrlWithRetryCount() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;retryCount=5";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(5, props.retryCount());
+	}
+
+	@Test
+	void testParseSimbaUrlWithMaxBillingBytes() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;maxBillingBytes=1000000";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(1_000_000L, props.maxBillingBytes());
+	}
+
+	@Test
+	void testParseSimbaUrlWithMetadataCacheTtl() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;metadataCacheTtl=600";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(600, props.metadataCacheTtl());
+	}
+
+	@Test
+	void testParseSimbaUrlWithMetadataCacheDisabled() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;metadataCacheEnabled=false";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertFalse(props.metadataCacheEnabled());
+	}
+
+	@Test
+	void testParseSimbaUrlWithMetadataLazyLoad() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;metadataLazyLoad=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.metadataLazyLoad());
+	}
+
+	@Test
+	void testParseSimbaUrlWithEnableQueryCostEstimation() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;enableQueryCostEstimation=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.enableQueryCostEstimation());
+	}
+
+	@Test
+	void testParseSimbaUrlWithLabels() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;labels=env=prod,team=data";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(2, props.labels().size());
+		assertEquals("prod", props.labels().get("env"));
+		assertEquals("data", props.labels().get("team"));
+	}
+
+	@Test
+	void testParseSimbaUrlAllPassThroughProperties() throws SQLException {
+		// Given: A Simba URL with all native pass-through properties set
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443" + ";ProjectId=my-project;OAuthType=3"
+				+ ";pageSize=2000;useStorageApi=false;jobCreationMode=OPTIONAL"
+				+ ";enableSessions=true;connectionTimeout=45;retryCount=2"
+				+ ";maxBillingBytes=5000000;metadataCacheTtl=120;metadataCacheEnabled=false"
+				+ ";metadataLazyLoad=true;enableQueryCostEstimation=true";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertEquals("my-project", props.projectId());
+		assertEquals(2000, props.pageSize());
+		assertEquals("false", props.useStorageApi());
+		assertEquals(JobCreationMode.OPTIONAL, props.jobCreationMode());
+		assertTrue(props.enableSessions());
+		assertEquals(45, props.connectionTimeout());
+		assertEquals(2, props.retryCount());
+		assertEquals(5_000_000L, props.maxBillingBytes());
+		assertEquals(120, props.metadataCacheTtl());
+		assertFalse(props.metadataCacheEnabled());
+		assertTrue(props.metadataLazyLoad());
+		assertTrue(props.enableQueryCostEstimation());
 	}
 }

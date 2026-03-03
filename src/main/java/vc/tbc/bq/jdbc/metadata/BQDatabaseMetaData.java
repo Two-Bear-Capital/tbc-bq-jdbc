@@ -1980,22 +1980,6 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	}
 
 	/**
-	 * Clears all shared metadata caches across all projects.
-	 *
-	 * <p>
-	 * This static method clears all shared cache instances, affecting all
-	 * connections to all projects. This is primarily useful for:
-	 * <ul>
-	 * <li>Testing - to ensure tests start with a clean cache state
-	 * <li>Debugging - to force a complete metadata refresh
-	 * <li>After major schema changes - when you want to refresh all cached metadata
-	 * </ul>
-	 *
-	 * <p>
-	 * Under normal operation, you should not need to call this method as the cache
-	 * expires entries based on TTL automatically.
-	 */
-	/**
 	 * Returns the shared {@link MetadataCache} for the given cache key, creating a
 	 * new instance if none exists yet.
 	 *

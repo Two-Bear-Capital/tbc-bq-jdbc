@@ -327,4 +327,119 @@ class ConnectionUrlParserTest {
 		assertInstanceOf(ApplicationDefaultAuth.class, props2.authType());
 		assertInstanceOf(ApplicationDefaultAuth.class, props3.authType());
 	}
+
+	// --- Properties not covered by existing tests ---
+
+	@Test
+	void testParseUrlWithEnableSessions() throws SQLException {
+		String url = "jdbc:bigquery:my-project?enableSessions=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.enableSessions());
+	}
+
+	@Test
+	void testParseUrlWithConnectionTimeout() throws SQLException {
+		String url = "jdbc:bigquery:my-project?connectionTimeout=60";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(60, props.connectionTimeout());
+	}
+
+	@Test
+	void testParseUrlWithRetryCount() throws SQLException {
+		String url = "jdbc:bigquery:my-project?retryCount=5";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(5, props.retryCount());
+	}
+
+	@Test
+	void testParseUrlWithMaxBillingBytes() throws SQLException {
+		String url = "jdbc:bigquery:my-project?maxBillingBytes=1000000";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(1_000_000L, props.maxBillingBytes());
+	}
+
+	@Test
+	void testParseUrlWithPageSize() throws SQLException {
+		String url = "jdbc:bigquery:my-project?pageSize=500";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(500, props.pageSize());
+	}
+
+	@Test
+	void testParseUrlWithUseStorageApi() throws SQLException {
+		String url = "jdbc:bigquery:my-project?useStorageApi=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals("true", props.useStorageApi());
+	}
+
+	@Test
+	void testParseUrlWithMetadataCacheTtl() throws SQLException {
+		String url = "jdbc:bigquery:my-project?metadataCacheTtl=600";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(600, props.metadataCacheTtl());
+	}
+
+	@Test
+	void testParseUrlWithMetadataCacheDisabled() throws SQLException {
+		String url = "jdbc:bigquery:my-project?metadataCacheEnabled=false";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertFalse(props.metadataCacheEnabled());
+	}
+
+	@Test
+	void testParseUrlWithMetadataLazyLoad() throws SQLException {
+		String url = "jdbc:bigquery:my-project?metadataLazyLoad=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.metadataLazyLoad());
+	}
+
+	@Test
+	void testParseUrlWithUseDestinationTables() throws SQLException {
+		String url = "jdbc:bigquery:my-project?useDestinationTables=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.useDestinationTables());
+	}
+
+	@Test
+	void testParseUrlWithEnableQueryCostEstimation() throws SQLException {
+		String url = "jdbc:bigquery:my-project?enableQueryCostEstimation=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.enableQueryCostEstimation());
+	}
+
+	@Test
+	void testParseUrlAllProperties() throws SQLException {
+		// Given: A URL with every supported property set
+		String url = "jdbc:bigquery:my-project/my_dataset"
+				+ "?authType=ADC&timeout=120&maxResults=2000&useLegacySql=false&location=EU"
+				+ "&labels=env=prod,team=data&jobCreationMode=OPTIONAL&datasetProjectId=other-project"
+				+ "&pageSize=500&useStorageApi=false&enableSessions=true&connectionTimeout=45"
+				+ "&retryCount=2&maxBillingBytes=5000000&metadataCacheTtl=120&metadataCacheEnabled=false"
+				+ "&metadataLazyLoad=true&useDestinationTables=true&enableQueryCostEstimation=true";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertEquals("my-project", props.projectId());
+		assertEquals("my_dataset", props.datasetId());
+		assertInstanceOf(ApplicationDefaultAuth.class, props.authType());
+		assertEquals(120, props.timeoutSeconds());
+		assertEquals(2000L, props.maxResults());
+		assertFalse(props.useLegacySql());
+		assertEquals("EU", props.location());
+		assertEquals(2, props.labels().size());
+		assertEquals("prod", props.labels().get("env"));
+		assertEquals(JobCreationMode.OPTIONAL, props.jobCreationMode());
+		assertEquals("other-project", props.datasetProjectId());
+		assertEquals(500, props.pageSize());
+		assertEquals("false", props.useStorageApi());
+		assertTrue(props.enableSessions());
+		assertEquals(45, props.connectionTimeout());
+		assertEquals(2, props.retryCount());
+		assertEquals(5_000_000L, props.maxBillingBytes());
+		assertEquals(120, props.metadataCacheTtl());
+		assertFalse(props.metadataCacheEnabled());
+		assertTrue(props.metadataLazyLoad());
+		assertTrue(props.useDestinationTables());
+		assertTrue(props.enableQueryCostEstimation());
+	}
 }
