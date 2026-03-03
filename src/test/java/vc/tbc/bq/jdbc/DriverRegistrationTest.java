@@ -120,7 +120,7 @@ class DriverRegistrationTest {
 		// authType must be present, required, with the correct default
 		var authTypeProp = java.util.Arrays.stream(propertyInfo).filter(p -> "authType".equals(p.name)).findFirst();
 		assertTrue(authTypeProp.isPresent(), "authType property must be present");
-		assertTrue(authTypeProp.get().required, "authType should be required");
+		assertFalse(authTypeProp.get().required, "authType should not be required (has default ADC)");
 		assertEquals("ADC", authTypeProp.get().value, "authType default should be ADC");
 		assertNotNull(authTypeProp.get().choices, "authType should have choices");
 

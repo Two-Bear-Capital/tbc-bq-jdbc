@@ -109,7 +109,7 @@ public final class BQDriver implements Driver {
 
 		props.add(prop(info, "authType", "ADC",
 				"Authentication method: ADC (Application Default Credentials), SERVICE_ACCOUNT, USER_OAUTH, WORKFORCE, WORKLOAD",
-				true, new String[]{"ADC", "SERVICE_ACCOUNT", "USER_OAUTH", "WORKFORCE", "WORKLOAD"}));
+				false, new String[]{"ADC", "SERVICE_ACCOUNT", "USER_OAUTH", "WORKFORCE", "WORKLOAD"}));
 
 		props.add(prop(info, "credentials", "",
 				"Path to service account JSON key file (required for SERVICE_ACCOUNT auth)", false, null));
