@@ -1650,6 +1650,12 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				rows.add(new Object[]{datasetId, projectId});
 			}
 
+			// Register schemas for adaptive pre-warming: fires speculative IS queries
+			// in the background so subsequent IntelliJ introspection passes hit cache.
+			if (cache != null && "%".equals(schemaPattern)) {
+				cache.registerKnownSchemas(datasetIds);
+			}
+
 			logger.info("getSchemas() returning {} schema(s)", rows.size());
 
 			return createResultSet(MetadataColumns.Schemas.COLUMN_NAMES, MetadataColumns.Schemas.COLUMN_TYPES, rows);

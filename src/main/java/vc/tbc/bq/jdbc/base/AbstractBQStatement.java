@@ -31,10 +31,13 @@ import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 import java.sql.*;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Abstract base class for BigQuery statement implementations. Provides common
@@ -51,6 +54,15 @@ import java.util.concurrent.TimeoutException;
 public abstract class AbstractBQStatement extends BaseCloseable implements Statement {
 
 	private static final Logger logger = LoggerFactory.getLogger(AbstractBQStatement.class);
+
+	/**
+	 * Extracts the dataset/schema name from a fully-qualified INFORMATION_SCHEMA
+	 * reference. Matches both unquoted ({@code project.schema.INFORMATION_SCHEMA})
+	 * and backtick-quoted ({@code `project`.`schema`.INFORMATION_SCHEMA}) forms.
+	 * Group 1 captures the schema token (with backticks if present).
+	 */
+	private static final Pattern IS_SCHEMA_EXTRACTOR = Pattern
+			.compile("(?:`[^`]+`|[^\\s.`]+)\\.(`[^`]+`|[^\\s.`]+)\\.INFORMATION_SCHEMA", Pattern.CASE_INSENSITIVE);
 
 	protected final BQConnection connection;
 	protected final BigQuery bigquery;
@@ -260,9 +272,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				String cacheKey = normalizeSqlCacheKey(sql);
 				Optional<ResultSet> cached = cache.get(cacheKey);
 				if (cached.isPresent()) {
-					logger.debug("Cache hit for INFORMATION_SCHEMA query");
+					IsSchemaMatch match = extractIsSchema(sql);
+					logger.info("IS cache hit [schema={}]: {}", match != null ? match.rawName() : "?", cacheKey);
 					currentResultSet = cached.get();
 					return currentResultSet;
+				}
+				// Log unexpected misses at INFO so new IDE query patterns are visible in logs.
+				if (!cache.getKnownSchemas().isEmpty()) {
+					logger.info("IS cache miss (new pattern?): {}", cacheKey);
 				}
 			}
 		}
@@ -373,6 +390,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				if (cache != null) {
 					String cacheKey = normalizeSqlCacheKey(sql);
 					cache.put(cacheKey, pair.result);
+					// Adaptive pre-warming: propagate this IS query pattern to all other
+					// known schemas in the background so IntelliJ's next introspection pass
+					// finds warm cache entries instead of firing live BigQuery jobs.
+					triggerSpeculativePreWarm(sql, cacheKey, cache);
 					// Serve from cache so the cursor state is independent of TableResult
 					currentResultSet = cache.get(cacheKey).orElseGet(() -> createResultSet(pair.result, pair.job));
 					return currentResultSet;
@@ -530,6 +551,123 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 */
 	private static String normalizeSqlCacheKey(String sql) {
 		return "query:" + sql.strip().replaceAll("\\s+", " ");
+	}
+
+	/**
+	 * Extracts the dataset/schema name from a fully-qualified INFORMATION_SCHEMA
+	 * SQL reference using {@link #IS_SCHEMA_EXTRACTOR}.
+	 *
+	 * @param sql
+	 *            the SQL string to inspect
+	 * @return the schema match, or {@code null} if no IS reference is found
+	 */
+	private static IsSchemaMatch extractIsSchema(String sql) {
+		Matcher m = IS_SCHEMA_EXTRACTOR.matcher(sql);
+		if (!m.find())
+			return null;
+		String token = m.group(1);
+		return token.startsWith("`")
+				? new IsSchemaMatch(token.substring(1, token.length() - 1), true)
+				: new IsSchemaMatch(token, false);
+	}
+
+	/**
+	 * Substitutes the schema name in an INFORMATION_SCHEMA query, preserving the
+	 * original backtick-quoting style of the source schema token. All occurrences
+	 * are replaced to handle JOIN queries that reference the same schema twice.
+	 *
+	 * @param sql
+	 *            the original SQL
+	 * @param from
+	 *            the schema name extracted from the original SQL
+	 * @param toSchema
+	 *            the target schema name to substitute
+	 * @return the SQL with the schema name replaced
+	 */
+	private static String substituteSchema(String sql, IsSchemaMatch from, String toSchema) {
+		String fromQuoted = from.backtickQuoted() ? "`" + from.rawName() + "`" : from.rawName();
+		String toQuoted = from.backtickQuoted() ? "`" + toSchema + "`" : toSchema;
+		return sql.replace("." + fromQuoted + ".INFORMATION_SCHEMA", "." + toQuoted + ".INFORMATION_SCHEMA");
+	}
+
+	/**
+	 * Fires a speculative BigQuery query in a virtual thread and stores the result
+	 * in the shared cache under the normalised SQL key. Uses a simple
+	 * {@link QueryJobConfiguration} (no labels, no sessions) since this is a
+	 * background cache-warming operation.
+	 *
+	 * @param cache
+	 *            the metadata cache to store the result in
+	 * @param specSql
+	 *            the speculative SQL to execute
+	 * @param specKey
+	 *            the normalised cache key for this SQL
+	 */
+	private void fireSpeculative(MetadataCache cache, String specSql, String specKey) {
+		Thread.ofVirtual().name("is-prewarm-" + specKey.hashCode()).start(() -> {
+			try {
+				QueryJobConfiguration config = QueryJobConfiguration.newBuilder(specSql).setUseLegacySql(false).build();
+				Job job = bigquery.create(JobInfo.of(config));
+				job = job.waitFor();
+				if (job != null && job.getStatus().getError() == null) {
+					cache.put(specKey, job.getQueryResults());
+					logger.debug("Speculative pre-warm complete: {}", specKey);
+				} else {
+					logger.debug("Speculative pre-warm failed (BQ error): {}", specKey);
+				}
+			} catch (Exception e) {
+				logger.debug("Speculative pre-warm exception for key {}: {}", specKey, e.getMessage());
+			} finally {
+				cache.releaseSpeculative(specKey);
+			}
+		});
+	}
+
+	/**
+	 * Triggers speculative pre-warming for an INFORMATION_SCHEMA query across all
+	 * known schemas. For each known schema that differs from the one in
+	 * {@code originalSql}, derives the equivalent SQL by substituting the schema
+	 * name, then fires a background BigQuery job (via {@link #fireSpeculative}) if
+	 * the result is not already cached or in-flight.
+	 *
+	 * @param originalSql
+	 *            the IS query that was just executed and cached
+	 * @param cachedKey
+	 *            the normalised cache key for {@code originalSql}
+	 * @param cache
+	 *            the metadata cache
+	 */
+	private void triggerSpeculativePreWarm(String originalSql, String cachedKey, MetadataCache cache) {
+		Set<String> schemas = cache.getKnownSchemas();
+		if (schemas.isEmpty())
+			return;
+
+		IsSchemaMatch from = extractIsSchema(originalSql);
+		if (from == null)
+			return; // SCHEMATA or other no-dataset IS query — skip
+
+		for (String toSchema : schemas) {
+			if (toSchema.equals(from.rawName()))
+				continue; // skip self
+			String specSql = substituteSchema(originalSql, from, toSchema);
+			String specKey = normalizeSqlCacheKey(specSql);
+			// Only fire if not already cached and not already in-flight
+			if (cache.get(specKey).isEmpty() && cache.claimSpeculative(specKey)) {
+				fireSpeculative(cache, specSql, specKey);
+			}
+		}
+	}
+
+	/**
+	 * Represents the schema/dataset name extracted from a BigQuery
+	 * INFORMATION_SCHEMA SQL reference.
+	 *
+	 * @param rawName
+	 *            the unquoted schema name
+	 * @param backtickQuoted
+	 *            whether the original token was enclosed in backticks
+	 */
+	private record IsSchemaMatch(String rawName, boolean backtickQuoted) {
 	}
 
 	/**

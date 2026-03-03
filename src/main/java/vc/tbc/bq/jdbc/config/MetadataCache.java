@@ -26,10 +26,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -59,6 +56,12 @@ public final class MetadataCache {
 
 	private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
 	private final Duration ttl;
+
+	// Schemas discovered via getSchemas(); used to drive speculative pre-warming.
+	private final Set<String> knownSchemas = ConcurrentHashMap.newKeySet();
+
+	// Keys of speculative queries currently in-flight; prevents duplicate BQ jobs.
+	private final Set<String> inFlightSpeculative = ConcurrentHashMap.newKeySet();
 
 	/**
 	 * Creates a new metadata cache with the specified TTL.
@@ -202,6 +205,50 @@ public final class MetadataCache {
 
 		cache.keySet().removeIf(key -> key.startsWith(keyPrefix));
 		logger.debug("Invalidated {} cache entries with prefix: {}", removed, keyPrefix);
+	}
+
+	/**
+	 * Registers all schemas known for this project, populated from
+	 * {@code getSchemas()}. Used to drive speculative pre-warming of
+	 * INFORMATION_SCHEMA queries across all known schemas.
+	 *
+	 * @param schemas
+	 *            the schema/dataset names to register
+	 */
+	public void registerKnownSchemas(Collection<String> schemas) {
+		knownSchemas.addAll(schemas);
+		logger.debug("Registered {} known schemas for pre-warming", schemas.size());
+	}
+
+	/**
+	 * Returns an unmodifiable view of the currently known schema names.
+	 *
+	 * @return the set of known schema names
+	 */
+	public Set<String> getKnownSchemas() {
+		return Collections.unmodifiableSet(knownSchemas);
+	}
+
+	/**
+	 * Tries to claim a speculative cache key for in-flight tracking.
+	 *
+	 * @param key
+	 *            the cache key to claim
+	 * @return {@code true} if the key was claimed (caller should fire the query),
+	 *         {@code false} if already claimed or already in-flight
+	 */
+	public boolean claimSpeculative(String key) {
+		return inFlightSpeculative.add(key);
+	}
+
+	/**
+	 * Releases an in-flight speculative key after the query completes or fails.
+	 *
+	 * @param key
+	 *            the cache key to release
+	 */
+	public void releaseSpeculative(String key) {
+		inFlightSpeculative.remove(key);
 	}
 
 	/**
