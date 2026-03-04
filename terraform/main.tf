@@ -48,9 +48,9 @@ resource "google_project_service" "iam" {
 # ── BigQuery Dataset ─────────────────────────────────────────────────────────
 
 resource "google_bigquery_dataset" "integration_tests" {
-  project    = google_project.integration.project_id
-  dataset_id = var.dataset_id
-  location   = var.region
+  project     = google_project.integration.project_id
+  dataset_id  = var.dataset_id
+  location    = var.region
   description = "Dataset for tbc-bq-jdbc integration tests"
 
   # Allow tests to create/drop tables freely
