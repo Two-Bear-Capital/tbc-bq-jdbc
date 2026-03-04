@@ -64,7 +64,7 @@ jobs:
       - name: Resync Terraform State
         run: |
           terraform state rm google_project.integration 2>/dev/null || true
-          terraform import google_project.integration projects/tbc-bq-jdbc-integration
+          terraform import google_project.integration projects/bigquery-jdbc-driver-test
         env:
           TF_VAR_org_id: ${{ secrets.GCP_ORG_ID }}
           TF_VAR_billing_account: ${{ secrets.GCP_BILLING_ACCOUNT }}

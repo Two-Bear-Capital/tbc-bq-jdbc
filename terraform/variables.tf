@@ -17,7 +17,7 @@ variable "github_repo" {
 variable "project_id" {
   description = "The GCP project ID to create for integration tests."
   type        = string
-  default     = "tbc-bq-jdbc-integration"
+  default     = "bigquery-jdbc-driver-test"
 }
 
 variable "region" {
