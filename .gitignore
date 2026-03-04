@@ -42,3 +42,11 @@ replay_pid*
 
 # Test output
 *.hprof
+
+# Terraform — never commit sensitive variable files or local state
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+terraform/tfplan
+terraform/*.tfstate
+terraform/*.tfstate.backup

@@ -700,7 +700,7 @@
             </build>
         </profile>
 
-        <!-- Integration Test Profile -->
+        <!-- Integration Test Profile (emulator-based, requires Docker) -->
         <profile>
             <id>integration-tests</id>
             <build>
@@ -708,6 +708,36 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Real BigQuery Integration Test Profile (requires BQ_TEST_PROJECT env var + ADC credentials) -->
+        <!-- Usage: ./mvnw verify -Preal-integration-tests                                              -->
+        <!-- Local setup: gcloud auth application-default login                                         -->
+        <!--              export BQ_TEST_PROJECT=my-gcp-project                                         -->
+        <!--              export BQ_TEST_DATASET=tbc_bq_jdbc_integration_tests                          -->
+        <profile>
+            <id>real-integration-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/integration/real/**/*Test.java</include>
+                            </includes>
+                        </configuration>
                         <executions>
                             <execution>
                                 <goals>

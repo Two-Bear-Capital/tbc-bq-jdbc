@@ -4,32 +4,61 @@
 
 This document explains how to run the integration tests for the tbc-bq-jdbc driver.
 
+The driver has two integration test tiers:
+
+| Tier | Profile | Backend | When to Use |
+|------|---------|---------|-------------|
+| **Emulator** | `integration-tests` | BigQuery emulator via Docker | Local development, all CI PRs |
+| **Real BigQuery** | `real-integration-tests` | Actual Google BigQuery | Post-merge CI, production validation |
+
 ## Test Structure
 
-Integration tests are located in:
 ```
 src/test/java/vc/tbc/bq/jdbc/integration/
+├── AbstractBigQueryIntegrationTest.java    # Emulator base class
+├── BasicConnectionTest.java
+├── SimpleQueryTest.java
+├── ParameterizedQueryTest.java
+├── MetadataTest.java
+├── TypeMappingTest.java
+├── ResultSetOperationsTest.java
+└── real/
+    ├── AbstractRealBigQueryIntegrationTest.java  # Real BQ base class
+    ├── RealBasicConnectionTest.java
+    ├── RealSimpleQueryTest.java
+    ├── RealParameterizedQueryTest.java           # Includes 2 re-enabled NULL tests
+    ├── RealMetadataTest.java
+    ├── RealTypeMappingTest.java
+    └── RealResultSetOperationsTest.java
 ```
 
-### Test Classes
+### Emulator Test Classes
 
-| Test Class | Description | Tests |
-|------------|-------------|-------|
-| AbstractBigQueryIntegrationTest | Base class with test utilities | N/A (base class) |
-| BasicConnectionTest | Connection lifecycle and properties | 16 tests |
-| SimpleQueryTest | Basic SQL query execution | 17 tests |
-| ParameterizedQueryTest | PreparedStatement with parameters | 15 tests |
-| MetadataTest | DatabaseMetaData operations | 29 tests |
-| TypeMappingTest | BigQuery to JDBC type conversions | 16 tests |
-| ResultSetOperationsTest | ResultSet navigation and data access | 20 tests |
+| Test Class | Description |
+|------------|-------------|
+| AbstractBigQueryIntegrationTest | Base class with emulator container + test utilities |
+| BasicConnectionTest | Connection lifecycle and properties |
+| SimpleQueryTest | Basic SQL query execution |
+| ParameterizedQueryTest | PreparedStatement with parameters |
+| MetadataTest | DatabaseMetaData operations |
+| TypeMappingTest | BigQuery to JDBC type conversions |
+| ResultSetOperationsTest | ResultSet navigation and data access |
 
-**Total**: **113 integration tests**
+### Real BigQuery Test Classes
+
+| Test Class | Description |
+|------------|-------------|
+| AbstractRealBigQueryIntegrationTest | Base class with ADC connection + test utilities |
+| RealBasicConnectionTest | Connection lifecycle (mirrors BasicConnectionTest) |
+| RealSimpleQueryTest | Simple queries (mirrors SimpleQueryTest) |
+| RealParameterizedQueryTest | Parameterized queries; re-enables 2 emulator-disabled tests |
+| RealMetadataTest | DatabaseMetaData (mirrors MetadataTest) |
+| RealTypeMappingTest | Type mapping (mirrors TypeMappingTest) |
+| RealResultSetOperationsTest | ResultSet operations (mirrors ResultSetOperationsTest) |
 
 ## Prerequisites
 
-### Option 1: Using BigQuery Emulator (Recommended for Local Testing)
-
-The integration tests are configured to use the **recidiviz/bigquery-emulator** Docker container.
+### Emulator Tests (Tier 1)
 
 **Requirements:**
 - Docker installed and running
@@ -37,46 +66,61 @@ The integration tests are configured to use the **recidiviz/bigquery-emulator** 
 
 **Advantages:**
 - No Google Cloud credentials needed
-- Fast test execution
+- Fast test execution (15–30 seconds total)
 - Isolated test environment
 - No costs
 
 **Limitations:**
-- Emulator may not support all BigQuery features
-- Some advanced queries may fail
 - Not 100% identical to production BigQuery
-- See [EMULATOR_LIMITATIONS.md](EMULATOR_LIMITATIONS.md) for detailed list of known limitations and how tests compensate
+- 2 NULL parameter tests are disabled due to emulator bugs (re-enabled in real BQ tier)
 
-### Option 2: Using Real BigQuery (For Production Validation)
-
-For comprehensive testing against real BigQuery:
+### Real BigQuery Tests (Tier 2)
 
 **Requirements:**
-- Google Cloud project with BigQuery enabled
-- Service account with BigQuery permissions
-- Credentials JSON file or Application Default Credentials configured
+- GCP project with BigQuery enabled and a test dataset created
+- Application Default Credentials (ADC) configured locally, or Workload Identity Federation in CI
+- `BQ_TEST_PROJECT` environment variable set
 
 **Advantages:**
-- Tests against real BigQuery implementation
-- All features supported
-- Production validation
+- Validates against actual BigQuery behavior
+- Catches emulator compatibility gaps
+- Re-enables emulator-disabled tests
 
-**Disadvantages:**
-- Requires Google Cloud credentials
-- May incur BigQuery costs
-- Slower than emulator
+**Cost:** Effectively zero — 3-row test tables with DROP TABLE cleanup are well within BigQuery's free tier.
 
 ## Running Integration Tests
 
-### Run All Integration Tests
+### Emulator Tests (Tier 1)
 
 ```bash
 # With Docker and emulator
 ./mvnw verify -Pintegration-tests
 
-# Or using failsafe directly
-./mvnw failsafe:integration-test failsafe:verify -Pintegration-tests
+# Run specific test class
+./mvnw verify -Pintegration-tests -Dit.test=BasicConnectionTest
+
+# Run specific test method
+./mvnw verify -Pintegration-tests -Dit.test=BasicConnectionTest#testConnectionIsValid
 ```
+
+### Real BigQuery Tests (Tier 2)
+
+```bash
+# 1. Authenticate
+gcloud auth application-default login
+
+# 2. Set required environment variables
+export BQ_TEST_PROJECT=my-gcp-project
+export BQ_TEST_DATASET=tbc_bq_jdbc_integration_tests   # optional, this is the default
+
+# 3. Run
+./mvnw verify -Preal-integration-tests
+
+# Run specific real BQ test class
+./mvnw verify -Preal-integration-tests -Dit.test=RealBasicConnectionTest
+```
+
+**Note:** If `BQ_TEST_PROJECT` is not set, all real BQ tests are automatically skipped with a clear message — no failures.
 
 ### Run Only Unit Tests (Default)
 
@@ -85,28 +129,15 @@ For comprehensive testing against real BigQuery:
 ./mvnw test
 ```
 
-### Run Specific Integration Test Class
-
-```bash
-./mvnw verify -Pintegration-tests -Dit.test=BasicConnectionTest
-```
-
-### Run Specific Integration Test Method
-
-```bash
-./mvnw verify -Pintegration-tests -Dit.test=BasicConnectionTest#testConnectionIsValid
-```
-
 ### Skip Integration Tests
 
 ```bash
-# Build and run only unit tests
 ./mvnw clean install
 ```
 
 ## Test Configuration
 
-### Default Configuration (Emulator)
+### Emulator Configuration
 
 The `AbstractBigQueryIntegrationTest` base class automatically:
 
@@ -121,26 +152,21 @@ The `AbstractBigQueryIntegrationTest` base class automatically:
 - Emulator image: `ghcr.io/recidiviz/bigquery-emulator:latest`
 - Emulator port: 9050
 
-### Custom Configuration (Real BigQuery)
+### Real BigQuery Configuration
 
-To test against real BigQuery, override `createTestConnection()`:
+The `AbstractRealBigQueryIntegrationTest` base class:
 
-```java
-@Override
-protected Connection createTestConnection() throws SQLException {
-    String url = "jdbc:bigquery:my-real-project/my_dataset?" +
-                 "authType=SERVICE_ACCOUNT&" +
-                 "credentials=/path/to/service-account-key.json";
-    return DriverManager.getConnection(url);
-}
-```
+1. Reads `BQ_TEST_PROJECT` and `BQ_TEST_DATASET` environment variables
+2. Connects using ADC: `jdbc:bigquery:<project>/<dataset>?authType=ADC`
+3. Skips all tests if `BQ_TEST_PROJECT` is not set
+4. Provides the same helper methods (`createTestTable`, `insertTestData`, etc.)
 
-Or set environment variables:
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
-export BQ_PROJECT_ID=my-project
-export BQ_DATASET=test_dataset
-```
+**Environment Variables:**
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `BQ_TEST_PROJECT` | Yes | — | GCP project ID |
+| `BQ_TEST_DATASET` | No | `tbc_bq_jdbc_integration_tests` | BigQuery dataset ID |
 
 ## Test Execution Flow
 
@@ -272,28 +298,49 @@ Error: Bind for 0.0.0.0:9050 failed: port is already allocated
 
 ### GitHub Actions
 
+The build workflow (`.github/workflows/build.yml`) runs two parallel integration test jobs:
+
+**Emulator tests** — Run on every push and PR (no credentials needed):
 ```yaml
-name: Integration Tests
-
-on: [push, pull_request]
-
-jobs:
-  integration-test:
-    runs-on: ubuntu-latest
-    services:
-      docker:
-        image: docker:dind
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Run Integration Tests
-        run: ./mvnw verify -Pintegration-tests
+- name: Run integration tests
+  run: mvn verify -Pintegration-tests -B
 ```
+
+**Real BigQuery tests** — Run on push to `main` only (requires WIF secrets):
+```yaml
+real-integration-tests:
+  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  permissions:
+    id-token: write
+  steps:
+    - uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+        service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+    - run: mvn verify -Preal-integration-tests -B
+      env:
+        BQ_TEST_PROJECT: ${{ vars.BQ_TEST_PROJECT }}
+        BQ_TEST_DATASET: ${{ vars.BQ_TEST_DATASET }}
+```
+
+### Why Real Tests Only Run on main
+
+GitHub secrets are not available to fork PRs (GitHub's built-in protection for public repos). Running real BQ tests only on push to `main` ensures:
+- Fork contributors can still run all emulator tests on their PRs
+- Real BQ costs and credentials are only consumed after code is reviewed and merged
+- No secrets leak to untrusted code
+
+### Required GitHub Secrets and Variables
+
+After Terraform provisioning, set these in the repository settings:
+
+| Setting | Type | Description |
+|---------|------|-------------|
+| `WIF_PROVIDER` | Secret | Terraform output `wif_provider` |
+| `WIF_SERVICE_ACCOUNT` | Secret | Terraform output `ci_service_account_email` |
+| `GCP_TERRAFORM_SA_KEY` | Secret | Bootstrap SA key (used by `terraform.yml` only) |
+| `BQ_TEST_PROJECT` | Variable | Terraform output `project_id` |
+| `BQ_TEST_DATASET` | Variable | Terraform output `dataset_id` |
 
 ### Running in CI Without Docker
 
@@ -311,6 +358,51 @@ Or configure failsafe to skip:
     <skipITs>true</skipITs>
 </configuration>
 ```
+
+## Terraform Infrastructure Setup
+
+The real BigQuery test infrastructure is managed via Terraform in the `terraform/` directory and applied exclusively through GitHub Actions — no local `terraform apply` is ever needed.
+
+### One-Time Bootstrap (Manual)
+
+1. Create a GCS bucket for Terraform state:
+   ```bash
+   gsutil mb -p YOUR_ORG_PROJECT gs://tbc-bq-jdbc-tfstate
+   gsutil versioning set on gs://tbc-bq-jdbc-tfstate
+   ```
+
+2. Create a bootstrap service account with permissions to create projects and manage state:
+   ```bash
+   gcloud iam service-accounts create terraform-bootstrap \
+     --project=YOUR_ORG_PROJECT \
+     --display-name="Terraform Bootstrap SA"
+
+   # Grant required roles (org-level)
+   gcloud organizations add-iam-policy-binding YOUR_ORG_ID \
+     --member="serviceAccount:terraform-bootstrap@YOUR_ORG_PROJECT.iam.gserviceaccount.com" \
+     --role="roles/resourcemanager.projectCreator"
+
+   gcloud organizations add-iam-policy-binding YOUR_ORG_ID \
+     --member="serviceAccount:terraform-bootstrap@YOUR_ORG_PROJECT.iam.gserviceaccount.com" \
+     --role="roles/billing.user"
+
+   # Grant state bucket access
+   gsutil iam ch \
+     serviceAccount:terraform-bootstrap@YOUR_ORG_PROJECT.iam.gserviceaccount.com:roles/storage.objectAdmin \
+     gs://tbc-bq-jdbc-tfstate
+   ```
+
+3. Download the bootstrap SA key and save it as `GCP_TERRAFORM_SA_KEY` GitHub secret.
+
+4. Copy `terraform/terraform.tfvars.example` to `terraform/terraform.tfvars`, fill in values, and **do not commit** it (it is gitignored).
+
+5. Merge the `terraform/` code to `main` — GitHub Actions' `terraform.yml` workflow applies infrastructure automatically.
+
+6. After successful Terraform apply, copy the outputs to GitHub:
+   - `wif_provider` → `WIF_PROVIDER` secret
+   - `ci_service_account_email` → `WIF_SERVICE_ACCOUNT` secret
+   - `project_id` → `BQ_TEST_PROJECT` variable
+   - `dataset_id` → `BQ_TEST_DATASET` variable
 
 ## Test Coverage
 
@@ -431,14 +523,13 @@ These require manual testing or Phase 3:
 
 ## Summary
 
-- **113 integration tests** covering core JDBC functionality
-- **Automatic setup** with Testcontainers and BigQuery emulator
-- **Separate Maven profile** (`integration-tests`) for optional execution
-- **Fast execution** with Docker and emulator
-- **Production validation** possible with real BigQuery
-- **Well-documented** with helper methods and examples
+**Tier 1 — Emulator tests (fast, no credentials):**
+- Automatic setup with Testcontainers and BigQuery emulator
+- Run on every push and PR in CI
+- `./mvnw verify -Pintegration-tests`
 
-Run integration tests:
-```bash
-./mvnw verify -Pintegration-tests
-```
+**Tier 2 — Real BigQuery tests (full fidelity, requires credentials):**
+- Validates against actual BigQuery behavior
+- Re-enables 2 NULL parameter tests that are disabled in the emulator tier
+- Run on push to `main` in CI via Workload Identity Federation
+- `./mvnw verify -Preal-integration-tests` (requires `BQ_TEST_PROJECT` env var)

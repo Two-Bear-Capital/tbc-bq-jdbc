@@ -56,3 +56,48 @@ jobs:
         with:
           name: coverage-reports
           path: target/site/jacoco/
+
+  # Real BigQuery integration tests — run on push to main only.
+  # PRs from forks cannot access secrets (GitHub's built-in protection),
+  # so this job intentionally runs only after merge.
+  real-integration-tests:
+    name: Real BigQuery Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven (skip tests)
+        run: mvn clean install -DskipTests -B
+
+      - name: Run real BigQuery integration tests
+        run: mvn verify -Preal-integration-tests -B
+        env:
+          BQ_TEST_PROJECT: ${{ vars.BQ_TEST_PROJECT }}
+          BQ_TEST_DATASET: ${{ vars.BQ_TEST_DATASET }}
+
+      - name: Upload real integration test reports
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: real-integration-test-reports
+          path: target/failsafe-reports/
