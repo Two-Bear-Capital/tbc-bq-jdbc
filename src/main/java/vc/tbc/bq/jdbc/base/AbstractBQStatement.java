@@ -352,40 +352,39 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		QueryJobConfiguration queryConfig = configBuilder.build();
 		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
 
-		try {
-			// Submit job asynchronously with timeout enforcement
-			CompletableFuture<JobResultPair> future = CompletableFuture.supplyAsync(() -> {
-				try {
-					Job job = bigquery.create(JobInfo.of(queryConfig));
+		CompletableFuture<JobResultPair> future = CompletableFuture.supplyAsync(() -> {
+			try {
+				Job job = bigquery.create(JobInfo.of(queryConfig));
 
-					// Thread-safe assignment
-					synchronized (this) {
-						this.currentJob = job;
-					}
-
-					logger.info("{} job created: {}", getLogPrefix(), job.getJobId());
-
-					// Wait for job completion
-					job = job.waitFor();
-
-					if (job == null) {
-						throw new RuntimeException("Job no longer exists");
-					}
-
-					JobStatus status = job.getStatus();
-					if (status.getError() != null) {
-						BigQueryError error = status.getError();
-						throw new RuntimeException("Query failed (job: " + job.getJobId() + "): " + error.getMessage());
-					}
-
-					return new JobResultPair(job, job.getQueryResults());
-
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					throw new RuntimeException("Query interrupted", e);
+				// Thread-safe assignment
+				synchronized (this) {
+					this.currentJob = job;
 				}
-			});
 
+				logger.info("{} job created: {}", getLogPrefix(), job.getJobId());
+
+				// Wait for job completion
+				job = job.waitFor();
+
+				if (job == null) {
+					throw new RuntimeException("Job no longer exists");
+				}
+
+				JobStatus status = job.getStatus();
+				if (status.getError() != null) {
+					BigQueryError error = status.getError();
+					throw new RuntimeException("Query failed (job: " + job.getJobId() + "): " + error.getMessage());
+				}
+
+				return new JobResultPair(job, job.getQueryResults());
+
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("Query interrupted", e);
+			}
+		});
+
+		try {
 			// Wait with timeout
 			JobResultPair pair = future.get(timeoutSeconds, TimeUnit.SECONDS);
 
@@ -410,6 +409,9 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			return currentResultSet;
 
 		} catch (TimeoutException e) {
+			// Cancel the future to interrupt the virtual thread
+			future.cancel(true);
+
 			// Thread-safe access to currentJob during cancel
 			Job jobToCancel;
 			synchronized (this) {
