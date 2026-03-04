@@ -18,10 +18,10 @@ jobs:
     name: Terraform Apply
     runs-on: ubuntu-latest
 
-    # Required for WIF authentication
     permissions:
       contents: read
       id-token: write
+      secrets: write
 
     defaults:
       run:
@@ -83,3 +83,10 @@ jobs:
           TF_VAR_org_id: ${{ secrets.GCP_ORG_ID }}
           TF_VAR_billing_account: ${{ secrets.GCP_BILLING_ACCOUNT }}
           TF_VAR_github_repo: Two-Bear-Capital/tbc-bq-jdbc
+
+      - name: Export Terraform Outputs to GitHub Secrets
+        run: |
+          terraform output -raw wif_provider | gh secret set WIF_PROVIDER --repo $GITHUB_REPOSITORY
+          terraform output -raw ci_service_account_email | gh secret set WIF_SERVICE_ACCOUNT --repo $GITHUB_REPOSITORY
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
