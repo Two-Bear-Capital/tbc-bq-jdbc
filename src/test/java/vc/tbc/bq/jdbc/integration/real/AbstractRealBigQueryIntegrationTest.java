@@ -131,10 +131,8 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 *             if creation fails
 	 */
 	protected void createTestTable(String tableName) throws SQLException {
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + tableName);
-
-		String createTable = String.format("CREATE TABLE %s (" + "id INT64, " + "name STRING, " + "age INT64, "
-				+ "salary FLOAT64, " + "is_active BOOL, " + "created_date DATE" + ")", tableName);
+		String createTable = String.format("CREATE OR REPLACE TABLE %s (" + "id INT64, " + "name STRING, "
+				+ "age INT64, " + "salary FLOAT64, " + "is_active BOOL, " + "created_date DATE" + ")", tableName);
 
 		try (Statement stmt = connection.createStatement()) {
 			stmt.execute(createTable);

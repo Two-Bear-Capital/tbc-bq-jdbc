@@ -167,6 +167,40 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return null;
 	}
 
+	/**
+	 * Converts a non-null FieldValue to a long, dispatching on the BigQuery column
+	 * type.
+	 *
+	 * <p>
+	 * FLOAT64 columns store values as decimal strings (e.g. {@code "25.0"}), which
+	 * would cause {@link NumberFormatException} if passed to
+	 * {@code FieldValue.getLongValue()}. NUMERIC/BIGNUMERIC similarly need
+	 * BigDecimal handling. This method routes to the appropriate conversion so that
+	 * {@code getInt()}/{@code getLong()}/etc. work correctly across all numeric
+	 * types per the JDBC spec (truncation toward zero is expected).
+	 *
+	 * @param value
+	 *            a non-null, non-null-attribute FieldValue
+	 * @param field
+	 *            the schema Field (may be null, in which case getLongValue is used)
+	 * @return the integral long representation, truncated if necessary
+	 */
+	private static long toIntegralLong(FieldValue value, Field field) {
+		if (field != null) {
+			switch (field.getType().getStandardType()) {
+				case FLOAT64 -> {
+					return (long) value.getDoubleValue();
+				}
+				case NUMERIC, BIGNUMERIC -> {
+					return value.getNumericValue().longValue();
+				}
+				default -> {
+				}
+			}
+		}
+		return value.getLongValue();
+	}
+
 	@Override
 	public boolean next() throws SQLException {
 		checkClosed();
@@ -216,7 +250,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return 0;
 		}
-		long longValue = value.getLongValue();
+		long longValue = toIntegralLong(value, getSchemaField(columnIndex));
 		if (longValue < Byte.MIN_VALUE || longValue > Byte.MAX_VALUE) {
 			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "byte", longValue),
 					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
@@ -230,7 +264,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return 0;
 		}
-		long longValue = value.getLongValue();
+		long longValue = toIntegralLong(value, getSchemaField(columnIndex));
 		if (longValue < Short.MIN_VALUE || longValue > Short.MAX_VALUE) {
 			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "short", longValue),
 					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
@@ -244,7 +278,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return 0;
 		}
-		long longValue = value.getLongValue();
+		long longValue = toIntegralLong(value, getSchemaField(columnIndex));
 		if (longValue < Integer.MIN_VALUE || longValue > Integer.MAX_VALUE) {
 			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "int", longValue),
 					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
@@ -255,7 +289,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public long getLong(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? 0 : value.getLongValue();
+		return value.isNull() ? 0 : toIntegralLong(value, getSchemaField(columnIndex));
 	}
 
 	@Override
@@ -318,97 +352,69 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 
 	@Override
 	public String getString(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return FieldValueConverter.toString(value, getSchemaField(findColumn(columnLabel)));
+		return getString(findColumn(columnLabel));
 	}
 
 	@Override
 	public boolean getBoolean(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return !value.isNull() && value.getBooleanValue();
+		return getBoolean(findColumn(columnLabel));
 	}
 
 	@Override
 	public byte getByte(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? 0 : (byte) value.getLongValue();
+		return getByte(findColumn(columnLabel));
 	}
 
 	@Override
 	public short getShort(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? 0 : (short) value.getLongValue();
+		return getShort(findColumn(columnLabel));
 	}
 
 	@Override
 	public int getInt(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? 0 : (int) value.getLongValue();
+		return getInt(findColumn(columnLabel));
 	}
 
 	@Override
 	public long getLong(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? 0 : value.getLongValue();
+		return getLong(findColumn(columnLabel));
 	}
 
 	@Override
 	public float getFloat(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? 0 : (float) value.getDoubleValue();
+		return getFloat(findColumn(columnLabel));
 	}
 
 	@Override
 	public double getDouble(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? 0 : value.getDoubleValue();
+		return getDouble(findColumn(columnLabel));
 	}
 
 	@Deprecated
 	@SuppressWarnings("deprecation")
 	@Override
 	public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		if (value.isNull()) {
-			return null;
-		}
-		return value.getNumericValue();
+		return getBigDecimal(findColumn(columnLabel), scale);
 	}
 
 	@Override
 	public byte[] getBytes(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? null : value.getBytesValue();
+		return getBytes(findColumn(columnLabel));
 	}
 
 	@Override
 	public Date getDate(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		if (value.isNull()) {
-			return null;
-		}
-		String dateStr = value.getStringValue();
-		return Date.valueOf(dateStr);
+		return getDate(findColumn(columnLabel));
 	}
 
 	@Override
 	public Time getTime(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		if (value.isNull()) {
-			return null;
-		}
-		String timeStr = value.getStringValue();
-		return Time.valueOf(timeStr);
+		return getTime(findColumn(columnLabel));
 	}
 
 	@Override
 	public Timestamp getTimestamp(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		if (value.isNull()) {
-			return null;
-		}
-		long micros = value.getTimestampValue();
-		return new Timestamp(micros / 1000);
+		return getTimestamp(findColumn(columnLabel));
 	}
 	@Override
 	public ResultSetMetaData getMetaData() throws SQLException {
@@ -457,8 +463,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 
 	@Override
 	public BigDecimal getBigDecimal(String columnLabel) throws SQLException {
-		FieldValue value = getFieldValue(columnLabel);
-		return value.isNull() ? null : value.getNumericValue();
+		return getBigDecimal(findColumn(columnLabel));
 	}
 
 	@Override
