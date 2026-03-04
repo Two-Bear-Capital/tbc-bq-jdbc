@@ -5,6 +5,8 @@ on:
     branches: [ main ]
     paths:
       - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
 
 # Prevent parallel applies — only one Terraform run at a time
 concurrency:
