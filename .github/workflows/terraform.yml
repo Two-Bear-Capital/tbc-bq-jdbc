@@ -21,7 +21,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-      secrets: write
 
     defaults:
       run:
@@ -89,4 +88,4 @@ jobs:
           terraform output -raw wif_provider | gh secret set WIF_PROVIDER --repo $GITHUB_REPOSITORY
           terraform output -raw ci_service_account_email | gh secret set WIF_SERVICE_ACCOUNT --repo $GITHUB_REPOSITORY
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
