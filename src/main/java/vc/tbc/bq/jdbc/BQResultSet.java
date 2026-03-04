@@ -27,9 +27,8 @@ import vc.tbc.bq.jdbc.util.TimezoneUtils;
 
 import java.math.BigDecimal;
 import java.sql.*;
-import java.util.Calendar;
-import java.util.Iterator;
-import java.util.Map;
+import java.sql.Date;
+import java.util.*;
 
 /**
  * JDBC ResultSet implementation for BigQuery.
@@ -52,9 +51,13 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	private final BQStatement statement;
 	private final TableResult tableResult;
 	private final Iterator<FieldValueList> rowIterator;
+	private final FieldList schemaFields; // Cached at construction to avoid repeated schema traversal
+	private final int maxRows; // Cached at construction; setMaxRows must be called before execution per JDBC
+								// spec
 	private FieldValueList currentRow;
 	private boolean wasNull = false;
 	private int rowCount = 0; // Track rows returned for maxRows enforcement
+	private Map<String, Integer> columnIndexByName; // Lazy-initialized for O(1) findColumn()
 
 	/**
 	 * Creates a new BigQuery ResultSet.
@@ -68,7 +71,9 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.statement = statement;
 		this.tableResult = tableResult;
 		this.rowIterator = tableResult.iterateAll().iterator();
-		this.currentRow = null;
+		Schema schema = tableResult.getSchema();
+		this.schemaFields = schema != null ? schema.getFields() : null;
+		this.maxRows = resolveMaxRows(statement);
 	}
 
 	/**
@@ -82,10 +87,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	 *            the BigQuery table result
 	 */
 	BQResultSet(TableResult tableResult) {
-		this.statement = null;
-		this.tableResult = tableResult;
-		this.rowIterator = tableResult.iterateAll().iterator();
-		this.currentRow = null;
+		this(null, tableResult);
 	}
 
 	/**
@@ -109,7 +111,20 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.statement = statement;
 		this.tableResult = tableResult;
 		this.rowIterator = tableResult != null ? tableResult.iterateAll().iterator() : null;
-		this.currentRow = null;
+		Schema schema = tableResult != null ? tableResult.getSchema() : null;
+		this.schemaFields = schema != null ? schema.getFields() : null;
+		this.maxRows = resolveMaxRows(statement);
+	}
+
+	private static int resolveMaxRows(BQStatement statement) {
+		if (statement == null) {
+			return 0;
+		}
+		try {
+			return statement.getMaxRows();
+		} catch (SQLException ignored) {
+			return 0;
+		}
 	}
 
 	@Override
@@ -146,9 +161,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	}
 
 	private Field getSchemaField(int columnIndex) {
-		var schema = tableResult != null ? tableResult.getSchema() : null;
-		if (schema != null && columnIndex > 0 && columnIndex <= schema.getFields().size()) {
-			return schema.getFields().get(columnIndex - 1);
+		if (schemaFields != null && columnIndex > 0 && columnIndex <= schemaFields.size()) {
+			return schemaFields.get(columnIndex - 1);
 		}
 		return null;
 	}
@@ -158,7 +172,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		checkClosed();
 
 		// Check if maxRows limit has been reached (JDBC Statement.setMaxRows)
-		int maxRows = statement.getMaxRows();
 		if (maxRows > 0 && rowCount >= maxRows) {
 			currentRow = null;
 			return false;
@@ -420,27 +433,20 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public int findColumn(String columnLabel) throws SQLException {
 		checkClosed();
-		var schema = tableResult.getSchema();
-		if (schema == null) {
+		if (schemaFields == null) {
 			throw new BQSQLException("Schema is not available");
 		}
-
-		// Find column by exact name match
-		FieldList fields = schema.getFields();
-		for (int i = 0; i < fields.size(); i++) {
-			if (fields.get(i).getName().equals(columnLabel)) {
-				return i + 1;
+		if (columnIndexByName == null) {
+			columnIndexByName = new HashMap<>(schemaFields.size() * 2);
+			for (int i = 0; i < schemaFields.size(); i++) {
+				columnIndexByName.put(schemaFields.get(i).getName().toLowerCase(Locale.ROOT), i + 1);
 			}
 		}
-
-		// Try case-insensitive match
-		for (int i = 0; i < fields.size(); i++) {
-			if (fields.get(i).getName().equalsIgnoreCase(columnLabel)) {
-				return i + 1;
-			}
+		Integer index = columnIndexByName.get(columnLabel.toLowerCase(Locale.ROOT));
+		if (index == null) {
+			throw new BQSQLException("Column not found: " + columnLabel);
 		}
-
-		throw new BQSQLException("Column not found: " + columnLabel);
+		return index;
 	}
 
 	@Override

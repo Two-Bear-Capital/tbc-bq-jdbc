@@ -680,6 +680,26 @@
     </build>
 
     <profiles>
+        <!-- Benchmarks Profile: requires a real BigQuery connection via BENCHMARK_JDBC_URL env var -->
+        <!-- Usage: ./mvnw test-compile exec:java -Pbenchmarks                          -->
+        <!--        ./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="ResultSet*" -->
+        <profile>
+            <id>benchmarks</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.0</version>
+                        <configuration>
+                            <mainClass>org.openjdk.jmh.Main</mainClass>
+                            <classpathScope>test</classpathScope>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- Integration Test Profile -->
         <profile>
             <id>integration-tests</id>

@@ -64,6 +64,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	private static final Pattern IS_SCHEMA_EXTRACTOR = Pattern
 			.compile("(?:`[^`]+`|[^\\s.`]+)\\.(`[^`]+`|[^\\s.`]+)\\.INFORMATION_SCHEMA", Pattern.CASE_INSENSITIVE);
 
+	private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
+
 	protected final BQConnection connection;
 	protected final BigQuery bigquery;
 	protected final ConnectionProperties properties;
@@ -550,7 +552,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @return the normalised cache key
 	 */
 	private static String normalizeSqlCacheKey(String sql) {
-		return "query:" + sql.strip().replaceAll("\\s+", " ");
+		return "query:" + WHITESPACE_PATTERN.matcher(sql.strip()).replaceAll(" ");
 	}
 
 	/**

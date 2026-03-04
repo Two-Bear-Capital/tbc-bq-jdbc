@@ -60,8 +60,8 @@ After `./mvnw clean package`, find these in `target/`:
 
 # Run benchmarks (requires real BigQuery connection)
 export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
-./mvnw clean package
-java -jar target/benchmarks.jar
+./mvnw test-compile exec:java -Pbenchmarks
+# Run a specific benchmark: -Dexec.args="ResultSetIterationBenchmark"
 ```
 
 ### Code Quality

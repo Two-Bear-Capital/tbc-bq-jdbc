@@ -393,16 +393,27 @@ See [Integration Tests Guide](docs/INTEGRATION_TESTS.md) for details.
 
 ### Benchmarks
 
-JMH benchmarks for performance testing:
+JMH benchmarks for performance testing against a real BigQuery connection:
 
 ```bash
-# Set BigQuery connection URL
+# Set BigQuery connection URL (required)
 export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 
-# Run benchmarks
-./mvnw clean package
-java -jar target/benchmarks.jar
+# Run all benchmarks
+./mvnw test-compile exec:java -Pbenchmarks
+
+# Run a specific benchmark class (glob pattern)
+./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="ResultSetIterationBenchmark"
+./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="QueryBenchmark"
+./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="PreparedStatementBenchmark"
 ```
+
+**Available benchmarks:**
+- `ResultSetIterationBenchmark` — throughput of `next()`, column access by name vs. index (100/1000/10000 rows)
+- `QueryBenchmark` — latency of query execution and connection creation
+- `PreparedStatementBenchmark` — parameterized query throughput
+
+> **Note:** Benchmarks require a live BigQuery project and will submit real jobs. JMH forks separate JVMs per benchmark to avoid JIT bias — this is expected behavior.
 
 ## JDBC Compliance
 

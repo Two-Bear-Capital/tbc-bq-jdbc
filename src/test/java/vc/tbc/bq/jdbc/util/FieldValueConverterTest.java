@@ -77,6 +77,8 @@ class FieldValueConverterTest {
 		// Use lenient() to avoid UnnecessaryStubbingException when methods aren't all
 		// called
 		org.mockito.Mockito.lenient().when(mockList.isEmpty()).thenReturn(elements.isEmpty());
+		org.mockito.Mockito.lenient().when(mockList.size()).thenReturn(elements.size());
+		org.mockito.Mockito.lenient().when(mockList.iterator()).thenAnswer(inv -> elements.iterator());
 		org.mockito.Mockito.lenient().when(mockList.stream()).thenAnswer(inv -> elements.stream());
 
 		when(mock.getRepeatedValue()).thenReturn(mockList);
@@ -97,6 +99,8 @@ class FieldValueConverterTest {
 		// Use lenient() to avoid UnnecessaryStubbingException when methods aren't all
 		// called
 		org.mockito.Mockito.lenient().when(mockList.isEmpty()).thenReturn(fields.isEmpty());
+		org.mockito.Mockito.lenient().when(mockList.size()).thenReturn(fields.size());
+		org.mockito.Mockito.lenient().when(mockList.iterator()).thenAnswer(inv -> fields.iterator());
 		org.mockito.Mockito.lenient().when(mockList.stream()).thenAnswer(inv -> fields.stream());
 
 		when(mock.getRecordValue()).thenReturn(mockList);

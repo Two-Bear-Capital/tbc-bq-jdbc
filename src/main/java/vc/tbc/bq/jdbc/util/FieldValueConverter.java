@@ -22,10 +22,10 @@ import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Utility class for converting BigQuery FieldValue objects to appropriate Java
@@ -147,10 +147,7 @@ public final class FieldValueConverter {
 		if (elements == null || elements.isEmpty()) {
 			return "[]";
 		}
-
-		List<Object> values = elements.stream().map(fv -> extractValue(fv, field)).collect(Collectors.toList());
-
-		return GSON.toJson(values);
+		return GSON.toJson(extractList(elements, field));
 	}
 
 	/**
@@ -202,7 +199,30 @@ public final class FieldValueConverter {
 		}
 
 		// Fallback: no schema info available, produce positional list
-		return values.stream().map(fv -> extractValue(fv, null)).collect(Collectors.toList());
+		List<Object> list = new ArrayList<>(values.size());
+		for (FieldValue fv : values) {
+			list.add(extractValue(fv, null));
+		}
+		return list;
+	}
+
+	/**
+	 * Builds a pre-sized {@link List} by extracting each element from
+	 * {@code elements}. Used by both {@link #arrayToJson} and
+	 * {@link #extractValue} to avoid duplicating the same loop pattern.
+	 *
+	 * @param elements
+	 *            the list of FieldValues to convert
+	 * @param field
+	 *            the schema Field for element type information; may be null
+	 * @return a new List containing the extracted values
+	 */
+	private static List<Object> extractList(List<FieldValue> elements, Field field) {
+		List<Object> list = new ArrayList<>(elements.size());
+		for (FieldValue fv : elements) {
+			list.add(extractValue(fv, field));
+		}
+		return list;
 	}
 
 	/**
@@ -222,10 +242,7 @@ public final class FieldValueConverter {
 		}
 
 		return switch (fieldValue.getAttribute()) {
-			case REPEATED -> {
-				List<FieldValue> elements = fieldValue.getRepeatedValue();
-				yield elements.stream().map(fv -> extractValue(fv, field)).collect(Collectors.toList());
-			}
+			case REPEATED -> extractList(fieldValue.getRepeatedValue(), field);
 			case RECORD -> recordToObject(fieldValue.getRecordValue(), field);
 			default -> // For primitive values, use getStringValue() which always works
 				// Gson will handle proper JSON encoding (numbers stay unquoted, strings are

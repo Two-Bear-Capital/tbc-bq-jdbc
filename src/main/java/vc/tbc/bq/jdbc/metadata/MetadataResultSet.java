@@ -21,8 +21,7 @@ import vc.tbc.bq.jdbc.util.NumberParser;
 
 import java.math.BigDecimal;
 import java.sql.*;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * A simple in-memory ResultSet implementation for database metadata queries.
@@ -42,6 +41,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	private int currentRowIndex = -1;
 	private Object[] currentRow;
 	private boolean wasNull = false;
+	private Map<String, Integer> columnIndexByName; // Lazy-initialized for O(1) column lookup
 
 	/**
 	 * Creates a new metadata ResultSet.
@@ -112,12 +112,17 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	}
 
 	private int getColumnIndex(String columnLabel) throws SQLException {
-		for (int i = 0; i < columnNames.length; i++) {
-			if (columnNames[i].equalsIgnoreCase(columnLabel)) {
-				return i + 1;
+		if (columnIndexByName == null) {
+			columnIndexByName = new HashMap<>(columnNames.length * 2);
+			for (int i = 0; i < columnNames.length; i++) {
+				columnIndexByName.put(columnNames[i].toLowerCase(Locale.ROOT), i + 1);
 			}
 		}
-		throw new SQLException("Column not found: " + columnLabel);
+		Integer index = columnIndexByName.get(columnLabel.toLowerCase(Locale.ROOT));
+		if (index == null) {
+			throw new SQLException("Column not found: " + columnLabel);
+		}
+		return index;
 	}
 
 	private Object getValue(int columnIndex) throws SQLException {

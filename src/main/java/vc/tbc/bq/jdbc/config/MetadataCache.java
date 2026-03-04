@@ -171,7 +171,8 @@ public final class MetadataCache {
 			columnTypes[i] = TypeMapper.toJdbcType(field);
 		}
 
-		List<Object[]> rows = new ArrayList<>();
+		long totalRows = result.getTotalRows();
+		List<Object[]> rows = new ArrayList<>(totalRows > 0 ? (int) totalRows : 16);
 		for (FieldValueList row : result.iterateAll()) {
 			Object[] rowData = new Object[fieldCount];
 			for (int i = 0; i < fieldCount; i++) {
@@ -210,10 +211,15 @@ public final class MetadataCache {
 	 *            the prefix to match
 	 */
 	public void invalidate(String keyPrefix) {
-		int removed = (int) cache.keySet().stream().filter(key -> key.startsWith(keyPrefix)).count();
-
-		cache.keySet().removeIf(key -> key.startsWith(keyPrefix));
-		logger.debug("Invalidated {} cache entries with prefix: {}", removed, keyPrefix);
+		int[] removed = {0};
+		cache.keySet().removeIf(key -> {
+			if (key.startsWith(keyPrefix)) {
+				removed[0]++;
+				return true;
+			}
+			return false;
+		});
+		logger.debug("Invalidated {} cache entries with prefix: {}", removed[0], keyPrefix);
 	}
 
 	/**
