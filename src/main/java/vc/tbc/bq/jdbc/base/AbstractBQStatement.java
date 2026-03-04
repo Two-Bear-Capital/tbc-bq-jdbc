@@ -93,6 +93,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		this.connection = connection;
 		this.bigquery = connection.getBigQuery();
 		this.properties = connection.getProperties();
+		// Apply maxResults connection property as the default statement row limit
+		if (properties.maxResults() != null && properties.maxResults() > 0) {
+			this.maxRows = properties.maxResults().intValue();
+		}
 		connection.registerStatement((BQStatement) this);
 	}
 

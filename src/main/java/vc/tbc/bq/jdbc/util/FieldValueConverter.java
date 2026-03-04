@@ -208,8 +208,8 @@ public final class FieldValueConverter {
 
 	/**
 	 * Builds a pre-sized {@link List} by extracting each element from
-	 * {@code elements}. Used by both {@link #arrayToJson} and
-	 * {@link #extractValue} to avoid duplicating the same loop pattern.
+	 * {@code elements}. Used by both {@link #arrayToJson} and {@link #extractValue}
+	 * to avoid duplicating the same loop pattern.
 	 *
 	 * @param elements
 	 *            the list of FieldValues to convert
