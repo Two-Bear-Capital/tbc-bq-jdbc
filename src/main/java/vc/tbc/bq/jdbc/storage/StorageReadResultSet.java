@@ -182,17 +182,29 @@ public class StorageReadResultSet extends BQResultSet {
 
 	@Override
 	public void close() throws SQLException {
+		SQLException thrown = null;
 		try {
 			if (currentStream != null) {
 				currentStream.cancel();
 			}
+		} catch (Exception e) {
+			thrown = new SQLException("Failed to cancel Storage API stream", e);
+		}
+		try {
 			if (readClient != null) {
 				readClient.close();
 			}
 		} catch (Exception e) {
-			throw new SQLException("Failed to close Storage API resources", e);
+			if (thrown == null) {
+				thrown = new SQLException("Failed to close Storage API client", e);
+			} else {
+				thrown.addSuppressed(e);
+			}
 		} finally {
 			super.close();
+		}
+		if (thrown != null) {
+			throw thrown;
 		}
 	}
 

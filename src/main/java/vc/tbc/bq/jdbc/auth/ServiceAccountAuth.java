@@ -83,6 +83,8 @@ public record ServiceAccountAuth(String jsonKeyPath) implements AuthType {
 
 	@Override
 	public Credentials toCredentials() throws IOException {
-		return ServiceAccountCredentials.fromStream(new FileInputStream(jsonKeyPath));
+		try (FileInputStream fis = new FileInputStream(jsonKeyPath)) {
+			return ServiceAccountCredentials.fromStream(fis);
+		}
 	}
 }
