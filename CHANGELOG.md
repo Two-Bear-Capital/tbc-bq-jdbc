@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.65] - 2026-03-04
+
+### ⚡ Features
+
+- **metadata:** Add warnings for null schemas in metadata cache and expand test coverage
+- **metadata:** Improve performance with optimized caching and conversion
+- **statement:** Apply maxResults as default row limit
+
 ## [1.0.64] - 2026-03-03
 
 ### ⚡ Features
@@ -16,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🐛 Bug Fixes
 
 - **metadata:** Make authType property optional with default ADC configuration
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.64
 
 ## [1.0.63] - 2026-03-03
 
@@ -1772,6 +1784,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.65]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.64...v1.0.65
 [1.0.64]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.63...v1.0.64
 [1.0.63]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.62...v1.0.63
 [1.0.62]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.61...v1.0.62
