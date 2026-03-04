@@ -61,6 +61,14 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan -out=tfplan
+        env:
+          TF_VAR_org_id: ${{ vars.GCP_ORG_ID }}
+          TF_VAR_billing_account: ${{ vars.GCP_BILLING_ACCOUNT }}
+          TF_VAR_github_repo: ${{ vars.GITHUB_REPO || 'Two-Bear-Capital/tbc-bq-jdbc' }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_org_id: ${{ vars.GCP_ORG_ID }}
+          TF_VAR_billing_account: ${{ vars.GCP_BILLING_ACCOUNT }}
+          TF_VAR_github_repo: ${{ vars.GITHUB_REPO || 'Two-Bear-Capital/tbc-bq-jdbc' }}
