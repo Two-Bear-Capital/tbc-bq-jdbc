@@ -99,8 +99,8 @@ jobs:
       - name: Run real BigQuery integration tests
         run: mvn verify -Preal-integration-tests -B
         env:
-          BQ_TEST_PROJECT: ${{ vars.BQ_TEST_PROJECT }}
-          BQ_TEST_DATASET: ${{ vars.BQ_TEST_DATASET }}
+          BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
+          BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
 
       - name: Upload real integration test reports
         uses: actions/upload-artifact@v7
