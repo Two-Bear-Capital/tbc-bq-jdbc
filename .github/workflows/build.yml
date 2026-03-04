@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  workflow_run:
+    workflows: [ "Terraform" ]
+    branches: [ main ]
+    types: [ completed ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run'
     permissions:
       contents: read
 
@@ -63,7 +68,9 @@ jobs:
   real-integration-tests:
     name: Real BigQuery Integration Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     permissions:
       contents: read
