@@ -68,6 +68,25 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	protected static final String TEST_PROJECT_ID = System.getenv().getOrDefault("BQ_TEST_PROJECT", "");
 	protected static final String TEST_DATASET = System.getenv().getOrDefault("BQ_TEST_DATASET", DEFAULT_DATASET);
 
+	/**
+	 * Unique 8-character hex identifier for this JVM session. Appended to table
+	 * names to prevent conflicts when multiple CI pipeline runs execute against the
+	 * same BigQuery dataset concurrently.
+	 */
+	protected static final String RUN_ID = Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
+
+	/**
+	 * Returns a session-unique table name by appending {@link #RUN_ID} to the given
+	 * base name.
+	 *
+	 * @param base
+	 *            the logical table name (e.g. {@code "users"})
+	 * @return a table name unique to this JVM run (e.g. {@code "users_a3f2b91c"})
+	 */
+	protected static String tableName(String base) {
+		return base + "_" + RUN_ID;
+	}
+
 	protected Connection connection;
 
 	@BeforeEach

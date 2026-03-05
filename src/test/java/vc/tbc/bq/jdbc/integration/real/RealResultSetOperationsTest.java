@@ -35,12 +35,17 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RealResultSetOperationsTest extends AbstractRealBigQueryIntegrationTest {
 
+	/**
+	 * Session-unique table name — prevents conflicts between concurrent CI runs.
+	 */
+	private static final String TABLE = tableName("users");
+
 	@Test
 	void testResultSetNext() throws SQLException {
-		createTestTable("users");
-		insertTestData("users");
+		createTestTable(TABLE);
+		insertTestData(TABLE);
 
-		String sql = "SELECT id FROM users ORDER BY id";
+		String sql = "SELECT id FROM " + TABLE + " ORDER BY id";
 
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertTrue(rs.next());
@@ -55,7 +60,7 @@ class RealResultSetOperationsTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS users");
+		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
