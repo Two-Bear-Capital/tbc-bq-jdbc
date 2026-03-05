@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.71] - 2026-03-05
+
+### ⚡ Features
+
+- **types:** Add native ARRAY/STRUCT support to BQPreparedStatement and connection
+
 ## [1.0.70] - 2026-03-05
 
 ### 📚 Documentation
 
 - **readme:** Document real BigQuery integration test suite
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.70
 
 ## [1.0.69] - 2026-03-05
 
@@ -1855,6 +1865,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.71]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.70...v1.0.71
 [1.0.70]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.69...v1.0.70
 [1.0.69]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.68...v1.0.69
 [1.0.68]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.67...v1.0.68
