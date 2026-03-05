@@ -5,11 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.69] - 2026-03-05
+
+### ⚡ Features
+
+- **tests:** Add BigQuery integration tests for ResultSet, Metadata, TypeMapping, and Parameterized Queries
+- **terraform:** Auto-export WIF outputs to GitHub secrets after apply
+
+### 🐛 Bug Fixes
+
+- **terraform:** Pass required vars via TF_VAR_ env vars to prevent interactive prompt hang
+- **terraform:** Read GCP_ORG_ID and GCP_BILLING_ACCOUNT from secrets not vars
+- **terraform:** Resync project state before plan to fix prevent_destroy error
+- **terraform:** Correct project_id to bigquery-jdbc-driver-test
+- **terraform:** Use GH_ADMIN_TOKEN PAT for setting GitHub secrets
+- **ci:** Read BQ_TEST_PROJECT and BQ_TEST_DATASET from secrets not vars
+- **resultset:** Handle FLOAT64 in integer getters; delegate label to index
+- **ci:** Prevent base failsafe excludes from suppressing real integration tests
+
+### 🧪 Testing
+
+- **real:** Expect SQLException for arrays with null elements in real BigQuery
+- **integration:** Share single emulator container across all test classes
+
+### ⚙️ Miscellaneous Tasks
+
+- **terraform:** Fix terraform fmt alignment in main.tf
+- **terraform:** Add workflow_dispatch trigger and path filter for workflow file
+- **ci:** Run real integration tests after Terraform workflow succeeds
+- **ci:** Add descriptive name to build job
+
 ## [1.0.68] - 2026-03-04
 
 ### 🔀 Pull Requests
 
 - Merge pull request #32 from Two-Bear-Capital/dependabot/maven/maven-dependencies-1040b9763d
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.68
 
 ## [1.0.67] - 2026-03-04
 
@@ -1814,6 +1848,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.69]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.68...v1.0.69
 [1.0.68]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.67...v1.0.68
 [1.0.67]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.66...v1.0.67
 [1.0.66]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.65...v1.0.66
