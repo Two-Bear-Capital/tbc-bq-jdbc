@@ -736,7 +736,8 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
-                        <configuration>
+                        <configuration combine.self="override">
+                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
                             <includes>
                                 <include>**/integration/real/**/*Test.java</include>
                             </includes>
