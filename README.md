@@ -375,9 +375,11 @@ After building:
 ./mvnw test
 ```
 
-### Integration Tests
+### Emulator Integration Tests
 
-113 integration tests covering:
+Integration tests run against the [BigQuery emulator](https://github.com/recidiviz/bigquery-emulator) via Docker/Testcontainers — no real GCP credentials required. A single shared container is started once for all test classes.
+
+Covers:
 - Connection lifecycle
 - Query execution
 - Prepared statements
@@ -388,6 +390,27 @@ After building:
 ```bash
 ./mvnw verify -Pintegration-tests
 ```
+
+### Real BigQuery Integration Tests
+
+A separate suite runs against a live BigQuery instance to validate behavior that the emulator does not fully replicate (e.g., strict type enforcement, BigQuery-specific SQL constraints).
+
+**Prerequisites:**
+
+```bash
+# Authenticate with ADC
+gcloud auth application-default login
+
+# Set required env vars
+export BQ_TEST_PROJECT=my-gcp-project
+export BQ_TEST_DATASET=tbc_bq_jdbc_integration_tests   # optional, this is the default
+```
+
+```bash
+./mvnw verify -Preal-integration-tests
+```
+
+Tests are **automatically skipped** when `BQ_TEST_PROJECT` is not set, so they never block local builds without credentials. In CI, they run via Workload Identity Federation.
 
 See [Integration Tests Guide](docs/INTEGRATION_TESTS.md) for details.
 
@@ -491,7 +514,7 @@ See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 - ✅ All authentication methods
 - ✅ Session support
 - ✅ Complete type mapping
-- ✅ Extensive testing (199 total tests)
+- ✅ Extensive testing (unit, emulator, and real BigQuery integration tests)
 - ✅ Comprehensive documentation
 
 ### Future Versions
@@ -547,4 +570,4 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 **Status:** ✅ Version 1.0 Release - Optimized for Database IDEs
 
-This initial release focuses on providing fast, high-quality database metadata for development tools like JetBrains IDEs, DataGrip, and other database clients. Comprehensive JDBC 4.3 implementation with extensive testing (91 unit tests, 108 integration tests).
+This initial release focuses on providing fast, high-quality database metadata for development tools like JetBrains IDEs, DataGrip, and other database clients. Comprehensive JDBC 4.3 implementation with extensive testing across unit, emulator-based integration, and real BigQuery integration test suites.
