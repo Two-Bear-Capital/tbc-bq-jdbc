@@ -21,8 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Connection;
@@ -34,13 +32,13 @@ import java.sql.Statement;
  * Base class for BigQuery integration tests using Testcontainers.
  *
  * <p>
- * This class sets up a BigQuery emulator container for integration testing.
- * Tests can be run against the emulator or against a real BigQuery instance if
- * credentials are provided.
+ * This class sets up a BigQuery emulator container for integration testing. A
+ * single container is shared across all test classes (singleton pattern) to
+ * avoid the overhead and resource exhaustion of starting one container per test
+ * class.
  *
  * @since 1.0.0
  */
-@Testcontainers
 public abstract class AbstractBigQueryIntegrationTest {
 
 	private static final Logger logger = LoggerFactory.getLogger(AbstractBigQueryIntegrationTest.class);
@@ -48,11 +46,14 @@ public abstract class AbstractBigQueryIntegrationTest {
 	protected static final String TEST_PROJECT_ID = "test-project";
 	protected static final String TEST_DATASET = "test_dataset";
 
-	@SuppressWarnings("resource") // Container lifecycle managed by JUnit @Container annotation
-	@Container
+	@SuppressWarnings("resource") // Container lifecycle managed by Testcontainers Ryuk shutdown
 	protected static final GenericContainer<?> bigqueryEmulator = new GenericContainer<>(
 			DockerImageName.parse("ghcr.io/recidiviz/bigquery-emulator:latest")).withExposedPorts(9050)
 			.withCommand("--project=" + TEST_PROJECT_ID, "--dataset=" + TEST_DATASET);
+
+	static {
+		bigqueryEmulator.start();
+	}
 
 	protected Connection connection;
 
