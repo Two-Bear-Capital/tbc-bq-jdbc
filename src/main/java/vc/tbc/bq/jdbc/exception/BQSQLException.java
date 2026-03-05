@@ -24,6 +24,8 @@ import java.sql.SQLException;
  */
 public class BQSQLException extends SQLException {
 
+	private static final long serialVersionUID = 1L;
+
 	/** SQLState for syntax errors. */
 	public static final String SQLSTATE_SYNTAX_ERROR = "42000";
 

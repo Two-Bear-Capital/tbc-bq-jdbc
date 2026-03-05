@@ -24,6 +24,8 @@ import java.sql.SQLFeatureNotSupportedException;
  */
 public class BQSQLFeatureNotSupportedException extends SQLFeatureNotSupportedException {
 
+	private static final long serialVersionUID = 1L;
+
 	public BQSQLFeatureNotSupportedException(String reason) {
 		super(reason, BQSQLException.SQLSTATE_FEATURE_NOT_SUPPORTED);
 	}

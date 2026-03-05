@@ -28,6 +28,8 @@ import java.sql.Types;
  *
  * @since 1.0.0
  */
+@SuppressWarnings("PMD.MissingStaticMethodInNonInstantiatableClass") // utility class: provides constants via static
+																		// nested classes
 public final class MetadataColumns {
 
 	private MetadataColumns() {

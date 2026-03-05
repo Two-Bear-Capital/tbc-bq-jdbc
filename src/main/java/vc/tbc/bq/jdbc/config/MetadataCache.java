@@ -121,6 +121,8 @@ public final class MetadataCache {
 	 * @throws SQLException
 	 *             if an error occurs reading the ResultSet
 	 */
+	@SuppressWarnings("PMD.CloseResource") // metadataResultSet is obtained via pattern-match on the caller-owned
+											// resultSet; we do not own it
 	public void put(String key, ResultSet resultSet) throws SQLException {
 		if (!(resultSet instanceof MetadataResultSet metadataResultSet)) {
 			logger.warn("Cannot cache non-MetadataResultSet: {}", resultSet.getClass().getName());
@@ -134,7 +136,9 @@ public final class MetadataCache {
 
 		Instant expiresAt = Instant.now().plus(ttl);
 		cache.put(key, new CacheEntry(columnNames, columnTypes, rows, expiresAt));
-		logger.trace("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
+		if (logger.isTraceEnabled()) {
+			logger.trace("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
+		}
 	}
 
 	/**
@@ -152,6 +156,7 @@ public final class MetadataCache {
 	 * @param result
 	 *            the BigQuery result to materialise and cache
 	 */
+	@SuppressWarnings("PMD.NullAssignment") // null represents SQL NULL in row data; intentional
 	public void put(String key, TableResult result) {
 		Schema schema = result.getSchema();
 

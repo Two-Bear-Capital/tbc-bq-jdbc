@@ -703,8 +703,7 @@
                     <printFailingErrors>true</printFailingErrors>
                     <linkXRef>false</linkXRef>
                     <rulesets>
-                        <ruleset>category/java/bestpractices.xml</ruleset>
-                        <ruleset>category/java/errorprone.xml</ruleset>
+                        <ruleset>src/main/pmd/ruleset.xml</ruleset>
                     </rulesets>
                     <excludeRoots>
                         <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
@@ -716,16 +715,35 @@
                         <phase>verify</phase>
                         <goals>
                             <goal>pmd</goal>
+                            <!-- check reads the generated report and emits a WARNING per violation
+                                 (respects printFailingErrors) so every violation appears in build output. -->
+                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>
             </plugin>
 
-            <!-- Create "latest" symlink in .m2 repository -->
+            <!-- Create "latest" symlink in .m2 repository + PMD summary -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <executions>
+                    <!-- Print a one-line PMD violation count after pmd:check runs in verify phase.
+                         beginline= is a unique attribute on every <violation> element. -->
+                    <execution>
+                        <id>pmd-summary</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>bash</executable>
+                            <arguments>
+                                <argument>-c</argument>
+                                <argument><![CDATA[COUNT=$(grep -c 'beginline=' target/pmd.xml 2>/dev/null); echo "[PMD] ${COUNT:-0} violation(s)"]]></argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>create-latest-symlink</id>
                         <phase>install</phase>

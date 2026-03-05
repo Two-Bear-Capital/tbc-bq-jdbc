@@ -169,6 +169,8 @@ public class SessionManager {
 	 * Note: BigQuery sessions are automatically cleaned up after timeout. This
 	 * method just marks the session as closed locally.
 	 */
+	@SuppressWarnings("PMD.NullAssignment") // null-out sessionId when closed; intentional — session ID is no longer
+											// valid
 	public void close() {
 		lock.lock();
 		try {

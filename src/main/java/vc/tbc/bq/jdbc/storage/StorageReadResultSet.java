@@ -72,6 +72,8 @@ public class StorageReadResultSet extends BQResultSet {
 	 * @throws SQLException
 	 *             if initialization fails
 	 */
+	@SuppressWarnings("PMD.CloseResource") // tempClient intentionally kept open on success (assigned to
+											// this.readClient); closed in catch
 	public StorageReadResultSet(BQStatement statement, TableId tableId) throws SQLException {
 		super(statement, null, true); // Will override iteration logic
 
@@ -181,6 +183,8 @@ public class StorageReadResultSet extends BQResultSet {
 	}
 
 	@Override
+	@SuppressWarnings("PMD.UseTryWithResources") // multi-resource close with suppressed-exception chaining requires
+													// manual try/catch
 	public void close() throws SQLException {
 		SQLException thrown = null;
 		try {

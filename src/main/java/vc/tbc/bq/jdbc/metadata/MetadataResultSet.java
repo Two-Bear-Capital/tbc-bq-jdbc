@@ -40,7 +40,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	private final List<Object[]> rows;
 	private int currentRowIndex = -1;
 	private Object[] currentRow;
-	private boolean wasNull = false;
+	private boolean lastWasNull = false;
 	private Map<String, Integer> columnIndexByName; // Lazy-initialized for O(1) column lookup
 
 	/**
@@ -72,7 +72,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * @return the column names array
 	 */
 	public String[] getColumnNames() {
-		return columnNames;
+		return Arrays.copyOf(columnNames, columnNames.length);
 	}
 
 	/**
@@ -84,7 +84,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * @return the column types array
 	 */
 	public int[] getColumnTypes() {
-		return columnTypes;
+		return Arrays.copyOf(columnTypes, columnTypes.length);
 	}
 
 	/**
@@ -131,11 +131,13 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 			throw new SQLException("Invalid column index: " + columnIndex);
 		}
 		Object value = currentRow[columnIndex - 1];
-		wasNull = (value == null);
+		lastWasNull = (value == null);
 		return value;
 	}
 
 	@Override
+	@SuppressWarnings("PMD.NullAssignment") // null-out currentRow to indicate end-of-rows; intentional JDBC iterator
+											// pattern
 	public boolean next() throws SQLException {
 		checkClosed();
 		currentRowIndex++;
@@ -148,6 +150,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	}
 
 	@Override
+	@SuppressWarnings("PMD.NullAssignment") // null-out currentRow on close to release reference; intentional cleanup
 	protected void doClose() throws SQLException {
 		currentRow = null;
 	}
@@ -155,7 +158,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public boolean wasNull() throws SQLException {
 		checkClosed();
-		return wasNull;
+		return lastWasNull;
 	}
 
 	@Override
@@ -211,6 +214,8 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	}
 
 	@Override
+	@SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull") // JDBC spec: getBytes() must return null for SQL NULL
+																	// values
 	public byte[] getBytes(int columnIndex) throws SQLException {
 		Object value = getValue(columnIndex);
 		if (value == null)

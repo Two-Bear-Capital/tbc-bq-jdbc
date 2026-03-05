@@ -130,6 +130,7 @@ public class BQStatement extends AbstractBQStatement {
 	}
 
 	@Override
+	@SuppressWarnings("PMD.NullAssignment") // null-out warnings on clear; intentional state reset
 	public void clearWarnings() throws SQLException {
 		checkClosed();
 		queryWarnings = null;

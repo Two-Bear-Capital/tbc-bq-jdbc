@@ -32,6 +32,7 @@ import vc.tbc.bq.jdbc.util.UnsupportedOperations;
 
 import java.io.IOException;
 import java.sql.*;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -341,15 +342,23 @@ public final class BQConnection extends AbstractBQConnection {
 	}
 
 	@Override
+	@SuppressWarnings("PMD.CloseResource") // stmt.close() is explicitly called in the loop body; PMD doesn't detect it
+											// across separate try blocks
 	protected void doClose() throws SQLException {
 		logger.debug("Closing BigQuery connection");
 
-		// Cancel all running statements
+		// Cancel and close all running statements (JDBC spec: closing a connection
+		// closes its statements)
 		for (BQStatement stmt : runningStatements) {
 			try {
 				stmt.cancel();
 			} catch (SQLException e) {
 				logger.warn("Failed to cancel statement during connection close", e);
+			}
+			try {
+				stmt.close();
+			} catch (SQLException e) {
+				logger.warn("Failed to close statement during connection close", e);
 			}
 		}
 
@@ -617,14 +626,14 @@ public final class BQConnection extends AbstractBQConnection {
 		checkClosed();
 		com.google.cloud.bigquery.StandardSQLTypeName sqlType;
 		try {
-			sqlType = com.google.cloud.bigquery.StandardSQLTypeName.valueOf(typeName.toUpperCase());
+			sqlType = com.google.cloud.bigquery.StandardSQLTypeName.valueOf(typeName.toUpperCase(Locale.ROOT));
 		} catch (IllegalArgumentException e) {
 			// Fall back to STRING for unknown type names
 			sqlType = com.google.cloud.bigquery.StandardSQLTypeName.STRING;
 		}
 		int jdbcType = TypeMapper.toJdbcType(sqlType);
 		java.util.List<Object> elementList = elements != null ? java.util.Arrays.asList(elements) : java.util.List.of();
-		return new BQArray(elementList, jdbcType, typeName.toUpperCase());
+		return new BQArray(elementList, jdbcType, typeName.toUpperCase(Locale.ROOT));
 	}
 
 	// JDBC 4.3 methods

@@ -98,6 +98,8 @@ public final class ParameterConverter {
 	 * @throws SQLException
 	 *             if conversion fails
 	 */
+	@SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull") // null input means SQL NULL parameter; returning empty
+																	// array would change semantics
 	public static byte[] toBytes(Object value, int parameterIndex) throws SQLException {
 		if (value == null) {
 			return null;

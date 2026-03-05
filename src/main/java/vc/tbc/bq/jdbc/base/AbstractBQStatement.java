@@ -205,7 +205,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		if (sql == null) {
 			return false;
 		}
-		String trimmed = sql.trim().toUpperCase();
+		String trimmed = sql.trim().toUpperCase(Locale.ROOT);
 		return trimmed.startsWith("SELECT") || trimmed.startsWith("WITH");
 	}
 
@@ -256,6 +256,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if query fails
 	 */
+	@SuppressWarnings({"PMD.NullAssignment", "PMD.PreserveStackTrace"})
 	protected ResultSet executeQueryInternal(String sql) throws SQLException {
 		checkClosed();
 		logger.debug("Executing {}: {}", getLogPrefix(), sql);
@@ -398,7 +399,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 					// Adaptive pre-warming: propagate this IS query pattern to all other
 					// known schemas in the background so IntelliJ's next introspection pass
 					// finds warm cache entries instead of firing live BigQuery jobs.
-					triggerSpeculativePreWarm(sql, cacheKey, cache);
+					triggerSpeculativePreWarm(sql, cache);
 					// Serve from cache so the cursor state is independent of TableResult
 					currentResultSet = cache.get(cacheKey).orElseGet(() -> createResultSet(pair.result, pair.job));
 					return currentResultSet;
@@ -426,11 +427,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 					logger.warn("Failed to cancel job after timeout", cancelEx);
 				}
 			}
-			throw new SQLTimeoutException("Query timeout after " + timeoutSeconds + " seconds");
+			// Chain the TimeoutException so the full stack trace is preserved
+			throw new SQLTimeoutException("Query timeout after " + timeoutSeconds + " seconds", "S1T00", e);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new BQSQLException("Query interrupted", e);
 		} catch (ExecutionException e) {
+			// Intentionally unwrap ExecutionException to expose the root cause.
+			// The ExecutionException wrapper adds no diagnostic value here.
 			Throwable cause = e.getCause();
 			if (cause instanceof RuntimeException) {
 				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
@@ -640,12 +644,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *
 	 * @param originalSql
 	 *            the IS query that was just executed and cached
-	 * @param cachedKey
-	 *            the normalised cache key for {@code originalSql}
 	 * @param cache
 	 *            the metadata cache
 	 */
-	private void triggerSpeculativePreWarm(String originalSql, String cachedKey, MetadataCache cache) {
+	private void triggerSpeculativePreWarm(String originalSql, MetadataCache cache) {
 		Set<String> schemas = cache.getKnownSchemas();
 		if (schemas.isEmpty())
 			return;

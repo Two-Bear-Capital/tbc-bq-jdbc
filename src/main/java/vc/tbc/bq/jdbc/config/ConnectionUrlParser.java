@@ -21,6 +21,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
@@ -192,7 +193,7 @@ public final class ConnectionUrlParser {
 				try {
 					port = Integer.parseInt(hostPort.substring(colonIdx + 1));
 				} catch (NumberFormatException e) {
-					throw new SQLException("Invalid port number in URL: " + hostPort.substring(colonIdx + 1));
+					throw new SQLException("Invalid port number in URL: " + hostPort.substring(colonIdx + 1), e);
 				}
 			} else {
 				host = hostPort;
@@ -367,7 +368,7 @@ public final class ConnectionUrlParser {
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
-		return switch (authTypeStr.toUpperCase()) {
+		return switch (authTypeStr.toUpperCase(Locale.ROOT)) {
 			case "EMULATOR" -> new EmulatorAuth();
 			case "SERVICE_ACCOUNT" -> {
 				String credentials = properties.get("credentials");
@@ -466,7 +467,7 @@ public final class ConnectionUrlParser {
 			return null; // Use default from ConnectionProperties
 		}
 		try {
-			return JobCreationMode.valueOf(mode.toUpperCase());
+			return JobCreationMode.valueOf(mode.toUpperCase(Locale.ROOT));
 		} catch (IllegalArgumentException e) {
 			throw new SQLException("Invalid jobCreationMode: " + mode, e);
 		}

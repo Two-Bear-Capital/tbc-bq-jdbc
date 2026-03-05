@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<ruleset name="TBC BQ JDBC Ruleset"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+
+    <description>
+        Custom PMD ruleset for tbc-bq-jdbc. Inherits Best Practices and Error Prone rulesets
+        with targeted exclusions for JDBC API constraints and BigQuery SDK limitations.
+    </description>
+
+    <!-- =========================================================================
+         Best Practices
+         ========================================================================= -->
+    <rule ref="category/java/bestpractices.xml">
+
+        <!--
+            UseVarargs: changing String[] last-parameter to varargs is a binary-incompatible
+            API change for any downstream caller. Not worth the risk for internal helpers.
+        -->
+        <exclude name="UseVarargs"/>
+
+        <!--
+            GuardLogStatement: the project uses SLF4J 2.x parameterized logging throughout
+            (e.g. logger.debug("msg {}", var)), which defers string formatting automatically.
+            Only trace-level calls need explicit guards; debug/info/warn/error are excluded.
+            Configure at rule level below so trace guards remain enforced.
+        -->
+        <exclude name="GuardLogStatement"/>
+
+        <!--
+            LooseCoupling: BigQuery Java SDK exposes FieldList, FieldValueList, etc. as
+            concrete classes without stable public interfaces, making it impossible to
+            program to an interface here.
+        -->
+        <exclude name="LooseCoupling"/>
+
+    </rule>
+
+    <!-- Re-include GuardLogStatement scoped to trace level only -->
+    <rule ref="category/java/bestpractices.xml/GuardLogStatement">
+        <properties>
+            <property name="logLevels" value="trace"/>
+            <property name="guardsMethods" value="isTraceEnabled"/>
+        </properties>
+    </rule>
+
+    <!-- =========================================================================
+         Error Prone
+         ========================================================================= -->
+    <rule ref="category/java/errorprone.xml">
+
+        <!--
+            ReplaceJavaUtilDate: java.sql.Date, java.sql.Time, and java.sql.Timestamp all
+            extend java.util.Date. The JDBC 4.x PreparedStatement and ResultSet method
+            signatures (setDate, getDate, setTime, getTime, setTimestamp, getTimestamp)
+            require java.util.Date/Calendar. These cannot be changed.
+        -->
+        <exclude name="ReplaceJavaUtilDate"/>
+
+        <!--
+            ReplaceJavaUtilCalendar: same JDBC API constraint — setDate(Date x, Calendar cal)
+            and getDate(int col, Calendar cal) etc. require java.util.Calendar.
+        -->
+        <exclude name="ReplaceJavaUtilCalendar"/>
+
+        <!--
+            AvoidDuplicateLiterals: repeated string literals in JDBC metadata column-name
+            arrays ("TABLE_CAT", "TABLE_SCHEM", etc.), property-info builders ("true"/"false"),
+            and version-parsing code. Extracting each to a named constant adds boilerplate
+            with no practical benefit in these contexts.
+        -->
+        <exclude name="AvoidDuplicateLiterals"/>
+
+        <!--
+            AvoidLiteralsInIfCondition: numeric/string literals in parsing and validation
+            conditionals (e.g. parts.length == 3, idx < 1, "true"/"false" comparisons).
+            These are intentional, self-documenting, and extracting them to constants would
+            add noise without improving readability.
+        -->
+        <exclude name="AvoidLiteralsInIfCondition"/>
+
+    </rule>
+
+</ruleset>

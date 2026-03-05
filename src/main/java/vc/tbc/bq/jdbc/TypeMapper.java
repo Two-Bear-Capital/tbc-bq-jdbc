@@ -19,6 +19,7 @@ import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 
 import java.sql.Types;
+import java.util.Locale;
 
 /**
  * Utility class for mapping between BigQuery types and JDBC types.
@@ -289,7 +290,7 @@ public final class TypeMapper {
 		if (dataType == null || dataType.isBlank()) {
 			return new InfoSchemaTypeInfo(Types.OTHER, 0, 0);
 		}
-		String upper = dataType.trim().toUpperCase();
+		String upper = dataType.trim().toUpperCase(Locale.ROOT);
 		if (upper.startsWith("ARRAY")) {
 			return new InfoSchemaTypeInfo(Types.ARRAY, 0, 0);
 		}

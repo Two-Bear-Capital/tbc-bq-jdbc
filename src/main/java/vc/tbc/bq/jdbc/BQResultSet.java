@@ -57,7 +57,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 								// spec
 	private final boolean nativeComplexTypes; // When true, return BQArray/BQStruct instead of JSON strings
 	private FieldValueList currentRow;
-	private boolean wasNull = false;
+	private boolean lastWasNull = false;
 	private int rowCount = 0; // Track rows returned for maxRows enforcement
 	private Map<String, Integer> columnIndexByName; // Lazy-initialized for O(1) findColumn()
 
@@ -69,6 +69,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	 * @param tableResult
 	 *            the BigQuery table result
 	 */
+	@SuppressWarnings("PMD.NullAssignment") // schemaFields is null when schema is unavailable; intentional
 	public BQResultSet(BQStatement statement, TableResult tableResult) {
 		this.statement = statement;
 		this.tableResult = tableResult;
@@ -119,6 +120,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	 * @param allowNullTableResult
 	 *            marker parameter to distinguish this constructor
 	 */
+	@SuppressWarnings("PMD.NullAssignment") // rowIterator and schemaFields may be null; intentional for subclass usage
 	protected BQResultSet(BQStatement statement, TableResult tableResult, boolean allowNullTableResult) {
 		if (!allowNullTableResult && tableResult == null) {
 			throw new IllegalArgumentException("tableResult cannot be null");
@@ -161,7 +163,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 			throw new BQSQLException("Column index out of bounds: " + columnIndex);
 		}
 		FieldValue value = currentRow.get(columnIndex - 1);
-		wasNull = value.isNull();
+		lastWasNull = value.isNull();
 		return value;
 	}
 
@@ -207,6 +209,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	}
 
 	@Override
+	@SuppressWarnings("PMD.NullAssignment") // null-out currentRow to indicate end-of-rows; intentional JDBC iterator
+											// pattern
 	public boolean next() throws SQLException {
 		checkClosed();
 
@@ -226,6 +230,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	}
 
 	@Override
+	@SuppressWarnings("PMD.NullAssignment") // null-out currentRow on close to release reference; intentional cleanup
 	protected void doClose() throws SQLException {
 		currentRow = null;
 		logger.debug("ResultSet closed");
@@ -234,7 +239,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public boolean wasNull() throws SQLException {
 		checkClosed();
-		return wasNull;
+		return lastWasNull;
 	}
 
 	@Override

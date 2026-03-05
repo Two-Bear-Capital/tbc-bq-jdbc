@@ -27,6 +27,7 @@ import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 
 import java.sql.*;
+import java.util.Locale;
 
 /**
  * JDBC DatabaseMetaData implementation for BigQuery.
@@ -799,7 +800,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				String paramMode = row.get("parameter_mode").isNull()
 						? "IN"
 						: row.get("parameter_mode").getStringValue();
-				short columnType = switch (paramMode.toUpperCase()) {
+				short columnType = switch (paramMode.toUpperCase(Locale.ROOT)) {
 					case "IN" -> (short) DatabaseMetaData.procedureColumnIn;
 					case "OUT" -> (short) DatabaseMetaData.procedureColumnOut;
 					case "INOUT" -> (short) DatabaseMetaData.procedureColumnInOut;
@@ -1986,7 +1987,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 					allRows.addAll(future.join());
 				} catch (java.util.concurrent.CompletionException e) {
 					if (e.getCause() instanceof RuntimeException && e.getCause().getCause() instanceof SQLException) {
-						throw (SQLException) e.getCause().getCause();
+						// Unwrap to the original SQLException; preserve the CompletionException chain
+						SQLException sqlEx = (SQLException) e.getCause().getCause();
+						sqlEx.addSuppressed(e);
+						throw sqlEx;
 					}
 					throw new SQLException(errorMessage, e);
 				}
