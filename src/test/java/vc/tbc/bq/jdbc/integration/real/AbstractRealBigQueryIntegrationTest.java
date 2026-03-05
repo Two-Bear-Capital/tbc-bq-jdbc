@@ -159,4 +159,33 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 			logger.info("Inserted test data into: {}", tableName);
 		}
 	}
+
+	/**
+	 * Creates a connection with {@code nativeComplexTypes=true} for testing native
+	 * JDBC Array/Struct support against real BigQuery.
+	 *
+	 * @return a JDBC connection with native complex types enabled
+	 * @throws SQLException
+	 *             if connection fails
+	 */
+	protected Connection createNativeComplexTypesConnection() throws SQLException {
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&nativeComplexTypes=true", TEST_PROJECT_ID,
+				TEST_DATASET);
+		logger.debug("Connecting with URL (native complex types): {}", url);
+		return DriverManager.getConnection(url);
+	}
+
+	/**
+	 * Creates a test routine (UDF) using the given DDL. Drops any existing routine
+	 * with the same name first. Errors are ignored.
+	 *
+	 * @param routineName
+	 *            the fully-qualified routine name
+	 * @param sql
+	 *            the {@code CREATE OR REPLACE FUNCTION} DDL
+	 */
+	protected void createTestRoutine(String routineName, String sql) {
+		executeIgnoreErrors("DROP FUNCTION IF EXISTS " + routineName);
+		executeIgnoreErrors(sql);
+	}
 }

@@ -118,6 +118,7 @@ jdbc:bigquery:my-project/my_dataset?authType=SERVICE_ACCOUNT&credentials=/path/t
 | `maxResults` | Long | `null` | Maximum rows to fetch (null = unlimited) |
 | `useLegacySql` | Boolean | `false` | Use legacy SQL dialect instead of standard SQL |
 | `pageSize` | Integer | `10000` | Result page size for pagination |
+| `nativeComplexTypes` | Boolean | `false` | Return ARRAY and STRUCT as native JDBC `Array`/`Struct` objects instead of JSON strings |
 
 **Example:**
 ```
@@ -128,6 +129,8 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
 - `timeout=0` means no timeout (wait indefinitely)
 - Smaller `pageSize` reduces memory usage but may increase latency
 - `maxResults` limits total rows returned, regardless of pagination
+- `nativeComplexTypes=false` (default) returns ARRAY/STRUCT as JSON strings — safe for IntelliJ IDEA and tools that don't handle JDBC Array/Struct
+- `nativeComplexTypes=true` enables `rs.getArray()` returning `java.sql.Array` and `rs.getObject()` returning `java.sql.Struct` for RECORD columns; also enables `PreparedStatement.setArray()` and `Connection.createArrayOf()`
 
 ---
 

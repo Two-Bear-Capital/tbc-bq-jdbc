@@ -184,6 +184,10 @@ public final class BQDriver implements Driver {
 				"Write SELECT query results to destination tables (useful for BigQuery emulator compatibility)", false,
 				new String[]{"true", "false"}));
 
+		props.add(prop(info, "nativeComplexTypes", "false",
+				"Return ARRAY and STRUCT as native JDBC Array/Struct objects instead of JSON strings", false,
+				new String[]{"true", "false"}));
+
 		return props.toArray(new DriverPropertyInfo[0]);
 	}
 

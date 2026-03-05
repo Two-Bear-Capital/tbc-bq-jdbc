@@ -489,4 +489,91 @@ class BQDatabaseMetaDataTest {
 		// Then: Should return CLOSE_CURSORS_AT_COMMIT
 		assertEquals(ResultSet.CLOSE_CURSORS_AT_COMMIT, holdability);
 	}
+
+	// Group A: formerly-throwing methods now return empty ResultSets
+
+	@Test
+	void testGetColumnPrivilegesReturnsEmpty() throws SQLException {
+		// Given: connection is open
+		lenient().when(connection.isClosed()).thenReturn(false);
+
+		// When: calling getColumnPrivileges
+		ResultSet rs = metaData.getColumnPrivileges(null, null, "table", null);
+
+		// Then: should not throw, and result set should be empty with 8 columns
+		assertNotNull(rs);
+		assertEquals(8, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetTablePrivilegesReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getTablePrivileges(null, null, null);
+		assertNotNull(rs);
+		assertEquals(7, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetBestRowIdentifierReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getBestRowIdentifier(null, null, "table", 0, true);
+		assertNotNull(rs);
+		assertEquals(8, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetVersionColumnsReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getVersionColumns(null, null, "table");
+		assertNotNull(rs);
+		assertEquals(8, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetCrossReferenceReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getCrossReference(null, null, "parent", null, null, "child");
+		assertNotNull(rs);
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetIndexInfoReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getIndexInfo(null, null, "table", false, false);
+		assertNotNull(rs);
+		assertEquals(13, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetUDTsReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getUDTs(null, null, null, null);
+		assertNotNull(rs);
+		assertEquals(6, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetSuperTypesReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getSuperTypes(null, null, null);
+		assertNotNull(rs);
+		assertEquals(6, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetSuperTablesReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getSuperTables(null, null, null);
+		assertNotNull(rs);
+		assertEquals(4, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
 }

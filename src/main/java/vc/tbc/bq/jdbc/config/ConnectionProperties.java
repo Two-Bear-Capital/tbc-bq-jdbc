@@ -77,6 +77,11 @@ import java.util.Objects;
  * @param enableQueryCostEstimation
  *            whether to run dry-run before each query to estimate cost
  *            (default: false). Cost estimates are attached as SQLWarnings.
+ * @param nativeComplexTypes
+ *            whether to return ARRAY and STRUCT as native JDBC Array/Struct
+ *            objects instead of JSON strings (default: false). When false,
+ *            complex types are returned as JSON strings for IntelliJ
+ *            compatibility.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
@@ -84,7 +89,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Map<String, String> labels, JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi,
 		boolean enableSessions, Integer connectionTimeout, Integer retryCount, Long maxBillingBytes,
 		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean useDestinationTables,
-		Boolean enableQueryCostEstimation) {
+		Boolean enableQueryCostEstimation, Boolean nativeComplexTypes) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -141,6 +146,9 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		}
 		if (enableQueryCostEstimation == null) {
 			enableQueryCostEstimation = false;
+		}
+		if (nativeComplexTypes == null) {
+			nativeComplexTypes = false;
 		}
 	}
 

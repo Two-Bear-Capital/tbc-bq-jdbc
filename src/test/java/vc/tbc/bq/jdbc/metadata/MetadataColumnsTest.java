@@ -332,6 +332,68 @@ class MetadataColumnsTest {
 		assertEquals(Types.SMALLINT, types[13]);
 	}
 
+	// New Inner Class Tests (added in plan)
+
+	@Test
+	void testColumnPrivilegesColumnCount() {
+		assertEquals(8, MetadataColumns.ColumnPrivileges.COLUMN_NAMES.length);
+		assertEquals(8, MetadataColumns.ColumnPrivileges.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testTablePrivilegesColumnCount() {
+		assertEquals(7, MetadataColumns.TablePrivileges.COLUMN_NAMES.length);
+		assertEquals(7, MetadataColumns.TablePrivileges.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testBestRowIdentifierColumnCount() {
+		assertEquals(8, MetadataColumns.BestRowIdentifier.COLUMN_NAMES.length);
+		assertEquals(8, MetadataColumns.BestRowIdentifier.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testVersionColumnsColumnCount() {
+		assertEquals(8, MetadataColumns.VersionColumns.COLUMN_NAMES.length);
+		assertEquals(8, MetadataColumns.VersionColumns.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testIndexInfoColumnCount() {
+		assertEquals(13, MetadataColumns.IndexInfo.COLUMN_NAMES.length);
+		assertEquals(13, MetadataColumns.IndexInfo.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testUDTsColumnCount() {
+		assertEquals(6, MetadataColumns.UDTs.COLUMN_NAMES.length);
+		assertEquals(6, MetadataColumns.UDTs.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testSuperTypesColumnCount() {
+		assertEquals(6, MetadataColumns.SuperTypes.COLUMN_NAMES.length);
+		assertEquals(6, MetadataColumns.SuperTypes.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testSuperTablesColumnCount() {
+		assertEquals(4, MetadataColumns.SuperTables.COLUMN_NAMES.length);
+		assertEquals(4, MetadataColumns.SuperTables.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testProceduresColumnCount() {
+		assertEquals(8, MetadataColumns.Procedures.COLUMN_NAMES.length);
+		assertEquals(8, MetadataColumns.Procedures.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testProcedureColumnsColumnCount() {
+		assertEquals(13, MetadataColumns.ProcedureColumns.COLUMN_NAMES.length);
+		assertEquals(13, MetadataColumns.ProcedureColumns.COLUMN_TYPES.length);
+	}
+
 	// Inner Class Constructor Tests
 
 	@Test

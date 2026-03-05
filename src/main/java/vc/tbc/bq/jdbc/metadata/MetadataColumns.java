@@ -195,6 +195,288 @@ public final class MetadataColumns {
 	}
 
 	/**
+	 * Column definitions for getColumnPrivileges() result set.
+	 */
+	public static final class ColumnPrivileges {
+		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+				"TABLE_SCHEM", // String => table schema (may be null)
+				"TABLE_NAME", // String => table name
+				"COLUMN_NAME", // String => column name
+				"GRANTOR", // String => grantor of access (may be null)
+				"GRANTEE", // String => grantee of access
+				"PRIVILEGE", // String => name of access
+				"IS_GRANTABLE" // String => "YES" if grantee can grant; "NO" if not
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+				Types.VARCHAR, // TABLE_SCHEM
+				Types.VARCHAR, // TABLE_NAME
+				Types.VARCHAR, // COLUMN_NAME
+				Types.VARCHAR, // GRANTOR
+				Types.VARCHAR, // GRANTEE
+				Types.VARCHAR, // PRIVILEGE
+				Types.VARCHAR // IS_GRANTABLE
+		};
+
+		private ColumnPrivileges() {
+		}
+	}
+
+	/**
+	 * Column definitions for getTablePrivileges() result set.
+	 */
+	public static final class TablePrivileges {
+		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+				"TABLE_SCHEM", // String => table schema (may be null)
+				"TABLE_NAME", // String => table name
+				"GRANTOR", // String => grantor of access (may be null)
+				"GRANTEE", // String => grantee of access
+				"PRIVILEGE", // String => name of access
+				"IS_GRANTABLE" // String => "YES" if grantee can grant; "NO" if not
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+				Types.VARCHAR, // TABLE_SCHEM
+				Types.VARCHAR, // TABLE_NAME
+				Types.VARCHAR, // GRANTOR
+				Types.VARCHAR, // GRANTEE
+				Types.VARCHAR, // PRIVILEGE
+				Types.VARCHAR // IS_GRANTABLE
+		};
+
+		private TablePrivileges() {
+		}
+	}
+
+	/**
+	 * Column definitions for getBestRowIdentifier() result set.
+	 */
+	public static final class BestRowIdentifier {
+		public static final String[] COLUMN_NAMES = {"SCOPE", // short => actual scope of result
+				"COLUMN_NAME", // String => column name
+				"DATA_TYPE", // int => SQL data type from java.sql.Types
+				"TYPE_NAME", // String => Data source dependent type name
+				"COLUMN_SIZE", // int => column precision
+				"BUFFER_LENGTH", // int => not used
+				"DECIMAL_DIGITS", // short => scale
+				"PSEUDO_COLUMN" // short => is this a pseudo column
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.SMALLINT, // SCOPE
+				Types.VARCHAR, // COLUMN_NAME
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR, // TYPE_NAME
+				Types.INTEGER, // COLUMN_SIZE
+				Types.INTEGER, // BUFFER_LENGTH
+				Types.SMALLINT, // DECIMAL_DIGITS
+				Types.SMALLINT // PSEUDO_COLUMN
+		};
+
+		private BestRowIdentifier() {
+		}
+	}
+
+	/**
+	 * Column definitions for getVersionColumns() result set.
+	 */
+	public static final class VersionColumns {
+		public static final String[] COLUMN_NAMES = {"SCOPE", // short => is not used
+				"COLUMN_NAME", // String => column name
+				"DATA_TYPE", // int => SQL data type from java.sql.Types
+				"TYPE_NAME", // String => Data source dependent type name
+				"COLUMN_SIZE", // int => precision
+				"BUFFER_LENGTH", // int => length of column value in bytes
+				"DECIMAL_DIGITS", // short => scale
+				"PSEUDO_COLUMN" // short => whether this is pseudo column
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.SMALLINT, // SCOPE
+				Types.VARCHAR, // COLUMN_NAME
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR, // TYPE_NAME
+				Types.INTEGER, // COLUMN_SIZE
+				Types.INTEGER, // BUFFER_LENGTH
+				Types.SMALLINT, // DECIMAL_DIGITS
+				Types.SMALLINT // PSEUDO_COLUMN
+		};
+
+		private VersionColumns() {
+		}
+	}
+
+	/**
+	 * Column definitions for getIndexInfo() result set.
+	 */
+	public static final class IndexInfo {
+		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+				"TABLE_SCHEM", // String => table schema (may be null)
+				"TABLE_NAME", // String => table name
+				"NON_UNIQUE", // boolean => index values can be non-unique
+				"INDEX_QUALIFIER", // String => index catalog (may be null)
+				"INDEX_NAME", // String => index name
+				"TYPE", // short => index type
+				"ORDINAL_POSITION", // short => column sequence number within index (starts at 1)
+				"COLUMN_NAME", // String => column name
+				"ASC_OR_DESC", // String => column sort sequence
+				"CARDINALITY", // long => number of unique values in the index
+				"PAGES", // long => pages used for current table / index
+				"FILTER_CONDITION" // String => filter condition, if any
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+				Types.VARCHAR, // TABLE_SCHEM
+				Types.VARCHAR, // TABLE_NAME
+				Types.BOOLEAN, // NON_UNIQUE
+				Types.VARCHAR, // INDEX_QUALIFIER
+				Types.VARCHAR, // INDEX_NAME
+				Types.SMALLINT, // TYPE
+				Types.SMALLINT, // ORDINAL_POSITION
+				Types.VARCHAR, // COLUMN_NAME
+				Types.VARCHAR, // ASC_OR_DESC
+				Types.BIGINT, // CARDINALITY
+				Types.BIGINT, // PAGES
+				Types.VARCHAR // FILTER_CONDITION
+		};
+
+		private IndexInfo() {
+		}
+	}
+
+	/**
+	 * Column definitions for getUDTs() result set.
+	 */
+	public static final class UDTs {
+		public static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
+				"TYPE_SCHEM", // String => type schema (may be null)
+				"TYPE_NAME", // String => type name
+				"CLASS_NAME", // String => Java class name
+				"DATA_TYPE", // int => type value from java.sql.Types
+				"REMARKS" // String => explanatory comment
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
+				Types.VARCHAR, // TYPE_SCHEM
+				Types.VARCHAR, // TYPE_NAME
+				Types.VARCHAR, // CLASS_NAME
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR // REMARKS
+		};
+
+		private UDTs() {
+		}
+	}
+
+	/**
+	 * Column definitions for getSuperTypes() result set.
+	 */
+	public static final class SuperTypes {
+		public static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
+				"TYPE_SCHEM", // String => type schema (may be null)
+				"TYPE_NAME", // String => type name
+				"SUPERTYPE_CAT", // String => direct super type catalog (may be null)
+				"SUPERTYPE_SCHEM", // String => direct super type schema (may be null)
+				"SUPERTYPE_NAME" // String => direct super type name
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
+				Types.VARCHAR, // TYPE_SCHEM
+				Types.VARCHAR, // TYPE_NAME
+				Types.VARCHAR, // SUPERTYPE_CAT
+				Types.VARCHAR, // SUPERTYPE_SCHEM
+				Types.VARCHAR // SUPERTYPE_NAME
+		};
+
+		private SuperTypes() {
+		}
+	}
+
+	/**
+	 * Column definitions for getSuperTables() result set.
+	 */
+	public static final class SuperTables {
+		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => type catalog (may be null)
+				"TABLE_SCHEM", // String => type schema (may be null)
+				"TABLE_NAME", // String => type name
+				"SUPERTABLE_NAME" // String => direct super table name
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+				Types.VARCHAR, // TABLE_SCHEM
+				Types.VARCHAR, // TABLE_NAME
+				Types.VARCHAR // SUPERTABLE_NAME
+		};
+
+		private SuperTables() {
+		}
+	}
+
+	/**
+	 * Column definitions for getProcedures() result set.
+	 */
+	public static final class Procedures {
+		public static final String[] COLUMN_NAMES = {"PROCEDURE_CAT", // String => procedure catalog (may be null)
+				"PROCEDURE_SCHEM", // String => procedure schema (may be null)
+				"PROCEDURE_NAME", // String => procedure name
+				"reserved1", // reserved for future use
+				"reserved2", // reserved for future use
+				"REMARKS", // String => explanatory comment
+				"PROCEDURE_TYPE", // short => kind of procedure
+				"SPECIFIC_NAME" // String => unique name for this procedure
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // PROCEDURE_CAT
+				Types.VARCHAR, // PROCEDURE_SCHEM
+				Types.VARCHAR, // PROCEDURE_NAME
+				Types.VARCHAR, // reserved1
+				Types.VARCHAR, // reserved2
+				Types.VARCHAR, // REMARKS
+				Types.SMALLINT, // PROCEDURE_TYPE
+				Types.VARCHAR // SPECIFIC_NAME
+		};
+
+		private Procedures() {
+		}
+	}
+
+	/**
+	 * Column definitions for getProcedureColumns() result set.
+	 */
+	public static final class ProcedureColumns {
+		public static final String[] COLUMN_NAMES = {"PROCEDURE_CAT", // String => procedure catalog (may be null)
+				"PROCEDURE_SCHEM", // String => procedure schema (may be null)
+				"PROCEDURE_NAME", // String => procedure name
+				"COLUMN_NAME", // String => column/parameter name
+				"COLUMN_TYPE", // Short => kind of column/parameter
+				"DATA_TYPE", // int => SQL type from java.sql.Types
+				"TYPE_NAME", // String => SQL type name
+				"PRECISION", // int => precision
+				"LENGTH", // int => length in bytes of data
+				"SCALE", // Short => scale
+				"RADIX", // Short => radix
+				"NULLABLE", // Short => can it contain NULL
+				"REMARKS" // String => comment describing parameter/column
+		};
+
+		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // PROCEDURE_CAT
+				Types.VARCHAR, // PROCEDURE_SCHEM
+				Types.VARCHAR, // PROCEDURE_NAME
+				Types.VARCHAR, // COLUMN_NAME
+				Types.SMALLINT, // COLUMN_TYPE
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR, // TYPE_NAME
+				Types.INTEGER, // PRECISION
+				Types.INTEGER, // LENGTH
+				Types.SMALLINT, // SCALE
+				Types.SMALLINT, // RADIX
+				Types.SMALLINT, // NULLABLE
+				Types.VARCHAR // REMARKS
+		};
+
+		private ProcedureColumns() {
+		}
+	}
+
+	/**
 	 * Column definitions for getImportedKeys() and getExportedKeys() result sets.
 	 */
 	public static final class ForeignKeys {

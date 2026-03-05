@@ -21,6 +21,9 @@ import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import vc.tbc.bq.jdbc.BQArray;
+import vc.tbc.bq.jdbc.BQStruct;
+import vc.tbc.bq.jdbc.TypeMapper;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -89,6 +92,62 @@ public final class FieldValueConverter {
 		}
 
 		return value.getValue();
+	}
+
+	/**
+	 * Converts a BigQuery REPEATED FieldValue to a {@link BQArray} for native JDBC
+	 * Array support.
+	 *
+	 * <p>
+	 * Delegates element extraction to {@link #extractList(List, Field)} and type
+	 * mapping to {@link TypeMapper#toJdbcType(StandardSQLTypeName)}.
+	 *
+	 * @param value
+	 *            the FieldValue with REPEATED attribute (must not be null)
+	 * @param field
+	 *            the schema Field providing element type information; may be null
+	 * @return a {@link BQArray} containing the extracted elements
+	 */
+	public static BQArray toBQArray(FieldValue value, Field field) {
+		List<Object> elements = extractList(value.getRepeatedValue(), field);
+		StandardSQLTypeName elemType = null;
+		if (field != null) {
+			FieldList subFields = field.getSubFields();
+			if (subFields != null && !subFields.isEmpty()) {
+				elemType = subFields.getFirst().getType().getStandardType();
+			} else {
+				elemType = field.getType().getStandardType();
+			}
+		}
+		int baseType = TypeMapper.toJdbcType(elemType);
+		String baseTypeName = elemType != null ? elemType.name() : "UNKNOWN";
+		return new BQArray(elements, baseType, baseTypeName);
+	}
+
+	/**
+	 * Converts a BigQuery RECORD FieldValue to a {@link BQStruct} for native JDBC
+	 * Struct support.
+	 *
+	 * <p>
+	 * Delegates field extraction to {@link #recordToObject(List, Field)} and type
+	 * name resolution to {@link TypeMapper#getTypeName(Field)}.
+	 *
+	 * @param value
+	 *            the FieldValue with RECORD attribute (must not be null)
+	 * @param field
+	 *            the schema Field providing sub-field names; may be null
+	 * @return a {@link BQStruct} containing the extracted field values in schema
+	 *         order
+	 */
+	public static BQStruct toBQStruct(FieldValue value, Field field) {
+		Object result = recordToObject(value.getRecordValue(), field);
+		Object[] attributes = switch (result) {
+			case Map<?, ?> m -> m.values().toArray();
+			case List<?> l -> l.toArray();
+			default -> new Object[]{result};
+		};
+		String typeName = field != null ? TypeMapper.getTypeName(field) : "STRUCT";
+		return new BQStruct(typeName, attributes);
 	}
 
 	/**

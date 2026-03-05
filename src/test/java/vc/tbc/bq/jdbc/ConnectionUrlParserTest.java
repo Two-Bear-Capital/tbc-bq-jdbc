@@ -408,6 +408,28 @@ class ConnectionUrlParserTest {
 	}
 
 	@Test
+	void testParseUrlWithNativeComplexTypesTrue() throws SQLException {
+		String url = "jdbc:bigquery:my-project?nativeComplexTypes=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.nativeComplexTypes());
+	}
+
+	@Test
+	void testParseUrlWithNativeComplexTypesFalse() throws SQLException {
+		String url = "jdbc:bigquery:my-project?nativeComplexTypes=false";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertFalse(props.nativeComplexTypes());
+	}
+
+	@Test
+	void testNativeComplexTypesDefaultIsFalse() throws SQLException {
+		// nativeComplexTypes defaults to false when not specified
+		String url = "jdbc:bigquery:my-project";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertFalse(props.nativeComplexTypes());
+	}
+
+	@Test
 	void testParseUrlAllProperties() throws SQLException {
 		// Given: A URL with every supported property set
 		String url = "jdbc:bigquery:my-project/my_dataset"
@@ -415,7 +437,8 @@ class ConnectionUrlParserTest {
 				+ "&labels=env=prod,team=data&jobCreationMode=OPTIONAL&datasetProjectId=other-project"
 				+ "&pageSize=500&useStorageApi=false&enableSessions=true&connectionTimeout=45"
 				+ "&retryCount=2&maxBillingBytes=5000000&metadataCacheTtl=120&metadataCacheEnabled=false"
-				+ "&metadataLazyLoad=true&useDestinationTables=true&enableQueryCostEstimation=true";
+				+ "&metadataLazyLoad=true&useDestinationTables=true&enableQueryCostEstimation=true"
+				+ "&nativeComplexTypes=true";
 
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
 
@@ -441,5 +464,6 @@ class ConnectionUrlParserTest {
 		assertTrue(props.metadataLazyLoad());
 		assertTrue(props.useDestinationTables());
 		assertTrue(props.enableQueryCostEstimation());
+		assertTrue(props.nativeComplexTypes());
 	}
 }

@@ -514,8 +514,72 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 				setParameter(parameterIndex, QueryParameterValue.of(dt.toString(), StandardSQLTypeName.DATE));
 			case Time t -> setParameter(parameterIndex, QueryParameterValue.of(t.toString(), StandardSQLTypeName.TIME));
 			case byte[] bytes -> setParameter(parameterIndex, QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
+			case java.sql.Array a -> setArray(parameterIndex, a);
+			case java.util.List<?> list -> setListParameter(parameterIndex, list);
 			default -> throw new SQLException("Unsupported parameter type: " + x.getClass().getName());
 		}
+	}
+
+	@Override
+	public void setArray(int parameterIndex, java.sql.Array x) throws SQLException {
+		checkClosed();
+		if (x == null) {
+			setNull(parameterIndex, java.sql.Types.ARRAY);
+			return;
+		}
+		Object[] arr = (Object[]) x.getArray();
+		StandardSQLTypeName elemType = TypeMapper.toStandardSQLTypeName(x.getBaseType());
+		QueryParameterValue[] paramValues = new QueryParameterValue[arr.length];
+		for (int i = 0; i < arr.length; i++) {
+			Object elem = arr[i];
+			if (elem == null) {
+				paramValues[i] = QueryParameterValue.of(null, elemType);
+			} else {
+				paramValues[i] = QueryParameterValue.of(elem.toString(), elemType);
+			}
+		}
+		setParameter(parameterIndex, QueryParameterValue.array(paramValues, elemType));
+	}
+
+	private void setListParameter(int parameterIndex, java.util.List<?> list) throws SQLException {
+		if (list.isEmpty()) {
+			setParameter(parameterIndex,
+					QueryParameterValue.array(new QueryParameterValue[0], StandardSQLTypeName.STRING));
+			return;
+		}
+		// Infer element type from first non-null element
+		Object first = list.stream().filter(e -> e != null).findFirst().orElse(null);
+		StandardSQLTypeName elemType = inferSqlType(first);
+		QueryParameterValue[] paramValues = new QueryParameterValue[list.size()];
+		for (int i = 0; i < list.size(); i++) {
+			Object elem = list.get(i);
+			if (elem == null) {
+				paramValues[i] = QueryParameterValue.of(null, elemType);
+			} else {
+				paramValues[i] = QueryParameterValue.of(elem.toString(), elemType);
+			}
+		}
+		setParameter(parameterIndex, QueryParameterValue.array(paramValues, elemType));
+	}
+
+	private static StandardSQLTypeName inferSqlType(Object obj) {
+		if (obj instanceof String)
+			return StandardSQLTypeName.STRING;
+		if (obj instanceof Long || obj instanceof Integer)
+			return StandardSQLTypeName.INT64;
+		if (obj instanceof Double || obj instanceof Float)
+			return StandardSQLTypeName.FLOAT64;
+		if (obj instanceof Boolean)
+			return StandardSQLTypeName.BOOL;
+		if (obj instanceof java.math.BigDecimal)
+			return StandardSQLTypeName.NUMERIC;
+		if (obj instanceof java.sql.Timestamp)
+			return StandardSQLTypeName.TIMESTAMP;
+		if (obj instanceof java.sql.Date)
+			return StandardSQLTypeName.DATE;
+		if (obj instanceof java.sql.Time)
+			return StandardSQLTypeName.TIME;
+		return StandardSQLTypeName.STRING;
 	}
 
 	@Override

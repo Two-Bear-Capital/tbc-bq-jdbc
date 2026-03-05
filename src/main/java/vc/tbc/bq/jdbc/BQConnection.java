@@ -612,6 +612,21 @@ public final class BQConnection extends AbstractBQConnection {
 		return networkTimeout;
 	}
 
+	@Override
+	public java.sql.Array createArrayOf(String typeName, Object[] elements) throws SQLException {
+		checkClosed();
+		com.google.cloud.bigquery.StandardSQLTypeName sqlType;
+		try {
+			sqlType = com.google.cloud.bigquery.StandardSQLTypeName.valueOf(typeName.toUpperCase());
+		} catch (IllegalArgumentException e) {
+			// Fall back to STRING for unknown type names
+			sqlType = com.google.cloud.bigquery.StandardSQLTypeName.STRING;
+		}
+		int jdbcType = TypeMapper.toJdbcType(sqlType);
+		java.util.List<Object> elementList = elements != null ? java.util.Arrays.asList(elements) : java.util.List.of();
+		return new BQArray(elementList, jdbcType, typeName.toUpperCase());
+	}
+
 	// JDBC 4.3 methods
 
 	@Override

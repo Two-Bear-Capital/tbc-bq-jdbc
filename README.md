@@ -58,7 +58,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
 - JetBrains driver: Hangs or takes 90+ seconds
 - tbc-bq-jdbc: 2-3 seconds (30x faster)
 
-✅ **Safe STRUCT/ARRAY Handling** - JSON representation prevents crashes (fixes [DBE-12749](https://youtrack.jetbrains.com/issue/DBE-12749))
+✅ **Safe STRUCT/ARRAY Handling** - JSON representation prevents crashes (fixes [DBE-12749](https://youtrack.jetbrains.com/issue/DBE-12749)); native `java.sql.Array`/`java.sql.Struct` objects available via `nativeComplexTypes=true`
 
 ✅ **Robust Authentication** - Automatic token refresh for long sessions (fixes [DBE-19753](https://youtrack.jetbrains.com/issue/DBE-19753))
 
@@ -363,7 +363,7 @@ After building:
 
 ### Unit Tests
 
-91 unit tests covering:
+904 unit tests covering:
 - Driver registration and URL parsing
 - Connection property validation
 - Authentication configuration
@@ -461,8 +461,6 @@ export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 - Scrollable or updatable ResultSets
 - Batch operations
 - CallableStatement
-- Stored procedures (limited routine support)
-- Full Array/Struct JDBC support (work in progress)
 
 See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete details.
 
@@ -500,7 +498,6 @@ See [Connection Properties - Performance Tuning](docs/CONNECTION_PROPERTIES.md#p
 - Forward-only ResultSets (no scrollable)
 - Read-only ResultSets (no updatable)
 - No batch operations (use BigQuery array syntax)
-- Limited Array/Struct support
 
 See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 
@@ -514,15 +511,15 @@ See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 - ✅ All authentication methods
 - ✅ Session support
 - ✅ Complete type mapping
+- ✅ Native JDBC Array/Struct support (`nativeComplexTypes=true`)
+- ✅ Routine (UDF) metadata via `getProcedures()` / `getProcedureColumns()`
+- ✅ Enhanced DatabaseMetaData (9 formerly-unsupported methods now return compliant results)
 - ✅ Extensive testing (unit, emulator, and real BigQuery integration tests)
 - ✅ Comprehensive documentation
 
 ### Future Versions
 
-- Full Array/Struct JDBC support
 - Complete Storage API Arrow deserialization
-- Routine (UDF) metadata
-- Enhanced DatabaseMetaData
 - Additional authentication methods
 
 ## Contributing

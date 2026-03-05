@@ -134,8 +134,8 @@ VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie')
 | `Blob`, `Clob`, `NClob` | ❌ No | Use byte[] and String |
 | `SQLXML` | ❌ No | Use String with JSON |
 | `Ref`, `RowId` | ❌ No | N/A |
-| `Array` (full support) | ⚠️ Limited | Get as String, parse manually |
-| `Struct` (full support) | ⚠️ Limited | Query fields individually |
+| `Array` | ✅ Full | Native `java.sql.Array` with `nativeComplexTypes=true`; JSON string by default |
+| `Struct` | ✅ Full | Native `java.sql.Struct` with `nativeComplexTypes=true`; JSON string by default |
 | Custom type maps | ❌ No | Use getObject() |
 | `Sharding` API (JDBC 4.3) | ❌ No | N/A |
 
@@ -154,6 +154,16 @@ VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie')
 | `getTableTypes()` | ✅ Full | TABLE, VIEW, MATERIALIZED VIEW |
 | `getPrimaryKeys()` | ⚠️ Partial | BigQuery has no PKs, returns empty |
 | `getIndexInfo()` | ⚠️ Partial | BigQuery has no indexes, returns empty |
+| `getProcedures()` | ✅ Full | Queries `INFORMATION_SCHEMA.ROUTINES` with caching and parallel loading |
+| `getProcedureColumns()` | ✅ Full | Queries `INFORMATION_SCHEMA.PARAMETERS` with caching and parallel loading |
+| `getColumnPrivileges()` | ⚠️ Partial | BigQuery uses IAM, returns empty |
+| `getTablePrivileges()` | ⚠️ Partial | BigQuery uses IAM, returns empty |
+| `getBestRowIdentifier()` | ⚠️ Partial | BigQuery has no PKs, returns empty |
+| `getVersionColumns()` | ⚠️ Partial | BigQuery has no row versioning, returns empty |
+| `getCrossReference()` | ⚠️ Partial | BigQuery has no FK constraints, returns empty |
+| `getUDTs()` | ⚠️ Partial | Not applicable to BigQuery, returns empty |
+| `getSuperTypes()` | ⚠️ Partial | Not applicable to BigQuery, returns empty |
+| `getSuperTables()` | ⚠️ Partial | Not applicable to BigQuery, returns empty |
 | `getTypeInfo()` | ✅ Full | BigQuery type information |
 | Product info | ✅ Full | Driver name, version, etc. |
 | JDBC version | ✅ Full | Returns 4.3 |
@@ -175,11 +185,6 @@ VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie')
 | `getForeignKeys()` | Empty | BigQuery has no FKs |
 | `getImportedKeys()` | Empty | BigQuery has no FKs |
 | `getExportedKeys()` | Empty | BigQuery has no FKs |
-| `getProcedures()` | Empty | BigQuery routines not supported yet |
-| `getProcedureColumns()` | Empty | Not supported |
-| `getUDTs()` | Empty | Not supported |
-| `getSuperTypes()` | Empty | Not supported |
-| `getSuperTables()` | Empty | Not supported |
 
 ---
 
@@ -499,10 +504,10 @@ Use ORMs for read-only queries. For writes, use:
 
 ### Current Limitations
 
-1. **Array/Struct Support:** Limited to JSON string representation
-   - **Status:** Framework in place, displays as readable JSON
-   - **Workaround:** Parse JSON manually if needed
-   - **Note:** Prevents crashes (unlike JetBrains driver)
+1. **Array/Struct Default Behavior:** JSON string representation by default
+   - **Status:** Native `java.sql.Array` / `java.sql.Struct` support available via `nativeComplexTypes=true`
+   - **Default:** JSON strings prevent crashes with IDEs (e.g., IntelliJ IDEA — see [DBE-12749](https://youtrack.jetbrains.com/issue/DBE-12749))
+   - **Native mode:** `jdbc:bigquery:my-project/my_dataset?authType=ADC&nativeComplexTypes=true`
 
 2. **Storage API:** Framework exists, Arrow deserialization incomplete
    - **Status:** Works for detection, full implementation in progress
@@ -510,9 +515,8 @@ Use ORMs for read-only queries. For writes, use:
 
 ### Planned Enhancements
 
-- Full Array/Struct JDBC support (beyond JSON strings)
 - Complete Storage API Arrow deserialization
-- Routine (UDF/stored procedure) metadata
+- Additional authentication methods
 
 ---
 

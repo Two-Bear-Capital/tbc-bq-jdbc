@@ -288,4 +288,114 @@ class MetadataTest extends AbstractBigQueryIntegrationTest {
 		// Then: Should match connection setting
 		assertEquals(connection.isReadOnly(), metaData.isReadOnly());
 	}
+
+	// Group A: formerly-throwing methods now return empty ResultSets
+
+	@Test
+	void testGetColumnPrivilegesReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getColumnPrivileges(null, null, "table", null);
+		assertNotNull(rs);
+		assertEquals(8, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — BigQuery uses IAM, not column privileges");
+	}
+
+	@Test
+	void testGetTablePrivilegesReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getTablePrivileges(null, null, null);
+		assertNotNull(rs);
+		assertEquals(7, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — BigQuery uses IAM, not table privileges");
+	}
+
+	@Test
+	void testGetBestRowIdentifierReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getBestRowIdentifier(null, null, "table", 0, true);
+		assertNotNull(rs);
+		assertEquals(8, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — BigQuery has no primary keys");
+	}
+
+	@Test
+	void testGetVersionColumnsReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getVersionColumns(null, null, "table");
+		assertNotNull(rs);
+		assertEquals(8, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — BigQuery has no row versioning");
+	}
+
+	@Test
+	void testGetCrossReferenceReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getCrossReference(null, null, "parent", null, null, "child");
+		assertNotNull(rs);
+		assertFalse(rs.next(), "Should be empty — BigQuery has no FK constraints");
+	}
+
+	@Test
+	void testGetIndexInfoReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getIndexInfo(null, null, "table", false, false);
+		assertNotNull(rs);
+		assertEquals(13, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — BigQuery has no indexes");
+	}
+
+	@Test
+	void testGetUDTsReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getUDTs(null, null, null, null);
+		assertNotNull(rs);
+		assertEquals(6, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — BigQuery has no UDTs");
+	}
+
+	@Test
+	void testGetSuperTypesReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getSuperTypes(null, null, null);
+		assertNotNull(rs);
+		assertEquals(6, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — not applicable to BigQuery");
+	}
+
+	@Test
+	void testGetSuperTablesReturnsEmpty() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+		ResultSet rs = metaData.getSuperTables(null, null, null);
+		assertNotNull(rs);
+		assertEquals(4, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next(), "Should be empty — not applicable to BigQuery");
+	}
+
+	// Group B: getProcedures and getProcedureColumns
+
+	@Test
+	void testGetProceduresReturnsValidResultSet() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+
+		// When: calling getProcedures with wildcard arguments
+		ResultSet rs = metaData.getProcedures(null, null, null);
+
+		// Then: should not throw and should return 8-column ResultSet
+		assertNotNull(rs);
+		assertEquals(8, rs.getMetaData().getColumnCount());
+		// Emulator may not support INFORMATION_SCHEMA.ROUTINES — empty result is fine
+	}
+
+	@Test
+	void testGetProcedureColumnsReturnsValidResultSet() throws SQLException {
+		DatabaseMetaData metaData = connection.getMetaData();
+
+		// When: calling getProcedureColumns with wildcard arguments
+		ResultSet rs = metaData.getProcedureColumns(null, null, null, null);
+
+		// Then: should not throw and should return 13-column ResultSet
+		assertNotNull(rs);
+		assertEquals(13, rs.getMetaData().getColumnCount());
+		// Emulator may not support INFORMATION_SCHEMA.PARAMETERS — empty result is fine
+	}
 }

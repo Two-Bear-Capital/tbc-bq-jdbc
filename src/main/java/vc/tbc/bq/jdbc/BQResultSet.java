@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.base.BaseReadOnlyResultSet;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
+import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.metadata.BQResultSetMetaData;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.FieldValueConverter;
@@ -54,6 +55,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	private final FieldList schemaFields; // Cached at construction to avoid repeated schema traversal
 	private final int maxRows; // Cached at construction; setMaxRows must be called before execution per JDBC
 								// spec
+	private final boolean nativeComplexTypes; // When true, return BQArray/BQStruct instead of JSON strings
 	private FieldValueList currentRow;
 	private boolean wasNull = false;
 	private int rowCount = 0; // Track rows returned for maxRows enforcement
@@ -74,6 +76,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		Schema schema = tableResult.getSchema();
 		this.schemaFields = schema != null ? schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
+		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
 	}
 
 	/**
@@ -88,6 +91,18 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	 */
 	BQResultSet(TableResult tableResult) {
 		this(null, tableResult);
+	}
+
+	private static boolean resolveNativeComplexTypes(BQStatement statement) {
+		if (statement == null) {
+			return false;
+		}
+		try {
+			BQConnection conn = (BQConnection) statement.getConnection();
+			return conn != null && conn.getProperties().nativeComplexTypes();
+		} catch (Exception ignored) {
+			return false;
+		}
 	}
 
 	/**
@@ -114,6 +129,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		Schema schema = tableResult != null ? tableResult.getSchema() : null;
 		this.schemaFields = schema != null ? schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
+		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
 	}
 
 	private static int resolveMaxRows(BQStatement statement) {
@@ -428,12 +444,39 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return null;
 		}
-		return FieldValueConverter.toObject(value, getSchemaField(columnIndex));
+		Field field = getSchemaField(columnIndex);
+		if (nativeComplexTypes) {
+			if (value.getAttribute() == FieldValue.Attribute.REPEATED) {
+				return FieldValueConverter.toBQArray(value, field);
+			}
+			if (value.getAttribute() == FieldValue.Attribute.RECORD) {
+				return FieldValueConverter.toBQStruct(value, field);
+			}
+		}
+		return FieldValueConverter.toObject(value, field);
 	}
 
 	@Override
 	public Object getObject(String columnLabel) throws SQLException {
 		return getObject(findColumn(columnLabel));
+	}
+
+	@Override
+	public Array getArray(int columnIndex) throws SQLException {
+		if (!nativeComplexTypes) {
+			throw new BQSQLFeatureNotSupportedException(
+					"getArray() requires nativeComplexTypes=true connection property");
+		}
+		FieldValue value = getFieldValue(columnIndex);
+		if (value.isNull()) {
+			return null;
+		}
+		return FieldValueConverter.toBQArray(value, getSchemaField(columnIndex));
+	}
+
+	@Override
+	public Array getArray(String columnLabel) throws SQLException {
+		return getArray(findColumn(columnLabel));
 	}
 
 	@Override

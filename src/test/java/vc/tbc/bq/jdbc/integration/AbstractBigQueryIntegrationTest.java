@@ -178,4 +178,36 @@ public abstract class AbstractBigQueryIntegrationTest {
 			logger.info("Inserted test data into: {}", tableName);
 		}
 	}
+
+	/**
+	 * Creates a connection with {@code nativeComplexTypes=true} for testing native
+	 * JDBC Array/Struct support.
+	 *
+	 * @return a JDBC connection with native complex types enabled
+	 * @throws SQLException
+	 *             if connection fails
+	 */
+	protected Connection createNativeComplexTypesConnection() throws SQLException {
+		String host = bigqueryEmulator.getHost();
+		int port = bigqueryEmulator.getMappedPort(9050);
+		String url = String.format(
+				"jdbc:bigquery://%s:%d;ProjectId=%s;DefaultDataset=%s;UseDestinationTables=true;nativeComplexTypes=true",
+				host, port, TEST_PROJECT_ID, TEST_DATASET);
+		return DriverManager.getConnection(url);
+	}
+
+	/**
+	 * Creates a test routine (UDF) using the given DDL. Drops any existing routine
+	 * with the same name first. Errors are ignored (emulator may not support
+	 * routines).
+	 *
+	 * @param routineName
+	 *            the fully-qualified routine name
+	 * @param sql
+	 *            the {@code CREATE OR REPLACE FUNCTION} DDL
+	 */
+	protected void createTestRoutine(String routineName, String sql) {
+		executeIgnoreErrors("DROP FUNCTION IF EXISTS " + routineName);
+		executeIgnoreErrors(sql);
+	}
 }

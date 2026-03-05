@@ -679,13 +679,158 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getProcedures(String catalog, String schemaPattern, String procedureNamePattern)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getProcedures not yet implemented");
+		checkClosed();
+
+		logger.info("getProcedures() called - catalog: [{}], schemaPattern: [{}], procedureNamePattern: [{}]", catalog,
+				schemaPattern, procedureNamePattern);
+
+		String cacheKey = "procedures:" + catalog + ":" + schemaPattern + ":" + procedureNamePattern;
+		return getCachedOrExecute(cacheKey, () -> executeGetProcedures(catalog, schemaPattern, procedureNamePattern));
+	}
+
+	private ResultSet executeGetProcedures(String catalog, String schemaPattern, String procedureNamePattern)
+			throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryProceduresForDataset(projectId, datasetId, procedureNamePattern),
+				"Error querying procedures in parallel");
+
+		logger.info("getProcedures() returning {} routine(s)", rows.size());
+		return createResultSet(MetadataColumns.Procedures.COLUMN_NAMES, MetadataColumns.Procedures.COLUMN_TYPES, rows);
+	}
+
+	private java.util.List<Object[]> queryProceduresForDataset(String projectId, String datasetId,
+			String procedureNamePattern) {
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+		try {
+			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+			String sql = String.format(
+					"SELECT routine_name, routine_type, routine_comment FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
+					projectId, datasetId);
+			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
+					.newBuilder(sql).build();
+			com.google.cloud.bigquery.TableResult result = bigquery.query(config);
+			for (com.google.cloud.bigquery.FieldValueList row : result.iterateAll()) {
+				String routineName = row.get("routine_name").getStringValue();
+				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
+					continue;
+				}
+				String remarks = row.get("routine_comment").isNull()
+						? null
+						: row.get("routine_comment").getStringValue();
+				rows.add(buildProcedureRow(projectId, datasetId, routineName, remarks));
+			}
+		} catch (Exception e) {
+			logger.warn("Could not query INFORMATION_SCHEMA.ROUTINES for dataset {}: {} (emulator may not support)",
+					datasetId, e.getMessage());
+		}
+		return rows;
+	}
+
+	private Object[] buildProcedureRow(String projectId, String datasetId, String routineName, String remarks) {
+		return new Object[]{projectId, // PROCEDURE_CAT
+				datasetId, // PROCEDURE_SCHEM
+				routineName, // PROCEDURE_NAME
+				null, // reserved1
+				null, // reserved2
+				remarks, // REMARKS
+				(short) DatabaseMetaData.procedureResultUnknown, // PROCEDURE_TYPE
+				routineName // SPECIFIC_NAME
+		};
 	}
 
 	@Override
 	public ResultSet getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern,
 			String columnNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getProcedureColumns not yet implemented");
+		checkClosed();
+
+		logger.info(
+				"getProcedureColumns() called - catalog: [{}], schemaPattern: [{}], procedureNamePattern: [{}], columnNamePattern: [{}]",
+				catalog, schemaPattern, procedureNamePattern, columnNamePattern);
+
+		String cacheKey = "procedureColumns:" + catalog + ":" + schemaPattern + ":" + procedureNamePattern + ":"
+				+ columnNamePattern;
+		return getCachedOrExecute(cacheKey,
+				() -> executeGetProcedureColumns(catalog, schemaPattern, procedureNamePattern, columnNamePattern));
+	}
+
+	private ResultSet executeGetProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern,
+			String columnNamePattern) throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryProcedureColumnsForDataset(projectId, datasetId, procedureNamePattern,
+						columnNamePattern),
+				"Error querying procedure columns in parallel");
+
+		logger.info("getProcedureColumns() returning {} column(s)", rows.size());
+		return createResultSet(MetadataColumns.ProcedureColumns.COLUMN_NAMES,
+				MetadataColumns.ProcedureColumns.COLUMN_TYPES, rows);
+	}
+
+	private java.util.List<Object[]> queryProcedureColumnsForDataset(String projectId, String datasetId,
+			String procedureNamePattern, String columnNamePattern) {
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+		try {
+			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+			String sql = String.format(
+					"SELECT specific_name, ordinal_position, parameter_name, parameter_mode, data_type "
+							+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.PARAMETERS ORDER BY specific_name, ordinal_position",
+					projectId, datasetId);
+			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
+					.newBuilder(sql).build();
+			com.google.cloud.bigquery.TableResult result = bigquery.query(config);
+			for (com.google.cloud.bigquery.FieldValueList row : result.iterateAll()) {
+				String routineName = row.get("specific_name").getStringValue();
+				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
+					continue;
+				}
+				String paramName = row.get("parameter_name").isNull() ? "" : row.get("parameter_name").getStringValue();
+				if (columnNamePattern != null && !matchesPattern(paramName, columnNamePattern)) {
+					continue;
+				}
+				String dataType = row.get("data_type").isNull() ? "STRING" : row.get("data_type").getStringValue();
+				TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+				String paramMode = row.get("parameter_mode").isNull()
+						? "IN"
+						: row.get("parameter_mode").getStringValue();
+				short columnType = switch (paramMode.toUpperCase()) {
+					case "IN" -> (short) DatabaseMetaData.procedureColumnIn;
+					case "OUT" -> (short) DatabaseMetaData.procedureColumnOut;
+					case "INOUT" -> (short) DatabaseMetaData.procedureColumnInOut;
+					default -> (short) DatabaseMetaData.procedureColumnUnknown;
+				};
+				rows.add(buildProcedureColumnRow(projectId, datasetId, routineName, paramName, columnType, typeInfo,
+						dataType));
+			}
+		} catch (Exception e) {
+			logger.warn("Could not query INFORMATION_SCHEMA.PARAMETERS for dataset {}: {} (emulator may not support)",
+					datasetId, e.getMessage());
+		}
+		return rows;
+	}
+
+	private Object[] buildProcedureColumnRow(String projectId, String datasetId, String routineName, String paramName,
+			short columnType, TypeMapper.InfoSchemaTypeInfo typeInfo, String typeName) {
+		return new Object[]{projectId, // PROCEDURE_CAT
+				datasetId, // PROCEDURE_SCHEM
+				routineName, // PROCEDURE_NAME
+				paramName, // COLUMN_NAME
+				columnType, // COLUMN_TYPE
+				typeInfo.jdbcType(), // DATA_TYPE
+				typeName, // TYPE_NAME
+				typeInfo.columnSize(), // PRECISION
+				typeInfo.columnSize(), // LENGTH
+				(short) typeInfo.decimalDigits(), // SCALE
+				(short) 10, // RADIX
+				(short) DatabaseMetaData.procedureNullable, // NULLABLE
+				null // REMARKS
+		};
 	}
 
 	/**
@@ -1211,24 +1356,37 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getColumnPrivileges(String catalog, String schema, String table, String columnNamePattern)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getColumnPrivileges not supported");
+		checkClosed();
+		logger.info("getColumnPrivileges() called - not applicable to BigQuery (uses IAM), returning empty result");
+		return createResultSet(MetadataColumns.ColumnPrivileges.COLUMN_NAMES,
+				MetadataColumns.ColumnPrivileges.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
 
 	@Override
 	public ResultSet getTablePrivileges(String catalog, String schemaPattern, String tableNamePattern)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getTablePrivileges not supported");
+		checkClosed();
+		logger.info("getTablePrivileges() called - not applicable to BigQuery (uses IAM), returning empty result");
+		return createResultSet(MetadataColumns.TablePrivileges.COLUMN_NAMES,
+				MetadataColumns.TablePrivileges.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
 
 	@Override
 	public ResultSet getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getBestRowIdentifier not supported");
+		checkClosed();
+		logger.info("getBestRowIdentifier() called - not applicable to BigQuery (no PKs), returning empty result");
+		return createResultSet(MetadataColumns.BestRowIdentifier.COLUMN_NAMES,
+				MetadataColumns.BestRowIdentifier.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
 
 	@Override
 	public ResultSet getVersionColumns(String catalog, String schema, String table) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getVersionColumns not supported");
+		checkClosed();
+		logger.info(
+				"getVersionColumns() called - not applicable to BigQuery (no row versioning), returning empty result");
+		return createResultSet(MetadataColumns.VersionColumns.COLUMN_NAMES, MetadataColumns.VersionColumns.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -1269,7 +1427,11 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getCrossReference(String parentCatalog, String parentSchema, String parentTable,
 			String foreignCatalog, String foreignSchema, String foreignTable) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getCrossReference not supported");
+		checkClosed();
+		logger.info(
+				"getCrossReference() called - not applicable to BigQuery (no FK constraints), returning empty result");
+		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -1427,7 +1589,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getIndexInfo not supported");
+		checkClosed();
+		logger.info("getIndexInfo() called - not applicable to BigQuery (no indexes), returning empty result");
+		return createResultSet(MetadataColumns.IndexInfo.COLUMN_NAMES, MetadataColumns.IndexInfo.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -1493,7 +1658,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getUDTs not supported");
+		checkClosed();
+		logger.info("getUDTs() called - not applicable to BigQuery, returning empty result");
+		return createResultSet(MetadataColumns.UDTs.COLUMN_NAMES, MetadataColumns.UDTs.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -1523,12 +1691,18 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	@Override
 	public ResultSet getSuperTypes(String catalog, String schemaPattern, String typeNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getSuperTypes not supported");
+		checkClosed();
+		logger.info("getSuperTypes() called - not applicable to BigQuery, returning empty result");
+		return createResultSet(MetadataColumns.SuperTypes.COLUMN_NAMES, MetadataColumns.SuperTypes.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
 	public ResultSet getSuperTables(String catalog, String schemaPattern, String tableNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getSuperTables not supported");
+		checkClosed();
+		logger.info("getSuperTables() called - not applicable to BigQuery, returning empty result");
+		return createResultSet(MetadataColumns.SuperTables.COLUMN_NAMES, MetadataColumns.SuperTables.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
