@@ -5,11 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.72] - 2026-03-05
+
+### ⚡ Features
+
+- **deps:** Add SpotBugs and PMD plugins for static code analysis
+- **spotbugs:** Add exclusions and enforce checks in build
+
+### 🔀 Pull Requests
+
+- Merge pull request #34 from Two-Bear-Capital/dependabot/maven/maven-dependencies-f891d841da
+
+chore(deps): bump com.google.cloud:libraries-bom from 26.76.0 to 26.77.0 in the maven-dependencies group
+- Merge pull request #33 from Two-Bear-Capital/dependabot/github_actions/github-actions-6abee65517
+
+chore(deps): bump the github-actions group with 2 updates
+
+### 🧪 Testing
+
+- **real:** Ensure unique table names for concurrent CI runs
+
 ## [1.0.71] - 2026-03-05
 
 ### ⚡ Features
 
 - **types:** Add native ARRAY/STRUCT support to BQPreparedStatement and connection
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.71
 
 ## [1.0.70] - 2026-03-05
 
@@ -1865,6 +1889,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.72]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.71...v1.0.72
 [1.0.71]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.70...v1.0.71
 [1.0.70]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.69...v1.0.70
 [1.0.69]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.68...v1.0.69
