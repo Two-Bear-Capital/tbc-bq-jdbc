@@ -662,7 +662,7 @@
                     <includeTestScope>false</includeTestScope>
                     <includeLicenseText>false</includeLicenseText>
                     <outputReactorProjects>true</outputReactorProjects>
-                    <outputFormat>all</outputFormat>
+                    <outputFormat>xml</outputFormat>
                     <outputName>bom</outputName>
                     <verbose>false</verbose>
                 </configuration>
@@ -701,6 +701,7 @@
                     <targetJdk>21</targetJdk>
                     <failOnViolation>false</failOnViolation>
                     <printFailingErrors>true</printFailingErrors>
+                    <linkXRef>false</linkXRef>
                     <rulesets>
                         <ruleset>category/java/bestpractices.xml</ruleset>
                         <ruleset>category/java/errorprone.xml</ruleset>
