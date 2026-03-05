@@ -76,8 +76,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 */
 	protected volatile Job currentJob;
 
-	protected int queryTimeout = 0;
-	protected int maxRows = 0;
+	protected volatile int queryTimeout = 0;
+	protected volatile int maxRows = 0;
 
 	/**
 	 * Current result set. Closed before creating new one to prevent resource leak.

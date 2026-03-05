@@ -670,7 +670,6 @@
 
             <!-- SpotBugs Static Analysis -->
             <!-- Reports written to target/spotbugsXml.xml and target/site/spotbugs.html -->
-            <!-- To enforce failures on bugs: change goal from 'spotbugs' to 'check'     -->
             <plugin>
                 <groupId>com.github.spotbugs</groupId>
                 <artifactId>spotbugs-maven-plugin</artifactId>
@@ -679,13 +678,14 @@
                     <threshold>Medium</threshold>
                     <xmlOutput>true</xmlOutput>
                     <spotbugsXmlOutputDirectory>${project.build.directory}</spotbugsXmlOutputDirectory>
+                    <excludeFilterFile>${project.basedir}/src/main/spotbugs/exclude.xml</excludeFilterFile>
                 </configuration>
                 <executions>
                     <execution>
                         <id>spotbugs-analysis</id>
                         <phase>verify</phase>
                         <goals>
-                            <goal>spotbugs</goal>
+                            <goal>check</goal>
                         </goals>
                     </execution>
                 </executions>

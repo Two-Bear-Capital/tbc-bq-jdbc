@@ -38,7 +38,7 @@ public final class MetadataColumns {
 	 * Column definitions for getTables() result set.
 	 */
 	public static final class Tables {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
 				"TABLE_SCHEM", // String => table schema (may be null)
 				"TABLE_NAME", // String => table name
 				"TABLE_TYPE", // String => table type
@@ -50,7 +50,7 @@ public final class MetadataColumns {
 				"REF_GENERATION" // String => how values in SELF_REFERENCING_COL_NAME created
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
 				Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR, // TABLE_NAME
 				Types.VARCHAR, // TABLE_TYPE
@@ -70,7 +70,7 @@ public final class MetadataColumns {
 	 * Column definitions for getColumns() result set.
 	 */
 	public static final class Columns {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
 				"TABLE_SCHEM", // String => table schema (may be null)
 				"TABLE_NAME", // String => table name
 				"COLUMN_NAME", // String => column name
@@ -96,7 +96,7 @@ public final class MetadataColumns {
 				"IS_GENERATEDCOLUMN" // String => is column generated
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
 				Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR, // TABLE_NAME
 				Types.VARCHAR, // COLUMN_NAME
@@ -130,11 +130,11 @@ public final class MetadataColumns {
 	 * Column definitions for getSchemas() result set.
 	 */
 	public static final class Schemas {
-		public static final String[] COLUMN_NAMES = {"TABLE_SCHEM", // String => schema name
+		static final String[] COLUMN_NAMES = {"TABLE_SCHEM", // String => schema name
 				"TABLE_CATALOG" // String => catalog name (may be null)
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_SCHEM
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR // TABLE_CATALOG
 		};
 
@@ -146,10 +146,10 @@ public final class MetadataColumns {
 	 * Column definitions for getCatalogs() result set.
 	 */
 	public static final class Catalogs {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT" // String => catalog name
+		static final String[] COLUMN_NAMES = {"TABLE_CAT" // String => catalog name
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR // TABLE_CAT
 		};
 
 		private Catalogs() {
@@ -160,10 +160,10 @@ public final class MetadataColumns {
 	 * Column definitions for getTableTypes() result set.
 	 */
 	public static final class TableTypes {
-		public static final String[] COLUMN_NAMES = {"TABLE_TYPE" // String => table type
+		static final String[] COLUMN_NAMES = {"TABLE_TYPE" // String => table type
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR // TABLE_TYPE
+		static final int[] COLUMN_TYPES = {Types.VARCHAR // TABLE_TYPE
 		};
 
 		private TableTypes() {
@@ -174,7 +174,7 @@ public final class MetadataColumns {
 	 * Column definitions for getPrimaryKeys() result set.
 	 */
 	public static final class PrimaryKeys {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
 				"TABLE_SCHEM", // String => table schema (may be null)
 				"TABLE_NAME", // String => table name
 				"COLUMN_NAME", // String => column name
@@ -182,7 +182,7 @@ public final class MetadataColumns {
 				"PK_NAME" // String => primary key name (may be null)
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
 				Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR, // TABLE_NAME
 				Types.VARCHAR, // COLUMN_NAME
@@ -198,7 +198,7 @@ public final class MetadataColumns {
 	 * Column definitions for getColumnPrivileges() result set.
 	 */
 	public static final class ColumnPrivileges {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
 				"TABLE_SCHEM", // String => table schema (may be null)
 				"TABLE_NAME", // String => table name
 				"COLUMN_NAME", // String => column name
@@ -208,7 +208,7 @@ public final class MetadataColumns {
 				"IS_GRANTABLE" // String => "YES" if grantee can grant; "NO" if not
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
 				Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR, // TABLE_NAME
 				Types.VARCHAR, // COLUMN_NAME
@@ -226,7 +226,7 @@ public final class MetadataColumns {
 	 * Column definitions for getTablePrivileges() result set.
 	 */
 	public static final class TablePrivileges {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
 				"TABLE_SCHEM", // String => table schema (may be null)
 				"TABLE_NAME", // String => table name
 				"GRANTOR", // String => grantor of access (may be null)
@@ -235,7 +235,7 @@ public final class MetadataColumns {
 				"IS_GRANTABLE" // String => "YES" if grantee can grant; "NO" if not
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
 				Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR, // TABLE_NAME
 				Types.VARCHAR, // GRANTOR
@@ -252,7 +252,7 @@ public final class MetadataColumns {
 	 * Column definitions for getBestRowIdentifier() result set.
 	 */
 	public static final class BestRowIdentifier {
-		public static final String[] COLUMN_NAMES = {"SCOPE", // short => actual scope of result
+		static final String[] COLUMN_NAMES = {"SCOPE", // short => actual scope of result
 				"COLUMN_NAME", // String => column name
 				"DATA_TYPE", // int => SQL data type from java.sql.Types
 				"TYPE_NAME", // String => Data source dependent type name
@@ -262,7 +262,7 @@ public final class MetadataColumns {
 				"PSEUDO_COLUMN" // short => is this a pseudo column
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.SMALLINT, // SCOPE
+		static final int[] COLUMN_TYPES = {Types.SMALLINT, // SCOPE
 				Types.VARCHAR, // COLUMN_NAME
 				Types.INTEGER, // DATA_TYPE
 				Types.VARCHAR, // TYPE_NAME
@@ -280,7 +280,7 @@ public final class MetadataColumns {
 	 * Column definitions for getVersionColumns() result set.
 	 */
 	public static final class VersionColumns {
-		public static final String[] COLUMN_NAMES = {"SCOPE", // short => is not used
+		static final String[] COLUMN_NAMES = {"SCOPE", // short => is not used
 				"COLUMN_NAME", // String => column name
 				"DATA_TYPE", // int => SQL data type from java.sql.Types
 				"TYPE_NAME", // String => Data source dependent type name
@@ -290,7 +290,7 @@ public final class MetadataColumns {
 				"PSEUDO_COLUMN" // short => whether this is pseudo column
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.SMALLINT, // SCOPE
+		static final int[] COLUMN_TYPES = {Types.SMALLINT, // SCOPE
 				Types.VARCHAR, // COLUMN_NAME
 				Types.INTEGER, // DATA_TYPE
 				Types.VARCHAR, // TYPE_NAME
@@ -308,7 +308,7 @@ public final class MetadataColumns {
 	 * Column definitions for getIndexInfo() result set.
 	 */
 	public static final class IndexInfo {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
 				"TABLE_SCHEM", // String => table schema (may be null)
 				"TABLE_NAME", // String => table name
 				"NON_UNIQUE", // boolean => index values can be non-unique
@@ -323,7 +323,7 @@ public final class MetadataColumns {
 				"FILTER_CONDITION" // String => filter condition, if any
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
 				Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR, // TABLE_NAME
 				Types.BOOLEAN, // NON_UNIQUE
@@ -346,7 +346,7 @@ public final class MetadataColumns {
 	 * Column definitions for getUDTs() result set.
 	 */
 	public static final class UDTs {
-		public static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
 				"TYPE_SCHEM", // String => type schema (may be null)
 				"TYPE_NAME", // String => type name
 				"CLASS_NAME", // String => Java class name
@@ -354,7 +354,7 @@ public final class MetadataColumns {
 				"REMARKS" // String => explanatory comment
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
 				Types.VARCHAR, // TYPE_SCHEM
 				Types.VARCHAR, // TYPE_NAME
 				Types.VARCHAR, // CLASS_NAME
@@ -370,7 +370,7 @@ public final class MetadataColumns {
 	 * Column definitions for getSuperTypes() result set.
 	 */
 	public static final class SuperTypes {
-		public static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
 				"TYPE_SCHEM", // String => type schema (may be null)
 				"TYPE_NAME", // String => type name
 				"SUPERTYPE_CAT", // String => direct super type catalog (may be null)
@@ -378,7 +378,7 @@ public final class MetadataColumns {
 				"SUPERTYPE_NAME" // String => direct super type name
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
 				Types.VARCHAR, // TYPE_SCHEM
 				Types.VARCHAR, // TYPE_NAME
 				Types.VARCHAR, // SUPERTYPE_CAT
@@ -394,13 +394,13 @@ public final class MetadataColumns {
 	 * Column definitions for getSuperTables() result set.
 	 */
 	public static final class SuperTables {
-		public static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => type catalog (may be null)
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => type catalog (may be null)
 				"TABLE_SCHEM", // String => type schema (may be null)
 				"TABLE_NAME", // String => type name
 				"SUPERTABLE_NAME" // String => direct super table name
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
 				Types.VARCHAR, // TABLE_SCHEM
 				Types.VARCHAR, // TABLE_NAME
 				Types.VARCHAR // SUPERTABLE_NAME
@@ -414,7 +414,7 @@ public final class MetadataColumns {
 	 * Column definitions for getProcedures() result set.
 	 */
 	public static final class Procedures {
-		public static final String[] COLUMN_NAMES = {"PROCEDURE_CAT", // String => procedure catalog (may be null)
+		static final String[] COLUMN_NAMES = {"PROCEDURE_CAT", // String => procedure catalog (may be null)
 				"PROCEDURE_SCHEM", // String => procedure schema (may be null)
 				"PROCEDURE_NAME", // String => procedure name
 				"reserved1", // reserved for future use
@@ -424,7 +424,7 @@ public final class MetadataColumns {
 				"SPECIFIC_NAME" // String => unique name for this procedure
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // PROCEDURE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // PROCEDURE_CAT
 				Types.VARCHAR, // PROCEDURE_SCHEM
 				Types.VARCHAR, // PROCEDURE_NAME
 				Types.VARCHAR, // reserved1
@@ -442,7 +442,7 @@ public final class MetadataColumns {
 	 * Column definitions for getProcedureColumns() result set.
 	 */
 	public static final class ProcedureColumns {
-		public static final String[] COLUMN_NAMES = {"PROCEDURE_CAT", // String => procedure catalog (may be null)
+		static final String[] COLUMN_NAMES = {"PROCEDURE_CAT", // String => procedure catalog (may be null)
 				"PROCEDURE_SCHEM", // String => procedure schema (may be null)
 				"PROCEDURE_NAME", // String => procedure name
 				"COLUMN_NAME", // String => column/parameter name
@@ -457,7 +457,7 @@ public final class MetadataColumns {
 				"REMARKS" // String => comment describing parameter/column
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // PROCEDURE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // PROCEDURE_CAT
 				Types.VARCHAR, // PROCEDURE_SCHEM
 				Types.VARCHAR, // PROCEDURE_NAME
 				Types.VARCHAR, // COLUMN_NAME
@@ -480,7 +480,7 @@ public final class MetadataColumns {
 	 * Column definitions for getImportedKeys() and getExportedKeys() result sets.
 	 */
 	public static final class ForeignKeys {
-		public static final String[] COLUMN_NAMES = {"PKTABLE_CAT", // String => primary key table catalog (may be null)
+		static final String[] COLUMN_NAMES = {"PKTABLE_CAT", // String => primary key table catalog (may be null)
 				"PKTABLE_SCHEM", // String => primary key table schema (may be null)
 				"PKTABLE_NAME", // String => primary key table name
 				"PKCOLUMN_NAME", // String => primary key column name
@@ -496,7 +496,7 @@ public final class MetadataColumns {
 				"DEFERRABILITY" // short => can evaluation of FK constraint be deferred
 		};
 
-		public static final int[] COLUMN_TYPES = {Types.VARCHAR, // PKTABLE_CAT
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // PKTABLE_CAT
 				Types.VARCHAR, // PKTABLE_SCHEM
 				Types.VARCHAR, // PKTABLE_NAME
 				Types.VARCHAR, // PKCOLUMN_NAME

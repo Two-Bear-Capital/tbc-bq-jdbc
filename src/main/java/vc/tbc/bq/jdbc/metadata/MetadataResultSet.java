@@ -217,7 +217,7 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 			return null;
 		if (value instanceof byte[])
 			return (byte[]) value;
-		return value.toString().getBytes();
+		return value.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
 	}
 
 	@Override

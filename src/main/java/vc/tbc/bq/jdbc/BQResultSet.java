@@ -165,17 +165,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return value;
 	}
 
-	private FieldValue getFieldValue(String columnLabel) throws SQLException {
-		checkPosition();
-		try {
-			FieldValue value = currentRow.get(columnLabel);
-			wasNull = value.isNull();
-			return value;
-		} catch (IllegalArgumentException e) {
-			throw new BQSQLException("Column not found: " + columnLabel, e);
-		}
-	}
-
 	private Field getSchemaField(int columnIndex) {
 		if (schemaFields != null && columnIndex > 0 && columnIndex <= schemaFields.size()) {
 			return schemaFields.get(columnIndex - 1);

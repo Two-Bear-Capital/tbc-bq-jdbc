@@ -80,8 +80,8 @@ public final class BQConnection extends AbstractBQConnection {
 	private final SessionManager sessionManager;
 	private BQDatabaseMetaData metadata;
 	private boolean autoCommit = true;
-	private boolean readOnly = false;
-	private int networkTimeout = 0;
+	private volatile boolean readOnly = false;
+	private volatile int networkTimeout = 0;
 
 	/**
 	 * Creates a new BigQuery connection.

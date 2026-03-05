@@ -105,7 +105,7 @@ public final class ParameterConverter {
 
 		return switch (value) {
 			case byte[] bytes -> bytes;
-			case String s -> s.getBytes();
+			case String s -> s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
 			default -> throw new BQSQLException(
 					"Cannot convert " + value.getClass().getName() + " to byte[] at parameter " + parameterIndex,
 					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);

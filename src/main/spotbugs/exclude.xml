@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter
+        xmlns="https://github.com/spotbugs/filter/3.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!-- JDBC API requires returning and storing mutable object references.
+         Defensive copying would break the JDBC contract (connections, result sets,
+         statements, and metadata objects must be the same instance across calls). -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- JDBC constructors are required by the spec to throw SQLException.
+         Neither BQResultSet nor StorageReadResultSet has a finalize() method,
+         so the finalizer-attack risk cited by SpotBugs does not apply here. -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!-- EXPERIMENTAL category: ResultSet lifecycle is managed by the Statement
+         per the JDBC spec. The methods flagged already carry @SuppressWarnings("resource")
+         and SpotBugs EXPERIMENTAL findings are inherently lower confidence. -->
+    <Match>
+        <Bug pattern="OBL_UNSATISFIED_OBLIGATION"/>
+    </Match>
+
+    <!-- Intentional tri-state Boolean: null = property absent, true/false = property present.
+         Returning null from a Boolean method is the documented API contract here. -->
+    <Match>
+        <Class name="vc.tbc.bq.jdbc.config.ConnectionUrlParser"/>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+
+</FindBugsFilter>
