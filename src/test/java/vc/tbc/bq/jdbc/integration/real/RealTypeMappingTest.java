@@ -289,18 +289,17 @@ class RealTypeMappingTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	@Test
-	void testArrayWithNulls() throws SQLException {
+	void testArrayWithNulls() {
+		// Real BigQuery does not support arrays with null elements — this is a known
+		// limitation.
+		// The query is valid SQL but BigQuery rejects it at execution time.
 		String sql = "SELECT ['first', NULL, 'third'] as array_with_nulls";
 
-		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-			assertTrue(rs.next());
-			String arrayValue = rs.getString("array_with_nulls");
-			assertNotNull(arrayValue);
-
-			assertTrue(arrayValue.contains("null"));
-			assertTrue(arrayValue.contains("first"));
-			assertTrue(arrayValue.contains("third"));
-		}
+		assertThrows(SQLException.class, () -> {
+			try (Statement stmt = connection.createStatement()) {
+				stmt.executeQuery(sql);
+			}
+		}, "BigQuery should reject arrays with null elements");
 	}
 
 	@Test
