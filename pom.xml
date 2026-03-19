@@ -43,7 +43,7 @@
         <google.cloud.bom.version>26.78.0</google.cloud.bom.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>6.0.3</junit.version>
-        <testcontainers.version>2.0.3</testcontainers.version>
+        <testcontainers.version>2.0.4</testcontainers.version>
         <arrow.version>19.0.0</arrow.version>
         <jmh.version>1.37</jmh.version>
 
@@ -58,7 +58,7 @@
         <maven-failsafe-plugin.version>3.5.5</maven-failsafe-plugin.version>
         <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
         <git-commit-id-maven-plugin.version>9.0.2</git-commit-id-maven-plugin.version>
-        <spotless-maven-plugin.version>3.3.0</spotless-maven-plugin.version>
+        <spotless-maven-plugin.version>3.4.0</spotless-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
