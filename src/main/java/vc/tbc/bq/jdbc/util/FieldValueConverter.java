@@ -303,10 +303,41 @@ public final class FieldValueConverter {
 		return switch (fieldValue.getAttribute()) {
 			case REPEATED -> extractList(fieldValue.getRepeatedValue(), field);
 			case RECORD -> recordToObject(fieldValue.getRecordValue(), field);
-			default -> // For primitive values, use getStringValue() which always works
-				// Gson will handle proper JSON encoding (numbers stay unquoted, strings are
-				// quoted)
-				fieldValue.getStringValue();
+			default -> extractPrimitive(fieldValue, field);
 		};
+	}
+
+	/**
+	 * Extracts a typed primitive value from a FieldValue using schema information.
+	 *
+	 * <p>
+	 * When schema is available, values are converted to their proper Java types
+	 * (e.g. TIMESTAMP → {@link java.sql.Timestamp}, BOOL → Boolean). This ensures
+	 * correct behaviour when primitives appear inside complex types (STRUCT,
+	 * ARRAY). Falls back to {@link FieldValue#getStringValue()} when no schema is
+	 * available.
+	 *
+	 * @param fieldValue
+	 *            the FieldValue to extract from (must not be null or isNull())
+	 * @param field
+	 *            the schema Field for type information; may be null
+	 * @return the typed Java object, or a String fallback
+	 */
+	private static Object extractPrimitive(FieldValue fieldValue, Field field) {
+		if (field != null) {
+			StandardSQLTypeName type = field.getType().getStandardType();
+			return switch (type) {
+				case BOOL -> fieldValue.getBooleanValue();
+				case INT64 -> fieldValue.getLongValue();
+				case FLOAT64 -> fieldValue.getDoubleValue();
+				case NUMERIC, BIGNUMERIC -> fieldValue.getNumericValue();
+				case BYTES -> fieldValue.getBytesValue();
+				case DATE -> java.sql.Date.valueOf(fieldValue.getStringValue());
+				case TIME -> java.sql.Time.valueOf(fieldValue.getStringValue());
+				case DATETIME, TIMESTAMP -> new java.sql.Timestamp(fieldValue.getTimestampValue() / 1000);
+				default -> fieldValue.getStringValue();
+			};
+		}
+		return fieldValue.getStringValue();
 	}
 }

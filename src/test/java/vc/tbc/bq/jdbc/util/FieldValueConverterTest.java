@@ -15,12 +15,17 @@
  */
 package vc.tbc.bq.jdbc.util;
 
+import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
+import com.google.cloud.bigquery.StandardSQLTypeName;
+import vc.tbc.bq.jdbc.BQStruct;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -64,6 +69,79 @@ class FieldValueConverterTest {
 	}
 
 	/**
+	 * Creates a mock FieldValue representing a TIMESTAMP primitive. BigQuery
+	 * timestamps are stored as microseconds since epoch. getTimestampValue()
+	 * returns microseconds, getStringValue() returns the epoch micros as a string.
+	 */
+	private FieldValue createTimestampValue(long epochMicros) {
+		FieldValue mock = mock(FieldValue.class);
+		when(mock.isNull()).thenReturn(false);
+		when(mock.getAttribute()).thenReturn(FieldValue.Attribute.PRIMITIVE);
+		when(mock.getTimestampValue()).thenReturn(epochMicros);
+		org.mockito.Mockito.lenient().when(mock.getStringValue()).thenReturn(String.valueOf(epochMicros / 1_000_000.0));
+		return mock;
+	}
+
+	/**
+	 * Creates a mock FieldValue representing a BOOL primitive.
+	 */
+	private FieldValue createBooleanValue(boolean value) {
+		FieldValue mock = mock(FieldValue.class);
+		when(mock.isNull()).thenReturn(false);
+		when(mock.getAttribute()).thenReturn(FieldValue.Attribute.PRIMITIVE);
+		when(mock.getBooleanValue()).thenReturn(value);
+		org.mockito.Mockito.lenient().when(mock.getStringValue()).thenReturn(String.valueOf(value));
+		return mock;
+	}
+
+	/**
+	 * Creates a mock FieldValue representing an INT64 primitive.
+	 */
+	private FieldValue createLongValue(long value) {
+		FieldValue mock = mock(FieldValue.class);
+		when(mock.isNull()).thenReturn(false);
+		when(mock.getAttribute()).thenReturn(FieldValue.Attribute.PRIMITIVE);
+		when(mock.getLongValue()).thenReturn(value);
+		org.mockito.Mockito.lenient().when(mock.getStringValue()).thenReturn(String.valueOf(value));
+		return mock;
+	}
+
+	/**
+	 * Creates a mock FieldValue representing a FLOAT64 primitive.
+	 */
+	private FieldValue createDoubleValue(double value) {
+		FieldValue mock = mock(FieldValue.class);
+		when(mock.isNull()).thenReturn(false);
+		when(mock.getAttribute()).thenReturn(FieldValue.Attribute.PRIMITIVE);
+		when(mock.getDoubleValue()).thenReturn(value);
+		org.mockito.Mockito.lenient().when(mock.getStringValue()).thenReturn(String.valueOf(value));
+		return mock;
+	}
+
+	/**
+	 * Creates a mock FieldValue representing a NUMERIC primitive.
+	 */
+	private FieldValue createNumericValue(BigDecimal value) {
+		FieldValue mock = mock(FieldValue.class);
+		when(mock.isNull()).thenReturn(false);
+		when(mock.getAttribute()).thenReturn(FieldValue.Attribute.PRIMITIVE);
+		when(mock.getNumericValue()).thenReturn(value);
+		org.mockito.Mockito.lenient().when(mock.getStringValue()).thenReturn(value.toPlainString());
+		return mock;
+	}
+
+	/**
+	 * Creates a mock FieldValue representing a DATE primitive (e.g. "2026-03-20").
+	 */
+	private FieldValue createDateValue(String dateStr) {
+		FieldValue mock = mock(FieldValue.class);
+		when(mock.isNull()).thenReturn(false);
+		when(mock.getAttribute()).thenReturn(FieldValue.Attribute.PRIMITIVE);
+		when(mock.getStringValue()).thenReturn(dateStr);
+		return mock;
+	}
+
+	/**
 	 * Creates a mock FieldValue with REPEATED attribute (array).
 	 */
 	private FieldValue createArrayValue(List<FieldValue> elements) {
@@ -90,8 +168,8 @@ class FieldValueConverterTest {
 	 */
 	private FieldValue createRecordValue(List<FieldValue> fields) {
 		FieldValue mock = mock(FieldValue.class);
-		when(mock.isNull()).thenReturn(false);
-		when(mock.getAttribute()).thenReturn(FieldValue.Attribute.RECORD);
+		org.mockito.Mockito.lenient().when(mock.isNull()).thenReturn(false);
+		org.mockito.Mockito.lenient().when(mock.getAttribute()).thenReturn(FieldValue.Attribute.RECORD);
 
 		// getRecordValue() returns FieldValueList which implements List<FieldValue>
 		// We need to mock a FieldValueList that behaves like our List
@@ -102,8 +180,10 @@ class FieldValueConverterTest {
 		org.mockito.Mockito.lenient().when(mockList.size()).thenReturn(fields.size());
 		org.mockito.Mockito.lenient().when(mockList.iterator()).thenAnswer(inv -> fields.iterator());
 		org.mockito.Mockito.lenient().when(mockList.stream()).thenAnswer(inv -> fields.stream());
+		org.mockito.Mockito.lenient().when(mockList.get(org.mockito.ArgumentMatchers.anyInt()))
+				.thenAnswer(inv -> fields.get(inv.getArgument(0)));
 
-		when(mock.getRecordValue()).thenReturn(mockList);
+		org.mockito.Mockito.lenient().when(mock.getRecordValue()).thenReturn(mockList);
 		return mock;
 	}
 
@@ -601,5 +681,185 @@ class FieldValueConverterTest {
 
 		// Then: Should preserve boolean string values
 		assertEquals("[\"true\",\"false\",\"TRUE\",\"FALSE\"]", result, "Boolean strings should be preserved as-is");
+	}
+
+	// Group 7: Typed primitives inside STRUCT — reproduces issue #39
+
+	@Test
+	void testStructWithTimestampFieldReturnsBQStructWithSqlTimestamp() {
+		// Given: STRUCT<mydate TIMESTAMP> — the exact structure from issue #39
+		long epochMicros = 1_742_000_000_000_000L; // ~2025-03-15
+		FieldValue tsValue = createTimestampValue(epochMicros);
+		List<FieldValue> structFields = Collections.singletonList(tsValue);
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field
+				.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("mydate", StandardSQLTypeName.TIMESTAMP))
+				.setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to BQStruct (nativeComplexTypes=true path)
+		BQStruct result = FieldValueConverter.toBQStruct(recordValue, structField);
+
+		// Then: The attribute should be a java.sql.Timestamp, not a String
+		Object[] attrs = assertDoesNotThrow(() -> result.getAttributes());
+		assertEquals(1, attrs.length);
+		assertInstanceOf(Timestamp.class, attrs[0], "TIMESTAMP inside STRUCT should be java.sql.Timestamp, not String");
+		Timestamp ts = (Timestamp) attrs[0];
+		assertEquals(epochMicros / 1000, ts.getTime(), "Timestamp millis should match input micros / 1000");
+	}
+
+	@Test
+	void testStructWithBoolFieldReturnsBQStructWithBoolean() {
+		// Given: STRUCT<flag BOOL>
+		FieldValue boolValue = createBooleanValue(true);
+		List<FieldValue> structFields = Collections.singletonList(boolValue);
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field
+				.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("flag", StandardSQLTypeName.BOOL))
+				.setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to BQStruct
+		BQStruct result = FieldValueConverter.toBQStruct(recordValue, structField);
+
+		// Then: Should be Boolean, not String
+		Object[] attrs = assertDoesNotThrow(() -> result.getAttributes());
+		assertEquals(1, attrs.length);
+		assertInstanceOf(Boolean.class, attrs[0], "BOOL inside STRUCT should be Boolean, not String");
+		assertEquals(true, attrs[0]);
+	}
+
+	@Test
+	void testStructWithInt64FieldReturnsBQStructWithLong() {
+		// Given: STRUCT<count INT64>
+		FieldValue longValue = createLongValue(42L);
+		List<FieldValue> structFields = Collections.singletonList(longValue);
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field
+				.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("count", StandardSQLTypeName.INT64))
+				.setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to BQStruct
+		BQStruct result = FieldValueConverter.toBQStruct(recordValue, structField);
+
+		// Then: Should be Long, not String
+		Object[] attrs = assertDoesNotThrow(() -> result.getAttributes());
+		assertEquals(1, attrs.length);
+		assertInstanceOf(Long.class, attrs[0], "INT64 inside STRUCT should be Long, not String");
+		assertEquals(42L, attrs[0]);
+	}
+
+	@Test
+	void testStructWithFloat64FieldReturnsBQStructWithDouble() {
+		// Given: STRUCT<price FLOAT64>
+		FieldValue doubleValue = createDoubleValue(3.14);
+		List<FieldValue> structFields = Collections.singletonList(doubleValue);
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field
+				.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("price", StandardSQLTypeName.FLOAT64))
+				.setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to BQStruct
+		BQStruct result = FieldValueConverter.toBQStruct(recordValue, structField);
+
+		// Then: Should be Double, not String
+		Object[] attrs = assertDoesNotThrow(() -> result.getAttributes());
+		assertEquals(1, attrs.length);
+		assertInstanceOf(Double.class, attrs[0], "FLOAT64 inside STRUCT should be Double, not String");
+		assertEquals(3.14, attrs[0]);
+	}
+
+	@Test
+	void testStructWithDateFieldReturnsBQStructWithSqlDate() {
+		// Given: STRUCT<created DATE>
+		FieldValue dateValue = createDateValue("2026-03-20");
+		List<FieldValue> structFields = Collections.singletonList(dateValue);
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field
+				.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("created", StandardSQLTypeName.DATE))
+				.setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to BQStruct
+		BQStruct result = FieldValueConverter.toBQStruct(recordValue, structField);
+
+		// Then: Should be java.sql.Date, not String
+		Object[] attrs = assertDoesNotThrow(() -> result.getAttributes());
+		assertEquals(1, attrs.length);
+		assertInstanceOf(java.sql.Date.class, attrs[0], "DATE inside STRUCT should be java.sql.Date, not String");
+		assertEquals("2026-03-20", attrs[0].toString());
+	}
+
+	@Test
+	void testStructWithNumericFieldReturnsBQStructWithBigDecimal() {
+		// Given: STRUCT<amount NUMERIC>
+		BigDecimal amount = new BigDecimal("12345.67");
+		FieldValue numericValue = createNumericValue(amount);
+		List<FieldValue> structFields = Collections.singletonList(numericValue);
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field
+				.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("amount", StandardSQLTypeName.NUMERIC))
+				.setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to BQStruct
+		BQStruct result = FieldValueConverter.toBQStruct(recordValue, structField);
+
+		// Then: Should be BigDecimal, not String
+		Object[] attrs = assertDoesNotThrow(() -> result.getAttributes());
+		assertEquals(1, attrs.length);
+		assertInstanceOf(BigDecimal.class, attrs[0], "NUMERIC inside STRUCT should be BigDecimal, not String");
+		assertEquals(amount, attrs[0]);
+	}
+
+	@Test
+	void testStructWithMultipleTypedFieldsIssue39() {
+		// Given: STRUCT<id INT64, name STRING, mydate TIMESTAMP, active BOOL>
+		// This is the most realistic reproduction of issue #39
+		long epochMicros = 1_742_000_000_000_000L;
+		List<FieldValue> structFields = Arrays.asList(createLongValue(1L), createPrimitiveValue("Alice"),
+				createTimestampValue(epochMicros), createBooleanValue(false));
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("id", StandardSQLTypeName.INT64),
+				Field.of("name", StandardSQLTypeName.STRING), Field.of("mydate", StandardSQLTypeName.TIMESTAMP),
+				Field.of("active", StandardSQLTypeName.BOOL)).setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to BQStruct
+		BQStruct result = FieldValueConverter.toBQStruct(recordValue, structField);
+
+		// Then: Each field should be properly typed
+		Object[] attrs = assertDoesNotThrow(() -> result.getAttributes());
+		assertEquals(4, attrs.length);
+		assertInstanceOf(Long.class, attrs[0], "id should be Long");
+		assertInstanceOf(String.class, attrs[1], "name should be String");
+		assertInstanceOf(Timestamp.class, attrs[2], "mydate should be Timestamp");
+		assertInstanceOf(Boolean.class, attrs[3], "active should be Boolean");
+	}
+
+	@Test
+	void testStructTimestampJsonSerializationUsesTimestamp() {
+		// Given: STRUCT<mydate TIMESTAMP> serialized as JSON (nativeComplexTypes=false
+		// path)
+		long epochMicros = 1_742_000_000_000_000L;
+		FieldValue tsValue = createTimestampValue(epochMicros);
+		List<FieldValue> structFields = Collections.singletonList(tsValue);
+		FieldValue recordValue = createRecordValue(structFields);
+
+		Field structField = Field
+				.newBuilder("a", StandardSQLTypeName.STRUCT, Field.of("mydate", StandardSQLTypeName.TIMESTAMP))
+				.setMode(Field.Mode.NULLABLE).build();
+
+		// When: Converting to JSON string (toString path)
+		String result = FieldValueConverter.toString(recordValue, structField);
+
+		// Then: Should contain a proper timestamp representation, not raw epoch micros
+		assertNotNull(result);
+		// The JSON should contain the mydate key with a timestamp value
+		assertTrue(result.contains("\"mydate\""), "JSON should use field name from schema");
+		// Should NOT contain the raw epoch double like "1.742E9"
+		assertFalse(result.contains("1.742E"), "Should not contain raw epoch double notation");
 	}
 }
