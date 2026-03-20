@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.80] - 2026-03-20
+
+### 🧪 Testing
+
+- **types:** Add integration tests for typed primitives inside STRUCT ([#39](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/39))
+
 ## [1.0.79] - 2026-03-20
 
 ### 🐛 Bug Fixes
 
 - **types:** Correctly type primitives inside STRUCT and ARRAY ([#39](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/39))
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.79
 
 ## [1.0.78] - 2026-03-19
 
@@ -1956,6 +1966,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.80]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.79...v1.0.80
 [1.0.79]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.78...v1.0.79
 [1.0.78]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.77...v1.0.78
 [1.0.77]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.76...v1.0.77
