@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.82] - 2026-04-03
+
+### 🔀 Pull Requests
+
+- Merge pull request #42 from Two-Bear-Capital/dependabot/maven/maven-dependencies-ed364ae9b6
+
 ## [1.0.81] - 2026-03-30
 
 ### 🔀 Pull Requests
 
 - Merge pull request #41 from Two-Bear-Capital/dependabot/maven/maven-dependencies-593403466b
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.81
 
 ## [1.0.80] - 2026-03-20
 
@@ -1976,6 +1986,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.82]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.81...v1.0.82
 [1.0.81]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.80...v1.0.81
 [1.0.80]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.79...v1.0.80
 [1.0.79]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.78...v1.0.79
