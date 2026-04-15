@@ -40,7 +40,7 @@
         <project.build.outputTimestamp>2026-04-03T11:04:28Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
-        <google.cloud.bom.version>26.79.0</google.cloud.bom.version>
+        <google.cloud.bom.version>26.80.0</google.cloud.bom.version>
         <slf4j.version>2.0.17</slf4j.version>
         <junit.version>6.0.3</junit.version>
         <testcontainers.version>2.0.4</testcontainers.version>
