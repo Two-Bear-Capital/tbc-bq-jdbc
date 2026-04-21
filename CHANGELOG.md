@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Merge pull request #45 from Two-Bear-Capital/dependabot/maven/maven-dependencies-eeeeaa1517
 - Merge pull request #43 from Two-Bear-Capital/dependabot/github_actions/github-actions-e24c266ee1
 
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.83
+
 ## [1.0.82] - 2026-04-03
 
 ### 🔀 Pull Requests
