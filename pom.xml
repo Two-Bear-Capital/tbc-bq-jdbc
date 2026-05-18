@@ -6,7 +6,7 @@
 
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.84</version>
+    <version>1.0.85</version>
     <packaging>jar</packaging>
 
     <name>BigQuery JDBC Driver</name>
@@ -37,7 +37,7 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.build.outputTimestamp>2026-04-21T11:29:58Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-05-18T21:00:51Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
         <google.cloud.bom.version>26.83.0</google.cloud.bom.version>
