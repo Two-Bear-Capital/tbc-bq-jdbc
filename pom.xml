@@ -42,7 +42,7 @@
         <!-- Dependency versions -->
         <google.cloud.bom.version>26.83.0</google.cloud.bom.version>
         <slf4j.version>2.0.18</slf4j.version>
-        <junit.version>6.0.3</junit.version>
+        <junit.version>6.1.0</junit.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <arrow.version>19.0.0</arrow.version>
         <jmh.version>1.37</jmh.version>
