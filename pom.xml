@@ -42,7 +42,7 @@
         <!-- Dependency versions -->
         <google.cloud.bom.version>26.83.0</google.cloud.bom.version>
         <slf4j.version>2.0.18</slf4j.version>
-        <junit.version>6.0.3</junit.version>
+        <junit.version>6.1.0</junit.version>
         <testcontainers.version>2.0.5</testcontainers.version>
         <arrow.version>19.0.0</arrow.version>
         <jmh.version>1.37</jmh.version>
@@ -54,11 +54,11 @@
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
-        <maven-surefire-plugin.version>3.5.5</maven-surefire-plugin.version>
-        <maven-failsafe-plugin.version>3.5.5</maven-failsafe-plugin.version>
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <git-commit-id-maven-plugin.version>10.0.0</git-commit-id-maven-plugin.version>
-        <spotless-maven-plugin.version>3.5.1</spotless-maven-plugin.version>
+        <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
@@ -124,7 +124,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.32</version>
+            <version>1.5.33</version>
             <optional>true</optional>
         </dependency>
 
