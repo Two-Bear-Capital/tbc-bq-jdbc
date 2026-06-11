@@ -166,7 +166,7 @@ class QueryCostEstimationTest extends AbstractBigQueryIntegrationTest {
 	void testWarningsForDMLStatements() throws SQLException {
 		try (Statement stmt = costEstimationConnection.createStatement()) {
 			// INSERT statement - dry-run should work for DML too
-			int rows = stmt.executeUpdate("INSERT INTO cost_test_table (id, name, value) VALUES (4, 'David', 400.0)");
+			stmt.executeUpdate("INSERT INTO cost_test_table (id, name, value) VALUES (4, 'David', 400.0)");
 
 			// Warning may or may not be present depending on emulator support
 			SQLWarning warning = stmt.getWarnings();

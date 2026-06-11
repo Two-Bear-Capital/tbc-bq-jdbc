@@ -102,7 +102,6 @@ class MetadataColumnsTest {
 	void testColumnsColumnNamesAndTypes() {
 		// Given: Columns column definitions
 		String[] names = MetadataColumns.Columns.COLUMN_NAMES;
-		int[] types = MetadataColumns.Columns.COLUMN_TYPES;
 
 		// Then: Should match expected definitions
 		assertEquals("TABLE_CAT", names[0]);
