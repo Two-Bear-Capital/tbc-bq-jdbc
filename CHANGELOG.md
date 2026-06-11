@@ -5,11 +5,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.88] - 2026-06-11
+
+### 🔀 Pull Requests
+
+- Merge pull request #54 from Two-Bear-Capital/dependabot/maven/maven-dependencies-c0a0c83bfa
+
+chore(deps): bump the maven-dependencies group across 1 directory with 2 updates
+
+## [1.0.87] - 2026-06-04
+
+### 🔀 Pull Requests
+
+- Merge pull request #52 from Two-Bear-Capital/dependabot/maven/maven-dependencies-a7e2c966ce
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.87
+
+## [1.0.86] - 2026-05-30
+
+### 🔀 Pull Requests
+
+- Merge pull request #51 from Two-Bear-Capital/dependabot/maven/maven-dependencies-7fe1d5f2ea
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.86
+
+## [1.0.85] - 2026-05-18
+
+### 🔀 Pull Requests
+
+- Merge pull request #49 from Two-Bear-Capital/dependabot/maven/maven-dependencies-823d9b50aa
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.85
+
+## [1.0.84] - 2026-04-21
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.84
+
+## [1.0.83] - 2026-04-21
+
+### 🔀 Pull Requests
+
+- Merge pull request #45 from Two-Bear-Capital/dependabot/maven/maven-dependencies-eeeeaa1517
+- Merge pull request #43 from Two-Bear-Capital/dependabot/github_actions/github-actions-e24c266ee1
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.83
+
+## [1.0.82] - 2026-04-03
+
+### 🔀 Pull Requests
+
+- Merge pull request #42 from Two-Bear-Capital/dependabot/maven/maven-dependencies-ed364ae9b6
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.82
+
+## [1.0.81] - 2026-03-30
+
+### 🔀 Pull Requests
+
+- Merge pull request #41 from Two-Bear-Capital/dependabot/maven/maven-dependencies-593403466b
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.81
+
 ## [1.0.80] - 2026-03-20
 
 ### 🧪 Testing
 
 - **types:** Add integration tests for typed primitives inside STRUCT ([#39](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/39))
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.80
 
 ## [1.0.79] - 2026-03-20
 
@@ -1966,6 +2045,14 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.88]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.87...v1.0.88
+[1.0.87]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.86...v1.0.87
+[1.0.86]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.85...v1.0.86
+[1.0.85]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.84...v1.0.85
+[1.0.84]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.83...v1.0.84
+[1.0.83]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.82...v1.0.83
+[1.0.82]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.81...v1.0.82
+[1.0.81]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.80...v1.0.81
 [1.0.80]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.79...v1.0.80
 [1.0.79]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.78...v1.0.79
 [1.0.78]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.77...v1.0.78

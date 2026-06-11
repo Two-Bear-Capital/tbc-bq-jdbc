@@ -6,7 +6,7 @@
 
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.80</version>
+    <version>1.0.88</version>
     <packaging>jar</packaging>
 
     <name>BigQuery JDBC Driver</name>
@@ -37,13 +37,13 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.build.outputTimestamp>2026-03-20T17:19:10Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-06-11T22:56:15Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
-        <google.cloud.bom.version>26.78.0</google.cloud.bom.version>
-        <slf4j.version>2.0.17</slf4j.version>
-        <junit.version>6.0.3</junit.version>
-        <testcontainers.version>2.0.4</testcontainers.version>
+        <google.cloud.bom.version>26.83.0</google.cloud.bom.version>
+        <slf4j.version>2.0.18</slf4j.version>
+        <junit.version>6.1.0</junit.version>
+        <testcontainers.version>2.0.5</testcontainers.version>
         <arrow.version>19.0.0</arrow.version>
         <jmh.version>1.37</jmh.version>
 
@@ -54,17 +54,17 @@
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
-        <maven-surefire-plugin.version>3.5.5</maven-surefire-plugin.version>
-        <maven-failsafe-plugin.version>3.5.5</maven-failsafe-plugin.version>
-        <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
-        <git-commit-id-maven-plugin.version>9.0.2</git-commit-id-maven-plugin.version>
-        <spotless-maven-plugin.version>3.4.0</spotless-maven-plugin.version>
-        <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+        <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
+        <git-commit-id-maven-plugin.version>10.0.0</git-commit-id-maven-plugin.version>
+        <spotless-maven-plugin.version>3.6.0</spotless-maven-plugin.version>
+        <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
-        <spotbugs-maven-plugin.version>4.9.8.2</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.9.8.4</spotbugs-maven-plugin.version>
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
     </properties>
 
@@ -124,7 +124,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.32</version>
+            <version>1.5.34</version>
             <optional>true</optional>
         </dependency>
 
