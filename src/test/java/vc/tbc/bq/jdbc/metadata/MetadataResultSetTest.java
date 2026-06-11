@@ -1002,13 +1002,13 @@ class MetadataResultSetTest {
 			rs.next(); // Row with null NAME
 
 			// When: Getting non-null then null values
-			int id = rs.getInt(1);
+			rs.getInt(1);
 			assertFalse(rs.wasNull());
 
-			String name = rs.getString(2);
+			rs.getString(2);
 			assertTrue(rs.wasNull());
 
-			int age = rs.getInt(3);
+			rs.getInt(3);
 			assertFalse(rs.wasNull());
 		}
 	}
