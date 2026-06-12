@@ -36,6 +36,9 @@ jobs:
       - name: Build with Maven
         run: mvn clean install -B
 
+      - name: Check generated docs are up to date
+        run: mvn test-compile exec:java -Pdocs -Dexec.args="--check" -B
+
       - name: Run tests
         run: mvn test -B
 

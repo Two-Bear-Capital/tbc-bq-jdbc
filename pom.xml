@@ -809,6 +809,25 @@
             </build>
         </profile>
 
+        <!-- Docs Generation Profile: regenerates docs/generated/ from the driver source of truth -->
+        <!-- Write:      ./mvnw test-compile exec:java -Pdocs                                      -->
+        <!-- Drift guard: ./mvnw test-compile exec:java -Pdocs -Dexec.args=&quot;[two dashes]check&quot;     -->
+        <profile>
+            <id>docs</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <mainClass>vc.tbc.bq.jdbc.docgen.DocGen</mainClass>
+                            <classpathScope>test</classpathScope>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
         <!-- Integration Test Profile (emulator-based, requires Docker) -->
         <profile>
             <id>integration-tests</id>
