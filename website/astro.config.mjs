@@ -10,6 +10,13 @@ export default defineConfig({
 		starlight({
 			title: 'tbc-bq-jdbc',
 			description: 'Modern JDBC 4.3 driver for Google BigQuery, built for Java 21+',
+			logo: {
+				light: './src/assets/tbc-horizontal.svg',
+				dark: './src/assets/tbc-horizontal-white.svg',
+				replacesTitle: true,
+			},
+			favicon: '/favicon.svg',
+			customCss: ['./src/styles/tbc.css'],
 			social: {
 				github: 'https://github.com/Two-Bear-Capital/tbc-bq-jdbc',
 			},

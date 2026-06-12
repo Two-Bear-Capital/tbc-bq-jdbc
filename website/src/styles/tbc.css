@@ -1,0 +1,62 @@
+/*
+ * Two Bear Capital brand theme for Starlight.
+ *
+ * Maps the canonical brand tokens (brand-kit/public/brand-theme.json) onto
+ * Starlight's CSS custom properties. Keep this file as the single bridge
+ * between the brand kit and the docs site.
+ */
+
+/* Condensed display + serif fallbacks for non-macOS visitors (Helvetica Neue
+   Condensed isn't available off-Mac; Barlow Condensed is the brand's fallback). */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Lora:wght@400;500&display=swap');
+
+:root {
+	/* --- Brand tokens (subset of brand-theme.json) --- */
+	--tbc-green: #00b451;
+	--tbc-green-shade: #067236;
+	--tbc-green-tint: #a6e5c2;
+	--tbc-purple: #7e57c5;
+	--tbc-blue: #0097ce;
+	--tbc-orange: #f18a00;
+	--tbc-dark: #100f0d;
+	--tbc-off-white: #f7f5f2;
+	--tbc-mid-grey: #888888;
+
+	--tbc-font-display: 'Helvetica Neue Condensed', 'Helvetica Neue', 'Barlow Condensed', 'Arial Narrow', sans-serif;
+	--tbc-font-serif: 'Lora', 'Georgia', 'Times New Roman', serif;
+	--tbc-font-body: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+	--tbc-font-mono: 'Courier New', monospace;
+
+	/* --- Starlight: fonts --- */
+	--sl-font: var(--tbc-font-body);
+	--sl-font-mono: var(--tbc-font-mono);
+}
+
+/* Accent palette — dark theme (Starlight's default). Brand green pops on dark. */
+:root,
+:root[data-theme='dark'] {
+	--sl-color-accent-low: #022f17;
+	--sl-color-accent: #00b451;
+	--sl-color-accent-high: #a6e5c2;
+}
+
+/* Accent palette — light theme. Use the darker green shade so links/text on
+   white stay readable (brand green #00b451 alone fails contrast on white). */
+:root[data-theme='light'] {
+	--sl-color-accent-low: #c9efd9;
+	--sl-color-accent: #067236;
+	--sl-color-accent-high: #023d1d;
+}
+
+/* Headings in the brand's condensed display face. Body stays in the body stack. */
+:is(.sl-markdown-content, .content-panel, .hero, .sl-banner) :is(h1, h2, h3, h4, h5, h6),
+.hero .tagline,
+.site-title {
+	font-family: var(--tbc-font-display);
+	letter-spacing: -0.01em;
+}
+
+/* Brand-square favicon is multicolor; give the header logo a little room. */
+.site-title img {
+	height: 2rem;
+}
