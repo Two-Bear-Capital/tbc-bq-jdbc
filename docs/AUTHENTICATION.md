@@ -14,6 +14,11 @@ tbc-bq-jdbc supports all Google Cloud authentication methods:
 | **Workforce Identity** | Federated workforce access | Yes (config file) |
 | **Workload Identity** | GKE workload federation | No (uses metadata) |
 
+> **Canonical `authType` values** — the accepted `authType` values and their underlying
+> implementations are generated from the driver in
+> **[Authentication (generated)](generated/authentication.md)**. The sections below cover setup,
+> credentials, and examples for each method.
+
 ## Application Default Credentials (ADC)
 
 **Recommended for:** Local development, Google Cloud environments
@@ -247,7 +252,7 @@ Allows employees to use existing corporate credentials (Azure AD, Okta, etc.) to
 ```java
 String url = "jdbc:bigquery:my-project/my_dataset?" +
              "authType=WORKFORCE&" +
-             "credentials=/path/to/workforce-config.json";
+             "credentialConfigFile=/path/to/workforce-config.json";
 
 try (Connection conn = DriverManager.getConnection(url)) {
     // Authenticated via workforce identity
@@ -259,7 +264,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 | Property | Required | Description |
 |----------|----------|-------------|
 | `authType` | Yes | Must be `WORKFORCE` |
-| `credentials` | Yes | Path to workforce config JSON |
+| `credentialConfigFile` | Yes | Path to workforce config JSON |
 
 ---
 
@@ -296,10 +301,12 @@ Allows workloads running outside Google Cloud to authenticate without service ac
 ### Usage
 
 ```java
-String url = "jdbc:bigquery:my-project/my_dataset?authType=WORKLOAD";
+String url = "jdbc:bigquery:my-project/my_dataset?" +
+             "authType=WORKLOAD&" +
+             "credentialConfigFile=/path/to/workload-config.json";
 
 try (Connection conn = DriverManager.getConnection(url)) {
-    // Authenticated via workload identity (uses metadata service)
+    // Authenticated via workload identity federation
 }
 ```
 
@@ -308,8 +315,11 @@ try (Connection conn = DriverManager.getConnection(url)) {
 | Property | Required | Description |
 |----------|----------|-------------|
 | `authType` | Yes | Must be `WORKLOAD` |
+| `credentialConfigFile` | Yes | Path to workload identity config JSON |
 
-No credentials file needed - uses GKE metadata service.
+> **Note:** The driver requires a `credentialConfigFile` for `WORKLOAD`. If you are running on
+> GKE/GCE and want to use the metadata service with no config file, use `authType=ADC` instead —
+> ADC automatically picks up the workload's attached service account.
 
 ---
 
@@ -389,8 +399,8 @@ String url = "jdbc:bigquery:my-project/my_dataset?" +
 
 ### Production (GKE)
 ```java
-// Use workload identity (no keys!)
-String url = "jdbc:bigquery:my-project/my_dataset?authType=WORKLOAD";
+// On GKE/GCE, ADC uses the workload's attached service account — no keys, no config file
+String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
 ```
 
 ### Production (Non-GCP)
@@ -405,6 +415,6 @@ String url = "jdbc:bigquery:my-project/my_dataset?" +
 
 ## See Also
 
+- [Authentication (generated)](generated/authentication.md) - Authoritative `authType` values and implementations
 - [Connection Properties](CONNECTION_PROPERTIES.md) - All configuration options
 - [Quick Start](QUICKSTART.md) - Get started in 5 minutes
-- [Connection Properties](CONNECTION_PROPERTIES.md) - Configuration reference

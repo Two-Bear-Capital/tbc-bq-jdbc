@@ -93,15 +93,16 @@ Simply replace your existing Simba JDBC driver with tbc-bq-jdbc - your connectio
 
 ## Complete Property Reference
 
+> **The authoritative property list is generated from the driver itself.**
+> See **[Connection Properties (generated)](generated/connection-properties.md)** for the
+> complete, always-current table of every property — name, default, allowed values, and
+> description — produced directly from `Driver.getPropertyInfo()`. The sections below add the
+> usage guidance, examples, and recommended configurations that a flat table can't capture.
+
 ### Authentication Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `authType` | String | `ADC` | Authentication method: `ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`, `WORKFORCE`, `WORKLOAD` |
-| `credentials` | String | `null` | Path to credentials file (for SERVICE_ACCOUNT, WORKFORCE) |
-| `clientId` | String | `null` | OAuth 2.0 client ID (for USER_OAUTH) |
-| `clientSecret` | String | `null` | OAuth 2.0 client secret (for USER_OAUTH) |
-| `refreshToken` | String | `null` | OAuth 2.0 refresh token (for USER_OAUTH) |
+> The `USER_OAUTH` properties `clientId`, `clientSecret`, and `refreshToken` are documented in the
+> [Authentication Guide](AUTHENTICATION.md#user-oauth).
 
 **Example:**
 ```
@@ -112,13 +113,8 @@ jdbc:bigquery:my-project/my_dataset?authType=SERVICE_ACCOUNT&credentials=/path/t
 
 ### Query Execution Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `timeout` | Integer | `300` | Query timeout in seconds |
-| `maxResults` | Long | `null` | Maximum rows to fetch (null = unlimited) |
-| `useLegacySql` | Boolean | `false` | Use legacy SQL dialect instead of standard SQL |
-| `pageSize` | Integer | `10000` | Result page size for pagination |
-| `nativeComplexTypes` | Boolean | `false` | Return ARRAY and STRUCT as native JDBC `Array`/`Struct` objects instead of JSON strings |
+Covers `timeout`, `maxResults`, `useLegacySql`, `pageSize`, and `nativeComplexTypes` (see the
+[generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
 ```
@@ -136,10 +132,8 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
 
 ### Location and Routing
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `location` | String | `null` | BigQuery location (e.g., `US`, `EU`, `us-central1`) |
-| `datasetProjectId` | String | `null` | Project ID for dataset if different from connection project |
+Covers `location` and `datasetProjectId` (see the
+[generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
 ```
@@ -154,9 +148,8 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&location=EU
 
 ### Session and Transaction Properties
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `enableSessions` | Boolean | `false` | Enable BigQuery sessions for temp tables and transactions |
+Controlled by `enableSessions` (see the
+[generated table](generated/connection-properties.md) for the default and allowed values).
 
 **Example:**
 ```
@@ -178,14 +171,9 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&enableSessions=true
 
 ### Performance Tuning
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `useStorageApi` | String | `auto` | Storage API mode: `auto`, `true`, `false` |
-| `connectionTimeout` | Integer | `30` | Connection establishment timeout in seconds |
-| `retryCount` | Integer | `3` | Retry attempts for transient errors |
-| `metadataCacheEnabled` | Boolean | `true` | Enable metadata caching for schema introspection |
-| `metadataCacheTtl` | Integer | `300` | Metadata cache time-to-live in seconds (5 minutes default) |
-| `metadataLazyLoad` | Boolean | `false` | Enable lazy loading for metadata (load only when needed) |
+Covers `useStorageApi`, `connectionTimeout`, `retryCount`, `metadataCacheEnabled`,
+`metadataCacheTtl`, and `metadataLazyLoad` (see the
+[generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
 ```
@@ -254,11 +242,8 @@ See **[IntelliJ Integration Guide](INTELLIJ.md)** for complete setup instruction
 
 ### Job Configuration
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `labels` | String | `null` | Comma-separated key=value pairs for job labels |
-| `jobCreationMode` | String | `REQUIRED` | Job creation mode: `REQUIRED`, `OPTIONAL` |
-| `maxBillingBytes` | Long | `null` | Maximum bytes billed for queries (cost limit) |
+Covers `labels`, `jobCreationMode`, and `maxBillingBytes` (see the
+[generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
 ```
@@ -376,25 +361,9 @@ jdbc:bigquery:my-project/reporting?\
 
 ### Valid Values
 
-**authType:**
-- `ADC` (Application Default Credentials)
-- `SERVICE_ACCOUNT`
-- `USER_OAUTH`
-- `WORKFORCE`
-- `WORKLOAD`
-
-**useStorageApi:**
-- `auto` (default)
-- `true`
-- `false`
-
-**jobCreationMode:**
-- `REQUIRED` (default)
-- `OPTIONAL`
-
-**useLegacySql:**
-- `true`
-- `false` (default, recommended)
+The allowed values for each property (e.g. `authType`, `useStorageApi`, `jobCreationMode`,
+`useLegacySql`) are listed in the **[generated property table](generated/connection-properties.md)**,
+produced directly from the driver.
 
 ### Invalid Combinations
 
@@ -463,24 +432,9 @@ Connection conn = DriverManager.getConnection(url, props);
 
 ## Default Values Summary
 
-| Property | Default | Notes |
-|----------|---------|-------|
-| authType | `ADC` | If not specified |
-| timeout | `300` | 5 minutes |
-| pageSize | `10000` | Rows per page |
-| connectionTimeout | `30` | Seconds |
-| retryCount | `3` | Transient error retries |
-| useLegacySql | `false` | Use standard SQL |
-| enableSessions | `false` | Sessions disabled |
-| useStorageApi | `auto` | Auto-enable for large results |
-| jobCreationMode | `REQUIRED` | Always create jobs |
-| maxResults | `null` | No limit |
-| maxBillingBytes | `null` | No cost limit |
-| labels | `{}` | No labels |
-| location | `null` | Use dataset location |
-| metadataCacheEnabled | `true` | Caching enabled |
-| metadataCacheTtl | `300` | 5 minutes |
-| metadataLazyLoad | `false` | Load metadata upfront |
+Every property's default value is listed in the
+**[generated property table](generated/connection-properties.md)** — produced directly from the
+driver's `getPropertyInfo()`, so it never goes stale.
 
 ---
 
@@ -503,6 +457,7 @@ Connection conn = DriverManager.getConnection(url, props);
 
 ## See Also
 
+- [Connection Properties (generated)](generated/connection-properties.md) - Authoritative, auto-generated property table
 - [Authentication Guide](AUTHENTICATION.md) - Credential configuration
 - [Quick Start](QUICKSTART.md) - Basic examples
 - [Type Mapping](TYPE_MAPPING.md) - BigQuery ↔ JDBC type conversions
