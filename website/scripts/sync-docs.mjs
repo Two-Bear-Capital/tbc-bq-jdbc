@@ -9,6 +9,12 @@
  *
  *   ../docs/*.md            -> src/content/docs/guides/<slug>.md      (Guides)
  *   ../docs/generated/*.md  -> src/content/docs/reference/<slug>.md   (Reference, from DocGen)
+ *
+ * Doc scoping convention: only TOP-LEVEL ../docs/*.md is user-facing and synced
+ * here. Contributor/build/release docs live in ../docs/contributing/ (a
+ * subdirectory) and are intentionally NOT synced — this script ignores
+ * subdirectories. Keep "how to use the driver" at the top level; keep "how to
+ * build/test/release" under docs/contributing/.
  */
 import {
 	readdirSync,

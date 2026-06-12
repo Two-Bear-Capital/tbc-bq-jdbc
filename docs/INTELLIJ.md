@@ -8,6 +8,7 @@ A comprehensive guide for using **tbc-bq-jdbc** as a superior alternative to Jet
 - [Quick Start](#quick-start)
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Logging in IntelliJ](#logging-in-intellij)
 - [Performance Tuning](#performance-tuning)
 - [Feature Comparison](#feature-comparison)
 - [Troubleshooting](#troubleshooting)
@@ -64,12 +65,16 @@ JetBrains' built-in BigQuery driver has several documented issues that affect us
 
 ### 1. Download the Driver
 
-Download the latest shaded JAR from the [releases page](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases):
+Download the latest **with-logging** JAR from the [releases page](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases):
 
 ```bash
-# Example filename
-tbc-bq-jdbc-1.0.88.jar
+# Recommended for IntelliJ — bundles a logging implementation
+tbc-bq-jdbc-1.0.88-with-logging.jar
 ```
+
+IntelliJ runs JDBC drivers in a separate process with no logging backend, so the
+`with-logging` variant (Logback bundled and relocated to avoid conflicts) is recommended —
+driver logs work out of the box. See [Logging in IntelliJ](#logging-in-intellij) below.
 
 ### 2. Add Driver to IntelliJ
 
@@ -227,6 +232,25 @@ jdbc:bigquery:my-project?authType=ADC&metadataCacheTtl=60
 ```
 
 - `metadataCacheTtl=60`: 1-minute cache (shorter refresh)
+
+---
+
+## Logging in IntelliJ
+
+The `with-logging` JAR writes driver logs to a predictable location, created automatically on first connection:
+
+- **macOS/Linux:** `~/.bigquery-jdbc/logs/bigquery-jdbc.log`
+- **Windows:** `C:\Users\<you>\.bigquery-jdbc\logs\bigquery-jdbc.log`
+
+Defaults: `DEBUG` for driver code, `WARN` for Google Cloud APIs, daily rotation with 30-day retention (500 MB cap). To change the location or level, add console output, or use a different JAR variant, supply your own `logback.xml` on IntelliJ's classpath — see the [Logging guide](LOGGING.md) for full configuration.
+
+### Suppressing IntelliJ's built-in dialect warnings
+
+IntelliJ's own BigQuery dialect can log harmless warnings such as `WARNING: Could not get connection`. These come from IntelliJ, not the driver. To silence them:
+
+1. **Help → Diagnostic Tools → Debug Log Settings**
+2. Add: `#com.intellij.database.remote.jdba.jdbc.dialects.BigQueryIntermediateFacade:error`
+3. Click **OK** and restart IntelliJ
 
 ---
 

@@ -200,7 +200,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 - **[Connection Properties](docs/CONNECTION_PROPERTIES.md)** - Complete configuration reference
 - **[Type Mapping](docs/TYPE_MAPPING.md)** - BigQuery ↔ JDBC type conversions
 - **[Compatibility Matrix](docs/COMPATIBILITY.md)** - JDBC features and limitations
-- **[Integration Tests](docs/INTEGRATION_TESTS.md)** - Running integration tests
+- **[Integration Tests](docs/contributing/INTEGRATION_TESTS.md)** - Running integration tests
 
 ## URL Format
 
@@ -412,7 +412,7 @@ export BQ_TEST_DATASET=tbc_bq_jdbc_integration_tests   # optional, this is the d
 
 Tests are **automatically skipped** when `BQ_TEST_PROJECT` is not set, so they never block local builds without credentials. In CI, they run via Workload Identity Federation.
 
-See [Integration Tests Guide](docs/INTEGRATION_TESTS.md) for details.
+See [Integration Tests Guide](docs/contributing/INTEGRATION_TESTS.md) for details.
 
 ### Benchmarks
 
