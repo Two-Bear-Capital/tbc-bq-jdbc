@@ -8,7 +8,7 @@ export default defineConfig({
 	// site: 'https://tbc-bq-jdbc.pages.dev',
 	integrations: [
 		starlight({
-			title: 'tbc-bq-jdbc',
+			title: 'TBC BigQuery JDBC Driver',
 			description: 'Modern JDBC 4.3 driver for Google BigQuery, built for Java 21+',
 			logo: {
 				light: './src/assets/tbc-horizontal.svg',

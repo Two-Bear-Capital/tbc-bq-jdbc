@@ -9,7 +9,7 @@
     <version>1.0.88</version>
     <packaging>jar</packaging>
 
-    <name>BigQuery JDBC Driver</name>
+    <name>TBC BigQuery JDBC Driver</name>
     <description>Modern JDBC driver for Google BigQuery, built for Java 21+</description>
     <url>https://github.com/Two-Bear-Capital/tbc-bq-jdbc</url>
 

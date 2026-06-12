@@ -1,4 +1,4 @@
-# BigQuery JDBC Driver
+# TBC BigQuery JDBC Driver
 
 [![Build](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/build.yml/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/build.yml)
 [![CodeQL](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/github-code-scanning/codeql)
