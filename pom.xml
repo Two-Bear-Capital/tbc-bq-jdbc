@@ -44,8 +44,8 @@
         <!-- Security overrides for transitive deps pulled in by libraries-bom.
              Declared before libraries-bom so these patched versions win.
              opentelemetry: CVE-2026-45292 (W3C Baggage), jackson: GHSA-72hv-8253-57qq. -->
-        <opentelemetry.bom.version>1.62.0</opentelemetry.bom.version>
-        <jackson.bom.version>2.18.6</jackson.bom.version>
+        <opentelemetry.bom.version>1.63.0</opentelemetry.bom.version>
+        <jackson.bom.version>2.22.0</jackson.bom.version>
         <slf4j.version>2.0.18</slf4j.version>
         <junit.version>6.1.0</junit.version>
         <testcontainers.version>2.0.5</testcontainers.version>
@@ -69,7 +69,7 @@
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
-        <spotbugs-maven-plugin.version>4.9.8.4</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
     </properties>
 
