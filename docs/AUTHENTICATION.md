@@ -14,6 +14,11 @@ tbc-bq-jdbc supports all Google Cloud authentication methods:
 | **Workforce Identity** | Federated workforce access | Yes (config file) |
 | **Workload Identity** | GKE workload federation | No (uses metadata) |
 
+> **Canonical `authType` values** — the accepted `authType` values and their underlying
+> implementations are generated from the driver in
+> **[Authentication (generated)](generated/authentication.md)**. The sections below cover setup,
+> credentials, and examples for each method.
+
 ## Application Default Credentials (ADC)
 
 **Recommended for:** Local development, Google Cloud environments
@@ -405,6 +410,6 @@ String url = "jdbc:bigquery:my-project/my_dataset?" +
 
 ## See Also
 
+- [Authentication (generated)](generated/authentication.md) - Authoritative `authType` values and implementations
 - [Connection Properties](CONNECTION_PROPERTIES.md) - All configuration options
 - [Quick Start](QUICKSTART.md) - Get started in 5 minutes
-- [Connection Properties](CONNECTION_PROPERTIES.md) - Configuration reference
