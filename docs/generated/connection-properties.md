@@ -8,13 +8,16 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **23** connection properties.
+There are **26** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
 | `authType` | `ADC` | `ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`, `WORKFORCE`, `WORKLOAD` | Authentication method: ADC (Application Default Credentials), SERVICE_ACCOUNT, USER_OAUTH, WORKFORCE, WORKLOAD |
 | `credentials` | _(none)_ | any | Path to service account JSON key file (required for SERVICE_ACCOUNT auth) |
 | `credentialConfigFile` | _(none)_ | any | Path to external account credential config file (required for WORKFORCE or WORKLOAD auth) |
+| `clientId` | _(none)_ | any | OAuth 2.0 client ID (required for USER_OAUTH auth) |
+| `clientSecret` | _(none)_ | any | OAuth 2.0 client secret (required for USER_OAUTH auth) |
+| `refreshToken` | _(none)_ | any | OAuth 2.0 refresh token (required for USER_OAUTH auth) |
 | `location` | _(none)_ | any | BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location. |
 | `timeout` | `300` | any | Query execution timeout in seconds |
 | `connectionTimeout` | `30` | any | Connection establishment timeout in seconds |
@@ -25,7 +28,7 @@ There are **23** connection properties.
 | `metadataLazyLoad` | `false` | `true`, `false` | Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects) |
 | `useStorageApi` | `auto` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
-| `jobCreationMode` | `REQUIRED` | `REQUIRED`, `JOB_CREATION_OPTIONAL` | REQUIRED always creates a query job; JOB_CREATION_OPTIONAL may skip it for small queries |
+| `jobCreationMode` | `REQUIRED` | `REQUIRED`, `OPTIONAL` | REQUIRED always creates a query job; OPTIONAL may skip it for small queries |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |
 | `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query to estimate cost; estimates are attached as SQLWarnings |
 | `maxResults` | _(none)_ | any | Maximum number of query result rows to return (blank = unlimited) |

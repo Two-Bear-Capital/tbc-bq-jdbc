@@ -118,6 +118,14 @@ public final class BQDriver implements Driver {
 				"Path to external account credential config file (required for WORKFORCE or WORKLOAD auth)", false,
 				null));
 
+		props.add(prop(info, "clientId", "", "OAuth 2.0 client ID (required for USER_OAUTH auth)", false, null));
+
+		props.add(
+				prop(info, "clientSecret", "", "OAuth 2.0 client secret (required for USER_OAUTH auth)", false, null));
+
+		props.add(
+				prop(info, "refreshToken", "", "OAuth 2.0 refresh token (required for USER_OAUTH auth)", false, null));
+
 		props.add(prop(info, "location", "",
 				"BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location.",
 				false, null));
@@ -153,8 +161,8 @@ public final class BQDriver implements Driver {
 				new String[]{"true", "false"}));
 
 		props.add(prop(info, "jobCreationMode", "REQUIRED",
-				"REQUIRED always creates a query job; JOB_CREATION_OPTIONAL may skip it for small queries", false,
-				new String[]{"REQUIRED", "JOB_CREATION_OPTIONAL"}));
+				"REQUIRED always creates a query job; OPTIONAL may skip it for small queries", false,
+				new String[]{"REQUIRED", "OPTIONAL"}));
 
 		props.add(prop(info, "useLegacySql", "false",
 				"Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL)", false,
