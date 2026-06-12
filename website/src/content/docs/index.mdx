@@ -1,0 +1,44 @@
+---
+title: tbc-bq-jdbc
+description: Modern JDBC 4.3 driver for Google BigQuery, built for Java 21+.
+template: splash
+hero:
+  tagline: A modern JDBC 4.3 driver for Google BigQuery, built from scratch for Java 21+.
+  actions:
+    - text: Quick Start
+      link: /guides/quickstart/
+      icon: right-arrow
+    - text: Connection Properties
+      link: /reference/connection-properties/
+      icon: open-book
+      variant: minimal
+    - text: View on GitHub
+      link: https://github.com/Two-Bear-Capital/tbc-bq-jdbc
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why tbc-bq-jdbc
+
+<CardGrid stagger>
+	<Card title="Built for Java 21+" icon="seti:java">
+		Records, sealed classes, pattern matching, and virtual threads throughout.
+	</Card>
+	<Card title="JDBC 4.3 compliant" icon="approve-check">
+		Full compliance within BigQuery's architectural constraints.
+	</Card>
+	<Card title="Fast in IntelliJ" icon="rocket">
+		Metadata and INFORMATION_SCHEMA caching eliminate multi-minute introspection hangs.
+	</Card>
+	<Card title="Simba URL compatible" icon="random">
+		Drop-in URL compatibility for easy migration from the Simba driver.
+	</Card>
+</CardGrid>
+
+## Reference docs stay honest
+
+The **Reference** section is generated directly from the driver's own source of
+truth — `Driver.getPropertyInfo()` and the `AuthType` hierarchy — so it can never
+drift from what the driver actually accepts.

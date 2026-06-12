@@ -1,0 +1,68 @@
+name: Docs Site
+
+# Manual-trigger only for now. Once the Cloudflare secrets and Pages project
+# exist (see below), uncomment the `push` block to deploy on every change.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'docs/**'
+  #     - 'website/**'
+  #     - 'src/main/java/**'
+  #     - 'pom.xml'
+
+# Required GitHub repo secrets before enabling auto-deploy:
+#   CLOUDFLARE_API_TOKEN   - token with "Cloudflare Pages: Edit" permission
+#   CLOUDFLARE_ACCOUNT_ID  - your Cloudflare account ID
+# And a Cloudflare Pages project named below must exist (or create it on first
+# `wrangler pages deploy`).
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & deploy docs site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Generate Javadoc API reference
+        run: |
+          mvn -q -DskipTests javadoc:javadoc -B
+          APIDIR=$(find target -type d -name apidocs | head -n 1)
+          if [ -z "$APIDIR" ]; then
+            echo "::error::Javadoc output (apidocs) not found under target/"
+            exit 1
+          fi
+          mkdir -p website/public/api
+          cp -r "$APIDIR"/. website/public/api/
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install & build site
+        working-directory: website
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy website/dist --project-name=tbc-bq-jdbc-docs
