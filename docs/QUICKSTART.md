@@ -29,7 +29,7 @@ Add to your `pom.xml`:
 
 Add to your `build.gradle`:
 
-```gradle
+```groovy
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:1.0.88'
 }
