@@ -27,8 +27,18 @@ export default defineConfig({
 			},
 			sidebar: [
 				{
+					// Explicit order (Quick Start first). Add new guides here.
 					label: 'Guides',
-					autogenerate: { directory: 'guides' },
+					items: [
+						{ slug: 'guides/quickstart' },
+						{ slug: 'guides/authentication' },
+						{ slug: 'guides/connection-properties' },
+						{ slug: 'guides/type-mapping' },
+						{ slug: 'guides/compatibility' },
+						{ slug: 'guides/logging' },
+						{ slug: 'guides/intellij' },
+						{ slug: 'guides/jetbrains-issues' },
+					],
 				},
 				{
 					label: 'API',

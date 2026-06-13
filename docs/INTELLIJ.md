@@ -18,46 +18,16 @@ A comprehensive guide for using **tbc-bq-jdbc** as a superior alternative to Jet
 
 ## Why Use tbc-bq-jdbc with IntelliJ?
 
-### Known Issues with JetBrains' Built-in Driver
+JetBrains' built-in BigQuery driver hangs on large projects, has unreliable schema introspection,
+crashes on STRUCT columns, and drops authentication after about an hour. tbc-bq-jdbc fixes these with:
 
-JetBrains' built-in BigQuery driver has several documented issues that affect usability:
+- **Production-grade performance** — cached, parallel metadata loading (and optional lazy loading)
+- **Complete JDBC compliance** — all metadata methods, full `ResultSetMetaData`, proper type mapping
+- **Modern authentication** — ADC, service accounts with auto-refresh, Workforce/Workload Identity
+- **Robust type handling** — safe STRUCT/ARRAY handling with no crashes on complex types
 
-| Issue | JetBrains Driver | tbc-bq-jdbc |
-|-------|------------------|-------------|
-| **[DBE-22088]** Hangs with 90+ datasets | ❌ Hangs/freezes | ✅ 2-3 seconds (parallel loading) |
-| **[DBE-18711]** Schema introspection failures | ❌ Unreliable | ✅ Complete JDBC compliance |
-| **[DBE-12749]** Crashes on STRUCT types | ❌ Crashes | ✅ Safe JSON representation |
-| **[DBE-19753]** Auth token expiration | ❌ Manual refresh | ✅ Automatic refresh |
-| **[DBE-12954]** Metadata retrieval issues | ❌ Incomplete | ✅ Full metadata support |
-
-[DBE-22088]: https://youtrack.jetbrains.com/issue/DBE-22088
-[DBE-18711]: https://youtrack.jetbrains.com/issue/DBE-18711
-[DBE-12749]: https://youtrack.jetbrains.com/issue/DBE-12749
-[DBE-19753]: https://youtrack.jetbrains.com/issue/DBE-19753
-[DBE-12954]: https://youtrack.jetbrains.com/issue/DBE-12954
-
-### Key Advantages
-
-✅ **Production-Grade Performance**
-- Metadata caching (5-min default)
-- Parallel dataset loading (6-9x faster)
-- Lazy loading for large projects
-
-✅ **Complete JDBC Compliance**
-- All metadata methods implemented
-- Full ResultSetMetaData support
-- Proper type mapping
-
-✅ **Modern Authentication**
-- Application Default Credentials (ADC)
-- Service Account with auto-refresh
-- Workload Identity
-- Workforce Identity
-
-✅ **Robust Type Handling**
-- Safe STRUCT/ARRAY handling
-- JSON representation fallback
-- No crashes on complex types
+For the full comparison and the specific YouTrack issues this resolves, see
+[Why tbc-bq-jdbc](JETBRAINS_ISSUES.md).
 
 ---
 
@@ -314,10 +284,8 @@ jdbc:bigquery:my-project?authType=ADC&metadataLazyLoad=true
 ```
 
 **Trade-offs**:
-- ✅ Instant initial connection
-- ✅ Minimal API calls
-- ❌ Must expand nodes to see contents
-- ❌ Search/autocomplete won't see unexpanded items
+- Instant initial connection and minimal API calls
+- But you must expand nodes to see their contents, and search/autocomplete won't see unexpanded items
 
 ### Recommended Configurations
 
@@ -376,43 +344,9 @@ jdbc:bigquery:my-project?authType=ADC&metadataCacheTtl=1800&metadataLazyLoad=tru
 
 ## Feature Comparison
 
-### Complete Feature Matrix
-
-| Feature | JetBrains Driver | tbc-bq-jdbc |
-|---------|------------------|-------------|
-| **Metadata Retrieval** |
-| List projects (catalogs) | ⚠️ Limited | ✅ Full support |
-| List datasets (schemas) | ✅ Works | ✅ Works + cached |
-| List tables | ⚠️ Slow (90+) | ✅ Fast (parallel) |
-| List columns | ⚠️ Slow | ✅ Fast (parallel) |
-| Table types | ✅ Works | ✅ Works |
-| Column metadata | ⚠️ Incomplete | ✅ Complete |
-| **Performance** |
-| Metadata caching | ❌ None | ✅ 5-min default |
-| Parallel loading | ❌ Sequential | ✅ Virtual threads |
-| Lazy loading | ❌ None | ✅ Optional |
-| **Type Support** |
-| Standard types | ✅ Works | ✅ Works |
-| STRUCT | ❌ Crashes | ✅ JSON representation |
-| ARRAY | ⚠️ Limited | ✅ Full support |
-| GEOGRAPHY | ⚠️ Limited | ✅ WKT string |
-| JSON | ⚠️ Limited | ✅ Native support |
-| **Authentication** |
-| ADC | ✅ Works | ✅ Works |
-| Service Account | ✅ Works | ✅ Works + auto-refresh |
-| Token expiration | ❌ Manual refresh | ✅ Auto-refresh |
-| Workload Identity | ❌ Not supported | ✅ Supported |
-| Workforce Identity | ❌ Not supported | ✅ Supported |
-| **Query Execution** |
-| Standard SQL | ✅ Works | ✅ Works |
-| Legacy SQL | ⚠️ Limited | ✅ Supported |
-| Parameterized queries | ✅ Works | ✅ Works |
-| Result pagination | ✅ Works | ✅ Works + Storage API |
-| **IntelliJ Integration** |
-| Database browser | ⚠️ Slow/hangs | ✅ Fast |
-| Autocomplete | ✅ Works | ✅ Works |
-| Query console | ✅ Works | ✅ Works |
-| Result viewer | ⚠️ STRUCT crashes | ✅ All types work |
+tbc-bq-jdbc supports the full JDBC/BigQuery feature surface that IntelliJ's database tools use. See
+the [Compatibility](COMPATIBILITY.md) reference for the complete feature-support matrix, and
+[Why tbc-bq-jdbc](JETBRAINS_ISSUES.md) for the side-by-side comparison with JetBrains' built-in driver.
 
 ---
 

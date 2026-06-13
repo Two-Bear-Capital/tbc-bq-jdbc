@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "sync": "node scripts/sync-docs.mjs",
+    "api": "cd .. && ./mvnw -q -DskipTests javadoc:javadoc -B && mkdir -p website/public/api && cp -r \"$(find target -type d -name apidocs | head -1)\"/. website/public/api/",
     "predev": "node scripts/sync-docs.mjs",
     "dev": "astro dev",
     "prebuild": "node scripts/sync-docs.mjs",
