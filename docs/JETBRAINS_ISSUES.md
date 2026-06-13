@@ -62,7 +62,7 @@ integration tests) and JMH benchmarks. Representative benchmark targets:
 - List 50 columns in a table: < 1 second
 - Cached metadata queries: < 10 ms
 
-## See also
+## See Also
 
 - [IntelliJ Integration Guide](INTELLIJ.md) — setup, configuration, and performance tuning
 - [Compatibility Matrix](COMPATIBILITY.md) — JDBC feature support and BigQuery limitations

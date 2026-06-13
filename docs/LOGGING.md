@@ -11,7 +11,7 @@ The driver is distributed in three variants:
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Smallest (runtime dependencies not included)
 
-### 2. Shaded JAR (`tbc-bq-jdbc-1.0.88.jar`)
+### 2. Shaded JAR (`tbc-bq-jdbc-1.0.88-shaded.jar`)
 - **Use case:** Standalone usage with all dependencies bundled
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Large (~40MB, includes Google Cloud libraries)
@@ -44,7 +44,7 @@ When using the `with-logging` variant in IntelliJ:
    - Select the `tbc-bq-jdbc-1.0.88-with-logging.jar` file
 
 2. **Default logging behavior:**
-   - Driver logs are written to `logs/bigquery-jdbc.log` in your working directory
+   - Driver logs are written to `~/.bigquery-jdbc/logs/bigquery-jdbc.log` (your home directory) — created automatically on first connection
    - Log level: DEBUG for driver code, WARN for Google Cloud APIs
    - Daily rotation with 30-day retention
    - Maximum total size: 500MB
@@ -55,15 +55,20 @@ When using the `with-logging` variant in IntelliJ:
 
 ### Example Custom Configuration for IntelliJ
 
-Create `src/main/resources/logback.xml`:
+Place a `logback.xml` on IntelliJ's classpath to override the default.
+
+> **Important:** In the `with-logging` variant, Logback is **relocated** to the
+> `vc.tbc.bq.jdbc.shaded.logback` package, so the appender `class` names must use that prefix
+> (as shown below). When you add your own (non-relocated) Logback to the standard JAR in a
+> Maven/Gradle project, use the normal `ch.qos.logback.*` class names instead.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- Custom file location -->
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <!-- Custom file location (relocated classes for the with-logging variant) -->
+    <appender name="FILE" class="vc.tbc.bq.jdbc.shaded.logback.core.rolling.RollingFileAppender">
         <file>/tmp/my-custom-location.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="vc.tbc.bq.jdbc.shaded.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>/tmp/my-custom-location.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>7</maxHistory>
         </rollingPolicy>
@@ -101,7 +106,7 @@ When using the standard JAR, add an SLF4J implementation:
     <dependency>
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
-        <version>1.0.88</version>
+        <version>1.5.34</version>
     </dependency>
 </dependencies>
 ```
@@ -110,7 +115,7 @@ When using the standard JAR, add an SLF4J implementation:
 ```groovy
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:1.0.88'
-    implementation 'ch.qos.logback:logback-classic:1.4.14'
+    implementation 'ch.qos.logback:logback-classic:1.5.34'
 }
 ```
 
@@ -152,7 +157,7 @@ If you don't want any driver logs:
 <dependency>
     <groupId>org.slf4j</groupId>
     <artifactId>slf4j-nop</artifactId>
-    <version>1.0.88</version>
+    <version>2.0.18</version>
 </dependency>
 ```
 
@@ -174,7 +179,7 @@ To suppress them:
 ## Troubleshooting
 
 ### Logs not appearing?
-1. Check that the `logs/` directory exists or can be created
+1. Check the default location `~/.bigquery-jdbc/logs/bigquery-jdbc.log` (or your custom path)
 2. Verify write permissions for the log file location
 3. Check if another logging configuration is taking precedence
 
@@ -190,8 +195,9 @@ Increase the log level for Google Cloud libraries:
 <logger name="com.google.cloud.bigquery" level="DEBUG"/>
 ```
 
-## Related Documentation
+## See Also
 
+- [IntelliJ IDEA Integration](INTELLIJ.md#logging-in-intellij) - Using the with-logging JAR in IntelliJ
 - [SLF4J Documentation](https://www.slf4j.org/manual.html)
 - [Logback Configuration](https://logback.qos.ch/manual/configuration.html)
 - [IntelliJ Database Tools](https://www.jetbrains.com/help/idea/relational-databases.html)

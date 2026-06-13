@@ -12,7 +12,7 @@ hero:
       link: /guides/quickstart/
       icon: right-arrow
     - text: Connection Properties
-      link: /reference/connection-properties/
+      link: /guides/connection-properties/
       icon: open-book
       variant: minimal
     - text: View on GitHub
@@ -40,8 +40,8 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 	</Card>
 </CardGrid>
 
-## Reference docs stay honest
+## Reference tables stay honest
 
-The **Reference** section is generated directly from the driver's own source of
-truth — `Driver.getPropertyInfo()` and the `AuthType` hierarchy — so it can never
-drift from what the driver actually accepts.
+The property and authentication tables embedded in the guides are generated directly from the
+driver's own source of truth — `Driver.getPropertyInfo()` and the `AuthType` hierarchy — so they can
+never drift from what the driver actually accepts.

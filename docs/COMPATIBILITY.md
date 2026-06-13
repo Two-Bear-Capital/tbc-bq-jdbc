@@ -237,7 +237,7 @@ All major BigQuery capabilities are supported: Standard SQL (GoogleSQL) and Lega
 
 ---
 
-## See also
+## See Also
 
 - [Quick Start](QUICKSTART.md) — get started quickly
 - [Connection Properties](CONNECTION_PROPERTIES.md) — configuration and performance options

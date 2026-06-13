@@ -31,11 +31,6 @@ export default defineConfig({
 					autogenerate: { directory: 'guides' },
 				},
 				{
-					// Pages generated from the driver source of truth (DocGen).
-					label: 'Reference',
-					autogenerate: { directory: 'reference' },
-				},
-				{
 					label: 'API',
 					items: [
 						{

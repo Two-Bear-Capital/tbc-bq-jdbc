@@ -1,4 +1,4 @@
-# Connection Properties Reference
+# Connection Properties
 
 Complete reference for all JDBC connection URL properties.
 
@@ -93,11 +93,12 @@ Simply replace your existing Simba JDBC driver with tbc-bq-jdbc - your connectio
 
 ## Complete Property Reference
 
-> **The authoritative property list is generated from the driver itself.**
-> See **[Connection Properties (generated)](generated/connection-properties.md)** for the
-> complete, always-current table of every property — name, default, allowed values, and
-> description — produced directly from `Driver.getPropertyInfo()`. The sections below add the
-> usage guidance, examples, and recommended configurations that a flat table can't capture.
+The full property table is generated directly from the driver's `Driver.getPropertyInfo()` (see
+[the generated reference](generated/connection-properties.md)), so it always matches what the driver
+accepts. The sections after it add the usage guidance, examples, and recommended configurations that
+a flat table can't capture.
+
+<!-- @include: generated/connection-properties.md -->
 
 ### Authentication Properties
 
@@ -457,7 +458,6 @@ driver's `getPropertyInfo()`, so it never goes stale.
 
 ## See Also
 
-- [Connection Properties (generated)](generated/connection-properties.md) - Authoritative, auto-generated property table
 - [Authentication Guide](AUTHENTICATION.md) - Credential configuration
 - [Quick Start](QUICKSTART.md) - Basic examples
 - [Type Mapping](TYPE_MAPPING.md) - BigQuery ↔ JDBC type conversions

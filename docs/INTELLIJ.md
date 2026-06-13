@@ -256,6 +256,9 @@ IntelliJ's own BigQuery dialect can log harmless warnings such as `WARNING: Coul
 
 ## Performance Tuning
 
+> For the full reference of every property used below (defaults and allowed values), see
+> [Connection Properties](CONNECTION_PROPERTIES.md). This section covers the IntelliJ-specific tuning.
+
 ### Understanding Performance Settings
 
 tbc-bq-jdbc includes three performance optimizations specifically for IntelliJ:

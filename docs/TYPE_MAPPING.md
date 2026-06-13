@@ -11,7 +11,7 @@ This driver maps BigQuery types to standard JDBC types following the JDBC 4.3 sp
 | BigQuery Type | JDBC Type | Java Type | ResultSet Method | PreparedStatement Method |
 |---------------|-----------|-----------|------------------|--------------------------|
 | `STRING` | `VARCHAR` | `String` | `getString()` | `setString()` |
-| `BYTES` | `BINARY` | `byte[]` | `getBytes()` | `setBytes()` |
+| `BYTES` | `VARBINARY` | `byte[]` | `getBytes()` | `setBytes()` |
 | `INT64` | `BIGINT` | `long` | `getLong()` | `setLong()` |
 | `FLOAT64` | `DOUBLE` | `double` | `getDouble()` | `setDouble()` |
 | `NUMERIC` | `NUMERIC` | `BigDecimal` | `getBigDecimal()` | `setBigDecimal()` |
@@ -27,7 +27,9 @@ This driver maps BigQuery types to standard JDBC types following the JDBC 4.3 sp
 | `STRUCT` | `STRUCT` | `Object` | `getObject()` | `setObject()` * |
 | `INTERVAL` | `VARCHAR` | `String` | `getString()` | `setString()` |
 
-\* Limited support - see Complex Types section
+\* By default, ARRAY and STRUCT are returned as JSON strings (use `getString()`). Native
+`java.sql.Array` / `java.sql.Struct` access (`getArray()` / `getObject()` / `setArray()`) requires the
+`nativeComplexTypes=true` connection property — see [Complex Types](#complex-types).
 
 ## Primitive Types
 
@@ -378,20 +380,21 @@ SELECT ['a', 'b', 'c'] as letters
 ```
 
 ```java
-// JDBC - Limited support
 ResultSet rs = stmt.executeQuery("SELECT [1, 2, 3] as numbers");
 while (rs.next()) {
-    // Option 1: Get as Array (limited support in current version)
-    Array array = rs.getArray("numbers");
-
-    // Option 2: Get as String representation
+    // Default: a JSON string
     String arrayStr = rs.getString("numbers");
-    // Returns: "[1, 2, 3]"
+    // Returns: "[1,2,3]"
+
+    // With nativeComplexTypes=true: a native java.sql.Array
+    Array array = rs.getArray("numbers");
 }
 ```
 
-**Current Limitation:**
-Full `java.sql.Array` support is limited. Arrays are currently best accessed as strings and parsed manually.
+**Default vs native:** By default ARRAY columns return a JSON string (parse it with your JSON library).
+Set `nativeComplexTypes=true` on the connection to get a real `java.sql.Array` from `getArray()` (and
+to use `setArray()` / `Connection.createArrayOf()`). The JSON-string default keeps IDEs such as
+IntelliJ from crashing — see [Connection Properties](CONNECTION_PROPERTIES.md).
 
 ---
 
@@ -405,20 +408,20 @@ SELECT STRUCT(1 as id, 'Alice' as name) as person
 ```
 
 ```java
-// JDBC - Limited support
 ResultSet rs = stmt.executeQuery("SELECT STRUCT(1 as id, 'Alice' as name) as person");
 while (rs.next()) {
-    // Get as Object
-    Object struct = rs.getObject("person");
-
-    // Or get as String representation
+    // Default: a JSON string
     String structStr = rs.getString("person");
-    // Returns: "{id=1, name=Alice}" (format may vary)
+    // Returns: '{"id":1,"name":"Alice"}'
+
+    // With nativeComplexTypes=true: getObject() returns a java.sql.Struct
+    Object struct = rs.getObject("person");
 }
 ```
 
-**Current Limitation:**
-Full `java.sql.Struct` support is limited. Structs are best accessed by querying their fields directly:
+**Default vs native:** By default STRUCT columns return a JSON object string. Set
+`nativeComplexTypes=true` to have `getObject()` return a `java.sql.Struct`. You can also project
+fields directly in SQL when you only need a few:
 
 ```sql
 SELECT person.id, person.name FROM table
@@ -609,5 +612,5 @@ Column created: TIMESTAMP (JDBC: 93, Java: java.sql.Timestamp)
 
 - [Quick Start](QUICKSTART.md) - Basic query examples
 - [Connection Properties](CONNECTION_PROPERTIES.md) - Configuration reference
-- [Compatibility Matrix](COMPATIBILITY.md) - JDBC feature support
+- [Compatibility](COMPATIBILITY.md) - JDBC feature support
 - [BigQuery Data Types](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types) - Official BigQuery documentation

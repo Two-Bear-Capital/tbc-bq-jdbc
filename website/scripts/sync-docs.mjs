@@ -4,17 +4,24 @@
  * The repo keeps its docs as plain GitHub-readable Markdown under ../docs (no
  * frontmatter). Starlight requires a `title` in frontmatter, so rather than
  * editing every doc, this script derives the title from the first H1 and writes
- * frontmatter'd copies into src/content/docs/. The output dirs are gitignored —
- * they are build artifacts, never edited by hand.
+ * frontmatter'd copies into src/content/docs/guides/. The output dir is
+ * gitignored — it is a build artifact, never edited by hand.
  *
- *   ../docs/*.md            -> src/content/docs/guides/<slug>.md      (Guides)
- *   ../docs/generated/*.md  -> src/content/docs/reference/<slug>.md   (Reference, from DocGen)
+ *   ../docs/*.md  ->  src/content/docs/guides/<slug>.md
  *
- * Doc scoping convention: only TOP-LEVEL ../docs/*.md is user-facing and synced
- * here. Contributor/build/release docs live in ../docs/contributing/ (a
- * subdirectory) and are intentionally NOT synced — this script ignores
- * subdirectories. Keep "how to use the driver" at the top level; keep "how to
- * build/test/release" under docs/contributing/.
+ * Generated reference tables (../docs/generated/*.md, produced by DocGen) are NOT
+ * synced as separate pages. Instead a guide embeds one with an include marker:
+ *
+ *   <!-- @include: generated/connection-properties.md -->
+ *
+ * which is replaced here with the generated table's body (its DO-NOT-EDIT comment
+ * and H1 stripped). On GitHub the marker is an invisible comment and the guide's
+ * prose links to the generated file; on the site the table is inlined and any
+ * `generated/*.md` links (which would 404) are unwrapped to plain text. This keeps
+ * one page per topic on the site while preserving the generator's drift guarantee.
+ *
+ * Doc scoping convention: only TOP-LEVEL ../docs/*.md is user-facing and synced.
+ * Contributor/build/release docs live in ../docs/contributing/ and are not synced.
  */
 import {
 	readdirSync,
@@ -35,7 +42,7 @@ const docsDir = join(repoRoot, 'docs');
 const generatedDir = join(docsDir, 'generated');
 const contentDir = join(websiteDir, 'src', 'content', 'docs');
 const guidesOut = join(contentDir, 'guides');
-const referenceOut = join(contentDir, 'reference');
+const referenceOut = join(contentDir, 'reference'); // legacy; removed below
 
 /** Turn a file name like CONNECTION_PROPERTIES.md into "connection-properties". */
 function slugify(fileName) {
@@ -49,6 +56,51 @@ function slugify(fileName) {
 /** Remove a leading HTML comment block (e.g. DocGen's DO-NOT-EDIT banner). */
 function stripLeadingComment(md) {
 	return md.replace(/^\s*<!--[\s\S]*?-->\s*/, '');
+}
+
+/** Strip the leading comment and the first H1, returning the remaining body. */
+function bodyWithoutTitle(md) {
+	const lines = stripLeadingComment(md).split('\n');
+	for (let i = 0; i < lines.length; i++) {
+		if (/^#\s+/.test(lines[i])) {
+			lines.splice(i, 1);
+			break;
+		}
+	}
+	return lines.join('\n').replace(/^\n+/, '').trimEnd();
+}
+
+/** Load generated tables keyed by slug, each as a heading-less body for inlining. */
+function loadGenerated() {
+	const map = {};
+	if (!existsSync(generatedDir)) {
+		return map;
+	}
+	for (const entry of readdirSync(generatedDir, { withFileTypes: true })) {
+		if (entry.isFile() && entry.name.endsWith('.md')) {
+			map[slugify(entry.name)] = bodyWithoutTitle(readFileSync(join(generatedDir, entry.name), 'utf8'));
+		}
+	}
+	return map;
+}
+
+const INCLUDE_RE = /^[ \t]*<!--\s*@include:\s*generated\/([a-z0-9-]+)\.md\s*-->[ \t]*$/gm;
+const GENERATED_LINK_RE = /\[([^\]]+)\]\(generated\/[a-z0-9-]+\.md(?:#[^)]*)?\)/g;
+
+/** Replace `<!-- @include: generated/<name>.md -->` markers with the generated body. */
+function inlineIncludes(md, generated) {
+	return md.replace(INCLUDE_RE, (_full, name) => {
+		if (generated[name] == null) {
+			console.warn(`[sync-docs] warning: @include target generated/${name}.md not found`);
+			return '';
+		}
+		return generated[name];
+	});
+}
+
+/** Unwrap links to generated/*.md to plain text (those pages don't exist on the site). */
+function stripGeneratedLinks(md) {
+	return md.replace(GENERATED_LINK_RE, '$1');
 }
 
 /**
@@ -75,32 +127,31 @@ function resetDir(dir) {
 	mkdirSync(dir, { recursive: true });
 }
 
-/** Copy every top-level *.md in srcDir into outDir as a Starlight page. */
-function syncDir(srcDir, outDir) {
-	if (!existsSync(srcDir)) {
-		return [];
-	}
+/** Sync the top-level guide docs, inlining generated tables and stripping their links. */
+function syncGuides(generated) {
 	const written = [];
-	for (const entry of readdirSync(srcDir, { withFileTypes: true })) {
+	for (const entry of readdirSync(docsDir, { withFileTypes: true })) {
 		if (!entry.isFile() || !entry.name.endsWith('.md')) {
 			continue;
 		}
 		const slug = slugify(entry.name);
-		const raw = readFileSync(join(srcDir, entry.name), 'utf8');
-		writeFileSync(join(outDir, `${slug}.md`), toStarlightPage(raw, slug), 'utf8');
+		let raw = readFileSync(join(docsDir, entry.name), 'utf8');
+		raw = inlineIncludes(raw, generated);
+		raw = stripGeneratedLinks(raw);
+		writeFileSync(join(guidesOut, `${slug}.md`), toStarlightPage(raw, slug), 'utf8');
 		written.push(slug);
 	}
 	return written;
 }
 
 resetDir(guidesOut);
-resetDir(referenceOut);
-const guides = syncDir(docsDir, guidesOut);
-const reference = syncDir(generatedDir, referenceOut);
+rmSync(referenceOut, { recursive: true, force: true }); // remove any stale reference pages
+const generated = loadGenerated();
+const guides = syncGuides(generated);
 
 if (guides.length === 0) {
 	console.warn(`[sync-docs] warning: no guide docs found in ${docsDir}`);
 }
 console.log(
-	`[sync-docs] ${guides.length} guide(s), ${reference.length} reference page(s)`,
+	`[sync-docs] ${guides.length} guide(s); ${Object.keys(generated).length} generated table(s) available to inline`,
 );
