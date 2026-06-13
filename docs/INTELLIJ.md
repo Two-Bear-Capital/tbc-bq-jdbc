@@ -647,17 +647,7 @@ jdbc:bigquery:dev-project?authType=ADC&metadataCacheTtl=60
 - Navigation Menu → BigQuery → Job History
 - Filter by user/service account
 
-### 7. Use Connection Pooling for Applications
-
-**For applications** (not IntelliJ):
-```java
-HikariConfig config = new HikariConfig();
-config.setJdbcUrl("jdbc:bigquery:my-project?authType=ADC");
-config.setMaximumPoolSize(10);
-HikariDataSource ds = new HikariDataSource(config);
-```
-
-### 8. Secure Your Credentials
+### 7. Secure Your Credentials
 
 **Never commit credentials**:
 ```bash
