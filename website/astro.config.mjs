@@ -1,11 +1,16 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import rehypeDocIcons from './src/plugins/rehype-doc-icons.mjs';
 
 // https://astro.build/config
 export default defineConfig({
 	// Set this to your Cloudflare Pages / custom domain once known, e.g.
 	// site: 'https://tbc-bq-jdbc.pages.dev',
+	markdown: {
+		// Replace emoji glyphs in docs with Starlight icon SVGs at build time.
+		rehypePlugins: [rehypeDocIcons],
+	},
 	integrations: [
 		starlight({
 			title: 'TBC BigQuery JDBC Driver',

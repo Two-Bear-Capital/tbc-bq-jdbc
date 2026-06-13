@@ -60,3 +60,25 @@
 .site-title img {
 	height: 2rem;
 }
+
+/* Inline icons that replace emoji in the docs (see rehype-doc-icons.mjs). */
+.doc-icon {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	vertical-align: -0.125em;
+	flex-shrink: 0;
+}
+.doc-icon--ok {
+	color: var(--tbc-green);
+}
+.doc-icon--no {
+	color: #d92d20;
+}
+.doc-icon--warn {
+	color: var(--tbc-orange);
+}
+.doc-icon--rocket,
+.doc-icon--book {
+	color: var(--sl-color-text-accent);
+}
