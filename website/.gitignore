@@ -1,0 +1,18 @@
+# build output
+dist/
+# astro generated types/cache
+.astro/
+# dependencies
+node_modules/
+# environment variables
+.env
+.env.production
+# macOS
+.DS_Store
+
+# Synced from ../docs by scripts/sync-docs.mjs (derived — do not commit)
+src/content/docs/guides/
+src/content/docs/reference/
+
+# Javadoc API reference, generated in CI (mvn javadoc:javadoc -> public/api)
+public/api/

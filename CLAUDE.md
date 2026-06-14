@@ -352,12 +352,20 @@ Example: `feat(auth): add workforce identity federation support`
 
 ## Documentation
 
-All user-facing documentation in `docs/`:
+User-facing documentation in `docs/` (synced to the Astro docs site):
 - `QUICKSTART.md` - Getting started guide
 - `AUTHENTICATION.md` - All auth methods with examples
 - `CONNECTION_PROPERTIES.md` - Complete property reference
 - `TYPE_MAPPING.md` - BigQuery ↔ JDBC type conversions
 - `COMPATIBILITY.md` - JDBC feature support matrix
-- `INTEGRATION_TESTS.md` - Running and writing tests
 - `INTELLIJ.md` - IntelliJ IDEA setup and optimization
+- `JETBRAINS_ISSUES.md` - Why tbc-bq-jdbc over JetBrains' built-in driver
 - `LOGGING.md` - Logging configuration and JAR variants
+
+Contributor/maintainer documentation in `docs/contributing/` (NOT synced to the site; linked from `CONTRIBUTING.md`):
+- `INTEGRATION_TESTS.md` - Running and writing tests
+- `EMULATOR_LIMITATIONS.md` - BigQuery emulator gaps and test workarounds
+- `JAR_SIZE_OPTIMIZATION.md` - Shading/size strategy
+- `MAVEN_CENTRAL_PUBLISHING.md` - Release runbook
+
+**Doc scoping convention:** top-level `docs/*.md` is end-user content (how to *use* the driver) and is synced to the website; anything about building, testing, or releasing belongs in `docs/contributing/`.

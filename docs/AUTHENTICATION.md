@@ -1,4 +1,4 @@
-# Authentication Guide
+# Authentication
 
 Complete guide to all authentication methods supported by tbc-bq-jdbc.
 
@@ -14,10 +14,11 @@ tbc-bq-jdbc supports all Google Cloud authentication methods:
 | **Workforce Identity** | Federated workforce access | Yes (config file) |
 | **Workload Identity** | GKE workload federation | No (uses metadata) |
 
-> **Canonical `authType` values** — the accepted `authType` values and their underlying
-> implementations are generated from the driver in
-> **[Authentication (generated)](generated/authentication.md)**. The sections below cover setup,
-> credentials, and examples for each method.
+The accepted `authType` values and their underlying implementations are generated from the driver —
+see [the generated reference](generated/authentication.md). The sections below cover setup,
+credentials, and examples for each method.
+
+<!-- @include: generated/authentication.md -->
 
 ## Application Default Credentials (ADC)
 
@@ -188,18 +189,21 @@ try (Connection conn = DriverManager.getConnection(url)) {
 | `authType` | Yes | Must be `USER_OAUTH` |
 | `clientId` | Yes | OAuth 2.0 client ID |
 | `clientSecret` | Yes | OAuth 2.0 client secret |
-| `refreshToken` | No | Refresh token (if already obtained) |
+| `refreshToken` | Yes | OAuth 2.0 refresh token |
 
-### OAuth Flow
+> All three (`clientId`, `clientSecret`, `refreshToken`) are required — the driver does not run an
+> interactive browser flow. Obtain a refresh token out of band first, then supply it here.
 
-For initial authentication without refresh token:
+### Obtaining a refresh token
 
-```java
-// 1. User authenticates via browser
-// 2. Obtain authorization code
-// 3. Exchange for refresh token
-// 4. Store refresh token securely
-// 5. Use refresh token for subsequent connections
+The driver expects a pre-obtained refresh token. To get one:
+
+```text
+1. User authenticates via browser (one time)
+2. Obtain an authorization code
+3. Exchange the code for a refresh token
+4. Store the refresh token securely
+5. Pass it as `refreshToken` on every connection
 ```
 
 ### When to Use
@@ -415,6 +419,5 @@ String url = "jdbc:bigquery:my-project/my_dataset?" +
 
 ## See Also
 
-- [Authentication (generated)](generated/authentication.md) - Authoritative `authType` values and implementations
 - [Connection Properties](CONNECTION_PROPERTIES.md) - All configuration options
 - [Quick Start](QUICKSTART.md) - Get started in 5 minutes

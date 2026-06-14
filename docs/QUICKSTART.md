@@ -29,7 +29,7 @@ Add to your `pom.xml`:
 
 Add to your `build.gradle`:
 
-```gradle
+```groovy
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:1.0.88'
 }
@@ -40,11 +40,11 @@ dependencies {
 Download the shaded JAR that includes all dependencies:
 
 ```bash
-# Download from Maven Central or GitHub Releases
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.88/tbc-bq-jdbc-1.0.88.jar
+# Download from Maven Central or GitHub Releases (note the -shaded classifier)
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.88/tbc-bq-jdbc-1.0.88-shaded.jar
 ```
 
-**Note:** The shaded JAR is ~38 MB due to platform-specific native libraries required for gRPC SSL/TLS support. This is competitive with other enterprise JDBC drivers (e.g., Simba's BigQuery driver is 41.7 MB). See [JAR Size Optimization](JAR_SIZE_OPTIMIZATION.md) for details.
+**Note:** The shaded JAR is ~38 MB due to platform-specific native libraries required for gRPC SSL/TLS support. This is competitive with other enterprise JDBC drivers (e.g., Simba's BigQuery driver is 41.7 MB).
 
 ## Basic Usage
 
@@ -149,6 +149,7 @@ String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;Project
 - `0` = Service Account (requires `OAuthPvtKeyPath`)
 - `1` = User OAuth (requires `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken`)
 - `3` = Application Default Credentials (recommended)
+- `4` = External Account → Workload/Workforce Identity (set `credentialConfigFile` via `Properties`)
 
 If you're migrating from Simba driver, simply replace the driver JAR - your existing connection strings will work without modification.
 
@@ -237,35 +238,9 @@ try (Connection conn = DriverManager.getConnection(url)) {
 
 ## Connection Pooling
 
-For production applications, use a connection pool:
-
-### HikariCP Example
-
-```xml
-<dependency>
-    <groupId>com.zaxxer</groupId>
-    <artifactId>HikariCP</artifactId>
-    <version>1.0.88</version>
-</dependency>
-```
-
-```java
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-
-HikariConfig config = new HikariConfig();
-config.setJdbcUrl("jdbc:bigquery:my-project/my_dataset?authType=ADC");
-config.setMaximumPoolSize(10);
-config.setMinimumIdle(2);
-config.setConnectionTimeout(30000);
-
-HikariDataSource dataSource = new HikariDataSource(config);
-
-// Use the pool
-try (Connection conn = dataSource.getConnection()) {
-    // Execute queries...
-}
-```
+For production applications, use a connection pool such as HikariCP. See
+[Compatibility → Connection pools](COMPATIBILITY.md#connection-pools) for a worked example and
+recommended settings.
 
 ## Environment Variables
 
@@ -303,10 +278,10 @@ See [Connection Properties](CONNECTION_PROPERTIES.md) for all configuration opti
 ## Next Steps
 
 - [Authentication Guide](AUTHENTICATION.md) - All authentication methods
-- [Connection Properties](CONNECTION_PROPERTIES.md) - Full configuration reference
+- [Connection Properties](CONNECTION_PROPERTIES.md) - Full configuration reference and performance tuning
 - [Type Mapping](TYPE_MAPPING.md) - BigQuery to JDBC type conversions
-- [Connection Properties](CONNECTION_PROPERTIES.md#performance-tuning) - Performance optimization
-- [Compatibility Matrix](COMPATIBILITY.md) - JDBC features and limitations
+- [Logging](LOGGING.md) - Driver logging setup and JAR variants
+- [Compatibility](COMPATIBILITY.md) - JDBC features and limitations
 
 ## Example Projects
 

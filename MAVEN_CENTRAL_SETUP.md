@@ -37,7 +37,7 @@ This project is now set up for publishing to **Maven Central** using the modern 
 
 ### 3. Documentation ✅
 
-**Created:** `docs/MAVEN_CENTRAL_PUBLISHING.md`
+**Created:** `docs/contributing/MAVEN_CENTRAL_PUBLISHING.md`
 
 Comprehensive guide covering:
 - Modern Central Portal setup
@@ -261,7 +261,7 @@ If you're familiar with the old process:
 
 ## Resources
 
-- **Full Documentation:** `docs/MAVEN_CENTRAL_PUBLISHING.md`
+- **Full Documentation:** `docs/contributing/MAVEN_CENTRAL_PUBLISHING.md`
 - **Official Guide:** https://central.sonatype.org/publish/publish-portal-maven/
 - **Central Portal:** https://central.sonatype.com/
 - **Plugin Docs:** https://github.com/sonatype/central-publishing-maven-plugin
