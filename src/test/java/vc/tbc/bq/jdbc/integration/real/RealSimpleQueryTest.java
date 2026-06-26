@@ -35,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 
+	private static final String TABLE = tableName("users");
+
 	@Test
 	void testSelectLiteral() throws SQLException {
 		String sql = "SELECT 1 as num";
@@ -73,10 +75,10 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testSelectWithTableScan() throws SQLException {
-		createTestTable("users");
-		insertTestData("users");
+		createTestTable(TABLE);
+		insertTestData(TABLE);
 
-		String sql = "SELECT id, name, age FROM users ORDER BY id";
+		String sql = "SELECT id, name, age FROM " + TABLE + " ORDER BY id";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertTrue(rs.next());
 			assertEquals(1, rs.getInt("id"));
@@ -96,15 +98,15 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS users");
+		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectWithWhere() throws SQLException {
-		createTestTable("users");
-		insertTestData("users");
+		createTestTable(TABLE);
+		insertTestData(TABLE);
 
-		String sql = "SELECT name, age FROM users WHERE age > 25 ORDER BY age";
+		String sql = "SELECT name, age FROM " + TABLE + " WHERE age > 25 ORDER BY age";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertTrue(rs.next());
 			assertEquals("Alice", rs.getString("name"));
@@ -117,29 +119,29 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS users");
+		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectCount() throws SQLException {
-		createTestTable("users");
-		insertTestData("users");
+		createTestTable(TABLE);
+		insertTestData(TABLE);
 
-		String sql = "SELECT COUNT(*) as total FROM users";
+		String sql = "SELECT COUNT(*) as total FROM " + TABLE;
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertTrue(rs.next());
 			assertEquals(3, rs.getInt("total"));
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS users");
+		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectWithAggregate() throws SQLException {
-		createTestTable("users");
-		insertTestData("users");
+		createTestTable(TABLE);
+		insertTestData(TABLE);
 
-		String sql = "SELECT COUNT(*) as count, AVG(age) as avg_age, MAX(salary) as max_salary FROM users";
+		String sql = "SELECT COUNT(*) as count, AVG(age) as avg_age, MAX(salary) as max_salary FROM " + TABLE;
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertTrue(rs.next());
 			assertEquals(3, rs.getInt("count"));
@@ -147,15 +149,15 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertEquals(85000.75, rs.getDouble("max_salary"), 0.01);
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS users");
+		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectWithGroupBy() throws SQLException {
-		createTestTable("users");
-		insertTestData("users");
+		createTestTable(TABLE);
+		insertTestData(TABLE);
 
-		String sql = "SELECT is_active, COUNT(*) as count FROM users GROUP BY is_active ORDER BY is_active";
+		String sql = "SELECT is_active, COUNT(*) as count FROM " + TABLE + " GROUP BY is_active ORDER BY is_active";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertTrue(rs.next());
 			assertFalse(rs.getBoolean("is_active"));
@@ -168,7 +170,7 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS users");
+		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
@@ -186,15 +188,15 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testEmptyResultSet() throws SQLException {
-		createTestTable("users");
-		insertTestData("users");
-		String sql = "SELECT * FROM users WHERE age > 100";
+		createTestTable(TABLE);
+		insertTestData(TABLE);
+		String sql = "SELECT * FROM " + TABLE + " WHERE age > 100";
 
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS users");
+		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
