@@ -31,9 +31,13 @@ export default defineConfig({
 			},
 			favicon: '/favicon.svg',
 			customCss: ['./src/styles/tbc.css'],
-			social: {
-				github: 'https://github.com/Two-Bear-Capital/tbc-bq-jdbc',
-			},
+			social: [
+				{
+					icon: 'github',
+					label: 'GitHub',
+					href: 'https://github.com/Two-Bear-Capital/tbc-bq-jdbc',
+				},
+			],
 			sidebar: [
 				{
 					// Explicit order (Quick Start first). Add new guides here.
