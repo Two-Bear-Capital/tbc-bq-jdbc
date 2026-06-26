@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Bootstrap: use long-lived SA key until WIF is fully provisioned.
       # Once WIF is active, switch to the google-github-actions/auth WIF block below.
