@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.89] - 2026-06-26
+
+### 🐛 Bug Fixes
+
+- **deps:** Override vulnerable transitive opentelemetry and jackson ([#57](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/57))
+- **driver:** Correct getPropertyInfo metadata to match parser behavior
+- **security:** Force esbuild >=0.28.1 and fix Starlight v0.33 social config
+
+### 🔀 Pull Requests
+
+- Merge pull request #60 from Two-Bear-Capital/docs/generate-reference-from-source
+
+docs: generate connection/auth reference from driver source of truth
+
+### 📚 Documentation
+
+- Generate connection/auth reference from driver source of truth
+- Defer property/auth tables to the generated reference
+- Add Astro Starlight documentation site ([#61](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/61))
+
+### 🧪 Testing
+
+- Remove unused local variables flagged by CodeQL quality scan ([#56](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/56))
+- **real:** Isolate RealSimpleQueryTest tables per run to fix flakiness
+
+### 👷 CI/CD
+
+- Auto-approve and auto-merge Dependabot patch/minor bumps ([#55](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/55))
+- **release:** Port tbc-mcp-server release pattern to fix protected-main push
+
 ## [1.0.88] - 2026-06-11
 
 ### 🔀 Pull Requests
@@ -12,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Merge pull request #54 from Two-Bear-Capital/dependabot/maven/maven-dependencies-c0a0c83bfa
 
 chore(deps): bump the maven-dependencies group across 1 directory with 2 updates
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CHANGELOG.md for version 1.0.88
 
 ## [1.0.87] - 2026-06-04
 
@@ -2045,6 +2079,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.89]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.88...v1.0.89
 [1.0.88]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.87...v1.0.88
 [1.0.87]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.86...v1.0.87
 [1.0.86]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.85...v1.0.86
