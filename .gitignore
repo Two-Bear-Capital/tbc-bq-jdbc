@@ -50,3 +50,7 @@ terraform/terraform.tfvars
 terraform/tfplan
 terraform/*.tfstate
 terraform/*.tfstate.backup
+
+# git-cliff download artifacts (release workflow installs it to a temp dir)
+git-cliff-*/
+git-cliff-*.tar.gz

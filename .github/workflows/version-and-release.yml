@@ -138,7 +138,10 @@ jobs:
 
       - name: Install git-cliff
         run: |
-          # Download and install git-cliff
+          # Download and extract OUTSIDE the repo workspace so the tarball and
+          # extracted files never land in the working tree (they must not be
+          # committed by the bump step below).
+          cd "$RUNNER_TEMP"
           wget -q https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
           tar -xzf git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
           sudo mv git-cliff-2.7.0/git-cliff /usr/local/bin/
@@ -167,7 +170,10 @@ jobs:
           # Single "Bump version to" commit: pom + docs + changelog together. This
           # one commit is both the loop-guard marker (job `if:` above) and a commit
           # cliff.toml skips, so it never pollutes the changelog.
-          git add -A
+          #
+          # Use `git add -u` (tracked, modified files only) — NOT `git add -A` —
+          # so stray build/tool artifacts in the workspace can never be committed.
+          git add -u
           git commit -m "Bump version to ${NEW_VERSION}
 
           Automated release: pom version, documentation, and changelog.
