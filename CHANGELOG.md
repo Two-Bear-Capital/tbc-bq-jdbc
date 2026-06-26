@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.90] - 2026-06-26
+
+### 🐛 Bug Fixes
+
+- **release:** Don't commit git-cliff artifacts into the bump commit
+
 ## [1.0.89] - 2026-06-26
 
 ### 🐛 Bug Fixes
@@ -2079,6 +2085,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.90]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.89...v1.0.90
 [1.0.89]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.88...v1.0.89
 [1.0.88]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.87...v1.0.88
 [1.0.87]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.86...v1.0.87
