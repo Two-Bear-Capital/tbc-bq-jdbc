@@ -1,6 +1,17 @@
 name: Version Increment and Release
 
-# Only run after build workflow completes successfully on main branch
+# Direct-push releases — ported from tbc-mcp-server's pattern.
+#
+# main is protected (PR required + "Build and Emulator Integration Tests" status
+# check), and the default GITHUB_TOKEN cannot push a bump commit through that gate
+# (the old workflow's push was rejected, which orphaned tags). RELEASE_TOKEN is a
+# repo ADMIN's PAT: with admin bypass enabled, an admin push bypasses the required
+# checks, so the bump commit + tag land on main directly.
+#
+# RELEASE_TOKEN: PAT from a repo admin, Contents: write. Until that secret exists,
+# checkout falls back to GITHUB_TOKEN and the push step will be rejected (no-op).
+
+# Only run after the Build workflow completes successfully on main.
 on:
   workflow_run:
     workflows: ["Build"]
@@ -15,18 +26,33 @@ permissions:
   id-token: write
   attestations: write
 
+# Serialize releases so rapid back-to-back merges to main can't race into
+# conflicting bumps or tags.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   version-and-release:
     runs-on: ubuntu-latest
-    # Only run if the build workflow succeeded
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Run on a successful Build of a normal main commit. The bump commit we push
+    # below also lands on main and re-runs Build; the "Bump version to" guard on
+    # the triggering commit prevents an infinite release loop.
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      !startsWith(github.event.workflow_run.head_commit.message, 'Bump version to')
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          # Admin PAT: its push bypasses the required status checks on main. The
+          # default GITHUB_TOKEN cannot, which orphaned tags on the old flow.
+          token: ${{ secrets.RELEASE_TOKEN }}
+          persist-credentials: true
 
       - name: Setup JDK 21
         uses: actions/setup-java@v5
@@ -43,63 +69,43 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Get current version
-        id: current_version
-        run: |
-          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $CURRENT_VERSION"
-
-      - name: Check if version bump needed
-        id: check_bump
-        run: |
-          # Get the commit message of the last commit
-          LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
-
-          # Skip if this was an automated version bump commit
-          if [[ "$LAST_COMMIT_MSG" == "Bump version to "* ]]; then
-            echo "Last commit was automated version bump, skipping"
-            echo "skip=true" >> $GITHUB_OUTPUT
-          else
-            echo "Version bump needed"
-            echo "skip=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Increment patch version
-        if: steps.check_bump.outputs.skip == 'false'
+      - name: Compute new version
         id: new_version
         run: |
-          # Remove any qualifiers (-alpha, -SNAPSHOT, etc.) and increment patch
-          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Current version: $CURRENT_VERSION"
 
-          # Strip qualifier if present
-          BASE_VERSION=$(echo $CURRENT_VERSION | cut -d'-' -f1)
-
-          # Split into major.minor.patch
+          # Strip any qualifier (-SNAPSHOT, -alpha, ...) and increment patch.
+          BASE_VERSION=$(echo "$CURRENT_VERSION" | cut -d'-' -f1)
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
 
-          # Increment patch
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
 
-          # Update pom.xml version
-          mvn versions:set -DnewVersion=$NEW_VERSION -DgenerateBackupPoms=false
-
-      - name: Commit version change
-        if: steps.check_bump.outputs.skip == 'false'
+      - name: Heal orphaned tag from a prior failed run
+        env:
+          VERSION: ${{ steps.new_version.outputs.new_version }}
         run: |
-          git add pom.xml
-          git commit -m "Bump version to ${{ steps.new_version.outputs.new_version }}
+          # If v$VERSION exists remotely but is NOT on main, it's an orphan left by
+          # a prior failed/partial release — delete it (remote + local) so we can
+          # recreate it cleanly. A tag that IS on main is a real release, untouched.
+          TAG="v$VERSION"
+          git fetch origin --tags --force
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            if git merge-base --is-ancestor "$TAG" origin/main 2>/dev/null; then
+              echo "Tag $TAG is on main — real release, leaving it."
+            else
+              echo "Deleting orphan tag $TAG (not on main)."
+              git push origin ":refs/tags/$TAG" || true
+              git tag -d "$TAG" || true
+            fi
+          fi
 
-          Automated version increment by GitHub Actions
-
-          Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+      - name: Set pom.xml version
+        run: mvn versions:set -DnewVersion=${{ steps.new_version.outputs.new_version }} -DgenerateBackupPoms=false
 
       - name: Update documentation versions
-        if: steps.check_bump.outputs.skip == 'false'
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
           echo "Updating documentation to version $NEW_VERSION"
@@ -130,26 +136,7 @@ jobs:
           # Show what changed
           git diff --stat
 
-      - name: Commit documentation updates
-        if: steps.check_bump.outputs.skip == 'false'
-        run: |
-          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
-
-          # Check if there are documentation changes to commit
-          if ! git diff --quiet; then
-            git add "*.md" "docs/*.md"
-            git commit -m "Update documentation to version $NEW_VERSION
-
-          Automated documentation version sync by GitHub Actions
-
-          Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-            echo "Documentation updated and committed"
-          else
-            echo "No documentation changes detected"
-          fi
-
       - name: Install git-cliff
-        if: steps.check_bump.outputs.skip == 'false'
         run: |
           # Download and install git-cliff
           wget -q https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
@@ -159,80 +146,63 @@ jobs:
           git-cliff --version
 
       - name: Update CHANGELOG.md
-        if: steps.check_bump.outputs.skip == 'false'
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
           echo "==> Updating CHANGELOG.md for version $NEW_VERSION"
 
-          # Create a temporary tag for the unreleased changes
+          # Temporary tag so git-cliff attributes unreleased commits to this version.
           git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
-
-          # Generate complete changelog (all releases including new one)
           git-cliff --config cliff.toml --output CHANGELOG.md
-
-          # Remove the temporary tag (will be recreated later)
+          # Remove the temporary tag — recreated on the bump commit below.
           git tag -d "v${NEW_VERSION}"
 
-          # Show what changed
           echo "==> CHANGELOG.md diff:"
           git diff CHANGELOG.md || true
 
-      - name: Commit CHANGELOG.md
-        if: steps.check_bump.outputs.skip == 'false'
-        run: |
-          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
-
-          # Check if CHANGELOG.md was updated
-          if ! git diff --quiet CHANGELOG.md; then
-            git add CHANGELOG.md
-            git commit -m "chore: update CHANGELOG.md for version $NEW_VERSION
-
-          Automated changelog update by GitHub Actions
-
-          Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-            echo "CHANGELOG.md updated and committed"
-          else
-            echo "No changelog changes detected"
-          fi
-
-      - name: Create and push tag
-        if: steps.check_bump.outputs.skip == 'false'
+      - name: Commit bump and create tag
         id: create_tag
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
+
+          # Single "Bump version to" commit: pom + docs + changelog together. This
+          # one commit is both the loop-guard marker (job `if:` above) and a commit
+          # cliff.toml skips, so it never pollutes the changelog.
+          git add -A
+          git commit -m "Bump version to ${NEW_VERSION}
+
+          Automated release: pom version, documentation, and changelog.
+
+          Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+
           git tag -a "v${NEW_VERSION}" -m "Release version ${NEW_VERSION}"
+          echo "tag=v${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Push commit, then tag
+        env:
+          VERSION: ${{ steps.new_version.outputs.new_version }}
+        run: |
+          # Push main FIRST; push the tag only if that succeeds, so a rejected push
+          # can never leave an orphaned tag (the previous failure mode).
           git push origin main
-          git push origin "v${NEW_VERSION}"
-          echo "tag=v${NEW_VERSION}" >> $GITHUB_OUTPUT
+          git push origin "v${VERSION}"
 
       - name: Build and package
-        if: steps.check_bump.outputs.skip == 'false'
         run: mvn clean package -DskipTests -B
 
       - name: Attest build provenance
-        if: steps.check_bump.outputs.skip == 'false'
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'target/*.jar'
 
       - name: Extract changelog for this release
-        if: steps.check_bump.outputs.skip == 'false'
         id: changelog
         run: |
-          NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
-
-          # Extract just this release's changelog section
-          CHANGELOG_CONTENT=$(git-cliff --config cliff.toml --unreleased --strip all)
-
-          # Save to file for use in release
-          echo "$CHANGELOG_CONTENT" > /tmp/release-notes.md
-
-          # Also save to output for debugging
-          echo "Changelog content for v${NEW_VERSION}:"
+          # --latest reads the newest tagged section (the tag we just pushed).
+          git-cliff --config cliff.toml --latest --strip all > /tmp/release-notes.md
+          echo "Changelog content for ${{ steps.create_tag.outputs.tag }}:"
           cat /tmp/release-notes.md
 
       - name: Create GitHub Release
-        if: steps.check_bump.outputs.skip == 'false'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.create_tag.outputs.tag }}
@@ -244,7 +214,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add artifacts section to release
-        if: steps.check_bump.outputs.skip == 'false'
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
 
@@ -268,7 +237,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to GitHub Packages
-        if: steps.check_bump.outputs.skip == 'false'
         run: mvn deploy -DskipTests -B
         env:
           GITHUB_ACTOR: ${{ github.actor }}
