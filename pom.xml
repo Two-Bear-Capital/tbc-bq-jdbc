@@ -40,12 +40,12 @@
         <project.build.outputTimestamp>2026-06-26T19:36:30Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
-        <google.cloud.bom.version>26.84.0</google.cloud.bom.version>
+        <google.cloud.bom.version>26.85.0</google.cloud.bom.version>
         <!-- Security overrides for transitive deps pulled in by libraries-bom.
              Declared before libraries-bom so these patched versions win.
              opentelemetry: CVE-2026-45292 (W3C Baggage), jackson: GHSA-72hv-8253-57qq. -->
         <opentelemetry.bom.version>1.63.0</opentelemetry.bom.version>
-        <jackson.bom.version>2.22.0</jackson.bom.version>
+        <jackson.bom.version>2.22.1</jackson.bom.version>
         <slf4j.version>2.0.18</slf4j.version>
         <junit.version>6.1.1</junit.version>
         <testcontainers.version>2.0.5</testcontainers.version>
