@@ -227,6 +227,20 @@ try {
 
 **Note:** `SessionTest` class documentation explicitly mentions emulator limitations (line 39-41).
 
+**Two further session gaps:**
+
+1. **No session ID is returned.** Real BigQuery reports the session it created in the job
+   statistics (`statistics.sessionInfo.sessionId`), which the driver then sends as the
+   `session_id` connection property on later jobs. The emulator returns no `sessionInfo`, so
+   `SessionManager.getSessionId()` is `null` there and no `session_id` property is attached
+   (the emulator is stateful per endpoint, so session-scoped behavior still appears to work).
+   `SessionManager.hasSession()` therefore tracks "a session-creating job succeeded", not
+   "we know the session ID".
+2. **`ROLLBACK TRANSACTION` is rejected** with `Statement not supported: RollbackStatement`.
+   `BEGIN`/`COMMIT TRANSACTION` are accepted. `TransactionTest.testRollbackWorksWithoutEnableSessions`
+   tolerates the failure; `integration/real/RealTransactionTest` verifies rollback semantics
+   for real.
+
 ---
 
 ### 10. Query Cost Estimation (Dry-Run)

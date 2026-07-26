@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
-import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -64,6 +63,7 @@ public class SessionManager {
 	private final BigQuery bigquery;
 	private final ReentrantLock lock = new ReentrantLock();
 	private String sessionId;
+	private boolean initialized = false;
 	private boolean closed = false;
 
 	/**
@@ -85,21 +85,16 @@ public class SessionManager {
 	public void initializeSession() throws SQLException {
 		lock.lock();
 		try {
-			if (sessionId != null) {
+			if (initialized) {
 				logger.debug("Session already initialized: {}", sessionId);
 				return;
 			}
 
-			// Generate unique session ID
-			String newSessionId = "jdbc_session_" + UUID.randomUUID().toString().replace("-", "");
-
-			// Create session by executing a simple query with session parameter
-			String createSessionSql = "SELECT 1";
-			QueryJobConfiguration queryConfig = QueryJobConfiguration.newBuilder(createSessionSql)
-					.setCreateSession(true)
-					.setConnectionProperties(java.util.List
-							.of(ConnectionProperty.newBuilder().setKey("session_id").setValue(newSessionId).build()))
-					.build();
+			// BigQuery assigns the session ID: run a trivial job with createSession set
+			// and read the ID back from the job statistics (session IDs cannot be chosen
+			// by the client).
+			QueryJobConfiguration queryConfig = QueryJobConfiguration.newBuilder("SELECT 1").setUseLegacySql(false)
+					.setCreateSession(true).build();
 
 			Job queryJob = bigquery.create(JobInfo.of(queryConfig));
 			queryJob = queryJob.waitFor();
@@ -113,8 +108,18 @@ public class SessionManager {
 				throw new SQLException("Failed to create session: " + status.getError().getMessage());
 			}
 
-			this.sessionId = newSessionId;
-			logger.info("BigQuery session created: {}", sessionId);
+			this.sessionId = extractSessionId(queryJob);
+			this.initialized = true;
+
+			if (sessionId == null) {
+				// The BigQuery emulator does not report session info; statements then run
+				// without a session_id connection property (the emulator is stateful per
+				// endpoint, so session-scoped features still behave as expected there).
+				logger.warn("Endpoint did not return a session ID for a job with createSession=true; "
+						+ "statements will not be bound to a session");
+			} else {
+				logger.info("BigQuery session created: {}", sessionId);
+			}
 
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -127,9 +132,27 @@ public class SessionManager {
 	}
 
 	/**
+	 * Reads the session ID BigQuery assigned to the session-creating job.
+	 *
+	 * @param job
+	 *            the completed session-creating job
+	 * @return the session ID, or {@code null} if the endpoint reported none
+	 */
+	private static String extractSessionId(Job job) {
+		JobStatistics statistics = job.getStatistics();
+		if (statistics == null) {
+			return null;
+		}
+
+		JobStatistics.SessionInfo sessionInfo = statistics.getSessionInfo();
+		return sessionInfo == null ? null : sessionInfo.getSessionId();
+	}
+
+	/**
 	 * Gets the session ID.
 	 *
-	 * @return the session ID, or null if no session is active
+	 * @return the session ID assigned by BigQuery, or null if no session is active
+	 *         (or the endpoint did not report one)
 	 */
 	public String getSessionId() {
 		return sessionId;
@@ -141,7 +164,7 @@ public class SessionManager {
 	 * @return true if session is active
 	 */
 	public boolean hasSession() {
-		return sessionId != null && !closed;
+		return initialized && !closed;
 	}
 
 	/**
@@ -152,7 +175,7 @@ public class SessionManager {
 	 * @return the builder with session property added
 	 */
 	public QueryJobConfiguration.Builder addSessionProperty(QueryJobConfiguration.Builder configBuilder) {
-		if (!hasSession()) {
+		if (!hasSession() || sessionId == null) {
 			return configBuilder;
 		}
 
@@ -166,8 +189,10 @@ public class SessionManager {
 	 * Closes the session.
 	 *
 	 * <p>
-	 * Note: BigQuery sessions are automatically cleaned up after timeout. This
-	 * method just marks the session as closed locally.
+	 * Terminates the BigQuery session with {@code BQ.ABORT_SESSION} on a
+	 * best-effort basis so it does not linger until BigQuery's idle timeout (24
+	 * hours of inactivity, 7 days maximum). Failures are logged, never thrown —
+	 * closing a connection must not fail because of session cleanup.
 	 */
 	@SuppressWarnings("PMD.NullAssignment") // null-out sessionId when closed; intentional — session ID is no longer
 											// valid
@@ -178,13 +203,18 @@ public class SessionManager {
 				return;
 			}
 
-			closed = true;
-
 			if (sessionId != null) {
 				logger.info("Closing BigQuery session: {}", sessionId);
-				// BigQuery will automatically clean up the session after timeout
+				try {
+					executeSessionStatement("CALL BQ.ABORT_SESSION()");
+				} catch (SQLException e) {
+					// Session will still expire on its own; nothing else to do
+					logger.warn("Failed to terminate BigQuery session {}: {}", sessionId, e.getMessage());
+				}
 				sessionId = null;
 			}
+
+			closed = true;
 		} finally {
 			lock.unlock();
 		}

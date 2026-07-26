@@ -287,6 +287,7 @@ public final class ConnectionUrlParser {
 				case "Location" -> properties.put("location", value);
 				case "DatasetProjectId" -> properties.put("datasetProjectId", value);
 				case "UseDestinationTables" -> properties.put("useDestinationTables", value);
+				case "EnableSessions" -> properties.put("enableSessions", value);
 				default -> properties.put(key, value); // Pass through — handles native tbc-bq-jdbc property names
 			}
 		}
