@@ -19,6 +19,7 @@ import com.google.cloud.bigquery.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -44,11 +45,39 @@ class SessionManagerTest {
 	@Mock
 	private JobStatus jobStatus;
 
+	@Mock
+	private JobStatistics jobStatistics;
+
+	@Mock
+	private JobStatistics.SessionInfo sessionInfo;
+
 	private SessionManager sessionManager;
+
+	/** Session ID as BigQuery would return it in the job statistics. */
+	private static final String SERVER_SESSION_ID = "CgwKCmZhbGl1LXRlc3QQARokMDAzYjI0OWQ";
 
 	@BeforeEach
 	void setUp() {
 		sessionManager = new SessionManager(bigquery);
+	}
+
+	/**
+	 * Stubs a successful job whose statistics report a BigQuery-assigned session
+	 * ID, mirroring what the service returns for {@code createSession=true}.
+	 */
+	private void stubSuccessfulJobWithSessionId() throws Exception {
+		stubSuccessfulJob();
+		doReturn(jobStatistics).when(job).getStatistics();
+		when(jobStatistics.getSessionInfo()).thenReturn(sessionInfo);
+		when(sessionInfo.getSessionId()).thenReturn(SERVER_SESSION_ID);
+	}
+
+	/** Stubs a successful job that reports no session info (e.g. the emulator). */
+	private void stubSuccessfulJob() throws Exception {
+		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
+		when(job.waitFor()).thenReturn(job);
+		when(job.getStatus()).thenReturn(jobStatus);
+		when(jobStatus.getError()).thenReturn(null);
 	}
 
 	// Constructor Tests
@@ -68,18 +97,14 @@ class SessionManagerTest {
 
 	@Test
 	void testInitializeSessionCreatesSession() throws Exception {
-		// Given: BigQuery client that creates jobs successfully
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		// Given: BigQuery returns a session ID in the job statistics
+		stubSuccessfulJobWithSessionId();
 
 		// When: Initializing session
 		sessionManager.initializeSession();
 
-		// Then: Session ID should be set
-		assertNotNull(sessionManager.getSessionId());
-		assertTrue(sessionManager.getSessionId().startsWith("jdbc_session_"));
+		// Then: The BigQuery-assigned session ID should be stored
+		assertEquals(SERVER_SESSION_ID, sessionManager.getSessionId());
 		assertTrue(sessionManager.hasSession());
 
 		// And: BigQuery create should be called
@@ -89,10 +114,7 @@ class SessionManagerTest {
 	@Test
 	void testInitializeSessionIsIdempotent() throws Exception {
 		// Given: Session already initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 		String firstSessionId = sessionManager.getSessionId();
@@ -172,19 +194,15 @@ class SessionManagerTest {
 	@Test
 	void testGetSessionIdAfterInitialization() throws Exception {
 		// Given: Session initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 
 		// When: Getting session ID
 		String sessionId = sessionManager.getSessionId();
 
-		// Then: Should return session ID
-		assertNotNull(sessionId);
-		assertTrue(sessionId.startsWith("jdbc_session_"));
+		// Then: Should return the ID BigQuery assigned
+		assertEquals(SERVER_SESSION_ID, sessionId);
 	}
 
 	// hasSession() Tests
@@ -201,10 +219,7 @@ class SessionManagerTest {
 	@Test
 	void testHasSessionAfterInitialization() throws Exception {
 		// Given: Session initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJob();
 
 		sessionManager.initializeSession();
 
@@ -218,10 +233,7 @@ class SessionManagerTest {
 	@Test
 	void testHasSessionAfterClose() throws Exception {
 		// Given: Session initialized and closed
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJob();
 
 		sessionManager.initializeSession();
 		sessionManager.close();
@@ -250,10 +262,7 @@ class SessionManagerTest {
 	@Test
 	void testAddSessionPropertyWithSession() throws Exception {
 		// Given: Session initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 		QueryJobConfiguration.Builder builder = QueryJobConfiguration.newBuilder("SELECT 1");
@@ -261,11 +270,27 @@ class SessionManagerTest {
 		// When: Adding session property
 		QueryJobConfiguration.Builder result = sessionManager.addSessionProperty(builder);
 
-		// Then: Should return builder with session property
+		// Then: Should return builder with the session_id connection property
 		assertNotNull(result);
 		QueryJobConfiguration config = result.build();
 		assertNotNull(config.getConnectionProperties());
-		assertFalse(config.getConnectionProperties().isEmpty());
+		assertEquals(1, config.getConnectionProperties().size());
+		assertEquals("session_id", config.getConnectionProperties().get(0).getKey());
+		assertEquals(SERVER_SESSION_ID, config.getConnectionProperties().get(0).getValue());
+	}
+
+	@Test
+	void testAddSessionPropertyWhenEndpointReportsNoSessionId() throws Exception {
+		// Given: An endpoint that creates the session but reports no session info
+		// (the BigQuery emulator behaves this way)
+		stubSuccessfulJob();
+		sessionManager.initializeSession();
+		QueryJobConfiguration.Builder builder = QueryJobConfiguration.newBuilder("SELECT 1");
+
+		// Then: The session is considered active but no session_id is attached
+		assertTrue(sessionManager.hasSession());
+		assertNull(sessionManager.getSessionId());
+		assertSame(builder, sessionManager.addSessionProperty(builder));
 	}
 
 	// close() Tests
@@ -280,10 +305,7 @@ class SessionManagerTest {
 	@Test
 	void testCloseWithSession() throws Exception {
 		// Given: Session initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 
@@ -296,12 +318,38 @@ class SessionManagerTest {
 	}
 
 	@Test
+	void testCloseTerminatesBigQuerySession() throws Exception {
+		// Given: Session initialized
+		stubSuccessfulJobWithSessionId();
+		sessionManager.initializeSession();
+
+		// When: Closing session
+		sessionManager.close();
+
+		// Then: The session is terminated server-side within the session
+		ArgumentCaptor<JobInfo> jobCaptor = ArgumentCaptor.forClass(JobInfo.class);
+		verify(bigquery, times(2)).create(jobCaptor.capture());
+		QueryJobConfiguration abortConfig = jobCaptor.getAllValues().get(1).getConfiguration();
+		assertEquals("CALL BQ.ABORT_SESSION()", abortConfig.getQuery());
+		assertEquals(SERVER_SESSION_ID, abortConfig.getConnectionProperties().get(0).getValue());
+	}
+
+	@Test
+	void testCloseSucceedsWhenSessionTerminationFails() throws Exception {
+		// Given: Session initialized, then the abort job fails
+		stubSuccessfulJobWithSessionId();
+		sessionManager.initializeSession();
+		when(bigquery.create(any(JobInfo.class))).thenThrow(new BigQueryException(500, "session gone"));
+
+		// Then: Closing still succeeds and clears local state
+		assertDoesNotThrow(() -> sessionManager.close());
+		assertFalse(sessionManager.hasSession());
+	}
+
+	@Test
 	void testCloseIsIdempotent() throws Exception {
 		// Given: Session initialized and closed
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 		sessionManager.close();
@@ -316,10 +364,7 @@ class SessionManagerTest {
 	@Test
 	void testBeginTransactionCreatesSessionIfNeeded() throws Exception {
 		// Given: No session initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJob();
 
 		// When: Beginning transaction
 		sessionManager.beginTransaction();
@@ -334,10 +379,7 @@ class SessionManagerTest {
 	@Test
 	void testBeginTransactionWithExistingSession() throws Exception {
 		// Given: Session already initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJob();
 
 		sessionManager.initializeSession();
 
@@ -360,10 +402,7 @@ class SessionManagerTest {
 	@Test
 	void testCommitWithSession() throws Exception {
 		// Given: Session initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJob();
 
 		sessionManager.initializeSession();
 
@@ -386,10 +425,7 @@ class SessionManagerTest {
 	@Test
 	void testRollbackWithSession() throws Exception {
 		// Given: Session initialized
-		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
-		when(job.waitFor()).thenReturn(job);
-		when(job.getStatus()).thenReturn(jobStatus);
-		when(jobStatus.getError()).thenReturn(null);
+		stubSuccessfulJob();
 
 		sessionManager.initializeSession();
 

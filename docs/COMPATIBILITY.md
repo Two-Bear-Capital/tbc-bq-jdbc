@@ -2,7 +2,7 @@
 
 What works, what doesn't, and how to work around BigQuery's constraints.
 
-**Specification:** JDBC 4.3 (Java 21+) · **Compliance:** partial — `Driver.jdbcCompliant()` returns `false` because BigQuery has no primary/foreign keys, no indexes, session-only transactions, no updatable result sets, and no stored procedures.
+**Specification:** JDBC 4.3 (Java 21+) · **Compliance:** partial — `Driver.jdbcCompliant()` returns `false` because BigQuery has no primary/foreign keys, no indexes, no savepoints or configurable isolation levels, no updatable result sets, and no stored procedures.
 
 **Legend** — used in every support table below:
 
@@ -75,10 +75,10 @@ Details:
 
 | Feature | Support | Notes |
 |---------|:------:|-------|
-| Sessions | ✅ | `enableSessions=true` |
+| Sessions | ✅ | `enableSessions=true`, or started on demand by `setAutoCommit(false)` |
 | Temp tables | ✅ | Requires sessions |
 | Multi-statement SQL | ✅ | Requires sessions |
-| Transactions | ⚠️ | Requires sessions |
+| Transactions | ⚠️ | Session-backed; no isolation levels or savepoints |
 | Storage Read API | ⚠️ | Detection works; Arrow deserialization in progress |
 | Query labels | ✅ | Job labels for tracking |
 | Location routing | ✅ | Multi-region support |
@@ -87,25 +87,43 @@ Details:
 
 ---
 
-## Unsupported JDBC features
+## Transactions
 
-### Transactions (without sessions)
+| Feature | Support | Notes |
+|---------|:------:|-------|
+| `setAutoCommit(false)`, `commit()`, `rollback()` | ✅ | Runs in a BigQuery session |
+| `Savepoint` | ❌ | Not supported |
+| Transaction isolation levels | ⚠️ | Snapshot isolation only, reported as `TRANSACTION_REPEATABLE_READ` |
+| Concurrent statements during a transaction | ❌ | BigQuery forbids concurrent queries in a session |
+| Permanent DDL inside a transaction | ❌ | Only DML and temp-entity DDL are transactional |
 
-| Feature | Support | Workaround |
-|---------|:------:|------------|
-| `setAutoCommit(false)`, `commit()`, `rollback()` | ❌ | Enable sessions |
-| `Savepoint` | ❌ | Not supported even with sessions |
-| Transaction isolation levels | ❌ | Always `TRANSACTION_NONE` |
-
-BigQuery is not a transactional database; transactions work only within a session:
+BigQuery transactions only exist inside a session, but the driver starts one for you the
+first time you disable auto-commit — no connection property required:
 
 ```java
-String url = "jdbc:bigquery:my-project/my_dataset?enableSessions=true";
-Connection conn = DriverManager.getConnection(url);
-conn.setAutoCommit(false); // now works
+Connection conn = DriverManager.getConnection("jdbc:bigquery:my-project/my_dataset?authType=ADC");
+conn.setAutoCommit(false); // starts a session; BEGIN comes with the first statement
 // ... execute statements ...
-conn.commit();
+conn.commit();             // COMMIT, then begins the next transaction
 ```
+
+The next statement after a `commit()`/`rollback()` opens a new transaction, so periodic-commit
+loops work as they do on other drivers, and toggling auto-commit without running anything costs
+no query jobs. Calling them while auto-commit is enabled throws `SQLException`
+(SQLState `25000`). Closing a connection with uncommitted work rolls it back. Set
+`enableSessions=true` to create the session eagerly at connection open.
+
+**Isolation.** BigQuery transactions provide snapshot isolation: every read in the transaction
+sees a consistent snapshot of the tables it references. JDBC has no snapshot constant, so
+`DatabaseMetaData.getDefaultTransactionIsolation()` and `Connection.getTransactionIsolation()`
+report the closest standard level, `TRANSACTION_REPEATABLE_READ`.
+`setTransactionIsolation()` accepts `TRANSACTION_REPEATABLE_READ` and `TRANSACTION_NONE`
+(recorded, but the engine's behavior never changes) and rejects the others.
+`DatabaseMetaData.supportsTransactions()` returns `true`; `supportsSavepoints()` returns `false`.
+
+---
+
+## Unsupported JDBC features
 
 ### ResultSet
 

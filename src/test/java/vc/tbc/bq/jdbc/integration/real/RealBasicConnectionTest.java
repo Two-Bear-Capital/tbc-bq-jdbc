@@ -56,28 +56,32 @@ class RealBasicConnectionTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	@Test
-	void testSetAutoCommitFalseThrowsException() {
-		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.setAutoCommit(false));
+	void testSetAutoCommitFalseIsSupported() throws SQLException {
+		// Disabling auto-commit starts a BigQuery session on demand
+		connection.setAutoCommit(false);
+		assertFalse(connection.getAutoCommit());
+		connection.setAutoCommit(true);
+		assertTrue(connection.getAutoCommit());
 	}
 
 	@Test
-	void testCommitThrowsException() {
-		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.commit());
+	void testCommitInAutoCommitModeThrowsException() {
+		assertThrows(SQLException.class, () -> connection.commit());
 	}
 
 	@Test
-	void testRollbackThrowsException() {
-		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.rollback());
+	void testRollbackInAutoCommitModeThrowsException() {
+		assertThrows(SQLException.class, () -> connection.rollback());
 	}
 
 	@Test
-	void testTransactionIsolationIsNone() throws SQLException {
+	void testTransactionIsolationIsRepeatableRead() throws SQLException {
 		int isolation = connection.getTransactionIsolation();
-		assertEquals(Connection.TRANSACTION_NONE, isolation);
+		assertEquals(Connection.TRANSACTION_REPEATABLE_READ, isolation);
 	}
 
 	@Test
-	void testSetTransactionIsolationNonNoneThrowsException() {
+	void testSetTransactionIsolationUnsupportedLevelThrowsException() {
 		assertThrows(SQLFeatureNotSupportedException.class,
 				() -> connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED));
 	}

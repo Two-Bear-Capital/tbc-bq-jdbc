@@ -215,14 +215,16 @@ try (Connection conn = DriverManager.getConnection(url);
 }
 ```
 
-### Using Transactions (with Sessions)
+### Using Transactions
+
+`setAutoCommit(false)` starts a BigQuery session on demand, so no extra connection
+property is needed (add `enableSessions=true` to create the session at connect time).
 
 ```java
-String url = "jdbc:bigquery:my-project/my_dataset?" +
-             "authType=ADC&enableSessions=true";
+String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
 
 try (Connection conn = DriverManager.getConnection(url)) {
-    conn.setAutoCommit(false); // Begin transaction
+    conn.setAutoCommit(false); // Starts a session; transaction begins with the first statement
 
     try (Statement stmt = conn.createStatement()) {
         stmt.executeUpdate("INSERT INTO accounts (id, balance) VALUES (1, 100)");

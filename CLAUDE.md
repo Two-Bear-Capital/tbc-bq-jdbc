@@ -250,10 +250,29 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 ## Important Implementation Details
 
 ### BigQuery Sessions
-- Enabled via `enableSessions=true` connection property
+- Created eagerly via `enableSessions=true`, or lazily on the first `setAutoCommit(false)`
 - Required for: transactions, temp tables, multi-statement SQL
 - Managed by `SessionManager` class
-- Session ID stored in connection, passed to all queries
+- BigQuery assigns the session ID: the creating job sets `createSession=true` and the ID is
+  read back from `JobStatistics.getSessionInfo()`, then sent as the `session_id` connection
+  property on later jobs (clients cannot choose the ID)
+- The emulator returns no `sessionInfo`; `hasSession()` means "session-creating job
+  succeeded", and the `session_id` property is only attached when the ID is known
+- `SessionManager.close()` terminates the session with `CALL BQ.ABORT_SESSION()` (best-effort)
+
+### Transactions
+- `setAutoCommit(false)` starts a session if needed; `BEGIN TRANSACTION` is deferred to the
+  first statement via `BQConnection.beginTransactionIfNeeded()` (called from
+  `AbstractBQStatement`), so pools toggling auto-commit cost no jobs
+- `commit()`/`rollback()` end the in-flight transaction (no-op if nothing ran) and the next
+  statement opens a new one; both throw `SQLException` (SQLState `25000`) in auto-commit mode
+- `setAutoCommit(true)` commits any in-flight transaction; closing a connection rolls it back
+- BigQuery forbids concurrent queries within a session — statements must be sequential once a
+  session is active
+- Only DML and temp-entity DDL are transactional; permanent DDL inside a transaction errors
+- BigQuery gives snapshot isolation, reported as `TRANSACTION_REPEATABLE_READ` (JDBC has no
+  snapshot constant). `DatabaseMetaData.supportsTransactions()` is `true`;
+  `setTransactionIsolation()` accepts `REPEATABLE_READ` and `NONE` only
 
 ### Query Execution
 - `BQStatement` handles simple queries
@@ -284,7 +303,7 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 ### Unsupported JDBC Features (BigQuery Limitations)
 - Scrollable ResultSets (no `previous()`, `absolute()`)
 - Updatable ResultSets (no `updateRow()`, `insertRow()`)
-- Traditional transactions without sessions
+- Savepoints and transaction isolation levels (transactions themselves work via sessions)
 - CallableStatement (limited UDF support)
 - Full Array/Struct JDBC support (returned as JSON)
 

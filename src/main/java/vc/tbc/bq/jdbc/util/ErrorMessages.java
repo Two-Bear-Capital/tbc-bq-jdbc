@@ -33,6 +33,10 @@ public final class ErrorMessages {
 	public static final String CURSORS_NOT_SUPPORTED = "Named cursors not supported";
 	public static final String HOLDABILITY_NOT_SUPPORTED = "Result set holdability configuration not supported";
 
+	// Transaction messages
+	public static final String COMMIT_IN_AUTO_COMMIT = "commit() cannot be called while auto-commit is enabled; call setAutoCommit(false) to start a transaction";
+	public static final String ROLLBACK_IN_AUTO_COMMIT = "rollback() cannot be called while auto-commit is enabled; call setAutoCommit(false) to start a transaction";
+
 	// Parameter validation messages
 	public static final String INVALID_PARAMETER_INDEX = "Invalid parameter index: %d";
 	public static final String NEGATIVE_TIMEOUT = "Timeout value must be non-negative";

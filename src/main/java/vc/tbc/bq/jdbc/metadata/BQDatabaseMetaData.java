@@ -642,29 +642,56 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return 0;
 	}
 
+	/**
+	 * Returns the isolation level BigQuery transactions run at.
+	 *
+	 * <p>
+	 * BigQuery multi-statement transactions provide snapshot isolation: every read
+	 * in the transaction sees a consistent snapshot of the referenced tables. JDBC
+	 * has no snapshot constant, so this is reported as the closest standard level,
+	 * {@link Connection#TRANSACTION_REPEATABLE_READ} — snapshot isolation prevents
+	 * dirty and non-repeatable reads but is weaker than serializable.
+	 *
+	 * @return {@link Connection#TRANSACTION_REPEATABLE_READ}
+	 */
 	@Override
 	public int getDefaultTransactionIsolation() throws SQLException {
-		return Connection.TRANSACTION_NONE;
+		return Connection.TRANSACTION_REPEATABLE_READ;
 	}
 
+	/**
+	 * Returns {@code true}: transactions are supported through BigQuery sessions.
+	 *
+	 * <p>
+	 * The driver starts a session on demand when {@code setAutoCommit(false)} is
+	 * called, so no connection property is required. Savepoints and alternative
+	 * isolation levels remain unsupported.
+	 *
+	 * @return {@code true}
+	 */
 	@Override
 	public boolean supportsTransactions() throws SQLException {
-		return false;
+		return true;
 	}
 
 	@Override
 	public boolean supportsTransactionIsolationLevel(int level) throws SQLException {
-		return level == Connection.TRANSACTION_NONE;
+		// REPEATABLE_READ is BigQuery's actual (snapshot) behavior; NONE is accepted
+		// for tools that ask to run without transactions
+		return level == Connection.TRANSACTION_REPEATABLE_READ || level == Connection.TRANSACTION_NONE;
 	}
 
 	@Override
 	public boolean supportsDataDefinitionAndDataManipulationTransactions() throws SQLException {
+		// DDL that creates or drops permanent entities is rejected inside a
+		// BigQuery transaction
 		return false;
 	}
 
 	@Override
 	public boolean supportsDataManipulationTransactionsOnly() throws SQLException {
-		return false;
+		// DML plus temporary-entity DDL (CREATE TEMP TABLE / FUNCTION)
+		return true;
 	}
 
 	@Override

@@ -119,8 +119,8 @@ class MetadataTest extends AbstractBigQueryIntegrationTest {
 		// When: Checking transaction support
 		DatabaseMetaData metaData = connection.getMetaData();
 
-		// Then: Should not support traditional transactions
-		assertFalse(metaData.supportsTransactions());
+		// Then: Should support session-backed transactions
+		assertTrue(metaData.supportsTransactions());
 	}
 
 	@Test

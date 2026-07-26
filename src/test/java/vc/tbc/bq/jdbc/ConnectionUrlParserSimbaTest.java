@@ -438,6 +438,14 @@ class ConnectionUrlParserSimbaTest {
 	}
 
 	@Test
+	void testParseSimbaUrlWithCapitalizedEnableSessions() throws SQLException {
+		// Simba-style capitalization must map to the native property name
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;EnableSessions=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.enableSessions());
+	}
+
+	@Test
 	void testParseSimbaUrlWithConnectionTimeout() throws SQLException {
 		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;connectionTimeout=60";
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
