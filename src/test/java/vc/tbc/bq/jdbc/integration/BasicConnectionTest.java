@@ -60,37 +60,49 @@ class BasicConnectionTest extends AbstractBigQueryIntegrationTest {
 	}
 
 	@Test
-	void testSetAutoCommitFalseThrowsException() {
-		// Then: Setting auto-commit to false should throw exception
-		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.setAutoCommit(false));
+	void testSetAutoCommitFalseIsSupported() {
+		// Then: Disabling auto-commit starts a session on demand (see TransactionTest)
+		assertDoesNotThrow(() -> connection.setAutoCommit(false));
 	}
 
 	@Test
-	void testCommitThrowsException() {
-		// Then: Commit should throw exception
-		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.commit());
+	void testCommitInAutoCommitModeThrowsException() {
+		// Then: Commit without an open transaction is an invalid-state error
+		assertThrows(SQLException.class, () -> connection.commit());
 	}
 
 	@Test
-	void testRollbackThrowsException() {
-		// Then: Rollback should throw exception
-		assertThrows(SQLFeatureNotSupportedException.class, () -> connection.rollback());
+	void testRollbackInAutoCommitModeThrowsException() {
+		// Then: Rollback without an open transaction is an invalid-state error
+		assertThrows(SQLException.class, () -> connection.rollback());
 	}
 
 	@Test
-	void testTransactionIsolationIsNone() throws SQLException {
+	void testTransactionIsolationIsRepeatableRead() throws SQLException {
 		// When: Getting transaction isolation
 		int isolation = connection.getTransactionIsolation();
 
-		// Then: Should be TRANSACTION_NONE
-		assertEquals(Connection.TRANSACTION_NONE, isolation);
+		// Then: BigQuery's snapshot isolation is reported as REPEATABLE_READ
+		assertEquals(Connection.TRANSACTION_REPEATABLE_READ, isolation);
 	}
 
 	@Test
-	void testSetTransactionIsolationNonNoneThrowsException() {
-		// Then: Setting isolation level should throw exception
+	void testSetTransactionIsolationAcceptsSupportedLevels() throws SQLException {
+		// Then: The levels the driver reports as supported are accepted
+		connection.setTransactionIsolation(Connection.TRANSACTION_NONE);
+		assertEquals(Connection.TRANSACTION_NONE, connection.getTransactionIsolation());
+
+		connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+		assertEquals(Connection.TRANSACTION_REPEATABLE_READ, connection.getTransactionIsolation());
+	}
+
+	@Test
+	void testSetTransactionIsolationUnsupportedLevelThrowsException() {
+		// Then: Levels BigQuery cannot honor are rejected
 		assertThrows(SQLFeatureNotSupportedException.class,
 				() -> connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED));
+		assertThrows(SQLFeatureNotSupportedException.class,
+				() -> connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE));
 	}
 
 	@Test

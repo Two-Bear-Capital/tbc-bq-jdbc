@@ -167,7 +167,10 @@ try (Connection conn = DriverManager.getConnection(url);
 }
 ```
 
-### Using Sessions for Transactions
+### Using Transactions and Temp Tables
+
+`setAutoCommit(false)` starts a BigQuery session on demand; `enableSessions=true`
+creates it when the connection opens instead.
 
 ```java
 String url = "jdbc:bigquery:my-project/my_dataset?" +

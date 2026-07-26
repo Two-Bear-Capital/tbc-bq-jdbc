@@ -340,9 +340,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			configBuilder.setMaxResults((long) effectiveFetchSize);
 		}
 
-		// Add session property if sessions are enabled
+		// Add session property if sessions are enabled, starting the transaction
+		// first when the connection is in manual-commit mode
 		SessionManager sessionManager = connection.getSessionManager();
 		if (sessionManager != null && sessionManager.hasSession()) {
+			connection.beginTransactionIfNeeded();
 			configBuilder = sessionManager.addSessionProperty(configBuilder);
 		}
 
@@ -527,9 +529,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			configBuilder.setLabels(properties.labels());
 		}
 
-		// Add session property if sessions are enabled
+		// Add session property if sessions are enabled, starting the transaction
+		// first when the connection is in manual-commit mode
 		SessionManager sessionManager = connection.getSessionManager();
 		if (sessionManager != null && sessionManager.hasSession()) {
+			connection.beginTransactionIfNeeded();
 			configBuilder = sessionManager.addSessionProperty(configBuilder);
 		}
 

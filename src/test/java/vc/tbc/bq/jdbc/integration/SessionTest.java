@@ -231,8 +231,8 @@ class SessionTest extends AbstractBigQueryIntegrationTest {
 			// Then: Connection properties should be correct
 			assertFalse(sessionConn.isReadOnly(), "Connection should not be read-only by default");
 			assertTrue(sessionConn.getAutoCommit(), "Auto-commit should be true");
-			assertEquals(Connection.TRANSACTION_NONE, sessionConn.getTransactionIsolation(),
-					"Transaction isolation should be NONE");
+			assertEquals(Connection.TRANSACTION_REPEATABLE_READ, sessionConn.getTransactionIsolation(),
+					"Snapshot isolation is reported as REPEATABLE_READ");
 		}
 	}
 

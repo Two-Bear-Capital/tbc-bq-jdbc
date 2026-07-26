@@ -44,6 +44,9 @@ public class BQSQLException extends SQLException {
 	/** SQLState for feature not supported. */
 	public static final String SQLSTATE_FEATURE_NOT_SUPPORTED = "0A000";
 
+	/** SQLState for an operation attempted in an invalid transaction state. */
+	public static final String SQLSTATE_INVALID_TRANSACTION_STATE = "25000";
+
 	/** SQLState for invalid parameter value. */
 	public static final String SQLSTATE_INVALID_PARAMETER_VALUE = "22023";
 

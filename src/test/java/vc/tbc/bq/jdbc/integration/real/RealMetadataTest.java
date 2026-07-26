@@ -97,7 +97,7 @@ class RealMetadataTest extends AbstractRealBigQueryIntegrationTest {
 	@Test
 	void testSupportsTransactions() throws SQLException {
 		DatabaseMetaData metaData = connection.getMetaData();
-		assertFalse(metaData.supportsTransactions());
+		assertTrue(metaData.supportsTransactions());
 	}
 
 	@Test

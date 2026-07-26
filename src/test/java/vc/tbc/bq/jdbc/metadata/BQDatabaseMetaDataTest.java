@@ -147,8 +147,15 @@ class BQDatabaseMetaDataTest {
 		// When: Checking transaction support
 		boolean supported = metaData.supportsTransactions();
 
-		// Then: Should return false (BigQuery has limited transaction support)
-		assertFalse(supported);
+		// Then: Should return true (session-backed transactions)
+		assertTrue(supported);
+	}
+
+	@Test
+	void testSupportsDataManipulationTransactionsOnly() throws SQLException {
+		// Then: DML (plus temp-entity DDL) is transactional; permanent DDL is not
+		assertTrue(metaData.supportsDataManipulationTransactionsOnly());
+		assertFalse(metaData.supportsDataDefinitionAndDataManipulationTransactions());
 	}
 
 	@Test
@@ -449,14 +456,12 @@ class BQDatabaseMetaDataTest {
 
 	@Test
 	void testSupportsTransactionIsolationLevel() throws SQLException {
-		// When: Checking supported isolation levels
-		boolean noneSupported = metaData.supportsTransactionIsolationLevel(java.sql.Connection.TRANSACTION_NONE);
-		boolean readCommittedSupported = metaData
-				.supportsTransactionIsolationLevel(java.sql.Connection.TRANSACTION_READ_COMMITTED);
-
-		// Then: Should only support TRANSACTION_NONE
-		assertTrue(noneSupported);
-		assertFalse(readCommittedSupported);
+		// Then: Snapshot isolation (reported as REPEATABLE_READ) and NONE only
+		assertTrue(metaData.supportsTransactionIsolationLevel(java.sql.Connection.TRANSACTION_REPEATABLE_READ));
+		assertTrue(metaData.supportsTransactionIsolationLevel(java.sql.Connection.TRANSACTION_NONE));
+		assertFalse(metaData.supportsTransactionIsolationLevel(java.sql.Connection.TRANSACTION_READ_COMMITTED));
+		assertFalse(metaData.supportsTransactionIsolationLevel(java.sql.Connection.TRANSACTION_READ_UNCOMMITTED));
+		assertFalse(metaData.supportsTransactionIsolationLevel(java.sql.Connection.TRANSACTION_SERIALIZABLE));
 	}
 
 	@Test
@@ -464,8 +469,8 @@ class BQDatabaseMetaDataTest {
 		// When: Getting default isolation level
 		int isolation = metaData.getDefaultTransactionIsolation();
 
-		// Then: Should return TRANSACTION_NONE
-		assertEquals(java.sql.Connection.TRANSACTION_NONE, isolation);
+		// Then: BigQuery's snapshot isolation maps to REPEATABLE_READ
+		assertEquals(java.sql.Connection.TRANSACTION_REPEATABLE_READ, isolation);
 	}
 
 	// Result Set Holdability Tests

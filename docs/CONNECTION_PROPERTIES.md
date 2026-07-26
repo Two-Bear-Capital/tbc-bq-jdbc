@@ -51,6 +51,8 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 | `UseLegacySQL` | `useLegacySql` | Use legacy SQL dialect |
 | `Location` | `location` | BigQuery location |
 | `DatasetProjectId` | `datasetProjectId` | Cross-project dataset access |
+| `EnableSessions` | `enableSessions` | Create a BigQuery session at connection open |
+| `UseDestinationTables` | `useDestinationTables` | Write SELECT results to a temp destination table |
 
 **OAuthType Values:**
 
@@ -157,16 +159,26 @@ Controlled by `enableSessions` (see the
 jdbc:bigquery:my-project/my_dataset?authType=ADC&enableSessions=true
 ```
 
-**When enabled:**
-- ✅ Can use `CREATE TEMP TABLE`
-- ✅ Can use multi-statement SQL scripts
-- ✅ Can use `BEGIN TRANSACTION`, `COMMIT`, `ROLLBACK`
-- ✅ Can call `setAutoCommit(false)` on Connection
+**When enabled:** the session is created when the connection opens, so from the first
+statement you can:
+- ✅ Use `CREATE TEMP TABLE`
+- ✅ Use multi-statement SQL scripts
+- ✅ Use `BEGIN TRANSACTION`, `COMMIT`, `ROLLBACK`
+- ✅ Call `setAutoCommit(false)` on Connection
 
-**When disabled (default):**
-- ❌ `setAutoCommit(false)` throws `SQLFeatureNotSupportedException`
-- ❌ `commit()` and `rollback()` throw exceptions
-- ❌ Temp tables not supported
+**When disabled (default):** no session exists until transaction semantics are requested.
+Calling `setAutoCommit(false)` starts one on demand, so generic JDBC tooling (connection
+pools, ORMs, data loaders) works without setting this property:
+- ✅ `setAutoCommit(false)` starts a session; the transaction begins with the next statement
+- ✅ `commit()` / `rollback()` work, each starting the next transaction
+- ✅ Temp tables and multi-statement scripts work once the session exists
+- ⚠️ Calling `commit()` / `rollback()` while auto-commit is enabled throws
+  `SQLException` (SQLState `25000`), per the JDBC spec
+- ⚠️ Sessions do not allow concurrent queries — with a session active, run statements
+  on the connection sequentially
+
+Set `enableSessions=true` when the very first statement needs the session (temp tables
+or scripts before any transaction), or to make the session cost explicit at connect time.
 
 ---
 
@@ -367,12 +379,6 @@ The allowed values for each property (e.g. `authType`, `useStorageApi`, `jobCrea
 produced directly from the driver.
 
 ### Invalid Combinations
-
-❌ **Don't:**
-```
-enableSessions=false + setAutoCommit(false)
-```
-**Error:** SQLFeatureNotSupportedException
 
 ❌ **Don't:**
 ```

@@ -47,8 +47,8 @@ import java.util.concurrent.Executor;
  * It supports:
  * <ul>
  * <li>Statement and PreparedStatement execution
- * <li>Transaction support (requires session mode with
- * {@code enableSessions=true})
+ * <li>Transaction support (session-backed; the session starts automatically on
+ * {@code setAutoCommit(false)})
  * <li>Metadata queries through {@link DatabaseMetaData}
  * <li>Multiple authentication methods (ADC, service account, OAuth, etc.)
  * </ul>
@@ -67,7 +67,11 @@ import java.util.concurrent.Executor;
  * <li>Temporary tables
  * <li>Multi-statement SQL execution
  * </ul>
- * Enable sessions with connection property: {@code enableSessions=true}
+ * Set {@code enableSessions=true} to create the session when the connection
+ * opens. Connections opened without it still start a session on demand the
+ * first time {@code setAutoCommit(false)} is called, so generic JDBC tooling
+ * (connection pools, ORMs, data loaders) works without BigQuery-specific
+ * configuration.
  *
  * @since 1.0.0
  */
@@ -81,6 +85,8 @@ public final class BQConnection extends AbstractBQConnection {
 	private final SessionManager sessionManager;
 	private BQDatabaseMetaData metadata;
 	private boolean autoCommit = true;
+	private boolean transactionActive = false;
+	private volatile int transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ;
 	private volatile boolean readOnly = false;
 	private volatile int networkTimeout = 0;
 
@@ -272,6 +278,30 @@ public final class BQConnection extends AbstractBQConnection {
 		return sql;
 	}
 
+	/**
+	 * Sets the auto-commit mode for this connection.
+	 *
+	 * <p>
+	 * BigQuery only supports transactions inside a session. When auto-commit is
+	 * disabled on a connection that has no session yet, the driver starts one on
+	 * demand — the caller does not need to have set {@code enableSessions=true} on
+	 * the connection URL. Setting {@code enableSessions=true} still creates the
+	 * session eagerly at connection open, which is preferable when temporary tables
+	 * or multi-statement scripts are used before any transaction.
+	 *
+	 * <p>
+	 * The {@code BEGIN TRANSACTION} itself is deferred until the first statement
+	 * runs, so toggling auto-commit (as connection pools do when recycling
+	 * connections) costs no query jobs. Re-enabling auto-commit commits any
+	 * in-flight transaction first, per the JDBC contract.
+	 *
+	 * @param autoCommit
+	 *            {@code true} to enable auto-commit, {@code false} for manual
+	 *            transaction control
+	 * @throws SQLException
+	 *             if the connection is closed, the session cannot be created, or
+	 *             the transaction cannot be started or committed
+	 */
 	@Override
 	public void setAutoCommit(boolean autoCommit) throws SQLException {
 		checkClosed();
@@ -283,23 +313,19 @@ public final class BQConnection extends AbstractBQConnection {
 				return;
 			}
 
-			// Sessions required for transaction support
-			if (!autoCommit && !properties.enableSessions()) {
-				throw new BQSQLFeatureNotSupportedException(
-						"BigQuery does not support transactions outside of sessions. "
-								+ "Enable sessions with: enableSessions=true");
-			}
-
 			// Change state atomically - only update flag if operations succeed
 			if (autoCommit) {
 				// Switching to auto-commit: commit pending transaction first
-				if (properties.enableSessions()) {
+				if (transactionActive) {
 					sessionManager.commit();
+					this.transactionActive = false;
 				}
 				this.autoCommit = true;
 			} else {
-				// Switching to manual commit: begin transaction
-				sessionManager.beginTransaction();
+				// Switching to manual commit: the session must exist so that every
+				// statement on this connection is bound to it; BEGIN TRANSACTION is
+				// deferred to the first statement
+				ensureSession();
 				this.autoCommit = false;
 			}
 
@@ -313,32 +339,115 @@ public final class BQConnection extends AbstractBQConnection {
 		return autoCommit;
 	}
 
+	/**
+	 * Commits the current transaction and begins the next one.
+	 *
+	 * <p>
+	 * Requires manual-commit mode ({@code setAutoCommit(false)}); the transaction
+	 * runs inside the connection's BigQuery session.
+	 *
+	 * @throws SQLException
+	 *             if the connection is closed, auto-commit is enabled, or the
+	 *             commit fails
+	 */
 	@Override
 	public void commit() throws SQLException {
 		checkClosed();
 
-		// Allow commit in session mode
-		if (properties.enableSessions()) {
-			sessionManager.commit();
-			return;
-		}
+		synchronized (this) {
+			if (autoCommit) {
+				throw new BQSQLException(ErrorMessages.COMMIT_IN_AUTO_COMMIT,
+						BQSQLException.SQLSTATE_INVALID_TRANSACTION_STATE);
+			}
 
-		throw new BQSQLFeatureNotSupportedException("BigQuery does not support transactions outside of sessions. "
-				+ "Enable sessions with: enableSessions=true");
+			endTransaction(true);
+		}
 	}
 
+	/**
+	 * Rolls back the current transaction and begins the next one.
+	 *
+	 * <p>
+	 * Requires manual-commit mode ({@code setAutoCommit(false)}); the transaction
+	 * runs inside the connection's BigQuery session.
+	 *
+	 * @throws SQLException
+	 *             if the connection is closed, auto-commit is enabled, or the
+	 *             rollback fails
+	 */
 	@Override
 	public void rollback() throws SQLException {
 		checkClosed();
 
-		// Allow rollback in session mode
-		if (properties.enableSessions()) {
-			sessionManager.rollback();
+		synchronized (this) {
+			if (autoCommit) {
+				throw new BQSQLException(ErrorMessages.ROLLBACK_IN_AUTO_COMMIT,
+						BQSQLException.SQLSTATE_INVALID_TRANSACTION_STATE);
+			}
+
+			endTransaction(false);
+		}
+	}
+
+	/**
+	 * Ends the in-flight transaction, if any. The next statement starts a new one
+	 * (JDBC's chained transaction model), so repeated commits work.
+	 *
+	 * @param commit
+	 *            {@code true} to commit, {@code false} to roll back
+	 * @throws SQLException
+	 *             if the commit or rollback fails
+	 */
+	private void endTransaction(boolean commit) throws SQLException {
+		if (!transactionActive) {
+			// Nothing has run since the last commit/rollback
+			logger.debug("No active transaction to {}", commit ? "commit" : "roll back");
 			return;
 		}
 
-		throw new BQSQLFeatureNotSupportedException("BigQuery does not support transactions outside of sessions. "
-				+ "Enable sessions with: enableSessions=true");
+		if (commit) {
+			sessionManager.commit();
+		} else {
+			sessionManager.rollback();
+		}
+		transactionActive = false;
+	}
+
+	/**
+	 * Begins a transaction if the connection is in manual-commit mode and no
+	 * transaction is in flight. Called by statements immediately before they submit
+	 * a job, which keeps {@code BEGIN TRANSACTION} out of the auto-commit toggling
+	 * that connection pools perform.
+	 *
+	 * @throws SQLException
+	 *             if the transaction cannot be started
+	 */
+	public void beginTransactionIfNeeded() throws SQLException {
+		synchronized (this) {
+			if (autoCommit || transactionActive) {
+				return;
+			}
+
+			sessionManager.beginTransaction();
+			transactionActive = true;
+		}
+	}
+
+	/**
+	 * Starts a BigQuery session on demand for connections that were opened without
+	 * {@code enableSessions=true}.
+	 *
+	 * @throws SQLException
+	 *             if the session cannot be created
+	 */
+	private void ensureSession() throws SQLException {
+		if (sessionManager.hasSession()) {
+			return;
+		}
+
+		logger.info("Starting BigQuery session on demand for transaction support "
+				+ "(use enableSessions=true to create the session when the connection opens)");
+		sessionManager.initializeSession();
 	}
 
 	@Override
@@ -365,10 +474,23 @@ public final class BQConnection extends AbstractBQConnection {
 		// Clear statement references
 		runningStatements.clear();
 
-		// Close session if active
-		if (sessionManager != null) {
-			sessionManager.close();
+		// Discard any uncommitted work (JDBC leaves this implementation-defined;
+		// rolling back matches the behavior of mainstream drivers). A transaction can
+		// only be active once a session exists.
+		synchronized (this) {
+			if (transactionActive) {
+				try {
+					sessionManager.rollback();
+				} catch (SQLException e) {
+					logger.warn("Failed to roll back open transaction during connection close", e);
+				}
+				transactionActive = false;
+			}
 		}
+
+		// Terminate the session; sessionManager is assigned by the constructor, which
+		// fails outright if it cannot be created, so it is never null here
+		sessionManager.close();
 
 		// Log metadata cache statistics (cache persists across connections)
 		if (metadata != null) {
@@ -423,18 +545,40 @@ public final class BQConnection extends AbstractBQConnection {
 		return properties.projectId();
 	}
 
+	/**
+	 * Sets the transaction isolation level.
+	 *
+	 * <p>
+	 * BigQuery transactions always run at snapshot isolation, reported as
+	 * {@link Connection#TRANSACTION_REPEATABLE_READ}. That level and
+	 * {@link Connection#TRANSACTION_NONE} (for tools that ask to run without
+	 * transactions) are accepted and recorded; the actual behavior never changes.
+	 * Other levels cannot be honored and are rejected.
+	 *
+	 * @param level
+	 *            one of {@code TRANSACTION_REPEATABLE_READ} or
+	 *            {@code TRANSACTION_NONE}
+	 * @throws SQLException
+	 *             if the connection is closed
+	 * @throws java.sql.SQLFeatureNotSupportedException
+	 *             if another isolation level is requested
+	 */
 	@Override
 	public void setTransactionIsolation(int level) throws SQLException {
 		checkClosed();
-		if (level != Connection.TRANSACTION_NONE) {
-			throw new BQSQLFeatureNotSupportedException("BigQuery does not support transaction isolation levels");
+		if (level != Connection.TRANSACTION_REPEATABLE_READ && level != Connection.TRANSACTION_NONE) {
+			throw new BQSQLFeatureNotSupportedException("BigQuery transactions run at snapshot isolation "
+					+ "(reported as TRANSACTION_REPEATABLE_READ); requested level not supported: " + level);
 		}
+
+		this.transactionIsolation = level;
+		logger.debug("Transaction isolation set to: {} (BigQuery always uses snapshot isolation)", level);
 	}
 
 	@Override
 	public int getTransactionIsolation() throws SQLException {
 		checkClosed();
-		return Connection.TRANSACTION_NONE;
+		return transactionIsolation;
 	}
 
 	@Override
