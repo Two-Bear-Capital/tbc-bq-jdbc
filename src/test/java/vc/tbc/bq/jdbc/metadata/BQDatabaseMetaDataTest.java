@@ -248,8 +248,8 @@ class BQDatabaseMetaDataTest {
 		// When: Checking batch updates support
 		boolean supported = metaData.supportsBatchUpdates();
 
-		// Then: Should return false
-		assertFalse(supported);
+		// Then: Should return true (multi-row INSERT collapse / sequential fallback)
+		assertTrue(supported);
 	}
 
 	// NULL Sorting Tests

@@ -459,7 +459,6 @@ export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 
 - Traditional transactions (without sessions)
 - Scrollable or updatable ResultSets
-- Batch operations
 - CallableStatement
 
 See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete details.
@@ -497,7 +496,6 @@ See [Connection Properties - Performance Tuning](docs/CONNECTION_PROPERTIES.md#p
 
 - Forward-only ResultSets (no scrollable)
 - Read-only ResultSets (no updatable)
-- No batch operations (use BigQuery array syntax)
 
 See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 

@@ -21,6 +21,7 @@ import com.google.cloud.bigquery.StandardSQLTypeName;
 import vc.tbc.bq.jdbc.base.AbstractBQPreparedStatement;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.metadata.BQParameterMetaData;
+import vc.tbc.bq.jdbc.util.BatchInsertRewriter;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.ParameterConverter;
 import vc.tbc.bq.jdbc.util.TimezoneUtils;
@@ -29,8 +30,10 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * JDBC PreparedStatement implementation for BigQuery.
@@ -41,6 +44,9 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 	private final String sqlTemplate;
 	private final List<QueryParameterValue> parameters = new ArrayList<>();
+
+	/** Parameter sets accumulated via {@link #addBatch()} for batch execution. */
+	private final List<List<QueryParameterValue>> batchParameterSets = new ArrayList<>();
 
 	public BQPreparedStatement(BQConnection connection, String sql) {
 		super(connection);
@@ -83,11 +89,16 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		return executeQueryInternal(sqlTemplate);
 	}
 
+	/**
+	 * Executes the prepared DML statement and returns the number of affected rows,
+	 * taken from BigQuery's DML job statistics ({@code numDmlAffectedRows}).
+	 * Returns 0 for statements that carry no DML statistics (DDL, SELECT), per the
+	 * JDBC contract for statements that return nothing.
+	 */
 	@Override
-	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public int executeUpdate() throws SQLException {
-		executeQuery();
-		return 0;
+		long count = executeLargeUpdate();
+		return count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
 	}
 
 	/**
@@ -582,11 +593,19 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		return StandardSQLTypeName.STRING;
 	}
 
+	/**
+	 * Executes the prepared statement, which may return multiple types of results.
+	 *
+	 * <p>
+	 * Returns {@code false} when BigQuery reports the statement was DML — retrieve
+	 * the affected-row count via {@link #getUpdateCount()}. Returns {@code true}
+	 * otherwise — retrieve results via {@link #getResultSet()}.
+	 */
 	@Override
 	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public boolean execute() throws SQLException {
 		executeQuery();
-		return true;
+		return !finishExecuteAsUpdateIfDml();
 	}
 
 	@Override
@@ -850,9 +869,154 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		setObject(parameterIndex, x);
 	}
 
+	/**
+	 * Large-count variant of {@link #executeUpdate()}.
+	 */
 	@Override
 	public long executeLargeUpdate() throws SQLException {
-		executeUpdate();
-		return 0L;
+		long affectedRows = executeDmlInternal(sqlTemplate, parameters);
+		// JDBC: 0 for statements that return nothing (DDL, or no DML statistics)
+		long count = Math.max(0L, affectedRows);
+		currentUpdateCount = count;
+		return count;
+	}
+
+	// Batch operations
+
+	/**
+	 * Adds the current parameter set to this statement's batch.
+	 *
+	 * <p>
+	 * The parameter set is snapshotted and the working parameters are cleared, so
+	 * all parameters must be set again before the next {@code addBatch()} call.
+	 *
+	 * @throws SQLException
+	 *             if the statement is closed
+	 */
+	@Override
+	public void addBatch() throws SQLException {
+		checkClosed();
+		batchParameterSets.add(new ArrayList<>(parameters));
+		parameters.clear();
+	}
+
+	/**
+	 * Discards all parameter sets accumulated via {@link #addBatch()}.
+	 *
+	 * @throws SQLException
+	 *             if the statement is closed
+	 */
+	@Override
+	public void clearBatch() throws SQLException {
+		checkClosed();
+		batchParameterSets.clear();
+	}
+
+	/**
+	 * Executes the batched parameter sets against BigQuery.
+	 *
+	 * <p>
+	 * When the SQL template is a simple single-row parameterized INSERT
+	 * ({@code INSERT INTO t (...) VALUES (?, ...)}), the batch is collapsed into
+	 * multi-row {@code INSERT ... VALUES (...), (...), ...} statements — the moral
+	 * equivalent of PostgreSQL's {@code reWriteBatchedInserts} and the only DML
+	 * shape that performs acceptably on BigQuery. Large batches are chunked to stay
+	 * under BigQuery's per-query limits (10,000 query parameters, ~1 MB query
+	 * text), one query job per chunk.
+	 *
+	 * <p>
+	 * Statements that cannot be collapsed (non-INSERT DML,
+	 * {@code INSERT ... SELECT}, tuples mixing literals with placeholders) are
+	 * executed sequentially, one job per parameter set.
+	 *
+	 * <p>
+	 * The batch is cleared once execution completes or fails. If execution fails, a
+	 * {@link BatchUpdateException} is thrown containing the update counts of the
+	 * parameter sets that completed before the failure.
+	 *
+	 * @return per-row update counts: the affected-row count when BigQuery reports
+	 *         one, otherwise {@link #SUCCESS_NO_INFO}
+	 * @throws SQLException
+	 *             if the statement is closed
+	 * @throws BatchUpdateException
+	 *             if any part of the batch fails
+	 */
+	@Override
+	public int[] executeBatch() throws SQLException {
+		checkClosed();
+		if (batchParameterSets.isEmpty()) {
+			return new int[0];
+		}
+		List<List<QueryParameterValue>> parameterSets = new ArrayList<>(batchParameterSets);
+		batchParameterSets.clear();
+
+		Optional<BatchInsertRewriter.RewritableInsert> rewritable = BatchInsertRewriter.parse(sqlTemplate);
+		if (rewritable.isPresent() && allSetsMatchTemplate(rewritable.get().parametersPerRow(), parameterSets)) {
+			return executeCollapsedBatch(rewritable.get(), parameterSets);
+		}
+		return executeSequentialBatch(parameterSets);
+	}
+
+	/**
+	 * Verifies every batched parameter set has exactly the number of parameters the
+	 * INSERT template expects. Collapsing misaligned sets would silently shift
+	 * values across rows; such batches fall back to sequential execution, where
+	 * BigQuery reports an accurate per-statement error.
+	 */
+	private static boolean allSetsMatchTemplate(int parametersPerRow, List<List<QueryParameterValue>> parameterSets) {
+		return parameterSets.stream().allMatch(set -> set.size() == parametersPerRow);
+	}
+
+	/**
+	 * Executes the batch as chunked multi-row INSERT query jobs.
+	 */
+	private int[] executeCollapsedBatch(BatchInsertRewriter.RewritableInsert insert,
+			List<List<QueryParameterValue>> parameterSets) throws SQLException {
+		int totalRows = parameterSets.size();
+		int maxRowsPerChunk = insert.maxRowsPerChunk();
+		int[] updateCounts = new int[totalRows];
+		int completedRows = 0;
+
+		while (completedRows < totalRows) {
+			int chunkRows = Math.min(maxRowsPerChunk, totalRows - completedRows);
+			String chunkSql = insert.buildSql(chunkRows);
+			List<QueryParameterValue> chunkParameters = new ArrayList<>(chunkRows * insert.parametersPerRow());
+			for (int row = completedRows; row < completedRows + chunkRows; row++) {
+				chunkParameters.addAll(parameterSets.get(row));
+			}
+
+			long affectedRows;
+			try {
+				affectedRows = executeDmlInternal(chunkSql, chunkParameters);
+			} catch (SQLException e) {
+				throw new BatchUpdateException(
+						"Batch INSERT failed on rows " + completedRows + "-" + (completedRows + chunkRows - 1) + ": "
+								+ e.getMessage(),
+						e.getSQLState(), e.getErrorCode(), Arrays.copyOf(updateCounts, completedRows), e);
+			}
+
+			// Only claim per-row success when BigQuery confirms the expected count
+			int perRowCount = affectedRows == chunkRows ? 1 : SUCCESS_NO_INFO;
+			Arrays.fill(updateCounts, completedRows, completedRows + chunkRows, perRowCount);
+			completedRows += chunkRows;
+		}
+		return updateCounts;
+	}
+
+	/**
+	 * Executes the batch sequentially, one query job per parameter set. Fallback
+	 * for statements that cannot be collapsed into a multi-row INSERT.
+	 */
+	private int[] executeSequentialBatch(List<List<QueryParameterValue>> parameterSets) throws SQLException {
+		int[] updateCounts = new int[parameterSets.size()];
+		for (int i = 0; i < parameterSets.size(); i++) {
+			try {
+				updateCounts[i] = toUpdateCount(executeDmlInternal(sqlTemplate, parameterSets.get(i)));
+			} catch (SQLException e) {
+				throw new BatchUpdateException("Batch entry " + i + " failed: " + e.getMessage(), e.getSQLState(),
+						e.getErrorCode(), Arrays.copyOf(updateCounts, i), e);
+			}
+		}
+		return updateCounts;
 	}
 }

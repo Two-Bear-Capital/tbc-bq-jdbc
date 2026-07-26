@@ -33,14 +33,6 @@ public final class UnsupportedOperations {
 	}
 
 	/**
-	 * Creates exception for unsupported batch update operations.
-	 */
-	public static SQLException batchUpdates() {
-		return new SQLFeatureNotSupportedException(ErrorMessages.BATCH_UPDATES_NOT_SUPPORTED,
-				SQLStates.FEATURE_NOT_SUPPORTED);
-	}
-
-	/**
 	 * Creates exception for unsupported callable statement operations.
 	 */
 	public static SQLException callableStatements() {
