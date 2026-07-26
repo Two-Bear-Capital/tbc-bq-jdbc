@@ -1651,9 +1651,17 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return false;
 	}
 
+	/**
+	 * Returns {@code true}: the driver supports JDBC batch updates.
+	 *
+	 * <p>
+	 * {@code PreparedStatement} batches over simple parameterized INSERTs are
+	 * collapsed into multi-row {@code INSERT ... VALUES (...), (...)} query jobs;
+	 * other batched statements execute sequentially, one job per entry.
+	 */
 	@Override
 	public boolean supportsBatchUpdates() throws SQLException {
-		return false;
+		return true;
 	}
 
 	@Override

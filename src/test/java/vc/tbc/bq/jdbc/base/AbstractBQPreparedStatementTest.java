@@ -159,9 +159,9 @@ class AbstractBQPreparedStatementTest {
 	}
 
 	@Test
-	void testAddBatchThrowsException() {
-		// Then: addBatch should throw SQLFeatureNotSupportedException
-		assertThrows(SQLFeatureNotSupportedException.class, () -> statement.addBatch());
+	void testAddBatchWithSqlThrowsException() {
+		// Then: addBatch(String) cannot be called on a PreparedStatement (JDBC spec)
+		assertThrows(SQLException.class, () -> statement.addBatch("INSERT INTO t VALUES (1)"));
 	}
 
 	/**
@@ -178,6 +178,10 @@ class AbstractBQPreparedStatementTest {
 		@Override
 		public ResultSet executeQuery() throws SQLException {
 			return null;
+		}
+
+		@Override
+		public void addBatch() throws SQLException {
 		}
 
 		@Override

@@ -24,6 +24,8 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | `Connection` lifecycle | ✅ | open, close, isValid |
 | `Statement` execution | ✅ | executeQuery, executeUpdate, execute |
 | `PreparedStatement` | ✅ | Positional parameters (`?`) |
+| Batch updates (`addBatch()`, `executeBatch()`) | ✅ | See [Batch execution](#batch-execution) |
+| Update counts | ✅ | `executeUpdate()` / `getUpdateCount()` return real affected-row counts from BigQuery DML statistics |
 | `ResultSet` iteration | ✅ | Forward-only (`TYPE_FORWARD_ONLY`) |
 | `ResultSetMetaData` | ✅ | Column names, types, counts |
 | `DatabaseMetaData` | ⚠️ | See [DatabaseMetaData](#databasemetadata) |
@@ -32,6 +34,42 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | `NULL` handling | ✅ | `wasNull()` |
 | `beginRequest()` / `endRequest()` (4.3) | ✅ | Connection-pooling hints |
 | `enquoteLiteral()`, `enquoteIdentifier()`, `isSimpleIdentifier()` (4.3) | ✅ | SQL/identifier quoting & validation |
+
+### Batch execution
+
+`PreparedStatement.addBatch()` / `executeBatch()` is the recommended bulk-insert path:
+
+```java
+try (PreparedStatement ps = conn.prepareStatement(
+        "INSERT INTO dataset.users (id, name) VALUES (?, ?)")) {
+    for (User user : users) {
+        ps.setLong(1, user.id());
+        ps.setString(2, user.name());
+        ps.addBatch();
+    }
+    int[] counts = ps.executeBatch();
+}
+```
+
+When the SQL is a simple parameterized INSERT (`INSERT INTO t (...) VALUES (?, ...)`),
+the driver collapses the batch into multi-row `INSERT ... VALUES (...), (...), ...`
+statements — the equivalent of PostgreSQL's `reWriteBatchedInserts` and the only DML
+shape that performs well on BigQuery. Large batches are automatically chunked to stay
+under BigQuery's per-query limits (10,000 query parameters, ~1 MB query text), one
+query job per chunk.
+
+Details:
+
+- Statements that cannot be collapsed (UPDATE/DELETE/MERGE, `INSERT ... SELECT`,
+  tuples mixing literals with placeholders) execute sequentially, one query job per
+  parameter set — correct, but subject to BigQuery DML quotas and job latency.
+- `Statement.addBatch(String)` (heterogeneous SQL batches) also executes sequentially.
+- Update counts come from BigQuery DML statistics; entries report the affected-row
+  count when available, otherwise `Statement.SUCCESS_NO_INFO`.
+- Failures throw `BatchUpdateException` with update counts for the work completed
+  before the failure.
+- `addBatch()` snapshots the current parameter set and clears the working parameters,
+  so set every parameter for each row.
 
 ### BigQuery-specific
 
@@ -92,16 +130,8 @@ while (rs.next()) {
 | Feature | Support | Workaround |
 |---------|:------:|------------|
 | `CallableStatement`, stored procedures | ❌ | Use standard queries / scripting |
-| Batch updates (`addBatch()`, `executeBatch()`) | ❌ | Use multi-row DML |
 | Generated keys (`getGeneratedKeys()`) | ❌ | Query the table after INSERT |
 | Named cursors | ❌ | Forward-only iteration |
-
-For batch inserts, use multi-row DML:
-
-```sql
-INSERT INTO table (id, name)
-VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie')
-```
 
 ### Advanced types
 

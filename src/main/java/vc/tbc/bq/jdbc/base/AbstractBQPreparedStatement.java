@@ -17,6 +17,7 @@ package vc.tbc.bq.jdbc.base;
 
 import vc.tbc.bq.jdbc.BQConnection;
 import vc.tbc.bq.jdbc.BQStatement;
+import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 
 import java.io.InputStream;
@@ -170,10 +171,18 @@ public abstract class AbstractBQPreparedStatement extends BQStatement implements
 		throw new BQSQLFeatureNotSupportedException("setSQLXML not supported");
 	}
 
-	// Batch operations - not supported
+	// Batch operations
 
+	/**
+	 * Always throws: the JDBC specification forbids calling
+	 * {@code addBatch(String)} on a PreparedStatement. Use the parameterless
+	 * {@link java.sql.PreparedStatement#addBatch()} instead.
+	 *
+	 * @throws SQLException
+	 *             always
+	 */
 	@Override
-	public void addBatch() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("Batch updates not supported");
+	public void addBatch(String sql) throws SQLException {
+		throw new BQSQLException("addBatch(String) cannot be called on a PreparedStatement");
 	}
 }

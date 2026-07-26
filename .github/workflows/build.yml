@@ -66,14 +66,17 @@ jobs:
           name: coverage-reports
           path: target/site/jacoco/
 
-  # Real BigQuery integration tests — run on push to main only.
-  # PRs from forks cannot access secrets (GitHub's built-in protection),
-  # so this job intentionally runs only after merge.
+  # Real BigQuery integration tests — run on push to main, same-repo PRs,
+  # and manual dispatch. PRs from forks cannot access secrets (GitHub's
+  # built-in protection), so fork PRs are excluded; the WIF attribute
+  # condition additionally restricts authentication to this repository.
   real-integration-tests:
     name: Real BigQuery Integration Tests
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     permissions:

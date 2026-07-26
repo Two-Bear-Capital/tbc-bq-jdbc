@@ -78,17 +78,6 @@ class ErrorMessagesTest {
 	}
 
 	@Test
-	void testBatchUpdatesNotSupportedMessage() {
-		// When: Accessing batch updates not supported message
-		String message = ErrorMessages.BATCH_UPDATES_NOT_SUPPORTED;
-
-		// Then: Should not be null or empty
-		assertNotNull(message);
-		assertFalse(message.isEmpty());
-		assertEquals("Batch updates not supported", message);
-	}
-
-	@Test
 	void testCallableStatementsNotSupportedMessage() {
 		// When: Accessing callable statements not supported message
 		String message = ErrorMessages.CALLABLE_STATEMENTS_NOT_SUPPORTED;
@@ -247,7 +236,6 @@ class ErrorMessagesTest {
 		assertNotNull(ErrorMessages.STATEMENT_CLOSED);
 		assertNotNull(ErrorMessages.RESULTSET_CLOSED);
 		assertNotNull(ErrorMessages.RESULTSET_UPDATES_NOT_SUPPORTED);
-		assertNotNull(ErrorMessages.BATCH_UPDATES_NOT_SUPPORTED);
 		assertNotNull(ErrorMessages.CALLABLE_STATEMENTS_NOT_SUPPORTED);
 		assertNotNull(ErrorMessages.SAVEPOINTS_NOT_SUPPORTED);
 		assertNotNull(ErrorMessages.GENERATED_KEYS_NOT_SUPPORTED);
@@ -265,7 +253,6 @@ class ErrorMessagesTest {
 		assertFalse(ErrorMessages.STATEMENT_CLOSED.isEmpty());
 		assertFalse(ErrorMessages.RESULTSET_CLOSED.isEmpty());
 		assertFalse(ErrorMessages.RESULTSET_UPDATES_NOT_SUPPORTED.isEmpty());
-		assertFalse(ErrorMessages.BATCH_UPDATES_NOT_SUPPORTED.isEmpty());
 		assertFalse(ErrorMessages.CALLABLE_STATEMENTS_NOT_SUPPORTED.isEmpty());
 		assertFalse(ErrorMessages.SAVEPOINTS_NOT_SUPPORTED.isEmpty());
 		assertFalse(ErrorMessages.GENERATED_KEYS_NOT_SUPPORTED.isEmpty());

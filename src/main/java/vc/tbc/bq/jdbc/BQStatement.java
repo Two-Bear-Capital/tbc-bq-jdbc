@@ -17,13 +17,18 @@ package vc.tbc.bq.jdbc;
 
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import vc.tbc.bq.jdbc.base.AbstractBQStatement;
+import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.UnsupportedOperations;
 
+import java.sql.BatchUpdateException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * JDBC Statement implementation for BigQuery.
@@ -34,6 +39,9 @@ public class BQStatement extends AbstractBQStatement {
 
 	/** Fetch size for result pagination. 0 means use connection default. */
 	private int fetchSize = 0;
+
+	/** Batched SQL commands accumulated via {@link #addBatch(String)}. */
+	private final List<String> sqlBatch = new ArrayList<>();
 
 	public BQStatement(BQConnection connection) {
 		super(connection);
@@ -85,42 +93,61 @@ public class BQStatement extends AbstractBQStatement {
 	}
 
 	/**
-	 * Executes the given SQL DML statement (INSERT, UPDATE, DELETE, MERGE).
+	 * Executes the given SQL DML statement (INSERT, UPDATE, DELETE, MERGE) and
+	 * returns the number of affected rows.
 	 *
 	 * <p>
 	 * The SQL is submitted to BigQuery as a query job. This method blocks until the
-	 * DML statement completes or the query timeout is reached.
+	 * DML statement completes or the query timeout is reached. The affected-row
+	 * count is taken from BigQuery's DML job statistics
+	 * ({@code numDmlAffectedRows}).
 	 *
 	 * <p>
-	 * <b>Return Value:</b> This method always returns 0 because BigQuery does not
-	 * provide row counts in the standard JDBC way. To determine the number of
-	 * affected rows, query the DML statistics from the job metadata or use
-	 * BigQuery's @@row_count session variable (requires session support).
+	 * <b>Return Value:</b> The actual number of rows affected for DML statements.
+	 * Returns 0 for statements that carry no DML statistics (DDL, SELECT), per the
+	 * JDBC contract for statements that return nothing.
 	 *
 	 * <p>
 	 * <b>Usage Example:</b>
 	 *
 	 * <pre>{@code
-	 * stmt.executeUpdate("INSERT INTO dataset.table (id, name) VALUES (1, 'Alice')");
-	 * stmt.executeUpdate("UPDATE dataset.table SET name = 'Bob' WHERE id = 1");
-	 * stmt.executeUpdate("DELETE FROM dataset.table WHERE id = 1");
+	 * int inserted = stmt.executeUpdate("INSERT INTO dataset.table (id, name) VALUES (1, 'Alice')");
+	 * int updated = stmt.executeUpdate("UPDATE dataset.table SET name = 'Bob' WHERE id = 1");
+	 * int deleted = stmt.executeUpdate("DELETE FROM dataset.table WHERE id = 1");
 	 * }</pre>
 	 *
 	 * @param sql
 	 *            the SQL DML statement to execute
-	 * @return always returns 0 (BigQuery limitation)
+	 * @return the number of affected rows (0 when BigQuery reports no DML
+	 *         statistics)
 	 * @throws SQLException
 	 *             if the statement is closed, the SQL is invalid, or execution
 	 *             fails
 	 */
 	@Override
-	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public int executeUpdate(String sql) throws SQLException {
-		checkClosed();
-		// Execute as DML
-		executeQuery(sql);
-		// BigQuery doesn't return update counts in the same way
-		return 0;
+		long count = executeLargeUpdate(sql);
+		return count > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
+	}
+
+	/**
+	 * Large-count variant of {@link #executeUpdate(String)}.
+	 *
+	 * @param sql
+	 *            the SQL DML statement to execute
+	 * @return the number of affected rows (0 when BigQuery reports no DML
+	 *         statistics)
+	 * @throws SQLException
+	 *             if the statement is closed, the SQL is invalid, or execution
+	 *             fails
+	 */
+	@Override
+	public long executeLargeUpdate(String sql) throws SQLException {
+		long affectedRows = executeDmlInternal(sql, null);
+		// JDBC: 0 for statements that return nothing (DDL, or no DML statistics)
+		long count = Math.max(0L, affectedRows);
+		currentUpdateCount = count;
+		return count;
 	}
 
 	@Override
@@ -145,10 +172,11 @@ public class BQStatement extends AbstractBQStatement {
 	 * Executes the given SQL statement, which may return multiple types of results.
 	 *
 	 * <p>
-	 * <b>Return Value:</b> This method always returns {@code true} because BigQuery
-	 * queries always produce a ResultSet, even for DML statements (which return an
-	 * empty result set). Use {@link #getResultSet()} to retrieve the ResultSet
-	 * after calling this method.
+	 * <b>Return Value:</b> Returns {@code false} when BigQuery reports the
+	 * statement was DML (INSERT, UPDATE, DELETE, MERGE) — retrieve the affected-row
+	 * count via {@link #getUpdateCount()}. Returns {@code true} otherwise (SELECT,
+	 * DDL, or when DML statistics are unavailable) — retrieve results via
+	 * {@link #getResultSet()}.
 	 *
 	 * <p>
 	 * The SQL is submitted to BigQuery as a query job. This method blocks until the
@@ -156,7 +184,8 @@ public class BQStatement extends AbstractBQStatement {
 	 *
 	 * @param sql
 	 *            the SQL statement to execute
-	 * @return always {@code true} indicating a ResultSet is available
+	 * @return {@code true} if the result is a ResultSet, {@code false} if it is an
+	 *         update count
 	 * @throws SQLException
 	 *             if the statement is closed, the SQL is invalid, or execution
 	 *             fails
@@ -165,6 +194,28 @@ public class BQStatement extends AbstractBQStatement {
 	@SuppressWarnings("resource") // ResultSet managed by statement, closed in statement.close()
 	public boolean execute(String sql) throws SQLException {
 		executeQuery(sql);
+		return !finishExecuteAsUpdateIfDml();
+	}
+
+	/**
+	 * Shared tail for {@code execute()} implementations: when the just-executed job
+	 * carried DML statistics, the JDBC result is an update count rather than a
+	 * ResultSet — close the (empty) ResultSet so {@link #getResultSet()} returns
+	 * null and {@link #getUpdateCount()} reports the count.
+	 *
+	 * @return true when the result was converted to an update count
+	 * @throws SQLException
+	 *             if closing the result set fails
+	 */
+	@SuppressWarnings("PMD.NullAssignment") // getResultSet() must return null for DML results
+	protected boolean finishExecuteAsUpdateIfDml() throws SQLException {
+		if (currentUpdateCount < 0) {
+			return false;
+		}
+		if (currentResultSet != null) {
+			currentResultSet.close();
+			currentResultSet = null;
+		}
 		return true;
 	}
 
@@ -214,24 +265,104 @@ public class BQStatement extends AbstractBQStatement {
 		return ResultSet.TYPE_FORWARD_ONLY;
 	}
 
+	/**
+	 * Adds the given SQL command to the batch of commands for this statement.
+	 *
+	 * <p>
+	 * Heterogeneous SQL batches are executed sequentially, one BigQuery query job
+	 * per command (BigQuery has no native multi-statement batch API outside of
+	 * sessions). For high-throughput inserts prefer
+	 * {@link java.sql.PreparedStatement#addBatch()}, which collapses batched
+	 * parameter sets into a single multi-row INSERT job.
+	 *
+	 * @param sql
+	 *            the SQL command to add to the batch
+	 * @throws SQLException
+	 *             if the statement is closed or sql is null
+	 */
 	@Override
 	public void addBatch(String sql) throws SQLException {
-		throw UnsupportedOperations.batchUpdates();
+		checkClosed();
+		if (sql == null) {
+			throw new BQSQLException("SQL statement must not be null", BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+		sqlBatch.add(sql);
 	}
 
 	@Override
 	public void clearBatch() throws SQLException {
-		throw UnsupportedOperations.batchUpdates();
+		checkClosed();
+		sqlBatch.clear();
+	}
+
+	/**
+	 * Executes the batched SQL commands sequentially, one BigQuery query job per
+	 * command, and returns their update counts.
+	 *
+	 * <p>
+	 * Update counts are taken from BigQuery's DML statistics when available;
+	 * commands whose affected-row count is unknown report {@link #SUCCESS_NO_INFO}.
+	 * The batch is cleared once execution completes or fails. If a command fails, a
+	 * {@link BatchUpdateException} is thrown containing the update counts of the
+	 * commands that completed before the failure.
+	 *
+	 * @return per-command update counts
+	 * @throws SQLException
+	 *             if the statement is closed
+	 * @throws BatchUpdateException
+	 *             if any command in the batch fails
+	 */
+	@Override
+	public int[] executeBatch() throws SQLException {
+		checkClosed();
+		if (sqlBatch.isEmpty()) {
+			return new int[0];
+		}
+		List<String> commands = new ArrayList<>(sqlBatch);
+		sqlBatch.clear();
+
+		int[] updateCounts = new int[commands.size()];
+		for (int i = 0; i < commands.size(); i++) {
+			try {
+				updateCounts[i] = toUpdateCount(executeDmlInternal(commands.get(i), null));
+			} catch (SQLException e) {
+				throw new BatchUpdateException("Batch entry " + i + " failed: " + e.getMessage(), e.getSQLState(),
+						e.getErrorCode(), Arrays.copyOf(updateCounts, i), e);
+			}
+		}
+		return updateCounts;
 	}
 
 	@Override
-	public int[] executeBatch() throws SQLException {
-		throw UnsupportedOperations.batchUpdates();
+	public long[] executeLargeBatch() throws SQLException {
+		int[] updateCounts = executeBatch();
+		long[] largeCounts = new long[updateCounts.length];
+		for (int i = 0; i < updateCounts.length; i++) {
+			largeCounts[i] = updateCounts[i];
+		}
+		return largeCounts;
+	}
+
+	/**
+	 * Converts a BigQuery affected-row count to a JDBC batch update count. Unknown
+	 * counts (negative) and counts exceeding int range map to
+	 * {@link #SUCCESS_NO_INFO}.
+	 *
+	 * @param affectedRows
+	 *            the affected-row count from BigQuery, or -1 if unknown
+	 * @return the JDBC update count
+	 */
+	protected static int toUpdateCount(long affectedRows) {
+		if (affectedRows < 0 || affectedRows > Integer.MAX_VALUE) {
+			return SUCCESS_NO_INFO;
+		}
+		return (int) affectedRows;
 	}
 
 	@Override
 	public boolean getMoreResults(int current) throws SQLException {
 		checkClosed();
+		currentUpdateCount = -1L;
 		return false;
 	}
 
@@ -253,6 +384,21 @@ public class BQStatement extends AbstractBQStatement {
 	@Override
 	public int executeUpdate(String sql, String[] columnNames) throws SQLException {
 		return executeUpdate(sql);
+	}
+
+	@Override
+	public long executeLargeUpdate(String sql, int autoGeneratedKeys) throws SQLException {
+		return executeLargeUpdate(sql);
+	}
+
+	@Override
+	public long executeLargeUpdate(String sql, int[] columnIndexes) throws SQLException {
+		return executeLargeUpdate(sql);
+	}
+
+	@Override
+	public long executeLargeUpdate(String sql, String[] columnNames) throws SQLException {
+		return executeLargeUpdate(sql);
 	}
 
 	@Override

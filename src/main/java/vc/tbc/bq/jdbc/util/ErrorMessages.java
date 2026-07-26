@@ -27,7 +27,6 @@ public final class ErrorMessages {
 
 	// Unsupported operation messages
 	public static final String RESULTSET_UPDATES_NOT_SUPPORTED = "ResultSet updates not supported";
-	public static final String BATCH_UPDATES_NOT_SUPPORTED = "Batch updates not supported";
 	public static final String CALLABLE_STATEMENTS_NOT_SUPPORTED = "Callable statements not supported";
 	public static final String SAVEPOINTS_NOT_SUPPORTED = "Savepoints not supported";
 	public static final String GENERATED_KEYS_NOT_SUPPORTED = "Generated keys not supported";

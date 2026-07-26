@@ -85,6 +85,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected ResultSet currentResultSet;
 
 	/**
+	 * Update count of the current result, from BigQuery DML statistics
+	 * ({@code numDmlAffectedRows}). -1 when the current result is a ResultSet or
+	 * there is no result, per the JDBC {@code getUpdateCount()} contract.
+	 */
+	protected volatile long currentUpdateCount = -1L;
+
+	/**
 	 * Query warnings (e.g., cost estimates from dry-run).
 	 */
 	protected SQLWarning queryWarnings = null;
@@ -267,8 +274,9 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			currentResultSet = null;
 		}
 
-		// Clear previous warnings
+		// Clear previous warnings and update count
 		queryWarnings = null;
+		currentUpdateCount = -1L;
 
 		// Serve INFORMATION_SCHEMA queries from the shared cache when available.
 		// These are read-only catalog views that IntelliJ executes on every
@@ -385,10 +393,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			}
 		});
 
-		try {
-			// Wait with timeout
-			JobResultPair pair = future.get(timeoutSeconds, TimeUnit.SECONDS);
+		JobResultPair pair = awaitWithTimeout(future, timeoutSeconds);
 
+		// Record the DML affected-row count so getUpdateCount() and execute()
+		// can report per-spec results when the statement turned out to be DML
+		currentUpdateCount = readDmlAffectedRows(pair.job);
+
+		try {
 			// Store INFORMATION_SCHEMA results in the shared cache and return a
 			// MetadataResultSet so the cached copy can be replayed on future hits.
 			if (isInformationSchemaQuery(sql)) {
@@ -409,6 +420,28 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			currentResultSet = createResultSet(pair.result, pair.job);
 			return currentResultSet;
 
+		} catch (BigQueryException e) {
+			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Awaits an async query job future with timeout enforcement. On timeout the
+	 * running BigQuery job is cancelled. ExecutionExceptions are unwrapped to
+	 * expose the root cause (the wrapper adds no diagnostic value).
+	 *
+	 * @param future
+	 *            the future to await
+	 * @param timeoutSeconds
+	 *            maximum seconds to wait
+	 * @return the future's result
+	 * @throws SQLException
+	 *             if the wait times out, is interrupted, or the job fails
+	 */
+	@SuppressWarnings("PMD.PreserveStackTrace")
+	private <T> T awaitWithTimeout(CompletableFuture<T> future, long timeoutSeconds) throws SQLException {
+		try {
+			return future.get(timeoutSeconds, TimeUnit.SECONDS);
 		} catch (TimeoutException e) {
 			// Cancel the future to interrupt the virtual thread
 			future.cancel(true);
@@ -433,8 +466,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			Thread.currentThread().interrupt();
 			throw new BQSQLException("Query interrupted", e);
 		} catch (ExecutionException e) {
-			// Intentionally unwrap ExecutionException to expose the root cause.
-			// The ExecutionException wrapper adds no diagnostic value here.
 			Throwable cause = e.getCause();
 			if (cause instanceof RuntimeException) {
 				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
@@ -442,6 +473,136 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
 		} catch (BigQueryException e) {
 			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Executes a DML statement as a BigQuery query job and returns the number of
+	 * affected rows. Used by JDBC batch execution, where per-statement update
+	 * counts are required and no ResultSet is produced.
+	 *
+	 * <p>
+	 * Applies the same connection-level configuration as query execution (legacy
+	 * SQL mode, default dataset, labels, session) and enforces the statement query
+	 * timeout with job cancellation, but skips query-only concerns
+	 * (INFORMATION_SCHEMA caching, cost estimation, fetch size).
+	 *
+	 * @param sql
+	 *            the DML statement to execute
+	 * @param positionalParameters
+	 *            positional query parameters, or null/empty for none
+	 * @return the number of rows affected, or -1 if BigQuery did not report DML
+	 *         statistics
+	 * @throws SQLException
+	 *             if the statement is closed or execution fails
+	 */
+	@SuppressWarnings("PMD.NullAssignment")
+	protected long executeDmlInternal(String sql, java.util.List<QueryParameterValue> positionalParameters)
+			throws SQLException {
+		checkClosed();
+		logger.debug("Executing {} DML: {}", getLogPrefix(), sql);
+
+		// Executing a statement implicitly closes the previous result
+		if (currentResultSet != null) {
+			currentResultSet.close();
+			currentResultSet = null;
+		}
+		queryWarnings = null;
+		currentUpdateCount = -1L;
+
+		QueryJobConfiguration.Builder configBuilder = QueryJobConfiguration.newBuilder(sql)
+				.setUseLegacySql(properties.useLegacySql());
+
+		if (positionalParameters != null && !positionalParameters.isEmpty()) {
+			configBuilder.setPositionalParameters(positionalParameters);
+		}
+
+		// Set default dataset if configured
+		if (properties.getDatasetId() != null) {
+			configBuilder.setDefaultDataset(properties.getDatasetId());
+		}
+
+		// Set labels
+		if (!properties.labels().isEmpty()) {
+			configBuilder.setLabels(properties.labels());
+		}
+
+		// Add session property if sessions are enabled
+		SessionManager sessionManager = connection.getSessionManager();
+		if (sessionManager != null && sessionManager.hasSession()) {
+			configBuilder = sessionManager.addSessionProperty(configBuilder);
+		}
+
+		// SELECT via executeUpdate() is tolerated (returns 0); apply the same
+		// destination-table workaround as the query path for emulator compatibility
+		if (properties.useDestinationTables() && properties.datasetId() != null && isSelectQuery(sql)) {
+			String tempTableName = "_jdbc_temp_" + System.currentTimeMillis() + "_" + Thread.currentThread().threadId();
+			TableId destinationTable = TableId.of(properties.projectId(), properties.datasetId(), tempTableName);
+			configBuilder.setDestinationTable(destinationTable)
+					.setCreateDisposition(JobInfo.CreateDisposition.CREATE_IF_NEEDED)
+					.setWriteDisposition(JobInfo.WriteDisposition.WRITE_TRUNCATE);
+		}
+
+		QueryJobConfiguration queryConfig = configBuilder.build();
+		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
+
+		CompletableFuture<Job> future = CompletableFuture.supplyAsync(() -> {
+			try {
+				Job job = bigquery.create(JobInfo.of(queryConfig));
+
+				// Thread-safe assignment
+				synchronized (this) {
+					this.currentJob = job;
+				}
+
+				logger.info("{} DML job created: {}", getLogPrefix(), job.getJobId());
+
+				job = job.waitFor();
+
+				if (job == null) {
+					throw new RuntimeException("Job no longer exists");
+				}
+
+				JobStatus status = job.getStatus();
+				if (status.getError() != null) {
+					BigQueryError error = status.getError();
+					throw new RuntimeException("DML failed (job: " + job.getJobId() + "): " + error.getMessage());
+				}
+
+				return job;
+
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new RuntimeException("Query interrupted", e);
+			}
+		});
+
+		Job job = awaitWithTimeout(future, timeoutSeconds);
+		return readDmlAffectedRows(job);
+	}
+
+	/**
+	 * Reads the DML affected-row count ({@code numDmlAffectedRows}) from a
+	 * completed query job's statistics.
+	 *
+	 * @param job
+	 *            the completed query job (may be null)
+	 * @return the affected-row count, or -1 when the job carries no DML statistics
+	 *         (SELECT, DDL, or statistics unavailable)
+	 */
+	protected long readDmlAffectedRows(Job job) {
+		if (job == null) {
+			return -1L;
+		}
+		try {
+			JobStatistics.QueryStatistics stats = job.getStatistics();
+			Long affectedRows = stats == null ? null : stats.getNumDmlAffectedRows();
+			return affectedRows == null ? -1L : affectedRows;
+		} catch (BigQueryException | ClassCastException e) {
+			// The statement itself succeeded; a statistics read failure only
+			// degrades the update count to "unknown"
+			logger.debug("Could not read DML statistics: {}", e.getMessage());
+			return -1L;
 		}
 	}
 
@@ -511,15 +672,33 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		return currentResultSet;
 	}
 
+	/**
+	 * Returns the current result's update count, taken from BigQuery DML statistics
+	 * ({@code numDmlAffectedRows}). Returns -1 when the current result is a
+	 * ResultSet (SELECT) or there is no result, per the JDBC contract.
+	 */
 	@Override
 	public int getUpdateCount() throws SQLException {
 		checkClosed();
-		return -1;
+		if (currentUpdateCount < 0) {
+			return -1;
+		}
+		return currentUpdateCount > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) currentUpdateCount;
+	}
+
+	/** Large-count variant of {@link #getUpdateCount()}. */
+	@Override
+	public long getLargeUpdateCount() throws SQLException {
+		checkClosed();
+		return currentUpdateCount < 0 ? -1L : currentUpdateCount;
 	}
 
 	@Override
 	public boolean getMoreResults() throws SQLException {
 		checkClosed();
+		// No more results: per the JDBC contract, subsequent getUpdateCount()
+		// must return -1
+		currentUpdateCount = -1L;
 		return false;
 	}
 

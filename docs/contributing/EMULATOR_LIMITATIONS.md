@@ -343,6 +343,44 @@ try {
 
 ---
 
+### 15. DML Statistics (numDmlAffectedRows)
+
+**Limitation:** The emulator does not populate `numDmlAffectedRows` in query job
+statistics. DML update counts therefore come back as 0 from `executeUpdate()`,
+and `execute()` cannot detect that a statement was DML (it falls back to
+returning `true` with an empty ResultSet). Real BigQuery returns exact
+affected-row counts.
+
+**Affected Tests:**
+- `UpdateCountTest` (all DML count assertions are tolerant: `count == expected || count == 0`)
+- `BatchExecutionTest` (batch update counts assert `1` or `SUCCESS_NO_INFO`)
+
+**Compensation:**
+```java
+// Real BigQuery: exact count; emulator: 0 (numDmlAffectedRows not reported)
+assertTrue(count == 2 || count == 0);
+```
+
+Exact-count assertions live in `RealUpdateCountTest`, which runs against real
+BigQuery via the `real-integration-tests` profile.
+
+**Real BigQuery Status:** ✅ `numDmlAffectedRows` populated for all DML
+
+---
+
+### 16. Mixed-Type Parameters in UPDATE
+
+**Limitation:** The emulator mis-binds positional parameters of different types
+in UPDATE statements (e.g. `UPDATE t SET name = ? WHERE id <= ?` with a STRING
+and an INT64 fails with `strconv.ParseInt: parsing "..."` errors).
+
+**Affected Tests:**
+- `UpdateCountTest.testPreparedStatementExecuteUpdateReportsCount` (uses a single INT64 parameter as a workaround)
+
+**Real BigQuery Status:** ✅ Mixed-type positional parameters work correctly
+
+---
+
 ## Tests Requiring Real BigQuery
 
 Some tests are intentionally skipped when running against the emulator because they require features only available in real BigQuery:

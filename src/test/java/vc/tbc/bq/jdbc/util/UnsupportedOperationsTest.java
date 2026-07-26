@@ -63,38 +63,6 @@ class UnsupportedOperationsTest {
 		assertEquals("0A000", exception.getSQLState());
 	}
 
-	// Batch updates
-
-	@Test
-	void testBatchUpdatesReturnsException() {
-		// When: Creating batch updates exception
-		SQLException exception = UnsupportedOperations.batchUpdates();
-
-		// Then: Should return SQLFeatureNotSupportedException
-		assertNotNull(exception);
-		assertInstanceOf(SQLFeatureNotSupportedException.class, exception);
-	}
-
-	@Test
-	void testBatchUpdatesHasCorrectMessage() {
-		// When: Creating batch updates exception
-		SQLException exception = UnsupportedOperations.batchUpdates();
-
-		// Then: Should have correct error message
-		assertEquals(ErrorMessages.BATCH_UPDATES_NOT_SUPPORTED, exception.getMessage());
-		assertEquals("Batch updates not supported", exception.getMessage());
-	}
-
-	@Test
-	void testBatchUpdatesHasCorrectSQLState() {
-		// When: Creating batch updates exception
-		SQLException exception = UnsupportedOperations.batchUpdates();
-
-		// Then: Should have correct SQL state
-		assertEquals(SQLStates.FEATURE_NOT_SUPPORTED, exception.getSQLState());
-		assertEquals("0A000", exception.getSQLState());
-	}
-
 	// Callable statements
 
 	@Test
@@ -309,7 +277,6 @@ class UnsupportedOperationsTest {
 	void testAllMethodsReturnSQLFeatureNotSupportedException() {
 		// Then: All factory methods should return SQLFeatureNotSupportedException
 		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.resultSetUpdates());
-		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.batchUpdates());
 		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.callableStatements());
 		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.savepoints());
 		assertInstanceOf(SQLFeatureNotSupportedException.class, UnsupportedOperations.generatedKeys());

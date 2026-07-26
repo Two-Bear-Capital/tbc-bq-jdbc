@@ -260,6 +260,7 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - `BQPreparedStatement` handles parameterized queries (uses QueryParameterValue)
 - Query timeout enforced by `queryJob.waitFor(timeoutSeconds)`
 - Query cancellation via `queryJob.cancel()`
+- `executeUpdate()`/`getUpdateCount()` return real affected-row counts from `JobStatistics.QueryStatistics.getNumDmlAffectedRows()`; `execute()` returns false for DML per the JDBC spec (update count via `getUpdateCount()`)
 
 ### Result Iteration
 - `BQResultSet` wraps BigQuery TableResult
@@ -273,10 +274,16 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Lazy loading option: `metadataLazyLoad=true`
 - Parallel dataset loading in `BQDatabaseMetaData.getSchemas()`
 
+### Batch Execution
+- `PreparedStatement.addBatch()/executeBatch()` collapses simple parameterized INSERTs into multi-row `INSERT ... VALUES (...), (...)` query jobs (like PostgreSQL's `reWriteBatchedInserts`)
+- Rewrite logic in `util/BatchInsertRewriter.java`; conservative parser — anything not a placeholder-only single-tuple INSERT falls back to sequential execution (one job per parameter set)
+- Chunked to stay under BigQuery limits (10,000 query parameters/query, ~1 MB query text)
+- `Statement.addBatch(String)` heterogeneous batches execute sequentially
+- DML executed via `AbstractBQStatement.executeDmlInternal()`, which returns real affected-row counts from job statistics
+
 ### Unsupported JDBC Features (BigQuery Limitations)
 - Scrollable ResultSets (no `previous()`, `absolute()`)
 - Updatable ResultSets (no `updateRow()`, `insertRow()`)
-- Batch operations (use BigQuery array syntax instead)
 - Traditional transactions without sessions
 - CallableStatement (limited UDF support)
 - Full Array/Struct JDBC support (returned as JSON)
