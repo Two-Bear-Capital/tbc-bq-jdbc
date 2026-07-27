@@ -76,8 +76,15 @@ jobs:
             exit 1
           fi
           echo "BQ_TEST_PROJECT is set (${#BQ_TEST_PROJECT} chars)"
+
+          # The integration suite defaults this in Java (AbstractRealBigQueryIntegrationTest);
+          # the benchmark URL is assembled here in YAML, so it needs its own default or an
+          # unset secret would silently produce jdbc:bigquery:project/?... and fail 30 seconds
+          # into a 30-minute job.
+          echo "BQ_TEST_DATASET=${BQ_TEST_DATASET:-tbc_bq_jdbc_integration_tests}" >> "$GITHUB_ENV"
         env:
           BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
+          BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
 
       # maxBillingBytes mirrors the integration suite's cost ceiling. The
       # benchmark queries are SELECT 1 and GENERATE_ARRAY, which scan no bytes at
@@ -92,8 +99,9 @@ jobs:
           fi
           ./mvnw test-compile exec:exec -Pbenchmark-scaling -B -Dbenchmark.args="${ARGS}"
         env:
+          # BQ_TEST_DATASET comes from $GITHUB_ENV, defaulted by the check above.
           BENCHMARK_JDBC_URL: >-
-            jdbc:bigquery:${{ secrets.BQ_TEST_PROJECT }}/${{ secrets.BQ_TEST_DATASET }}?authType=ADC&maxBillingBytes=1073741824
+            jdbc:bigquery:${{ secrets.BQ_TEST_PROJECT }}/${{ env.BQ_TEST_DATASET }}?authType=ADC&maxBillingBytes=1073741824
           THREADS: ${{ inputs.threads }}
           QUICK: ${{ inputs.quick }}
 

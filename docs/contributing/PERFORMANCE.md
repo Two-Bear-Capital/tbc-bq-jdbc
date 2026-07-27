@@ -112,13 +112,14 @@ matter how good the driver was):
 - `iterateResultSet` — full iteration of a 50,000-row multi-page result
 - `getTablesWarm` / `getColumnsWarm` — metadata against a warm cache
 
-> **The two metadata benchmarks are only meaningful against a wide project.** They
-> measure the warm cache, so their throughput is a function of how many rows the
-> project's metadata produces — against a near-empty dataset they run at tens of
-> thousands of ops/s and tell you almost nothing. Compare them only across runs
-> against the *same* project, and treat a baseline recorded against a small project
-> as informative for the query benchmarks alone. Cold fan-out is covered by
-> `WideMetadataScaleTest`, not here.
+> **The two metadata numbers are only comparable across runs against the same
+> project.** They measure the warm cache — building a fresh `ResultSet` from cached
+> rows and iterating it — so throughput is inversely proportional to how many rows
+> the project's metadata produces. A project with 600 tables and a project with 20
+> will produce numbers an order of magnitude apart, and neither is "better". Record
+> the baseline against the project you will re-measure against, and treat a large
+> delta as a question about the project before it is a question about the driver.
+> Cold fan-out is not measured here at all; that is `WideMetadataScaleTest`.
 
 ### Running
 
@@ -151,10 +152,32 @@ costs nothing beyond query slots.
 | Scaling | Throughput at N threads ÷ throughput at 1 thread. Perfect is Nx |
 | Efficiency | Scaling ÷ N, as a percentage. Perfect is 100% |
 
-Efficiency well below 100% is **normal**. BigQuery itself, the network, and the
-runner's core count (GitHub's `ubuntu-latest` has 4) all impose ceilings the driver
-does not control. What matters is that total throughput keeps *rising* as threads are
-added. A curve where it stops rising — or falls — is the failure being watched for.
+What matters is that total throughput keeps *rising* as threads are added. A curve
+where it stops rising — or falls — is the failure being watched for. Efficiency itself
+is a diagnostic, not a score, and it lands in three regimes:
+
+**Above 100% is normal for the query benchmarks, and not a bug in the measurement.**
+`submitToFirstRow` and `iterateResultSet` are latency-bound: a single thread spends
+nearly all of its time blocked on a BigQuery round trip, doing nothing. Adding threads
+fills that dead time, and HTTP connection reuse amortises better under concurrency, so
+throughput at N threads can exceed N times the single-threaded rate. The recorded
+baseline shows 25x at 16 threads. Superlinear here means the single-threaded number is
+mostly idle waiting — which it is.
+
+**Well below 100% is normal for the metadata benchmarks.** `getTablesWarm` and
+`getColumnsWarm` serve from an in-memory cache, so they are CPU- and allocation-bound
+rather than network-bound. They cannot exceed the core count, and in practice plateau
+well before it because each operation allocates a fresh `ResultSet` over the cached
+rows. The baseline plateaus around 4x.
+
+**Near 1x on a latency-bound benchmark is the failure.** That is #98: throughput flat
+no matter how many callers.
+
+> **Read the error column before reading the throughput column.** On the metadata
+> benchmarks the JMH error can exceed the score itself (the baseline has 18578 ±
+> 20480 at four threads). Those runs are noisy — short operations, GC interference,
+> few samples — and a change of less than about 2x in them means nothing. The query
+> benchmarks are far better behaved.
 
 ### The baseline
 
@@ -174,9 +197,10 @@ git commit -m "perf(benchmarks): refresh the thread-scaling baseline"
 Refresh it deliberately — after a change to the concurrency, dispatch or metadata
 paths — not on a schedule. A baseline that tracks noise is not a baseline.
 
-> **No baseline is committed yet.** The first one has to come from a real run
-> against a real project. Until it exists the report simply has no comparison
-> columns.
+The committed baseline was recorded on a 10-core Apple Silicon laptop, not on a CI
+runner — the report's header records the JVM, OS and core count for exactly this
+reason. A sweep run on GitHub's 4-core `ubuntu-latest` will not match it and should
+not be expected to; compare like with like, or re-record.
 
 ### Note on the JMH harness
 
