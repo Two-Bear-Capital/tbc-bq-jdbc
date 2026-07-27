@@ -395,16 +395,26 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
   - Categorizes changes: Features, Bug Fixes, Performance, Documentation, Testing, etc.
 
 ### Commit Message Conventions
-For optimal changelog generation, use Conventional Commits format:
-- `feat(scope): description` - New features
-- `fix(scope): description` - Bug fixes
-- `perf(scope): description` - Performance improvements
-- `docs(scope): description` - Documentation changes
-- `test(scope): description` - Test additions/changes
-- `refactor(scope): description` - Code refactoring
-- `chore(scope): description` - Maintenance tasks
+Conventional Commits are required: they drive **both** the changelog and the released
+version number, from the same `cliff.toml` parsers.
 
-Example: `feat(auth): add workforce identity federation support`
+| Prefix | Meaning | Version bump |
+|---|---|---|
+| `feat(scope):` | New feature | **minor** (1.0.x → 1.1.0) |
+| `fix(scope):` | Bug fix | patch |
+| `perf(scope):` | Performance | patch |
+| `docs(scope):` | Documentation | patch |
+| `test(scope):` | Tests | patch |
+| `refactor(scope):` | Refactoring | patch |
+| `chore(scope):` | Maintenance | patch (`chore(deps)` is skipped entirely) |
+| `feat(scope)!:` or a `BREAKING CHANGE:` footer | Breaking change | **major** (1.x → 2.0.0) |
+
+Example: `feat(auth): add workforce identity federation support` → a minor release.
+
+The bump is computed by `git-cliff --bumped-version` in `version-and-release.yml`. If
+every commit since the last tag is one `cliff.toml` skips, the release falls back to a
+patch bump so the tag still advances. Mislabelling a feature as `fix` silently
+understates the release, so pick the prefix deliberately.
 
 ## Documentation
 
