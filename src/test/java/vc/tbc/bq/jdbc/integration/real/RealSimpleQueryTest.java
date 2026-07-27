@@ -238,9 +238,9 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 	@Test
 	void testMultipleStatements() throws SQLException {
 		try (Statement stmt1 = connection.createStatement();
-			 Statement stmt2 = connection.createStatement();
-			 ResultSet rs1 = stmt1.executeQuery("SELECT 1 as num");
-			 ResultSet rs2 = stmt2.executeQuery("SELECT 2 as num")) {
+				Statement stmt2 = connection.createStatement();
+				ResultSet rs1 = stmt1.executeQuery("SELECT 1 as num");
+				ResultSet rs2 = stmt2.executeQuery("SELECT 2 as num")) {
 
 			assertTrue(rs1.next());
 			assertEquals(1, rs1.getInt("num"));
