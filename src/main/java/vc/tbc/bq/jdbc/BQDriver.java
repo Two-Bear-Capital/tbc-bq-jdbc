@@ -190,7 +190,7 @@ public final class BQDriver implements Driver {
 				"Project ID for the default dataset when it differs from the connection project", false, null));
 
 		props.add(prop(info, "useDestinationTables", "false",
-				"Write SELECT query results to destination tables (useful for BigQuery emulator compatibility)", false,
+				"Write SELECT query results to an explicit temp destination table that expires after 24 hours", false,
 				new String[]{"true", "false"}));
 
 		props.add(prop(info, "nativeComplexTypes", "false",

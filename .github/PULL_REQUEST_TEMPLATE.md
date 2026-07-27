@@ -25,7 +25,7 @@ Fixes #
 <!-- Describe the tests you ran and/or added -->
 
 - [ ] Unit tests pass (`./mvnw test`)
-- [ ] Integration tests pass (`./mvnw verify -Pintegration-tests`)
+- [ ] Integration tests pass (`./mvnw verify -Preal-integration-tests`, needs BigQuery credentials)
 - [ ] Code formatted (`./mvnw spotless:apply`)
 - [ ] New tests added for new functionality
 - [ ] Manual testing performed (describe below if applicable)
