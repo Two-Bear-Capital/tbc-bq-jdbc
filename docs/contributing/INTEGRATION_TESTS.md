@@ -6,55 +6,59 @@ This document explains how to run the integration tests for the tbc-bq-jdbc driv
 
 The driver has two integration test tiers:
 
-| Tier | Profile | Backend | When to Use |
+| Tier | Profile | Backend | When to use |
 |------|---------|---------|-------------|
-| **Emulator** | `integration-tests` | BigQuery emulator via Docker | Local development, all CI PRs |
-| **Real BigQuery** | `real-integration-tests` | Actual Google BigQuery | Post-merge CI, production validation |
+| **Real BigQuery** | `real-integration-tests` | Actual Google BigQuery | **Default for new tests.** Runs on same-repo PRs and pushes to main |
+| **Emulator** | `integration-tests` | BigQuery emulator via Docker | Plumbing and concurrency-shape tests only; runs on every push and PR, no credentials |
 
-## Test Structure
+> **Write new tests against the real tier unless they assert no BigQuery behaviour.**
+> The emulator cannot verify semantics — DML affected-row counts, session and
+> transaction behaviour, NULL and temporal parameter binding, JSON/GEOGRAPHY,
+> `INFORMATION_SCHEMA` — and tests written against it were historically weakened until
+> they passed, which shipped real bugs (#93, #98). The emulator tier is being reduced
+> to tests that need an endpoint but not fidelity: connection/URL plumbing, and
+> `ConcurrentQueryTest`, which measures query *overlap*. See issue #118 and
+> [Emulator Limitations](EMULATOR_LIMITATIONS.md).
+
+## Test structure
 
 ```
 src/test/java/vc/tbc/bq/jdbc/integration/
-├── AbstractBigQueryIntegrationTest.java    # Emulator base class
-├── BasicConnectionTest.java
-├── SimpleQueryTest.java
-├── ParameterizedQueryTest.java
-├── MetadataTest.java
-├── TypeMappingTest.java
-├── ResultSetOperationsTest.java
+├── AbstractBigQueryIntegrationTest.java     # Emulator base class (image pinned by digest)
+├── ...17 emulator test classes, 319 tests
 └── real/
     ├── AbstractRealBigQueryIntegrationTest.java  # Real BQ base class
-    ├── RealBasicConnectionTest.java
-    ├── RealSimpleQueryTest.java
-    ├── RealParameterizedQueryTest.java           # Includes 2 re-enabled NULL tests
-    ├── RealMetadataTest.java
-    ├── RealTypeMappingTest.java
-    └── RealResultSetOperationsTest.java
+    └── ...10 test classes, 155 tests
 ```
 
-### Emulator Test Classes
+Run `ls src/test/java/vc/tbc/bq/jdbc/integration/` for the current inventory — an
+explicit list here goes stale, as this document repeatedly has.
 
-| Test Class | Description |
-|------------|-------------|
-| AbstractBigQueryIntegrationTest | Base class with emulator container + test utilities |
-| BasicConnectionTest | Connection lifecycle and properties |
-| SimpleQueryTest | Basic SQL query execution |
-| ParameterizedQueryTest | PreparedStatement with parameters |
-| MetadataTest | DatabaseMetaData operations |
-| TypeMappingTest | BigQuery to JDBC type conversions |
-| ResultSetOperationsTest | ResultSet navigation and data access |
+### Real BigQuery test classes
 
-### Real BigQuery Test Classes
+`RealBasicConnectionTest`, `RealComplexTypesTest`, `RealMetadataTest`,
+`RealMetadataEnhancedTest`, `RealParameterizedQueryTest`, `RealResultSetOperationsTest`,
+`RealSimpleQueryTest`, `RealTransactionTest`, `RealTypeMappingTest`,
+`RealUpdateCountTest`.
 
-| Test Class | Description |
-|------------|-------------|
-| AbstractRealBigQueryIntegrationTest | Base class with ADC connection + test utilities |
-| RealBasicConnectionTest | Connection lifecycle (mirrors BasicConnectionTest) |
-| RealSimpleQueryTest | Simple queries (mirrors SimpleQueryTest) |
-| RealParameterizedQueryTest | Parameterized queries; re-enables 2 emulator-disabled tests |
-| RealMetadataTest | DatabaseMetaData (mirrors MetadataTest) |
-| RealTypeMappingTest | Type mapping (mirrors TypeMappingTest) |
-| RealResultSetOperationsTest | ResultSet operations (mirrors ResultSetOperationsTest) |
+Most mirror an emulator class of the same name but assert more strongly —
+`RealUpdateCountTest` checks exact `numDmlAffectedRows` where the emulator version
+accepts `count == expected || count == 0`, and `RealParameterizedQueryTest` re-enables
+two tests the emulator forces disabled. **They are not a shared suite run against two
+backends**, and the assertion-strength differences are deliberate: do not collapse them.
+
+### Fixture helpers on the real base class
+
+| Helper | Use |
+|---|---|
+| `createSeededTable(...)` | `CREATE TABLE AS SELECT` + 2h expiry — one BigQuery job instead of three |
+| `createTestTable(name)` | Empty fixture table, also expiring after 2h |
+| `tableName(base)` | Appends `RUN_ID` so concurrent CI runs cannot collide |
+| `createSharedTestTable` / `dropSharedTestTable` | Class-scoped fixture on its own connection, for `@BeforeAll` |
+| `createTestRoutine` | UDF; tracked and dropped on JVM exit, since routines cannot expire |
+
+Every test connection carries `maxBillingBytes`, so a query that accidentally scans a
+large table fails instead of billing for it.
 
 ## Prerequisites
 
@@ -303,34 +307,52 @@ The build workflow (`.github/workflows/build.yml`) runs two parallel integration
 **Emulator tests** — Run on every push and PR (no credentials needed):
 ```yaml
 - name: Run integration tests
-  run: mvn verify -Pintegration-tests -B
+  run: ./mvnw verify -Pintegration-tests -B
 ```
 
-**Real BigQuery tests** — Run on push to `main` only (requires WIF secrets):
+**Real BigQuery tests** — Run on pushes to `main`, **same-repo PRs**, manual dispatch,
+and after a successful Terraform run (requires WIF secrets):
 ```yaml
 real-integration-tests:
-  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  if: |
+    (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+    (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+    github.event_name == 'workflow_dispatch' ||
+    (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
   permissions:
     id-token: write
   steps:
-    - uses: google-github-actions/auth@v2
+    - uses: google-github-actions/auth@v3
       with:
         workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
         service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
-    - run: mvn verify -Preal-integration-tests -B
+    # Goal list, not `verify` — skips packaging, javadoc and the unit suite the
+    # Build job already ran (~135s saved).
+    - run: ./mvnw test-compile failsafe:integration-test failsafe:verify -Preal-integration-tests -B
       env:
-        BQ_TEST_PROJECT: ${{ vars.BQ_TEST_PROJECT }}
-        BQ_TEST_DATASET: ${{ vars.BQ_TEST_DATASET }}
+        BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
+        BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
 ```
 
-### Why Real Tests Only Run on main
+### Why fork PRs are excluded
 
-GitHub secrets are not available to fork PRs (GitHub's built-in protection for public repos). Running real BQ tests only on push to `main` ensures:
-- Fork contributors can still run all emulator tests on their PRs
-- Real BQ costs and credentials are only consumed after code is reviewed and merged
-- No secrets leak to untrusted code
+GitHub secrets are not available to fork PRs (GitHub's built-in protection for public
+repos), so the `head.repo.full_name` check keeps the job from starting and reporting a
+confusing auth failure. Same-repo PRs — including Dependabot's — do run the real suite,
+so the gate is on the PR that introduces a change, not only after merge.
 
-### Required GitHub Secrets and Variables
+Fork contributors still get compile, the full unit suite, static analysis, and the
+emulator tier on their PRs.
+
+### The suite must not pass without testing anything
+
+The real tests are gated by `@EnabledIfEnvironmentVariable` on `BQ_TEST_PROJECT`, so a
+blank or missing secret silently disables every test and the job reports success. Two
+CI steps guard that: a pre-flight check that the secret is non-empty, and a post-run
+check that `failsafe-summary.xml` reports a non-zero completed count. Keep both if you
+touch that job.
+
+### Required GitHub Secrets
 
 After Terraform provisioning, set these in the repository settings:
 
@@ -339,8 +361,8 @@ After Terraform provisioning, set these in the repository settings:
 | `WIF_PROVIDER` | Secret | Terraform output `wif_provider` |
 | `WIF_SERVICE_ACCOUNT` | Secret | Terraform output `ci_service_account_email` |
 | `GCP_TERRAFORM_SA_KEY` | Secret | Bootstrap SA key (used by `terraform.yml` only) |
-| `BQ_TEST_PROJECT` | Variable | Terraform output `project_id` |
-| `BQ_TEST_DATASET` | Variable | Terraform output `dataset_id` |
+| `BQ_TEST_PROJECT` | Secret | Terraform output `project_id` |
+| `BQ_TEST_DATASET` | Secret | Terraform output `dataset_id` |
 
 ### Running in CI Without Docker
 

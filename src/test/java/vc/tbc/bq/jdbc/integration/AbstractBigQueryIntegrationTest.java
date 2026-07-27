@@ -46,9 +46,27 @@ public abstract class AbstractBigQueryIntegrationTest {
 	protected static final String TEST_PROJECT_ID = "test-project";
 	protected static final String TEST_DATASET = "test_dataset";
 
+	/**
+	 * Emulator image, pinned by digest rather than {@code :latest}.
+	 *
+	 * <p>
+	 * {@code :latest} is mutable, so the emulator's behaviour could change under CI
+	 * with no commit to point at — and it already had: a locally cached
+	 * {@code :latest} and the registry's {@code :latest} resolved to different
+	 * digests. Since this suite's whole job is to tell us when behaviour changes,
+	 * the one thing it must not do is change underneath us.
+	 *
+	 * <p>
+	 * To move it deliberately: {@code docker buildx imagetools inspect
+	 * ghcr.io/recidiviz/bigquery-emulator:latest}, then update this constant and
+	 * the matching pre-pull in {@code .github/workflows/build.yml}.
+	 */
+	private static final String EMULATOR_IMAGE = "ghcr.io/recidiviz/bigquery-emulator"
+			+ "@sha256:75b96f0061ddc9f9599a4bfc8fc282c9e9fd9358fc12151379998b63da69936b";
+
 	@SuppressWarnings("resource") // Container lifecycle managed by Testcontainers Ryuk shutdown
 	protected static final GenericContainer<?> bigqueryEmulator = new GenericContainer<>(
-			DockerImageName.parse("ghcr.io/recidiviz/bigquery-emulator:latest")).withExposedPorts(9050)
+			DockerImageName.parse(EMULATOR_IMAGE)).withExposedPorts(9050)
 			.withCommand("--project=" + TEST_PROJECT_ID, "--dataset=" + TEST_DATASET);
 
 	static {
