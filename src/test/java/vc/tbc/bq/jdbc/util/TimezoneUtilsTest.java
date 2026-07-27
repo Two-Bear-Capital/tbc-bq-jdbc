@@ -16,10 +16,14 @@
 package vc.tbc.bq.jdbc.util;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Calendar;
 import java.util.TimeZone;
 
@@ -35,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class TimezoneUtilsTest {
 
-	// Group 1: adjustToCalendarTimezone() Core Logic (10 tests)
+	// Group 1: fromCalendarZone() Core Logic (10 tests)
 
 	@Test
 	void testAdjustToCalendarTimezoneWithNullCalendar() {
@@ -43,7 +47,7 @@ class TimezoneUtilsTest {
 		long millis = System.currentTimeMillis();
 
 		// When: Adjusting with null calendar
-		long result = TimezoneUtils.adjustToCalendarTimezone(millis, null);
+		long result = TimezoneUtils.fromCalendarZone(millis, null);
 
 		// Then: Should return original millis
 		assertEquals(millis, result, "Null calendar should return original milliseconds");
@@ -56,7 +60,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getDefault());
 
 		// When: Adjusting
-		long result = TimezoneUtils.adjustToCalendarTimezone(millis, cal);
+		long result = TimezoneUtils.fromCalendarZone(millis, cal);
 
 		// Then: Should return same millis (same timezone = no adjustment)
 		assertEquals(millis, result, "Same timezone should return same milliseconds");
@@ -75,7 +79,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting from UTC to EST
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, calEST);
+			long result = TimezoneUtils.fromCalendarZone(millis, calEST);
 
 			// Then: Result should be adjusted (EST is UTC-5 in winter)
 			// UTC 00:00 interpreted as EST should give different epoch millis
@@ -98,7 +102,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(est);
 		try {
 			// When: Adjusting from EST to UTC
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, calUTC);
+			long result = TimezoneUtils.fromCalendarZone(millis, calUTC);
 
 			// Then: Result should be adjusted
 			assertNotEquals(millis, result, "EST to UTC should adjust milliseconds");
@@ -119,7 +123,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(pst);
 		try {
 			// When: Adjusting from PST to EST
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, calEST);
+			long result = TimezoneUtils.fromCalendarZone(millis, calEST);
 
 			// Then: Result should be adjusted (3-hour difference)
 			long diff = result - millis;
@@ -141,7 +145,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting to India timezone
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, calIndia);
+			long result = TimezoneUtils.fromCalendarZone(millis, calIndia);
 
 			// Then: Should handle half-hour offset (5.5 hours = 330 minutes)
 			long diff = result - millis;
@@ -162,7 +166,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting to Nepal timezone
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, calNepal);
+			long result = TimezoneUtils.fromCalendarZone(millis, calNepal);
 
 			// Then: Should handle quarter-hour offset (5:45)
 			long diff = result - millis;
@@ -184,7 +188,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting to UTC-12
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, cal);
+			long result = TimezoneUtils.fromCalendarZone(millis, cal);
 
 			// Then: Should handle negative offset
 			long diff = result - millis;
@@ -205,7 +209,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting to UTC+14
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, cal);
+			long result = TimezoneUtils.fromCalendarZone(millis, cal);
 
 			// Then: Should handle large positive offset
 			long diff = result - millis;
@@ -226,7 +230,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting epoch time
-			long result = TimezoneUtils.adjustToCalendarTimezone(millis, cal);
+			long result = TimezoneUtils.fromCalendarZone(millis, cal);
 
 			// Then: Should handle epoch time correctly
 			assertNotEquals(0L, result, "Epoch time should be adjusted for non-UTC timezone");
@@ -235,7 +239,7 @@ class TimezoneUtilsTest {
 		}
 	}
 
-	// Group 2: adjustDateToCalendar() Tests (8 tests)
+	// Group 2: dateFromCalendarZone() Tests (8 tests)
 
 	@Test
 	void testAdjustDateToCalendarWithNullDate() {
@@ -243,7 +247,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance();
 
 		// When: Adjusting null date
-		Date result = TimezoneUtils.adjustDateToCalendar(null, cal);
+		Date result = TimezoneUtils.dateFromCalendarZone(null, cal);
 
 		// Then: Should return null
 		assertNull(result, "Null date should return null");
@@ -255,7 +259,7 @@ class TimezoneUtilsTest {
 		Date date = new Date(System.currentTimeMillis());
 
 		// When: Adjusting with null calendar
-		Date result = TimezoneUtils.adjustDateToCalendar(date, null);
+		Date result = TimezoneUtils.dateFromCalendarZone(date, null);
 
 		// Then: Should return original date
 		assertSame(date, result, "Null calendar should return original date");
@@ -264,7 +268,7 @@ class TimezoneUtilsTest {
 	@Test
 	void testAdjustDateToCalendarBothNull() {
 		// When: Both null
-		Date result = TimezoneUtils.adjustDateToCalendar(null, null);
+		Date result = TimezoneUtils.dateFromCalendarZone(null, null);
 
 		// Then: Should return null
 		assertNull(result, "Both null should return null");
@@ -281,7 +285,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Date result = TimezoneUtils.adjustDateToCalendar(date, calEST);
+			Date result = TimezoneUtils.dateFromCalendarZone(date, calEST);
 
 			// Then: Result should be different Date object with adjusted time
 			assertNotNull(result, "Result should not be null");
@@ -299,7 +303,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/Los_Angeles"));
 
 		// When: Adjusting
-		Date result = TimezoneUtils.adjustDateToCalendar(sqlDate, cal);
+		Date result = TimezoneUtils.dateFromCalendarZone(sqlDate, cal);
 
 		// Then: Should preserve SQL Date type
 		assertNotNull(result, "Result should not be null");
@@ -317,7 +321,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Date result = TimezoneUtils.adjustDateToCalendar(epochDate, cal);
+			Date result = TimezoneUtils.dateFromCalendarZone(epochDate, cal);
 
 			// Then: Should handle epoch date
 			assertNotNull(result, "Epoch date should be adjusted");
@@ -334,7 +338,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Europe/London"));
 
 		// When: Adjusting
-		Date result = TimezoneUtils.adjustDateToCalendar(modernDate, cal);
+		Date result = TimezoneUtils.dateFromCalendarZone(modernDate, cal);
 
 		// Then: Should handle modern dates
 		assertNotNull(result, "Modern date should be adjusted");
@@ -347,13 +351,13 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Australia/Sydney"));
 
 		// When: Adjusting
-		Date result = TimezoneUtils.adjustDateToCalendar(futureDate, cal);
+		Date result = TimezoneUtils.dateFromCalendarZone(futureDate, cal);
 
 		// Then: Should handle future dates
 		assertNotNull(result, "Future date should be adjusted");
 	}
 
-	// Group 3: adjustTimeToCalendar() Tests (8 tests)
+	// Group 3: timeFromCalendarZone() Tests (8 tests)
 
 	@Test
 	void testAdjustTimeToCalendarWithNullTime() {
@@ -361,7 +365,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance();
 
 		// When: Adjusting null time
-		Time result = TimezoneUtils.adjustTimeToCalendar(null, cal);
+		Time result = TimezoneUtils.timeFromCalendarZone(null, cal);
 
 		// Then: Should return null
 		assertNull(result, "Null time should return null");
@@ -373,7 +377,7 @@ class TimezoneUtilsTest {
 		Time time = new Time(System.currentTimeMillis());
 
 		// When: Adjusting with null calendar
-		Time result = TimezoneUtils.adjustTimeToCalendar(time, null);
+		Time result = TimezoneUtils.timeFromCalendarZone(time, null);
 
 		// Then: Should return original time
 		assertSame(time, result, "Null calendar should return original time");
@@ -390,7 +394,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Time result = TimezoneUtils.adjustTimeToCalendar(time, cal);
+			Time result = TimezoneUtils.timeFromCalendarZone(time, cal);
 
 			// Then: Should adjust for timezone
 			assertNotNull(result, "Result should not be null");
@@ -407,7 +411,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Pacific/Auckland"));
 
 		// When: Adjusting
-		Time result = TimezoneUtils.adjustTimeToCalendar(sqlTime, cal);
+		Time result = TimezoneUtils.timeFromCalendarZone(sqlTime, cal);
 
 		// Then: Should preserve SQL Time type
 		assertNotNull(result, "Result should not be null");
@@ -425,7 +429,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Time result = TimezoneUtils.adjustTimeToCalendar(midnight, cal);
+			Time result = TimezoneUtils.timeFromCalendarZone(midnight, cal);
 
 			// Then: Should handle midnight
 			assertNotNull(result, "Midnight should be adjusted");
@@ -441,7 +445,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/Chicago"));
 
 		// When: Adjusting
-		Time result = TimezoneUtils.adjustTimeToCalendar(noon, cal);
+		Time result = TimezoneUtils.timeFromCalendarZone(noon, cal);
 
 		// Then: Should handle noon
 		assertNotNull(result, "Noon should be adjusted");
@@ -454,7 +458,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Shanghai"));
 
 		// When: Adjusting
-		Time result = TimezoneUtils.adjustTimeToCalendar(endOfDay, cal);
+		Time result = TimezoneUtils.timeFromCalendarZone(endOfDay, cal);
 
 		// Then: Should handle end of day
 		assertNotNull(result, "End of day should be adjusted");
@@ -467,13 +471,13 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/Sao_Paulo"));
 
 		// When: Adjusting
-		Time result = TimezoneUtils.adjustTimeToCalendar(timeWithMillis, cal);
+		Time result = TimezoneUtils.timeFromCalendarZone(timeWithMillis, cal);
 
 		// Then: Should preserve precision
 		assertNotNull(result, "Time with millis should be adjusted");
 	}
 
-	// Group 4: adjustTimestampToCalendar() Tests (10 tests)
+	// Group 4: timestampFromCalendarZone() Tests (10 tests)
 
 	@Test
 	void testAdjustTimestampToCalendarWithNullTimestamp() {
@@ -481,7 +485,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance();
 
 		// When: Adjusting null timestamp
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(null, cal);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(null, cal);
 
 		// Then: Should return null
 		assertNull(result, "Null timestamp should return null");
@@ -494,7 +498,7 @@ class TimezoneUtilsTest {
 		ts.setNanos(123456789);
 
 		// When: Adjusting with null calendar
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, null);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, null);
 
 		// Then: Should return original timestamp
 		assertSame(ts, result, "Null calendar should return original timestamp");
@@ -514,7 +518,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Timestamp result = TimezoneUtils.adjustTimestampToCalendar(original, cal);
+			Timestamp result = TimezoneUtils.timestampFromCalendarZone(original, cal);
 
 			// Then: Nanoseconds must be preserved exactly
 			assertNotNull(result, "Result should not be null");
@@ -536,7 +540,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, cal);
+			Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, cal);
 
 			// Then: Should adjust time but preserve nanos
 			assertNotNull(result, "Result should not be null");
@@ -554,7 +558,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Asia/Dubai"));
 
 		// When: Adjusting
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(sqlTs, cal);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(sqlTs, cal);
 
 		// Then: Should preserve type
 		assertNotNull(result, "Result should not be null");
@@ -570,7 +574,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/New_York"));
 
 		// When: Adjusting
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, cal);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, cal);
 
 		// Then: Should preserve max nanos
 		assertNotNull(result, "Result should not be null");
@@ -586,7 +590,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Pacific/Fiji"));
 
 		// When: Adjusting
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, cal);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, cal);
 
 		// Then: Should preserve zero nanos
 		assertNotNull(result, "Result should not be null");
@@ -602,7 +606,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("America/Mexico_City"));
 
 		// When: Adjusting
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, cal);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, cal);
 
 		// Then: Should preserve mid-range nanos
 		assertNotNull(result, "Result should not be null");
@@ -622,7 +626,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Timestamp result = TimezoneUtils.adjustTimestampToCalendar(epochTs, cal);
+			Timestamp result = TimezoneUtils.timestampFromCalendarZone(epochTs, cal);
 
 			// Then: Should handle epoch
 			assertNotNull(result, "Epoch timestamp should be adjusted");
@@ -641,7 +645,7 @@ class TimezoneUtilsTest {
 		Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("Australia/Melbourne"));
 
 		// When: Adjusting
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(modernTs, cal);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(modernTs, cal);
 
 		// Then: Should handle modern timestamp
 		assertNotNull(result, "Modern timestamp should be adjusted");
@@ -664,7 +668,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, cal);
+			Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, cal);
 
 			// Then: Should handle DST transition and preserve nanos
 			assertNotNull(result, "DST spring forward should be handled");
@@ -688,7 +692,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, cal);
+			Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, cal);
 
 			// Then: Should handle DST transition and preserve nanos
 			assertNotNull(result, "DST fall back should be handled");
@@ -715,8 +719,8 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting both
-			Timestamp resultSummer = TimezoneUtils.adjustTimestampToCalendar(summer, calSummer);
-			Timestamp resultWinter = TimezoneUtils.adjustTimestampToCalendar(winter, calWinter);
+			Timestamp resultSummer = TimezoneUtils.timestampFromCalendarZone(summer, calSummer);
+			Timestamp resultWinter = TimezoneUtils.timestampFromCalendarZone(winter, calWinter);
 
 			// Then: Should handle both correctly
 			assertNotNull(resultSummer, "Summer timestamp should be adjusted");
@@ -743,9 +747,9 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Chaining adjustments
-			Timestamp result1 = TimezoneUtils.adjustTimestampToCalendar(ts, cal1);
-			Timestamp result2 = TimezoneUtils.adjustTimestampToCalendar(result1, cal2);
-			Timestamp result3 = TimezoneUtils.adjustTimestampToCalendar(result2, cal3);
+			Timestamp result1 = TimezoneUtils.timestampFromCalendarZone(ts, cal1);
+			Timestamp result2 = TimezoneUtils.timestampFromCalendarZone(result1, cal2);
+			Timestamp result3 = TimezoneUtils.timestampFromCalendarZone(result2, cal3);
 
 			// Then: Each adjustment should preserve nanos
 			assertEquals(111222333, result1.getNanos(), "First adjustment should preserve nanos");
@@ -769,7 +773,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Timestamp result = TimezoneUtils.adjustTimestampToCalendar(historical, cal);
+			Timestamp result = TimezoneUtils.timestampFromCalendarZone(historical, cal);
 
 			// Then: Should handle negative epoch times
 			assertNotNull(result, "Historical date should be adjusted");
@@ -792,7 +796,7 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Adjusting
-			Timestamp result = TimezoneUtils.adjustTimestampToCalendar(farFuture, cal);
+			Timestamp result = TimezoneUtils.timestampFromCalendarZone(farFuture, cal);
 
 			// Then: Should handle far future dates
 			assertNotNull(result, "Far future date should be adjusted");
@@ -817,11 +821,11 @@ class TimezoneUtilsTest {
 		TimeZone.setDefault(utc);
 		try {
 			// When: Converting UTC -> EST -> UTC
-			Timestamp toEST = TimezoneUtils.adjustTimestampToCalendar(original, calEST);
+			Timestamp toEST = TimezoneUtils.timestampFromCalendarZone(original, calEST);
 
 			// Now adjust back assuming EST is default
 			TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"));
-			Timestamp backToUTC = TimezoneUtils.adjustTimestampToCalendar(toEST, calUTC);
+			Timestamp backToUTC = TimezoneUtils.timestampFromCalendarZone(toEST, calUTC);
 
 			// Then: Should get back to original value
 			assertEquals(original.getTime(), backToUTC.getTime(), "Round trip should preserve time");
@@ -843,10 +847,75 @@ class TimezoneUtilsTest {
 		customCal.setMinimalDaysInFirstWeek(4);
 
 		// When: Adjusting with custom calendar
-		Timestamp result = TimezoneUtils.adjustTimestampToCalendar(ts, customCal);
+		Timestamp result = TimezoneUtils.timestampFromCalendarZone(ts, customCal);
 
 		// Then: Should use calendar's timezone regardless of other settings
 		assertNotNull(result, "Custom calendar should be handled");
 		assertEquals(123000000, result.getNanos(), "Nanos should be preserved with custom calendar");
+	}
+
+	// ── Direction (#121) ──────────────────────────────────────────────────────
+	// The tests above compare two Calendar zones against each other, which is
+	// independent of the JVM default and therefore of the overall sign — every one
+	// of them passed while the setters shifted the instant the wrong way. These
+	// assert absolute instants instead, and set a non-UTC default zone so they
+	// cannot pass vacuously on a UTC CI runner the way the old suite did.
+
+	private static void withDefaultZone(String zoneId, Runnable body) {
+		TimeZone original = TimeZone.getDefault();
+		try {
+			TimeZone.setDefault(TimeZone.getTimeZone(zoneId));
+			body.run();
+		} finally {
+			TimeZone.setDefault(original);
+		}
+	}
+
+	private static long instantOf(String isoLocal, String zoneId) {
+		return LocalDateTime.parse(isoLocal).atZone(ZoneId.of(zoneId)).toInstant().toEpochMilli();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"UTC", "America/New_York", "Asia/Tokyo", "Australia/Eucla"})
+	void toCalendarZoneInterpretsWallClockInTheCalendarZone(String defaultZone) {
+		withDefaultZone(defaultZone, () -> {
+			// 12:34:56 read in Asia/Tokyo is 03:34:56Z, whatever the JVM default is.
+			Timestamp wallClock = Timestamp.valueOf("2024-02-01 12:34:56");
+			Calendar tokyo = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tokyo"));
+
+			Timestamp result = TimezoneUtils.timestampToCalendarZone(wallClock, tokyo);
+
+			assertEquals(instantOf("2024-02-01T12:34:56", "Asia/Tokyo"), result.getTime(),
+					"setter direction must interpret the wall clock as being in the Calendar's zone");
+		});
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"UTC", "America/New_York", "Asia/Tokyo"})
+	void setterAndGetterDirectionsAreInverse(String defaultZone) {
+		withDefaultZone(defaultZone, () -> {
+			Timestamp original = Timestamp.valueOf("2024-02-01 12:34:56");
+			for (String zone : new String[]{"UTC", "Asia/Tokyo", "America/New_York", "Asia/Kolkata"}) {
+				Calendar cal = Calendar.getInstance(TimeZone.getTimeZone(zone));
+				Timestamp roundTripped = TimezoneUtils
+						.timestampFromCalendarZone(TimezoneUtils.timestampToCalendarZone(original, cal), cal);
+				assertEquals(original, roundTripped,
+						"round-trip through " + zone + " must be identity (default " + defaultZone + ")");
+			}
+		});
+	}
+
+	@Test
+	void toCalendarZoneMovesOppositeToFromCalendarZone() {
+		withDefaultZone("America/New_York", () -> {
+			long millis = Timestamp.valueOf("2024-02-01 12:34:56").getTime();
+			Calendar tokyo = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tokyo"));
+
+			long forward = TimezoneUtils.toCalendarZone(millis, tokyo) - millis;
+			long backward = TimezoneUtils.fromCalendarZone(millis, tokyo) - millis;
+
+			assertEquals(-forward, backward, "the two directions must be exact opposites");
+			assertNotEquals(0L, forward, "Asia/Tokyo differs from America/New_York, so the shift is non-zero");
+		});
 	}
 }

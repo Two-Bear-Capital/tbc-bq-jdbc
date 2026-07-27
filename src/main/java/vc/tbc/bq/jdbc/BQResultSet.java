@@ -542,7 +542,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public Date getDate(int columnIndex, Calendar cal) throws SQLException {
 		Date date = getDate(columnIndex);
-		return TimezoneUtils.adjustDateToCalendar(date, cal);
+		return TimezoneUtils.dateFromCalendarZone(date, cal);
 	}
 
 	@Override
@@ -553,7 +553,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public Time getTime(int columnIndex, Calendar cal) throws SQLException {
 		Time time = getTime(columnIndex);
-		return TimezoneUtils.adjustTimeToCalendar(time, cal);
+		return TimezoneUtils.timeFromCalendarZone(time, cal);
 	}
 
 	@Override
@@ -564,7 +564,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
 		Timestamp timestamp = getTimestamp(columnIndex);
-		return TimezoneUtils.adjustTimestampToCalendar(timestamp, cal);
+		return TimezoneUtils.timestampFromCalendarZone(timestamp, cal);
 	}
 
 	@Override
