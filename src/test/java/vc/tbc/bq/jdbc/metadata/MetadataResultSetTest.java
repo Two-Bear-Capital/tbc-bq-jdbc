@@ -959,6 +959,53 @@ class MetadataResultSetTest {
 		}
 	}
 
+	@Test
+	void testFindColumnMixedCase() throws SQLException {
+		// Given: A result set whose columns are declared upper case
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When: Finding columns by labels that match neither the declared case
+			// nor a uniform lower case. The lookup resolves exact matches without
+			// allocating, so these take the case-insensitive fallback - the path most
+			// likely to be missed by a change to that resolution.
+			// Then: Every one still resolves
+			assertEquals(1, rs.findColumn("Id"));
+			assertEquals(2, rs.findColumn("NaMe"));
+			assertEquals(3, rs.findColumn("aGe"));
+			assertEquals(4, rs.findColumn("ACTIVe"));
+		}
+	}
+
+	@Test
+	void testFindColumnUnknownLabelThrows() throws SQLException {
+		// Given: A result set
+		try (MetadataResultSet rs = createTestResultSet()) {
+			// When/Then: An absent column is an error, not a silent miss. The
+			// case-insensitive fallback must exhaust every column before giving up.
+			SQLException thrown = assertThrows(SQLException.class, () -> rs.findColumn("NOT_A_COLUMN"));
+			assertTrue(thrown.getMessage().contains("NOT_A_COLUMN"), thrown.getMessage());
+		}
+	}
+
+	@Test
+	void testFindColumnDuplicateLabelResolvesToFirst() throws SQLException {
+		// Given: A result set with the same label twice, differing only in case.
+		// BigQuery metadata does not produce these, but JDBC specifies the answer
+		// and the lookup builds a map that could silently pick either.
+		String[] columns = {"VALUE", "OTHER", "value"};
+		int[] types = {Types.VARCHAR, Types.INTEGER, Types.VARCHAR};
+		List<Object[]> rows = new ArrayList<>();
+		rows.add(new Object[]{"first", 1, "third"});
+
+		try (MetadataResultSet rs = new MetadataResultSet(columns, types, rows)) {
+			// When/Then: JDBC says the first matching column wins. An exact match is
+			// still exact - "value" names column 3 unambiguously - while a label that
+			// matches both only case-insensitively resolves to the earlier column.
+			assertEquals(1, rs.findColumn("VALUE"));
+			assertEquals(3, rs.findColumn("value"));
+			assertEquals(1, rs.findColumn("VaLuE"));
+		}
+	}
+
 	// wasNull() Tests
 
 	@Test
