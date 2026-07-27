@@ -11,7 +11,7 @@ The driver is distributed in three variants:
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Smallest (runtime dependencies not included)
 
-### 2. Shaded JAR (`tbc-bq-jdbc-1.0.103.jar`)
+### 2. Shaded JAR (`tbc-bq-jdbc-1.0.103-shaded.jar`)
 - **Use case:** Standalone usage with all dependencies bundled
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Large (~40MB, includes Google Cloud libraries)
