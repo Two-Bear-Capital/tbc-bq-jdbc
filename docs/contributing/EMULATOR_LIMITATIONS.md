@@ -14,9 +14,21 @@ The integration test suite runs against the BigQuery emulator for fast, local te
 
 ## Summary Statistics
 
-- **Total Integration Tests:** 250
-- **Tests Affected by Emulator Limitations:** 24 compensations across 5 test files
-- **Skipped Tests:** 2 (storage API tests requiring real BigQuery)
+- **Emulator integration tests:** 319 across 17 classes
+- **Real BigQuery integration tests:** 155 across 10 classes
+- **Tests affected by emulator limitations:** 36 compensation sites across 8 test files
+- **Disabled tests:** 6, all citing confirmed emulator bugs — `ComplexTypesTest` ×4
+  (the issue #39 regression tests) and `ParameterizedQueryTest` ×2. They are written
+  `@org.junit.jupiter.api.Disabled`, so a grep for `@Disabled` will not find them.
+
+> **This tier is being retired as a correctness oracle — see issue #118.** The
+> "log the limitation and continue" approach below is what let issue #93 ship: a
+> malformed `INFORMATION_SCHEMA.ROUTINES` query returned zero rows for every real
+> user while CI stayed green, because the failure was logged as an emulator gap and
+> the covering test treated "nothing found" as a pass. Semantics tests are moving to
+> the real tier with strong assertions; the emulator tier is shrinking to plumbing
+> and concurrency-shape tests that assert no BigQuery behaviour. Do not add new
+> compensations here.
 
 ## Detailed Limitations
 
