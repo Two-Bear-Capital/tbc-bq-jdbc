@@ -585,17 +585,20 @@ class RealComplexTypesTest extends AbstractRealBigQueryIntegrationTest {
 				rs -> assertEquals("[1.5,2.7,3.14]", rs.getString("float_array"), "ARRAY<FLOAT64> as JSON"));
 	}
 
-	@Test
-	void testArrayWithNulls() throws SQLException {
-		firstRow("SELECT ['first', NULL, 'third'] AS array_with_nulls",
-				rs -> assertEquals("[\"first\",null,\"third\"]", rs.getString("array_with_nulls"),
-						"A null element is an explicit JSON null, and does not shift its neighbours"));
-	}
-
-	@Test
-	void testMixedNullAndValues() throws SQLException {
-		firstRow("SELECT [NULL, 'value', NULL, 'another'] AS mixed_array",
-				rs -> assertEquals("[null,\"value\",null,\"another\"]", rs.getString("mixed_array"),
-						"Leading and interior nulls both keep their positions"));
-	}
+	// testArrayWithNulls and testMixedNullAndValues are deliberately absent.
+	//
+	// Their emulator versions selected ['first', NULL, 'third'] and
+	// [NULL, 'value', NULL, 'another'], but real BigQuery rejects both outright:
+	//
+	// Array cannot have a null element; error in writing field array_with_nulls
+	//
+	// A BigQuery ARRAY cannot contain NULL elements at all, so those tests were
+	// asserting how the driver serialises input that cannot reach it. The emulator
+	// accepted the query because it is more permissive than the service.
+	//
+	// The null-element branch in FieldValueConverter.arrayToJson is therefore
+	// unreachable from real BigQuery. A NULL *array* is a different thing and is
+	// still covered, by testNullArrayIsNormalisedToEmpty; so is a STRUCT with a
+	// null
+	// field, which BigQuery does allow.
 }
