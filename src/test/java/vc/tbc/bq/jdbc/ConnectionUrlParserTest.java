@@ -22,6 +22,7 @@ import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
 import vc.tbc.bq.jdbc.config.JobCreationMode;
+import vc.tbc.bq.jdbc.config.MetadataCache;
 
 import java.sql.SQLException;
 import java.util.Properties;
@@ -377,6 +378,32 @@ class ConnectionUrlParserTest {
 		String url = "jdbc:bigquery:my-project?metadataCacheTtl=600";
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
 		assertEquals(600, props.metadataCacheTtl());
+	}
+
+	@Test
+	void testParseUrlWithMetadataCacheMaxRows() throws SQLException {
+		String url = "jdbc:bigquery:my-project?metadataCacheMaxRows=1000";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(1000, props.metadataCacheMaxRows());
+	}
+
+	@Test
+	void testMetadataCacheMaxRowsDefaultsToABoundedValue() throws SQLException {
+		// The cache was unbounded before this property existed, so the default
+		// mattering is the whole point - an omitted property must not mean "no
+		// limit".
+		String url = "jdbc:bigquery:my-project";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(MetadataCache.DEFAULT_MAX_ROWS, props.metadataCacheMaxRows());
+		assertTrue(props.metadataCacheMaxRows() > 0, "the default must actually bound the cache");
+	}
+
+	@Test
+	void testParseUrlWithMetadataCacheUnbounded() throws SQLException {
+		// Zero is the documented opt-out for anyone who wants the old behaviour.
+		String url = "jdbc:bigquery:my-project?metadataCacheMaxRows=0";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(0, props.metadataCacheMaxRows());
 	}
 
 	@Test

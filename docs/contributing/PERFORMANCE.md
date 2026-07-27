@@ -161,7 +161,7 @@ is a diagnostic, not a score, and it lands in three regimes:
 nearly all of its time blocked on a BigQuery round trip, doing nothing. Adding threads
 fills that dead time, and HTTP connection reuse amortises better under concurrency, so
 throughput at N threads can exceed N times the single-threaded rate. The recorded
-baseline shows 25x at 16 threads. Superlinear here means the single-threaded number is
+baseline shows 22x at 16 threads. Superlinear here means the single-threaded number is
 mostly idle waiting — which it is.
 
 **Well below 100% is expected for the metadata benchmarks, and the exact ceiling is
@@ -172,12 +172,13 @@ accounts for.
 
 One hypothesis has been tested and **refuted**, which is worth recording so it is not
 retried. `MetadataResultSet.findColumn` used to lowercase the requested label on every
-by-name lookup, allocating a `String` per row — 11,735 per `getColumnsWarm` operation.
+by-name lookup, allocating a `String` per row — over eleven thousand per
+`getColumnsWarm` operation against a project with a few hundred tables.
 Removing that allocation made these benchmarks roughly **three times faster at every
 thread count** (see the baseline's delta column), so it was a large real cost. But the
 scaling curve did not change shape at all: 1.71x / 2.79x / 3.69x / 4.02x after, against
-1.81x / 2.85x / 3.71x / 4.10x before. Allocation pressure was therefore not what
-limits the scaling.
+1.81x / 2.85x / 3.71x / 4.10x before, both measured against the same project.
+Allocation pressure was therefore not what limits the scaling.
 
 Whatever the ceiling is, it survives a 3x change in per-operation cost, which points at
 something structural rather than something on the hot path — plausibly memory bandwidth
@@ -212,10 +213,17 @@ git commit -m "perf(benchmarks): refresh the thread-scaling baseline"
 Refresh it deliberately — after a change to the concurrency, dispatch or metadata
 paths — not on a schedule. A baseline that tracks noise is not a baseline.
 
-The committed baseline was recorded on a 10-core Apple Silicon laptop, not on a CI
-runner — the report's header records the JVM, OS and core count for exactly this
-reason. A sweep run on GitHub's 4-core `ubuntu-latest` will not match it and should
-not be expected to; compare like with like, or re-record.
+The committed baseline was recorded against the Terraform-managed integration
+project (`bigquery-jdbc-driver-test`, the one `BQ_TEST_PROJECT` points at), on a
+10-core Apple Silicon laptop rather than a CI runner. The report header records the
+JVM, OS and core count for exactly this reason.
+
+Two things therefore will not match it and should not be expected to: a sweep on
+GitHub's 4-core `ubuntu-latest`, and a sweep against any other project. The second
+matters more than it sounds — the metadata benchmarks scale inversely with how much
+metadata the project has, so pointing `BENCHMARK_JDBC_URL` at a different project can
+move them by an order of magnitude while the driver is unchanged. Compare like with
+like, or re-record.
 
 ### Note on the JMH harness
 
@@ -371,20 +379,31 @@ User-facing documentation is in **[docs/OBSERVABILITY.md](../OBSERVABILITY.md)**
 
 **Fixed:** `MetadataResultSet.findColumn` lowercased the requested label on every
 by-name column access, allocating a throwaway `String` per lookup — and by-name access
-is per row, so a `getColumns()` over a wide project did it 11,735 times per call. The
+is per row, so a `getColumns()` over a project with a few hundred tables did it over
+eleven thousand times per call. The
 same shape as the per-row regex compilation #99 found. Resolving the exact match from a
 map keyed by the declared name, and falling back to a linear `equalsIgnoreCase` scan
 only on a miss, made `getColumnsWarm` **3.2x** faster and `getTablesWarm` **3.5x**
-faster, with no change to the query benchmarks — which is what tells you the gain is
-real and attributable rather than measurement drift.
+faster — measured before and after against the same project, with no change to the
+query benchmarks, which is what tells you the gain is real and attributable rather
+than measurement drift. The absolute figures scale with how many rows a
+`getColumns()` returns, so the multiple is the durable part of that result, not the
+ops/s.
 
-Two more found by reading the code, **not fixed**, recorded so they are not
-rediscovered:
+**Fixed:** `MetadataCache` had **no size bound**. `evictExpired()` removed expired
+entries only, so within a single TTL window every distinct query shape accumulated its
+own entry holding every materialised row of its result — thousands of rows per entry on
+a wide project, in a cache that is static and shared for the life of the process. It
+now carries a ceiling on total cached rows (`metadataCacheMaxRows`, default 50,000),
+evicting oldest-first once exceeded.
 
-- `MetadataCache` has **no size bound**. `evictExpired()` removes expired entries
-  only, so distinct query shapes accumulate within a TTL window, each holding every
-  materialised row of its result. On a wide project that is thousands of rows per
-  entry, in a cache that is static and shared for the life of the process.
+Eviction is oldest-first rather than LRU on purpose: LRU needs the read path to record
+an access on every hit, which is a write to shared state on the one path that has to
+stay concurrent. Ordering by expiry costs the read path nothing and is exactly
+insertion order, since every entry in a cache takes the same TTL.
+
+**Not fixed**, recorded so it is not rediscovered:
+
 - `BQDatabaseMetaData` logs **31 times at INFO**, several per `getTables()` /
   `getColumns()` miss — including one that builds a sublist-to-string of dataset IDs
   before the level is checked. Routine library operations should not be INFO.

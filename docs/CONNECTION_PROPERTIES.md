@@ -221,6 +221,27 @@ Dramatically improves schema introspection performance, especially for projects 
 - Recommended: `600` (10 minutes) for large projects
 - Set to `60` for frequently changing schemas
 
+**`metadataCacheMaxRows`:**
+- Ceiling on the **total rows** held across every cache entry
+- Default: `50000`
+- Set to `0` for no limit
+
+The cache is shared by every connection to a project and deliberately outlives any
+of them — that is what makes reopening a connection fast. The cost is that only
+expiry ever removes anything, so within a single TTL window each distinct metadata
+query gets its own entry holding every row of its result, and a tool that issues many
+different patterns grows it steadily. This ceiling bounds that: once the total is
+exceeded, the oldest entries are dropped until it is not.
+
+It is a row count rather than a byte count because rows are what the cache can
+measure exactly, and rather than an entry count because entries are wildly uneven —
+a `getColumns()` over a wide project is tens of thousands of rows while a
+`getSchemas()` is tens. Raise it if you have a very wide project and memory to
+spare; lower it if the driver is running somewhere memory-constrained.
+
+One entry larger than the whole ceiling is kept anyway rather than cached and
+immediately dropped, which would make every lookup of that query a guaranteed miss.
+
 **`metadataLazyLoad`:**
 - `true` - Only load metadata when user expands tree nodes (best for 200+ datasets)
 - `false` (default) - Load all metadata upfront (better for immediate visibility)

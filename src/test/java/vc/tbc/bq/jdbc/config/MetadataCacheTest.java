@@ -458,4 +458,89 @@ class MetadataCacheTest {
 		when(result.iterateAll()).thenReturn(List.of());
 		return result;
 	}
+
+	// Row-ceiling Tests
+	//
+	// Expiry alone never bounded this cache: within one TTL window every distinct
+	// query shape got its own entry holding every materialised row of its result,
+	// nothing removed an unexpired entry, and the cache is static and shared for
+	// the life of the process.
+
+	private static MetadataResultSet resultSetWithRows(int rowCount) {
+		String[] columns = {"ID", "NAME"};
+		int[] types = {Types.INTEGER, Types.VARCHAR};
+		List<Object[]> rows = new ArrayList<>(rowCount);
+		for (int i = 0; i < rowCount; i++) {
+			rows.add(new Object[]{i, "row_" + i});
+		}
+		return new MetadataResultSet(columns, types, rows);
+	}
+
+	@Test
+	void testRowCeilingEvictsOldestEntriesFirst() throws Exception {
+		// Given: a cache that can hold 250 rows
+		MetadataCache cache = new MetadataCache(Duration.ofMinutes(10), 250);
+
+		// When: inserting four 100-row entries, oldest first
+		cache.put("oldest", resultSetWithRows(100));
+		cache.put("older", resultSetWithRows(100));
+		cache.put("newer", resultSetWithRows(100));
+
+		// Then: the total is back under the ceiling and the oldest went first
+		assertTrue(cache.totalRows() <= 250,
+				() -> "cache holds " + cache.totalRows() + " rows, over its 250-row ceiling");
+		assertTrue(cache.get("oldest").isEmpty(), "the oldest entry should have been evicted first");
+		assertTrue(cache.get("newer").isPresent(), "the most recent entry must survive");
+	}
+
+	@Test
+	void testRowCeilingKeepsTheEntryJustInserted() throws Exception {
+		// Given: a cache whose ceiling is smaller than a single result
+		MetadataCache cache = new MetadataCache(Duration.ofMinutes(10), 50);
+
+		// When: inserting a result larger than the whole budget
+		cache.put("huge", resultSetWithRows(500));
+
+		// Then: it is kept anyway. Evicting it would make every future lookup of a
+		// wide project's getColumns() a guaranteed miss - the exact metadata stall
+		// the cache exists to prevent - so exceeding the ceiling is the safer way to
+		// be wrong, and is documented as such.
+		assertTrue(cache.get("huge").isPresent(), "an oversized entry must not evict itself");
+		assertEquals(500, cache.totalRows());
+	}
+
+	@Test
+	void testRowCeilingDisabledWhenNotPositive() throws Exception {
+		// Given: a cache explicitly opted out of the bound
+		MetadataCache cache = new MetadataCache(Duration.ofMinutes(10), 0);
+
+		// When: inserting well past any default
+		for (int i = 0; i < 5; i++) {
+			cache.put("key" + i, resultSetWithRows(1_000));
+		}
+
+		// Then: nothing is evicted
+		assertEquals(5, cache.size());
+		assertEquals(5_000, cache.totalRows());
+	}
+
+	@Test
+	void testRowCeilingIsReportedInStats() throws Exception {
+		MetadataCache cache = new MetadataCache(Duration.ofMinutes(10), 250);
+		cache.put("key", resultSetWithRows(10));
+
+		assertEquals(250, cache.getMaxRows());
+
+		// Rows, not just entry count: entries range from tens to tens of thousands
+		// of rows, so a size alone says nothing about what is being held.
+		String stats = cache.getStats();
+		assertTrue(stats.contains("Rows: 10/250"), stats);
+	}
+
+	@Test
+	void testDefaultCacheIsBounded() throws Exception {
+		// The whole point: a cache built the ordinary way must have a ceiling.
+		assertEquals(MetadataCache.DEFAULT_MAX_ROWS, new MetadataCache().getMaxRows());
+		assertEquals(MetadataCache.DEFAULT_MAX_ROWS, new MetadataCache(Duration.ofMinutes(1)).getMaxRows());
+	}
 }

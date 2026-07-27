@@ -124,9 +124,9 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * This used to lowercase both sides: the keys once per ResultSet, and <em>the
 	 * requested label on every single lookup</em>. Since by-name access is per row,
 	 * a {@code getColumns()} over a wide project allocated one throwaway String per
-	 * row — 11,735 of them per call against the project the benchmark baseline was
-	 * recorded on. That is the same shape as the per-row regex compilation found in
-	 * #99, and {@code getColumnsWarm} is the benchmark that shows it.
+	 * row — measured at over eleven thousand per call against a project with a few
+	 * hundred tables. That is the same shape as the per-row regex compilation found
+	 * in #99, and {@code getColumnsWarm} is the benchmark that shows it.
 	 *
 	 * <p>
 	 * JDBC requires the lookup to be case-insensitive, so a miss falls back to a
