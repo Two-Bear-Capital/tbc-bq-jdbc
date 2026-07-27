@@ -14,8 +14,8 @@ The integration test suite runs against the BigQuery emulator for fast, local te
 
 ## Summary Statistics
 
-- **Emulator integration tests:** 42 across 4 classes
-- **Real BigQuery integration tests:** 319 across 16 classes
+- **Emulator integration tests:** 31 across 3 classes
+- **Real BigQuery integration tests:** 326 across 16 classes
 - **Disabled tests:** 0 — the six that cited confirmed emulator bugs were deleted along
   with their classes as those ported (#118)
 

@@ -214,7 +214,7 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
-### Emulator Integration Tests (42 tests, 0 disabled)
+### Emulator Integration Tests (31 tests, 0 disabled)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/`
 - Run locally: `./mvnw verify -Pintegration-tests`
 - Run automatically in CI/CD on every push and PR
@@ -228,9 +228,8 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - `ConcurrentQueryTest` - Query overlap; the #98 regression guard, and hermetic by design
 - `SimbaUrlConnectionTest` - Simba URL properties taking effect
 - `BasicConnectionTest` - Connection lifecycle
-- `TransactionTest` - Not yet ported
 
-### Real BigQuery Integration Tests (319 tests, 16 classes)
+### Real BigQuery Integration Tests (326 tests, 16 classes)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/real/`
 - Run locally: `gcloud auth application-default login`, `export BQ_TEST_PROJECT=...`,
   then `./mvnw verify -Preal-integration-tests`

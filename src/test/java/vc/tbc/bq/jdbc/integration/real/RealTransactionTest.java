@@ -155,4 +155,100 @@ class RealTransactionTest extends AbstractRealBigQueryIntegrationTest {
 		assertFalse(ex instanceof SQLFeatureNotSupportedException);
 		assertEquals("25000", ex.getSQLState());
 	}
+
+	// ── Ported from the emulator TransactionTest (#118) ───────────────────────
+
+	@Test
+	void testSetAutoCommitFalseDoesNotThrowFeatureNotSupported() {
+		// A JDBC-standard call must not be rejected as unsupported. The driver used to
+		// throw SQLFeatureNotSupportedException here, which made connection pools and
+		// ORMs treat the driver as transaction-less.
+		assertDoesNotThrow(() -> connection.setAutoCommit(false));
+	}
+
+	@Test
+	void testSetAutoCommitFalseIsIdempotent() throws SQLException {
+		connection.setAutoCommit(false);
+		assertDoesNotThrow(() -> connection.setAutoCommit(false));
+		assertFalse(connection.getAutoCommit());
+	}
+
+	@Test
+	void testCommitWithoutStatementsIsNoOp() throws SQLException {
+		// BEGIN is deferred to the first statement, so commits with nothing in flight
+		// cost no query jobs. This is what makes pools that toggle auto-commit cheap.
+		connection.setAutoCommit(false);
+
+		assertDoesNotThrow(() -> connection.commit());
+		assertDoesNotThrow(() -> connection.commit());
+		assertDoesNotThrow(() -> connection.rollback());
+		assertFalse(connection.getAutoCommit(), "The connection stays in manual-commit mode");
+	}
+
+	@Test
+	void testRepeatedCommitsWorkWithoutEnableSessions() throws SQLException {
+		connection.setAutoCommit(false);
+
+		for (int i = 1; i <= 2; i++) {
+			try (Statement stmt = connection.createStatement();
+					ResultSet rs = stmt.executeQuery("SELECT " + i + " AS value")) {
+				assertTrue(rs.next());
+				assertEquals(i, rs.getInt("value"));
+			}
+			connection.commit();
+		}
+
+		// Each statement/commit pair is its own transaction over one session.
+		assertTrue(connection.unwrap(BQConnection.class).getSessionManager().hasSession(),
+				"The session created on demand is reused across transactions");
+	}
+
+	@Test
+	void testRollbackWorksWithoutEnableSessions() throws SQLException {
+		// The emulator rejects ROLLBACK TRANSACTION ("Statement not supported:
+		// RollbackStatement"), so its version caught SQLException and logged a skip —
+		// it could not tell "rollback works" from "rollback is unimplemented".
+		connection.setAutoCommit(false);
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery("SELECT 1 AS value")) {
+			assertTrue(rs.next());
+		}
+
+		connection.rollback();
+
+		// And the connection is still usable afterwards, on the same session.
+		assertFalse(connection.getAutoCommit());
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery("SELECT 2 AS value")) {
+			assertTrue(rs.next());
+			assertEquals(2, rs.getInt("value"));
+		}
+	}
+
+	@Test
+	void testRollbackInAutoCommitModeThrowsInvalidState() {
+		// The commit() half of this contract was already covered; the rollback half
+		// was not.
+		SQLException ex = assertThrows(SQLException.class, () -> connection.rollback());
+		assertFalse(ex instanceof SQLFeatureNotSupportedException,
+				"rollback() in auto-commit mode is an invalid-state error, not unsupported");
+		assertEquals("25000", ex.getSQLState());
+	}
+
+	@Test
+	void testReenablingAutoCommitCommitsAndKeepsConnectionUsable() throws SQLException {
+		connection.setAutoCommit(false);
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery("SELECT 1 AS value")) {
+			assertTrue(rs.next());
+		}
+
+		// Switching back commits whatever is in flight rather than stranding it.
+		connection.setAutoCommit(true);
+
+		assertTrue(connection.getAutoCommit());
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery("SELECT 1 AS value")) {
+			assertTrue(rs.next());
+			assertEquals(1, rs.getInt("value"));
+		}
+		// commit() is now an error again, which proves the mode really changed.
+		assertThrows(SQLException.class, () -> connection.commit());
+	}
 }
