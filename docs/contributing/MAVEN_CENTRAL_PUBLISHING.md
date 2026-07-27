@@ -205,11 +205,11 @@ Published artifacts for version `1.0.43`:
 
 | Artifact | Classifier | Size | Description |
 |----------|-----------|------|-------------|
-| `tbc-bq-jdbc-1.0.99.jar` | *(none)* | ~60KB | Slim JAR (requires dependencies) |
-| `tbc-bq-jdbc-1.0.99.jar` | `shaded` | ~38MB | Fat JAR with all dependencies |
-| `tbc-bq-jdbc-1.0.99-with-logging.jar` | `with-logging` | ~39MB | Fat JAR + Logback (for IntelliJ) |
-| `tbc-bq-jdbc-1.0.99.jar` | `sources` | ~200KB | Source code |
-| `tbc-bq-jdbc-1.0.99.jar` | `javadoc` | ~500KB | Javadoc |
+| `tbc-bq-jdbc-1.0.100.jar` | *(none)* | ~60KB | Slim JAR (requires dependencies) |
+| `tbc-bq-jdbc-1.0.100.jar` | `shaded` | ~38MB | Fat JAR with all dependencies |
+| `tbc-bq-jdbc-1.0.100-with-logging.jar` | `with-logging` | ~39MB | Fat JAR + Logback (for IntelliJ) |
+| `tbc-bq-jdbc-1.0.100.jar` | `sources` | ~200KB | Source code |
+| `tbc-bq-jdbc-1.0.100.jar` | `javadoc` | ~500KB | Javadoc |
 
 Each artifact includes:
 - `.md5` - MD5 checksum
@@ -287,7 +287,7 @@ cat > pom.xml << 'EOF'
     <dependency>
       <groupId>vc.tbc</groupId>
       <artifactId>tbc-bq-jdbc</artifactId>
-      <version>1.0.99</version>
+      <version>1.0.100</version>
     </dependency>
   </dependencies>
 </project>
@@ -307,14 +307,14 @@ Once published to Maven Central, users can add the driver as a dependency:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.99</version>
+    <version>1.0.100</version>
 </dependency>
 
 <!-- Or use shaded JAR (includes all dependencies) -->
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.99</version>
+    <version>1.0.100</version>
     <classifier>shaded</classifier>
 </dependency>
 ```
@@ -323,10 +323,10 @@ Once published to Maven Central, users can add the driver as a dependency:
 
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.99'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.100'
 
     // Or shaded variant
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.99:shaded'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.100:shaded'
 }
 ```
 
@@ -334,7 +334,7 @@ dependencies {
 
 ```bash
 # Download from Maven Central
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.99/tbc-bq-jdbc-1.0.99.jar
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.100/tbc-bq-jdbc-1.0.100.jar
 ```
 
 ## Troubleshooting
