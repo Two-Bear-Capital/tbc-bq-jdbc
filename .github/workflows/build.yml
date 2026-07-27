@@ -197,3 +197,27 @@ jobs:
         with:
           name: real-integration-test-reports
           path: target/failsafe-reports/
+
+      # The Java Flight Recorder recording written by the failsafe fork (the JFR
+      # flag lives on the real-integration-tests profile in pom.xml). This is the
+      # only tier that runs the driver against real BigQuery under concurrency, so
+      # it is the only recording worth keeping, and it is what makes a future "why
+      # is this slow" answerable with evidence instead of by reading Maven's
+      # per-class timings and guessing. See docs/contributing/PERFORMANCE.md.
+      #
+      # Uploaded on failure too - `dumponexit` still fires on a normal JVM exit
+      # after a test failure, and a timeout is precisely when the recording is
+      # most worth having.
+      #
+      # if-no-files-found is `error`, not the default `warn`: a profiling
+      # instrument that quietly stops producing output is the exact failure this
+      # whole change exists to prevent, and it would go unnoticed for months. The
+      # only way to lose the file is a hard JVM crash, which is worth a red step
+      # of its own.
+      - name: Upload JFR recording
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: real-integration-tests-jfr
+          path: target/*.jfr
+          if-no-files-found: error

@@ -202,6 +202,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 - **[Connection Properties](docs/CONNECTION_PROPERTIES.md)** - Complete configuration reference
 - **[Type Mapping](docs/TYPE_MAPPING.md)** - BigQuery ↔ JDBC type conversions
 - **[Compatibility Matrix](docs/COMPATIBILITY.md)** - JDBC features and limitations
+- **[Observability](docs/OBSERVABILITY.md)** - Driver metrics for diagnosing your own workload
 - **[Integration Tests](docs/contributing/INTEGRATION_TESTS.md)** - Running integration tests
 
 ## URL Format

@@ -32,6 +32,7 @@ Build, test, and release topics live under [`docs/contributing/`](docs/contribut
 intentionally kept out of the user-facing documentation site):
 
 - [Integration Tests](docs/contributing/INTEGRATION_TESTS.md) — running and writing the real-BigQuery integration tests
+- [Performance Instrumentation](docs/contributing/PERFORMANCE.md) — JFR recordings, thread-scaling benchmarks, and the opt-in scale and load tests
 - [JAR Size Optimization](docs/contributing/JAR_SIZE_OPTIMIZATION.md) — the shading/size strategy for the distributed JARs
 - [Publishing to Maven Central](docs/contributing/MAVEN_CENTRAL_PUBLISHING.md) — the release runbook
 

@@ -32,10 +32,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * Base class for real BigQuery integration tests.
  *
  * <p>
- * Unlike the emulator-based
- * {@link vc.tbc.bq.jdbc.integration.AbstractBigQueryIntegrationTest}, this
- * class connects to a real Google BigQuery instance using Application Default
- * Credentials (ADC).
+ * Connects to a real Google BigQuery instance using Application Default
+ * Credentials (ADC). This is the only integration tier — the emulator-based one
+ * this used to be contrasted with was removed in #118, because tests written
+ * against it were weakened until they passed and shipped bugs behind an
+ * "emulator limitation" comment.
+ *
+ * <p>
+ * For scale and load coverage, which is opt-in and lives separately, see
+ * {@code vc.tbc.bq.jdbc.integration.scale} and
+ * {@code docs/contributing/PERFORMANCE.md}.
  *
  * <p>
  * Tests in this class are skipped automatically unless the

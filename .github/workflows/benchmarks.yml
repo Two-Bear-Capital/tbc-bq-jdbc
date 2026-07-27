@@ -1,0 +1,118 @@
+name: Benchmarks
+
+# Manual only, deliberately.
+#
+# These benchmarks talk to real BigQuery, take roughly half an hour, and answer a
+# question that does not change between commits: does throughput scale with
+# threads, or flatten? Running them per PR would add latency and BigQuery spend to
+# every change while measuring the same thing over and over. Running them nightly
+# would spend money on a schedule for a report nobody is waiting for.
+#
+# So: dispatch. Run it when the driver's concurrency, dispatch or metadata paths
+# change, and when refreshing the committed baseline.
+#
+# Nothing here fails on a regression. BigQuery latency varies enough between runs,
+# regions and times of day that a threshold would flake more often than it caught
+# anything real. The job publishes a table into the run summary and a human reads
+# it against the committed baseline. See docs/contributing/PERFORMANCE.md.
+on:
+  workflow_dispatch:
+    inputs:
+      threads:
+        description: 'Thread counts to sweep (comma-separated)'
+        required: false
+        default: '1,2,4,8,16'
+      quick:
+        description: 'Quick mode — verifies the harness runs, numbers are meaningless'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  thread-scaling:
+    name: Thread-scaling sweep
+    runs-on: ubuntu-latest
+    # A full sweep is ~25-30 minutes. The ceiling is generous because a stuck
+    # BigQuery poll would otherwise hold the runner for GitHub's 6-hour default,
+    # but tight enough that a wedged run is not an all-day billing surprise.
+    timeout-minutes: 75
+
+    # One sweep at a time, repo-wide rather than per-ref. Two concurrent sweeps
+    # would contend for the same project's query concurrency and each would
+    # measure the other's load - the numbers would be quietly wrong rather than
+    # obviously broken, which is the worst failure mode for a benchmark.
+    concurrency:
+      group: benchmarks
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      id-token: write  # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Authenticate to Google Cloud (WIF)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # Same guard as the real integration test job: the benchmarks fail on a
+      # missing URL rather than skipping, but failing 30 minutes in on an empty
+      # secret is a worse experience than failing here in two seconds.
+      - name: Verify BigQuery configuration is present
+        run: |
+          if [ -z "${BQ_TEST_PROJECT}" ]; then
+            echo "::error::BQ_TEST_PROJECT is empty or unset. There is nothing to benchmark against."
+            exit 1
+          fi
+          echo "BQ_TEST_PROJECT is set (${#BQ_TEST_PROJECT} chars)"
+        env:
+          BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
+
+      # maxBillingBytes mirrors the integration suite's cost ceiling. The
+      # benchmark queries are SELECT 1 and GENERATE_ARRAY, which scan no bytes at
+      # all, so this should never bind - it is here so that a future benchmark
+      # added against a real table cannot quietly run a full scan thousands of
+      # times over.
+      - name: Run the thread-scaling sweep
+        run: |
+          ARGS="--threads ${THREADS} --out target/benchmarks/thread-scaling.md"
+          if [ "${QUICK}" = "true" ]; then
+            ARGS="${ARGS} --quick"
+          fi
+          ./mvnw test-compile exec:exec -Pbenchmark-scaling -B -Dbenchmark.args="${ARGS}"
+        env:
+          BENCHMARK_JDBC_URL: >-
+            jdbc:bigquery:${{ secrets.BQ_TEST_PROJECT }}/${{ secrets.BQ_TEST_DATASET }}?authType=ADC&maxBillingBytes=1073741824
+          THREADS: ${{ inputs.threads }}
+          QUICK: ${{ inputs.quick }}
+
+      # The report is the deliverable, so it goes where a human will actually see
+      # it - the run summary page - rather than only inside a downloadable zip.
+      - name: Publish report to the run summary
+        if: always()
+        run: |
+          if [ -f target/benchmarks/thread-scaling.md ]; then
+            cat target/benchmarks/thread-scaling.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## No benchmark report was produced" >> "$GITHUB_STEP_SUMMARY"
+            echo "The sweep failed before writing target/benchmarks/thread-scaling.md." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: thread-scaling-report
+          path: target/benchmarks/
+          if-no-files-found: warn
