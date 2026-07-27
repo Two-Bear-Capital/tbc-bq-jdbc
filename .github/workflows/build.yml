@@ -37,9 +37,6 @@ jobs:
       - name: Pre-fetch the BigQuery emulator image
         run: docker pull ghcr.io/recidiviz/bigquery-emulator:latest >/dev/null 2>&1 &
 
-      - name: Check generated docs are up to date
-        run: mvn test-compile exec:java -Pdocs -Dexec.args="--check" -B
-
       # One pass: compile, unit tests, then the emulator integration tests.
       # This was `mvn clean install` followed by `mvn test` and `mvn verify`,
       # which ran the unit suite three times over and packaged the shaded JARs
@@ -54,6 +51,13 @@ jobs:
       # release unnoticed.
       - name: Build, unit tests and emulator integration tests
         run: mvn verify -Pintegration-tests -B -Dmaven.javadoc.skip=${{ github.event_name == 'pull_request' }}
+
+      # After the build, not before: this is a second Maven invocation, and running
+      # it first made it pay the dependency resolution and compile that `verify`
+      # then repeated — it was the single most expensive step in the job at ~41s.
+      # Placed here it reuses the compiled classes and warm resolution.
+      - name: Check generated docs are up to date
+        run: mvn test-compile exec:java -Pdocs -Dexec.args="--check" -B
 
       - name: Upload test reports
         uses: actions/upload-artifact@v7
