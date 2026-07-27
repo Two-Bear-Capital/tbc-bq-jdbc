@@ -221,8 +221,55 @@ jobs:
           VERSION: ${{ steps.new_version.outputs.new_version }}
         run: |
           # Push main FIRST; push the tag only if that succeeds, so a rejected push
-          # can never leave an orphaned tag (the previous failure mode).
-          git push origin main
+          # can never leave an orphaned tag (an earlier failure mode).
+          #
+          # main can move while this job runs — one PR merging while another's
+          # release is in flight is enough — and the push is then rejected
+          # non-fast-forward (#127). Replay the bump commit onto the new main and
+          # retry, rather than failing a release for a routine condition.
+          pushed=""
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              pushed=yes
+              break
+            fi
+
+            echo "::notice::main moved during this release; replaying the bump commit (attempt ${attempt}/3)"
+            git fetch origin main
+
+            # If another run already published this version it won the race, and
+            # its tag is the one that counts. Re-pushing would collide with it.
+            if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+              echo "::notice::v${VERSION} is already published by another run. Exiting without releasing."
+              exit 0
+            fi
+
+            if ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "::error::Could not replay the bump commit onto the updated main."
+              exit 1
+            fi
+
+            # CHANGELOG.md was generated against the old base. Regenerate it on the
+            # new one: commits that landed in between would otherwise be missing
+            # from this release's notes AND from every later release, since the tag
+            # now sits after them.
+            git tag -f -a "v${VERSION}" -m "Release version ${VERSION}"
+            git-cliff --config cliff.toml --output CHANGELOG.md
+            git add CHANGELOG.md
+            git commit --amend --no-edit
+
+            # Both the tag and the amend rewrote the commit, so re-point the tag at
+            # the commit that will actually be pushed. The tag push still happens
+            # only after main lands, so a failed retry cannot orphan it.
+            git tag -f -a "v${VERSION}" -m "Release version ${VERSION}"
+          done
+
+          if [ -z "$pushed" ]; then
+            echo "::error::main is still moving after 3 attempts; giving up without pushing a tag."
+            exit 1
+          fi
+
           git push origin "v${VERSION}"
 
       - name: Build and package
