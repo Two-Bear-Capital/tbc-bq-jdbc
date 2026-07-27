@@ -39,7 +39,7 @@ Download the latest **with-logging** JAR from the [releases page](https://github
 
 ```bash
 # Recommended for IntelliJ — bundles a logging implementation
-tbc-bq-jdbc-1.0.127-with-logging.jar
+tbc-bq-jdbc-1.0.128-with-logging.jar
 ```
 
 IntelliJ runs JDBC drivers in a separate process with no logging backend, so the
@@ -77,7 +77,7 @@ Choose one of these methods:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.127</version>
+    <version>1.0.128</version>
     <classifier>shaded</classifier>
 </dependency>
 ```
@@ -87,7 +87,7 @@ Choose one of these methods:
 git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
 cd tbc-bq-jdbc
 ./mvnw clean package
-# JAR will be in target/tbc-bq-jdbc-1.0.127.jar
+# JAR will be in target/tbc-bq-jdbc-1.0.128.jar
 ```
 
 **Option C: Download Release**
@@ -645,5 +645,5 @@ For introspection performance issues:
 ---
 
 **Last Updated**: 2026-07-27
-**Driver Version**: 1.0.127
+**Driver Version**: 1.0.128
 **IntelliJ Version Tested**: 2025.3.x
