@@ -41,9 +41,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Build Artifacts
 After `./mvnw clean package`, find these in `target/`:
-- `tbc-bq-jdbc-1.0.125.jar` - Slim JAR (60K, requires dependencies)
-- `tbc-bq-jdbc-1.0.125-shaded.jar` - Shaded JAR with all dependencies (38M)
-- `tbc-bq-jdbc-1.0.125-with-logging.jar` - Shaded JAR + Logback for IntelliJ (39M)
+- `tbc-bq-jdbc-1.0.125.jar` - Slim JAR (180K, requires dependencies)
+- `tbc-bq-jdbc-1.0.125-shaded.jar` - Shaded JAR with all dependencies (36M)
+- `tbc-bq-jdbc-1.0.125-with-logging.jar` - Shaded JAR + Logback for IntelliJ (37M)
 - `tbc-bq-jdbc-1.0.125-sources.jar` - Source JAR
 - `tbc-bq-jdbc-1.0.125-javadoc.jar` - Javadoc JAR
 
