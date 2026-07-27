@@ -15,6 +15,7 @@
  */
 package vc.tbc.bq.jdbc.integration.real;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -43,12 +44,25 @@ class RealMetadataEnhancedTest extends AbstractRealBigQueryIntegrationTest {
 
 	private static final Logger logger = LoggerFactory.getLogger(RealMetadataEnhancedTest.class);
 
-	private static final String TEST_ROUTINE = TEST_DATASET + ".test_add_routine";
+	/**
+	 * Run-scoped routine name. A fixed name would be dropped and recreated
+	 * underneath any other CI run using the same dataset, so concurrent runs would
+	 * silently stop finding the routine they just created.
+	 */
+	private static final String ROUTINE_NAME = tableName("test_add_routine");
+
+	private static final String TEST_ROUTINE = TEST_DATASET + "." + ROUTINE_NAME;
 
 	@BeforeEach
 	void createRoutine() {
 		createTestRoutine(TEST_ROUTINE,
 				"CREATE OR REPLACE FUNCTION " + TEST_ROUTINE + "(x INT64, y INT64) RETURNS INT64 AS (x + y)");
+	}
+
+	@AfterEach
+	void dropRoutine() {
+		// Run-scoped names would otherwise accumulate in the shared test dataset
+		executeIgnoreErrors("DROP FUNCTION IF EXISTS " + TEST_ROUTINE);
 	}
 
 	// Group A: formerly-throwing methods now return empty ResultSets
@@ -150,17 +164,15 @@ class RealMetadataEnhancedTest extends AbstractRealBigQueryIntegrationTest {
 	void testGetProceduresFindsTestRoutine() throws SQLException {
 		DatabaseMetaData metaData = connection.getMetaData();
 
-		ResultSet rs = metaData.getProcedures(TEST_PROJECT_ID, TEST_DATASET, "test_add_routine");
+		ResultSet rs = metaData.getProcedures(TEST_PROJECT_ID, TEST_DATASET, ROUTINE_NAME);
 
+		// Assert rather than tolerate: treating "not found" as a pass let
+		// getProcedures() return zero rows for every real connection unnoticed
 		assertNotNull(rs);
-		if (rs.next()) {
-			String procedureName = rs.getString("PROCEDURE_NAME");
-			assertNotNull(procedureName, "PROCEDURE_NAME should not be null");
-			logger.info("Found procedure: {}", procedureName);
-		} else {
-			// Routine may not have been created if dataset doesn't exist yet; log and pass
-			logger.info("No procedures found for test_add_routine (dataset may not have routines yet)");
-		}
+		assertTrue(rs.next(), "getProcedures() should find the routine created in @BeforeEach: " + ROUTINE_NAME);
+		assertEquals(ROUTINE_NAME, rs.getString("PROCEDURE_NAME"));
+		assertEquals(TEST_DATASET, rs.getString("PROCEDURE_SCHEM"));
+		assertEquals(ROUTINE_NAME, rs.getString("SPECIFIC_NAME"));
 	}
 
 	@Test
@@ -178,16 +190,17 @@ class RealMetadataEnhancedTest extends AbstractRealBigQueryIntegrationTest {
 	void testGetProcedureColumnsFindsRoutineParams() throws SQLException {
 		DatabaseMetaData metaData = connection.getMetaData();
 
-		ResultSet rs = metaData.getProcedureColumns(TEST_PROJECT_ID, TEST_DATASET, "test_add_routine", null);
+		ResultSet rs = metaData.getProcedureColumns(TEST_PROJECT_ID, TEST_DATASET, ROUTINE_NAME, null);
 
 		assertNotNull(rs);
-		int count = 0;
+		java.util.List<String> parameters = new java.util.ArrayList<>();
 		while (rs.next()) {
-			count++;
-			String columnName = rs.getString("COLUMN_NAME");
-			logger.info("Found parameter: {}", columnName);
+			parameters.add(rs.getString("COLUMN_NAME"));
 		}
-		// test_add_routine has 2 parameters (x, y); may be 0 if routine creation failed
-		logger.info("getProcedureColumns() found {} parameters for test_add_routine", count);
+
+		// x, y, plus the unnamed return value row BigQuery reports for scalar UDFs
+		logger.info("getProcedureColumns() found parameters {} for {}", parameters, ROUTINE_NAME);
+		assertTrue(parameters.contains("x"), "Should find parameter x, found: " + parameters);
+		assertTrue(parameters.contains("y"), "Should find parameter y, found: " + parameters);
 	}
 }

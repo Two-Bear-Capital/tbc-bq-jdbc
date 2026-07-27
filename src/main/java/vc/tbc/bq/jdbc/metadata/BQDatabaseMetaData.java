@@ -735,8 +735,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
 			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-			String sql = String.format(
-					"SELECT routine_name, routine_type, routine_comment FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
+			// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
+			// routine's description lives in ROUTINE_OPTIONS under
+			// option_name = 'description', so REMARKS is reported as null
+			String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
 					projectId, datasetId);
 			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
 					.newBuilder(sql).build();
@@ -746,14 +748,13 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
 					continue;
 				}
-				String remarks = row.get("routine_comment").isNull()
-						? null
-						: row.get("routine_comment").getStringValue();
-				rows.add(buildProcedureRow(projectId, datasetId, routineName, remarks));
+				rows.add(buildProcedureRow(projectId, datasetId, routineName, null));
 			}
 		} catch (Exception e) {
-			logger.warn("Could not query INFORMATION_SCHEMA.ROUTINES for dataset {}: {} (emulator may not support)",
-					datasetId, e.getMessage());
+			// One inaccessible dataset must not sink getProcedures() for the whole
+			// project, so this dataset contributes no rows — but the real error is
+			// logged rather than presented as an expected limitation
+			logger.warn("Could not query INFORMATION_SCHEMA.ROUTINES for dataset {}: {}", datasetId, e.getMessage());
 		}
 		return rows;
 	}
@@ -837,8 +838,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 						dataType));
 			}
 		} catch (Exception e) {
-			logger.warn("Could not query INFORMATION_SCHEMA.PARAMETERS for dataset {}: {} (emulator may not support)",
-					datasetId, e.getMessage());
+			// Degrades per dataset like the ROUTINES query above; the cause is logged
+			logger.warn("Could not query INFORMATION_SCHEMA.PARAMETERS for dataset {}: {}", datasetId, e.getMessage());
 		}
 		return rows;
 	}
@@ -1163,8 +1164,11 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * <p>
 	 * Uses {@code INFORMATION_SCHEMA.COLUMNS} for performance: one query per
 	 * dataset instead of one {@code getTable()} API call per table. Falls back to
-	 * the legacy {@code getTable()} approach if {@code INFORMATION_SCHEMA} is
-	 * unavailable (e.g., BigQuery emulator).
+	 * the legacy {@code getTable()} approach if the query fails — because the
+	 * endpoint does not implement {@code INFORMATION_SCHEMA} (the BigQuery emulator
+	 * does not), or because the caller lacks permission on the dataset. The failure
+	 * is logged at WARN so a genuine query defect is not mistaken for an endpoint
+	 * limitation.
 	 */
 	private java.util.List<Object[]> queryColumnsForDataset(com.google.cloud.bigquery.BigQuery bigquery,
 			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
@@ -1175,7 +1179,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			Thread.currentThread().interrupt();
 			throw new BQSQLException("INFORMATION_SCHEMA query interrupted for dataset: " + datasetId, e);
 		} catch (Exception e) {
-			logger.debug("INFORMATION_SCHEMA.COLUMNS unavailable for {}.{}, falling back to getTable() API: {}",
+			// Logged at WARN, not debug: the fallback is correct but slower, and a
+			// malformed INFORMATION_SCHEMA query would otherwise look like a normal
+			// endpoint limitation
+			logger.warn("INFORMATION_SCHEMA.COLUMNS query failed for {}.{}, falling back to the getTable() API: {}",
 					projectId, datasetId, e.getMessage());
 			return queryColumnsViaGetTable(bigquery, projectId, datasetId, tableNamePattern, columnNamePattern);
 		}
@@ -1230,8 +1237,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * table.
 	 *
 	 * <p>
-	 * Used when {@code INFORMATION_SCHEMA} is unavailable (e.g., BigQuery
-	 * emulator).
+	 * Used when the {@code INFORMATION_SCHEMA.COLUMNS} query fails; the BigQuery
+	 * emulator is one endpoint that does not implement it.
 	 */
 	private java.util.List<Object[]> queryColumnsViaGetTable(com.google.cloud.bigquery.BigQuery bigquery,
 			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
