@@ -20,6 +20,7 @@ import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.BigQueryOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vc.tbc.bq.jdbc.auth.CredentialsCache;
 import vc.tbc.bq.jdbc.base.AbstractBQConnection;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
@@ -54,11 +55,13 @@ import java.util.concurrent.Executor;
  * </ul>
  *
  * <p>
- * <b>Thread Safety:</b> This connection implementation is thread-safe. Multiple
- * statements can be created and executed concurrently from the same connection.
- * However, transaction operations ({@link #commit()}, {@link #rollback()})
- * affect all statements on the connection and should be coordinated
- * appropriately.
+ * <b>Thread Safety:</b> This connection's own state is safe to touch from
+ * several threads. Statements, however, are not free to run concurrently once a
+ * session exists: BigQuery rejects concurrent queries within a session, and
+ * transaction control ({@link #setAutoCommit(boolean)}, {@link #commit()},
+ * {@link #rollback()}) serializes on this connection while the corresponding
+ * BigQuery job runs. Give each thread its own connection — as a connection pool
+ * does — rather than sharing one.
  *
  * <p>
  * <b>Session Mode:</b> BigQuery sessions are required for:
@@ -83,9 +86,21 @@ public final class BQConnection extends AbstractBQConnection {
 	private final ConnectionProperties properties;
 	private final Set<BQStatement> runningStatements = ConcurrentHashMap.newKeySet();
 	private final SessionManager sessionManager;
-	private BQDatabaseMetaData metadata;
-	private boolean autoCommit = true;
-	private boolean transactionActive = false;
+	/**
+	 * Reused across calls so metadata caching actually pays off — see
+	 * {@link #getMetaData()}. Volatile because callers may reach it from any
+	 * thread.
+	 */
+	private volatile BQDatabaseMetaData metadata;
+
+	/**
+	 * Transaction state. Written under this connection's monitor and read without
+	 * it (JDBC callers ask for auto-commit state freely), so both are volatile:
+	 * otherwise a thread that did not perform the write can observe a stale value.
+	 */
+	private volatile boolean autoCommit = true;
+
+	private volatile boolean transactionActive = false;
 	private volatile int transactionIsolation = Connection.TRANSACTION_REPEATABLE_READ;
 	private volatile boolean readOnly = false;
 	private volatile int networkTimeout = 0;
@@ -101,7 +116,9 @@ public final class BQConnection extends AbstractBQConnection {
 	public BQConnection(ConnectionProperties properties) throws SQLException {
 		this.properties = properties;
 		try {
-			Credentials credentials = properties.authType().toCredentials();
+			// Shared across connections authenticating the same way: building these
+			// means an ADC probe plus token fetch, or reading and parsing a key file
+			Credentials credentials = CredentialsCache.forAuthType(properties.authType());
 			BigQueryOptions.Builder builder = BigQueryOptions.newBuilder().setProjectId(properties.projectId())
 					.setCredentials(credentials);
 
@@ -514,10 +531,21 @@ public final class BQConnection extends AbstractBQConnection {
 	@Override
 	public DatabaseMetaData getMetaData() throws SQLException {
 		checkClosed();
-		if (metadata == null) {
-			metadata = new BQDatabaseMetaData(this);
+
+		// Double-checked locking: two threads racing here would each build their own
+		// BQDatabaseMetaData, and the single-instance reuse is what keeps IntelliJ's
+		// repeated introspection off the wire
+		BQDatabaseMetaData result = metadata;
+		if (result == null) {
+			synchronized (this) {
+				result = metadata;
+				if (result == null) {
+					result = new BQDatabaseMetaData(this);
+					metadata = result;
+				}
+			}
 		}
-		return metadata;
+		return result;
 	}
 
 	@Override
