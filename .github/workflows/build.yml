@@ -15,6 +15,9 @@ jobs:
   build:
     name: Build and Emulator Integration Tests
     runs-on: ubuntu-latest
+    # Typical run is ~2.5 minutes. Without a limit a hung Testcontainers start or
+    # a wedged Maven download inherits GitHub's 6-hour default and burns runner time.
+    timeout-minutes: 20
     if: github.event_name != 'workflow_run'
     permissions:
       contents: read
@@ -35,8 +38,11 @@ jobs:
       # Testcontainers starts the container from a static initializer in the first
       # integration test class to load, so without this the pull lands on the
       # critical path — it is why SessionTest reports ~26s in CI and 2s locally.
+      # Digest must match EMULATOR_IMAGE in AbstractBigQueryIntegrationTest — pulling
+      # a different one just wastes the pre-fetch, it does not change what runs.
       - name: Pre-fetch the BigQuery emulator image
-        run: docker pull ghcr.io/recidiviz/bigquery-emulator:latest >/dev/null 2>&1 &
+        run: |
+          docker pull ghcr.io/recidiviz/bigquery-emulator@sha256:75b96f0061ddc9f9599a4bfc8fc282c9e9fd9358fc12151379998b63da69936b >/dev/null 2>&1 &
 
       # One pass: compile, unit tests, then the emulator integration tests.
       # This was `./mvnw clean install` followed by `./mvnw test` and `./mvnw verify`,
@@ -114,6 +120,10 @@ jobs:
   real-integration-tests:
     name: Real BigQuery Integration Tests
     runs-on: ubuntu-latest
+    # Typical run is ~1.5 minutes. This job talks to BigQuery over the network, so
+    # it is the one that can actually hang: without a limit a stuck job poll would
+    # hold a runner for GitHub's 6-hour default.
+    timeout-minutes: 20
     # Deduplicate runs per branch: a new push supersedes the previous run of the
     # same ref. Isolation between concurrent PRs comes from RUN_ID-scoped table
     # and routine names, not from serializing here — a repo-wide group cancels
@@ -149,6 +159,20 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # The real tests are gated by @EnabledIfEnvironmentVariable on BQ_TEST_PROJECT,
+      # so a blank or missing secret does not fail — it silently disables every test
+      # and the job reports success having verified nothing. Check before running.
+      - name: Verify BigQuery test configuration is present
+        run: |
+          if [ -z "${BQ_TEST_PROJECT}" ]; then
+            echo "::error::BQ_TEST_PROJECT is empty or unset. The real BigQuery tests would" \
+                 "silently skip and this job would pass without testing anything."
+            exit 1
+          fi
+          echo "BQ_TEST_PROJECT is set (${#BQ_TEST_PROJECT} chars)"
+        env:
+          BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
+
       # One Maven invocation, integration tests only. `./mvnw clean install` followed
       # by `./mvnw verify` built the shaded JARs and javadoc twice and re-ran the
       # full unit suite that the Build job already covers — about 135s of the
@@ -158,6 +182,24 @@ jobs:
         env:
           BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
           BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
+
+      # Second half of the same guard: the pre-flight check proves the secret is set,
+      # this proves tests actually ran. Catches a broken include pattern or an
+      # env-gate change that disables the suite without anything going red.
+      - name: Verify the real suite actually ran tests
+        run: |
+          summary=target/failsafe-reports/failsafe-summary.xml
+          if [ ! -f "$summary" ]; then
+            echo "::error::$summary not found — failsafe did not run."
+            exit 1
+          fi
+          completed=$(sed -n 's;.*<completed>\([0-9]*\)</completed>.*;\1;p' "$summary" | head -1)
+          skipped=$(sed -n 's;.*<skipped>\([0-9]*\)</skipped>.*;\1;p' "$summary" | head -1)
+          echo "Real BigQuery tests completed=${completed:-0} skipped=${skipped:-0}"
+          if [ "${completed:-0}" -eq 0 ]; then
+            echo "::error::The real BigQuery suite ran 0 tests. A green job here would be meaningless."
+            exit 1
+          fi
 
       - name: Upload real integration test reports
         uses: actions/upload-artifact@v7

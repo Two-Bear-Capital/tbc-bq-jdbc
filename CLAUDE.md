@@ -208,13 +208,13 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 
 ## Testing Architecture
 
-### Unit Tests (91 tests)
+### Unit Tests (964 tests)
 - Location: `src/test/java/vc/tbc/bq/jdbc/`
 - Run: `./mvnw test`
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
-### Integration Tests (108 tests, 2 skipped)
+### Emulator Integration Tests (319 tests, 6 disabled)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/`
 - Run locally: `./mvnw verify -Pintegration-tests`
 - Run automatically in CI/CD on every push and PR
@@ -231,6 +231,28 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - `MetadataTest` - DatabaseMetaData operations
 - `TypeMappingTest` - Type conversions
 - `ResultSetOperationsTest` - ResultSet navigation
+
+### Real BigQuery Integration Tests (155 tests, 10 classes)
+- Location: `src/test/java/vc/tbc/bq/jdbc/integration/real/`
+- Run locally: `gcloud auth application-default login`, `export BQ_TEST_PROJECT=...`,
+  then `./mvnw verify -Preal-integration-tests`
+- Runs in CI on pushes to main, same-repo PRs, and manual dispatch (WIF auth)
+- Base class: `AbstractRealBigQueryIntegrationTest`
+- Skips silently when `BQ_TEST_PROJECT` is unset — CI guards against that passing green
+
+**Which tier should a new test go in?** Default to the **real** tier. The emulator
+cannot verify BigQuery semantics — DML affected-row counts, session/transaction
+behaviour, NULL and temporal parameter binding, JSON/GEOGRAPHY, `INFORMATION_SCHEMA`
+— and tests written against it have historically been weakened until they passed,
+which shipped bugs (#93, #98). See issue #118. Use the emulator tier only for tests
+that assert no BigQuery behaviour at all: connection/URL plumbing, and concurrency
+*shape* (`ConcurrentQueryTest` measures query overlap, which needs no fidelity).
+
+Real-tier fixture patterns to reuse rather than reinvent:
+`createSeededTable()` (CTAS + 2h expiry, one job instead of three), `tableName()` /
+`RUN_ID` for names that survive concurrent CI runs, `@Execution(CONCURRENT)` plus a
+table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
+`createSharedTestTable` for read-only ones.
 
 ## Code Style and Conventions
 

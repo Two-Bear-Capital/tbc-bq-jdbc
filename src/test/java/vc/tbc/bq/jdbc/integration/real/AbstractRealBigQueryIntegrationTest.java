@@ -25,6 +25,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Base class for real BigQuery integration tests.
@@ -76,6 +78,20 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	protected static final String RUN_ID = Long.toHexString(System.nanoTime() & 0xFFFFFFFFL);
 
 	/**
+	 * Hard ceiling on bytes billed per query, appended to every test connection
+	 * URL.
+	 *
+	 * <p>
+	 * Fixtures here are three rows, so no legitimate test comes close to 1 GB —
+	 * BigQuery bills a 10 MB minimum per query regardless. The ceiling exists so a
+	 * test that accidentally references a large table (a public dataset, a
+	 * production table, a mistyped name that happens to resolve) fails immediately
+	 * instead of billing for the scan. Nothing else in the harness or the Terraform
+	 * project caps query cost.
+	 */
+	private static final String COST_CEILING = "&maxBillingBytes=1073741824";
+
+	/**
 	 * Returns a session-unique table name by appending {@link #RUN_ID} to the given
 	 * base name.
 	 *
@@ -112,7 +128,7 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 *             if connection fails
 	 */
 	protected Connection createTestConnection() throws SQLException {
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC", TEST_PROJECT_ID, TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC%s", TEST_PROJECT_ID, TEST_DATASET, COST_CEILING);
 		logger.debug("Connecting with URL: {}", url);
 		return DriverManager.getConnection(url);
 	}
@@ -239,8 +255,12 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 *             if creation fails
 	 */
 	protected void createTestTable(String tableName) throws SQLException {
+		// EXPIRES_SOON matters here as much as in createSeededTable: a cancelled CI
+		// run leaves whatever it had created behind, and without an expiry those
+		// tables accumulate in the shared dataset with nothing to remove them.
 		String createTable = String.format("CREATE OR REPLACE TABLE %s (" + "id INT64, " + "name STRING, "
-				+ "age INT64, " + "salary FLOAT64, " + "is_active BOOL, " + "created_date DATE" + ")", tableName);
+				+ "age INT64, " + "salary FLOAT64, " + "is_active BOOL, " + "created_date DATE" + ") " + EXPIRES_SOON,
+				tableName);
 
 		try (Statement stmt = connection.createStatement()) {
 			stmt.execute(createTable);
@@ -277,8 +297,8 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 *             if connection fails
 	 */
 	protected Connection createNativeComplexTypesConnection() throws SQLException {
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&nativeComplexTypes=true", TEST_PROJECT_ID,
-				TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&nativeComplexTypes=true%s", TEST_PROJECT_ID,
+				TEST_DATASET, COST_CEILING);
 		logger.debug("Connecting with URL (native complex types): {}", url);
 		return DriverManager.getConnection(url);
 	}
@@ -295,5 +315,46 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	protected void createTestRoutine(String routineName, String sql) {
 		executeIgnoreErrors("DROP FUNCTION IF EXISTS " + routineName);
 		executeIgnoreErrors(sql);
+		CREATED_ROUTINES.add(routineName);
+	}
+
+	/**
+	 * Routines created by this JVM run, dropped on exit.
+	 *
+	 * <p>
+	 * Tables clean themselves up via {@link #EXPIRES_SOON}, but BigQuery routines
+	 * have no {@code expiration_timestamp} option — a run that dies between
+	 * creating a UDF and its {@code @AfterAll} strands that routine in the shared
+	 * dataset permanently, and nothing else would ever remove it.
+	 */
+	private static final Set<String> CREATED_ROUTINES = ConcurrentHashMap.newKeySet();
+
+	static {
+		Runtime.getRuntime().addShutdownHook(
+				new Thread(AbstractRealBigQueryIntegrationTest::dropCreatedRoutines, "real-it-routine-cleanup"));
+	}
+
+	/**
+	 * Best-effort sweep of routines this run created. Runs on JVM exit, so it also
+	 * covers a run that failed partway; it cannot help if the JVM is killed
+	 * outright, which is why routine names carry {@link #RUN_ID} and are dropped
+	 * with {@code DROP FUNCTION IF EXISTS} before being recreated.
+	 */
+	private static void dropCreatedRoutines() {
+		if (CREATED_ROUTINES.isEmpty() || TEST_PROJECT_ID.isEmpty()) {
+			return;
+		}
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC%s", TEST_PROJECT_ID, TEST_DATASET, COST_CEILING);
+		try (Connection conn = DriverManager.getConnection(url); Statement stmt = conn.createStatement()) {
+			for (String routine : CREATED_ROUTINES) {
+				try {
+					stmt.execute("DROP FUNCTION IF EXISTS " + routine);
+				} catch (SQLException e) {
+					logger.debug("Could not drop routine {}: {}", routine, e.getMessage());
+				}
+			}
+		} catch (SQLException e) {
+			logger.debug("Routine cleanup skipped: {}", e.getMessage());
+		}
 	}
 }
