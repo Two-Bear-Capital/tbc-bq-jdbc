@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.108] - 2026-07-27
+
+### ⚡ Features
+
+- **ci:** Report test coverage to GitHub Code Quality ([#111](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/111))
+
 ## [1.0.107] - 2026-07-27
 
 ### ⚙️ Miscellaneous Tasks
@@ -2210,6 +2216,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.108]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.107...v1.0.108
 [1.0.107]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.106...v1.0.107
 [1.0.106]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.105...v1.0.106
 [1.0.105]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.104...v1.0.105
