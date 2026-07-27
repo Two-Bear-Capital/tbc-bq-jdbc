@@ -49,6 +49,7 @@
         <slf4j.version>2.0.18</slf4j.version>
         <junit.version>6.1.2</junit.version>
         <jmh.version>1.37</jmh.version>
+        <hikaricp.version>7.0.2</hikaricp.version>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
@@ -202,6 +203,21 @@
             <version>${jmh.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- Connection pool, for the opt-in pooled load test only.
+
+             A pool is how this driver is actually deployed, and it is the scenario #98
+             broke: queries went to ForkJoinPool.commonPool(), so concurrent callers
+             serialized and SELECT 1 took over 30 seconds behind eight of them. That the
+             fix works has been asserted but never demonstrated under a real pool.
+             HikariCP is the one most users will put in front of it. Test scope: nothing
+             in the driver depends on it and it is not shaded into any published JAR. -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>${hikaricp.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -329,6 +345,33 @@
                         <arg>-Xlint:deprecation</arg>
                     </compilerArgs>
                 </configuration>
+                <executions>
+                    <!-- JMH generates its benchmark descriptors (META-INF/BenchmarkList) with an
+                         annotation processor. jmh-generator-annprocess is a test-scoped dependency,
+                         and javac used to discover processors from the classpath automatically -
+                         but as of JDK 23 it does not, unless -proc:full is passed. On a modern JDK
+                         the processor therefore never ran, no BenchmarkList was produced, and both
+                         `exec:java -Pbenchmarks` and the thread-scaling sweep failed at startup
+                         with "Unable to find the resource: /META-INF/BenchmarkList". The build
+                         targets release 21 but is compiled by whatever JDK the developer has.
+
+                         Naming the processor explicitly fixes that and is the form that does not
+                         depend on the JDK's discovery defaults. It is scoped to default-testCompile
+                         because the benchmarks are test sources; running it over main sources would
+                         find nothing and only cost time. -->
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>org.openjdk.jmh</groupId>
+                                    <artifactId>jmh-generator-annprocess</artifactId>
+                                    <version>${jmh.version}</version>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- Maven Resources Plugin (for filtering) -->
@@ -816,19 +859,58 @@
 
     <profiles>
         <!-- Benchmarks Profile: requires a real BigQuery connection via BENCHMARK_JDBC_URL env var -->
-        <!-- Usage: ./mvnw test-compile exec:java -Pbenchmarks                          -->
-        <!--        ./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="ResultSet*" -->
+        <!-- Usage: ./mvnw test-compile exec:exec -Pbenchmarks                                      -->
+        <!--        ./mvnw test-compile exec:exec -Pbenchmarks -Dbenchmark.args="ResultSet*"        -->
+        <!--                                                                                        -->
+        <!-- exec:exec, not exec:java. Every benchmark here declares @Fork(1), and JMH's forked      -->
+        <!-- JVM rebuilds its classpath from the java.class.path system property. exec:java runs     -->
+        <!-- in-process behind its own classloader and leaves that property pointing at Maven's      -->
+        <!-- own classpath, so the fork died with ClassNotFoundException on JMH's own ForkedMain.    -->
+        <!-- exec:exec spawns a real JVM with an explicit -classpath, which the fork can inherit.    -->
         <profile>
             <id>benchmarks</id>
+            <properties>
+                <benchmark.args></benchmark.args>
+            </properties>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.codehaus.mojo</groupId>
                         <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.6.3</version>
                         <configuration>
-                            <mainClass>org.openjdk.jmh.Main</mainClass>
+                            <executable>${java.home}/bin/java</executable>
                             <classpathScope>test</classpathScope>
+                            <commandlineArgs>-classpath %classpath org.openjdk.jmh.Main
+                                ${benchmark.args}</commandlineArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Thread-Scaling Benchmark Profile: sweeps concurrency and writes a report.          -->
+        <!-- Separate from -Pbenchmarks because the sweep cannot be expressed as a JMH          -->
+        <!-- annotation - @Threads takes a single int - so it needs its own driver rather       -->
+        <!-- than org.openjdk.jmh.Main. Requires BENCHMARK_JDBC_URL.                            -->
+        <!-- Usage: ./mvnw test-compile exec:exec -Pbenchmark-scaling                           -->
+        <!--  Quick: ./mvnw test-compile exec:exec -Pbenchmark-scaling                          -->
+        <!--             -Dbenchmark.args=&quot;[two dashes]quick&quot;                               -->
+        <profile>
+            <id>benchmark-scaling</id>
+            <properties>
+                <benchmark.args></benchmark.args>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <executable>${java.home}/bin/java</executable>
+                            <classpathScope>test</classpathScope>
+                            <commandlineArgs>-classpath %classpath
+                                vc.tbc.bq.jdbc.benchmark.ThreadScalingRunner
+                                ${benchmark.args}</commandlineArgs>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -868,7 +950,27 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
                         <configuration combine.self="override">
-                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
+                            <!-- Java Flight Recorder is on for this suite. It is the only tier that
+                                 exercises the driver against real BigQuery under concurrency, so it
+                                 is the only place a recording is worth anything - and the overhead
+                                 is irrelevant here because the threads spend nearly all their time
+                                 blocked on the network.
+
+                                 `settings=profile` is what makes it useful: it records ThreadPark
+                                 and JavaMonitorEnter events above a 10ms threshold, which is
+                                 exactly the signature of #98 (queries dispatched to
+                                 ForkJoinPool.commonPool, so eight callers serialized). That defect
+                                 was found by a test timeout, twice widened, rather than by any
+                                 instrument. A recording would have named the parking site.
+
+                                 %p expands to the pid, so the filename stays unique if forkCount is
+                                 ever raised above the default of 1. target/ is used directly rather
+                                 than a subdirectory because JFR does not create parent directories,
+                                 and target/ is guaranteed to exist by the integration-test phase.
+                                 CI uploads target/*.jfr as an artifact; see docs/contributing/PERFORMANCE.md
+                                 for how to read one. -->
+                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading
+                                -XX:StartFlightRecording:name=real-integration-tests,settings=profile,dumponexit=true,filename=target/real-integration-tests-%p.jfr</argLine>
                             <includes>
                                 <include>**/integration/real/**/*Test.java</include>
                             </includes>
@@ -888,6 +990,61 @@
                                     junit.jupiter.execution.parallel.mode.classes.default=concurrent
                                     junit.jupiter.execution.parallel.config.strategy=fixed
                                     junit.jupiter.execution.parallel.config.fixed.parallelism=8
+                                </configurationParameters>
+                            </properties>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Scale / Load Test Profile. Opt-in, never part of a PR run.                          -->
+        <!-- Usage: export BQ_TEST_PROJECT=my-gcp-project                                        -->
+        <!--        export BQ_SCALE_TESTS=true                                                   -->
+        <!--        ./mvnw verify -Pscale-tests                                                  -->
+        <!--                                                                                     -->
+        <!-- These build datasets with hundreds of tables and iterate a million rows, so they    -->
+        <!-- take minutes and leave BigQuery state behind. Both the profile and the              -->
+        <!-- BQ_SCALE_TESTS variable must be present: the profile keeps them out of the          -->
+        <!-- ordinary suite, and the variable keeps a broadened include pattern from quietly     -->
+        <!-- turning them back on. See docs/contributing/PERFORMANCE.md.                         -->
+        <profile>
+            <id>scale-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration combine.self="override">
+                            <!-- -Xmx512m is load-bearing, not tidiness. The large-result test asserts
+                                 that retained heap does not grow with rows read, and its heap
+                                 measurement is soft - System.gc() is only a hint, and under a
+                                 generous heap a JVM may simply never collect, letting a driver that
+                                 buffered everything pass. A bounded heap turns full materialisation
+                                 of a million rows into an OutOfMemoryError, which is unambiguous.
+
+                                 JFR is on here for the same reason it is on for the real suite: when
+                                 a scale run is slow, the recording is the evidence. -->
+                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading -Xmx512m
+                                -XX:StartFlightRecording:name=scale-tests,settings=profile,dumponexit=true,filename=target/scale-tests-%p.jfr</argLine>
+                            <includes>
+                                <include>**/integration/scale/**/*Test.java</include>
+                            </includes>
+                            <!-- Sequential, unlike the real suite. Each of these classes is itself a
+                                 concurrency or throughput measurement; running two at once would
+                                 mean each measures the other's load on the same BigQuery project,
+                                 and the numbers would be wrong rather than obviously broken. -->
+                            <properties>
+                                <configurationParameters>
+                                    junit.jupiter.execution.parallel.enabled=false
                                 </configurationParameters>
                             </properties>
                         </configuration>

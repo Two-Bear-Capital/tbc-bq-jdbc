@@ -25,6 +25,7 @@ import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
+import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
 import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 
@@ -973,6 +974,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @return the completed, successful job
 	 */
 	private Job runJob(QueryJobConfiguration config, String operation) {
+		// Every query and DML job the driver runs passes through here, which makes it
+		// the one place worth timing: instrumenting the callers instead would mean
+		// several sites to keep in step, and would still miss whichever one was added
+		// next. See DriverMetrics.
+		long startNanos = System.nanoTime();
+		boolean succeeded = false;
+
 		try {
 			Job job = bigquery.create(JobInfo.of(config));
 
@@ -996,11 +1004,24 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 						sqlStateFor(error), null);
 			}
 
+			succeeded = true;
 			return job;
 
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new QueryJobFailure(operation + " interrupted", BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
+		} finally {
+			// In a finally block so a job that fails, times out or is cancelled is
+			// counted too. A workload whose queries fail slowly is precisely the shape
+			// worth being able to see, and recording only the successes would hide it.
+			long elapsedNanos = System.nanoTime() - startNanos;
+			if (succeeded) {
+				DriverMetrics.recordQuerySucceeded(elapsedNanos);
+			} else {
+				DriverMetrics.recordQueryFailed(elapsedNanos);
+			}
+			logger.debug("{} {} {} in {} ms", getLogPrefix(), operation, succeeded ? "completed" : "failed",
+					TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
 		}
 	}
 

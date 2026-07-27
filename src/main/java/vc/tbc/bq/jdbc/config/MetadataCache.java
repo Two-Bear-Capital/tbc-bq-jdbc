@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.TypeMapper;
 import vc.tbc.bq.jdbc.metadata.MetadataResultSet;
+import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 import vc.tbc.bq.jdbc.util.FieldValueConverter;
 
 import java.sql.ResultSet;
@@ -92,16 +93,23 @@ public final class MetadataCache {
 	public Optional<ResultSet> get(String key) {
 		CacheEntry entry = cache.get(key);
 		if (entry == null) {
+			DriverMetrics.recordMetadataCacheMiss();
 			logger.trace("Cache miss for key: {}", key);
 			return Optional.empty();
 		}
 
 		if (entry.isExpired()) {
 			cache.remove(key);
+			// Counted as a miss, not as its own category: from the caller's point of
+			// view an expired entry costs exactly what an absent one does - a round
+			// trip to BigQuery - and the hit rate is only useful if it means "lookups
+			// that avoided the network".
+			DriverMetrics.recordMetadataCacheMiss();
 			logger.trace("Cache entry expired for key: {}", key);
 			return Optional.empty();
 		}
 
+		DriverMetrics.recordMetadataCacheHit();
 		logger.trace("Cache hit for key: {}", key);
 		return Optional.of(entry.createResultSet());
 	}

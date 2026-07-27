@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.config;
 import com.google.cloud.bigquery.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 
 import java.sql.SQLException;
 import java.util.concurrent.locks.ReentrantLock;
@@ -121,6 +122,11 @@ public class SessionManager {
 
 			this.sessionId = assignedSessionId;
 			this.initialized = true;
+			// Counted here rather than at the top of the method, so the counter tracks
+			// sessions BigQuery actually assigned an ID to - the same bar hasSession()
+			// uses. Counting attempts would make sessionsOpen() drift upward on every
+			// failed creation and stop being a usable leak signal.
+			DriverMetrics.recordSessionCreated();
 			logger.info("BigQuery session created: {}", sessionId);
 
 		} catch (InterruptedException e) {
@@ -214,6 +220,10 @@ public class SessionManager {
 					logger.warn("Failed to terminate BigQuery session {}: {}", sessionId, e.getMessage());
 				}
 				sessionId = null;
+				// Counted even when ABORT_SESSION failed above. The driver has let go of
+				// the session either way, and BigQuery expires it on its own; leaving it
+				// uncounted would show a permanent phantom in sessionsOpen().
+				DriverMetrics.recordSessionClosed();
 			}
 
 			closed = true;

@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
+import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -71,11 +72,17 @@ public final class CredentialsCache {
 	public static Credentials forAuthType(AuthType authType) throws IOException {
 		Credentials cached = CACHE.get(authType);
 		if (cached != null) {
+			DriverMetrics.recordCredentialCacheHit();
 			return cached;
 		}
 
+		DriverMetrics.recordCredentialCacheMiss();
 		Credentials created = authType.toCredentials();
 		Credentials existing = CACHE.putIfAbsent(authType, created);
+		// A racing thread may have won the putIfAbsent, in which case this call did
+		// build credentials and is correctly counted as a miss even though the object
+		// it hands back came from the cache. The alternative - counting the loser as a
+		// hit - would understate exactly the duplicated work worth knowing about.
 		return existing != null ? existing : created;
 	}
 

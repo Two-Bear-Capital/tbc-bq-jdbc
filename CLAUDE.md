@@ -60,9 +60,24 @@ After `./mvnw clean package`, find these in `target/`:
 
 # Run benchmarks (requires real BigQuery connection)
 export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
-./mvnw test-compile exec:java -Pbenchmarks
-# Run a specific benchmark: -Dexec.args="ResultSetIterationBenchmark"
+./mvnw test-compile exec:exec -Pbenchmarks
+# Run a specific benchmark: -Dbenchmark.args="ResultSetIterationBenchmark"
+
+# Thread-scaling sweep (1,2,4,8,16 threads) with a Markdown report — ~25-30 min
+./mvnw test-compile exec:exec -Pbenchmark-scaling
+# Verify the harness without the wait: -Dbenchmark.args="--quick"
+
+# Opt-in scale and load tests (slow, creates BigQuery datasets)
+export BQ_TEST_PROJECT=my-gcp-project BQ_SCALE_TESTS=true
+./mvnw verify -Pscale-tests
 ```
+
+**Benchmarks use `exec:exec`, not `exec:java`.** JMH's `@Fork` rebuilds the forked
+JVM's classpath from `java.class.path`; `exec:java` runs in-process behind its own
+classloader and the fork dies with `ClassNotFoundException` on `ForkedMain`. The JMH
+annotation processor is also named explicitly in `annotationProcessorPaths` — javac
+stopped discovering processors from the classpath in JDK 23, so without it no
+`META-INF/BenchmarkList` is generated and JMH exits at startup.
 
 ### Code Quality
 ```bash
@@ -227,6 +242,25 @@ against it were weakened until they passed, which shipped bugs — #93, #98, #12
 #123 and #129 all hid behind an "emulator limitation" comment, four of which turned
 out to describe BigQuery or the driver rather than the emulator.
 
+### Scale and Load Tests (opt-in, never in CI)
+- Location: `src/test/java/vc/tbc/bq/jdbc/integration/scale/`
+- Run: `export BQ_SCALE_TESTS=true` then `./mvnw verify -Pscale-tests`
+- Gated three ways — separate profile, separate package the default failsafe includes
+  do not match, and the `BQ_SCALE_TESTS` variable. A gate that lives only in build
+  config is one broadened include pattern away from firing.
+- Covers: a million-row result set (throughput + heap does not grow with rows read),
+  20 datasets / 300 tables (the #99 fan-out cap, which had never actually been
+  reached), metadata cache steady state across TTL boundaries, and HikariCP pooled
+  load (the #98 scenario).
+- The `-Xmx512m` on this profile is load-bearing: it turns accidental full
+  materialisation of a large result into an `OutOfMemoryError`. Do not raise it to
+  make a failure go away.
+- Fixtures are generated per run and dropped in `@AfterAll`; datasets have no
+  BigQuery-side expiry, so a killed run strands `scale_<runId>_*` datasets.
+
+See `docs/contributing/PERFORMANCE.md` for the whole instrumentation story (JFR, the
+thread-scaling sweep and its baseline, scale tests, tuning variables).
+
 Real-tier fixture patterns to reuse rather than reinvent:
 `createSeededTable()` (CTAS + 2h expiry, one job instead of three), `tableName()` /
 `RUN_ID` for names that survive concurrent CI runs, `@Execution(CONCURRENT)` plus a
@@ -301,6 +335,20 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 - Cache TTL default: 5 minutes
 - Lazy loading option: `metadataLazyLoad=true`
 - Parallel dataset loading in `BQDatabaseMetaData.getSchemas()`
+
+### Observability
+- `metrics/DriverMetrics` holds JVM-global `LongAdder` counters; `MetricsSnapshot` is
+  the immutable reading, with `minus()` for windowed deltas
+- Scope is the JVM, not the connection, because what it measures already is: the
+  metadata cache and credentials cache are both static and shared
+- Instrumented at four choke points only — `AbstractBQStatement.runJob()` (every query
+  and DML job passes through it), `MetadataCache.get()`, `SessionManager`
+  init/close, `CredentialsCache.forAuthType()`. Add counters there, not at callers
+- On by default; `-Dtbc.bq.jdbc.metrics.enabled=false` or `setEnabled(false)` to stop
+- No JMX MBean deliberately — a static accessor has no registration lifecycle to get
+  wrong and forwards to Micrometer/Prometheus in a few lines
+- `DriverMetrics.reset()` is global; tests using it must reset in both `@BeforeEach`
+  and `@AfterEach` or they will corrupt unrelated tests in the same JVM
 
 ### Batch Execution
 - `PreparedStatement.addBatch()/executeBatch()` collapses simple parameterized INSERTs into multi-row `INSERT ... VALUES (...), (...)` query jobs (like PostgreSQL's `reWriteBatchedInserts`)
@@ -406,9 +454,11 @@ User-facing documentation in `docs/` (synced to the Astro docs site):
 - `INTELLIJ.md` - IntelliJ IDEA setup and optimization
 - `JETBRAINS_ISSUES.md` - Why tbc-bq-jdbc over JetBrains' built-in driver
 - `LOGGING.md` - Logging configuration and JAR variants
+- `OBSERVABILITY.md` - Driver metrics (`DriverMetrics`/`MetricsSnapshot`) for diagnosing a workload
 
 Contributor/maintainer documentation in `docs/contributing/` (NOT synced to the site; linked from `CONTRIBUTING.md`):
 - `INTEGRATION_TESTS.md` - Running and writing tests
+- `PERFORMANCE.md` - JFR, thread-scaling benchmarks and baseline, scale and load tests
 - `JAR_SIZE_OPTIMIZATION.md` - Shading/size strategy
 - `MAVEN_CENTRAL_PUBLISHING.md` - Release runbook
 
