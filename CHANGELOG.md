@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-07-27
+
+### ⚡ Features
+
+- **auth:** Remove emulator support and fail fast on a missing session ID ([#149](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/149)) [**BREAKING**]
+
 ## [1.1.2] - 2026-07-27
 
 ### 🐛 Bug Fixes
@@ -2355,6 +2361,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[2.0.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.1.2...v2.0.0
 [1.1.2]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.129...v1.1.0
