@@ -152,18 +152,29 @@ public final class MetadataCache {
 	 * used by {@link vc.tbc.bq.jdbc.BQResultSet#getObject(int)}, ensuring
 	 * consistent type representation.
 	 *
+	 * <p>
+	 * Returns the materialised copy so callers do not have to read it back with
+	 * {@link #get(String)}. That round trip was unsound: materialising drains the
+	 * {@code TableResult}, so if the entry were evicted or expired between the
+	 * write and the read, a caller falling back to the original {@code TableResult}
+	 * would wrap an already-consumed result and silently produce no rows. An empty
+	 * return means nothing was cached <em>and</em> the result was left untouched,
+	 * so falling back to it is safe.
+	 *
 	 * @param key
 	 *            the cache key
 	 * @param result
 	 *            the BigQuery result to materialise and cache
+	 * @return the cached copy as a ResultSet, or empty if the result could not be
+	 *         cached (in which case {@code result} has not been consumed)
 	 */
 	@SuppressWarnings("PMD.NullAssignment") // null represents SQL NULL in row data; intentional
-	public void put(String key, TableResult result) {
+	public Optional<ResultSet> put(String key, TableResult result) {
 		Schema schema = result.getSchema();
 
 		if (schema == null) {
 			logger.warn("Cannot cache TableResult without schema: {}", result);
-			return;
+			return Optional.empty();
 		}
 
 		FieldList fields = schema.getFields();
@@ -189,10 +200,12 @@ public final class MetadataCache {
 		}
 
 		Instant expiresAt = Instant.now().plus(ttl);
-		cache.put(key, new CacheEntry(columnNames, columnTypes, Collections.unmodifiableList(rows), expiresAt));
+		CacheEntry entry = new CacheEntry(columnNames, columnTypes, Collections.unmodifiableList(rows), expiresAt);
+		cache.put(key, entry);
 		evictExpired();
 		logger.debug("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
 
+		return Optional.of(entry.createResultSet());
 	}
 
 	/**
