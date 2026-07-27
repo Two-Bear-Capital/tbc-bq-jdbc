@@ -18,6 +18,7 @@ jobs:
     if: github.event_name != 'workflow_run'
     permissions:
       contents: read
+      code-quality: write  # Upload the coverage report to GitHub Code Quality
 
     steps:
       - name: Checkout code
@@ -51,6 +52,27 @@ jobs:
       # release unnoticed.
       - name: Build, unit tests and emulator integration tests
         run: mvn verify -Pintegration-tests -B -Dmaven.javadoc.skip=${{ github.event_name == 'pull_request' }}
+
+      # Coverage goes up here rather than at the end so a failure in the docs
+      # check below cannot cost us the report. `verify` above already produced
+      # target/site/jacoco/jacoco.xml covering both the unit and emulator
+      # integration suites, so this adds no build work — only a format
+      # conversion, since the upload API takes Cobertura and JaCoCo cannot
+      # write it.
+      - name: Convert JaCoCo report to Cobertura
+        run: python3 scripts/jacoco-to-cobertura.py target/site/jacoco/jacoco.xml target/site/jacoco/cobertura.xml
+
+      # The action no-ops on fork PRs (no code-quality:write token) and on merge
+      # queue events, so it needs no `if:` guard of its own. fail-on-error is
+      # false deliberately: coverage reporting is a nice-to-have, and an outage
+      # in the upload API should not turn a green build red.
+      - name: Upload coverage to GitHub Code Quality
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: target/site/jacoco/cobertura.xml
+          language: Java
+          label: code-coverage/jacoco
+          fail-on-error: false
 
       # After the build, not before: this is a second Maven invocation, and running
       # it first made it pay the dependency resolution and compile that `verify`
