@@ -866,6 +866,22 @@
                             <includes>
                                 <include>**/integration/real/**/*Test.java</include>
                             </includes>
+                            <!-- Run test classes concurrently: the suite is dominated by BigQuery
+                                 round-trips, not CPU. Methods stay sequential within a class -
+                                 they share one connection, and BigQuery forbids concurrent
+                                 queries inside a session. Cross-class isolation comes from
+                                 RUN_ID-scoped table and routine names. Only the real profile
+                                 enables this; the emulator suite shares one container and fixed
+                                 table names, so it must stay sequential. -->
+                            <properties>
+                                <configurationParameters>
+                                    junit.jupiter.execution.parallel.enabled=true
+                                    junit.jupiter.execution.parallel.mode.default=same_thread
+                                    junit.jupiter.execution.parallel.mode.classes.default=concurrent
+                                    junit.jupiter.execution.parallel.config.strategy=fixed
+                                    junit.jupiter.execution.parallel.config.fixed.parallelism=4
+                                </configurationParameters>
+                            </properties>
                         </configuration>
                         <executions>
                             <execution>

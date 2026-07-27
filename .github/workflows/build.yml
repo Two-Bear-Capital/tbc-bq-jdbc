@@ -108,11 +108,12 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build with Maven (skip tests)
-        run: mvn clean install -DskipTests -B
-
+      # One Maven invocation, integration tests only. `mvn clean install` followed
+      # by `mvn verify` built the shaded JARs and javadoc twice and re-ran the
+      # full unit suite that the Build job already covers — about 135s of the
+      # job with nothing to show for it. Nothing here needs the packaged JARs.
       - name: Run real BigQuery integration tests
-        run: mvn verify -Preal-integration-tests -B
+        run: mvn test-compile failsafe:integration-test failsafe:verify -Preal-integration-tests -B
         env:
           BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
           BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
