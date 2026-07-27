@@ -214,7 +214,7 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
-### Emulator Integration Tests (319 tests, 6 disabled)
+### Emulator Integration Tests (42 tests, 0 disabled)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/`
 - Run locally: `./mvnw verify -Pintegration-tests`
 - Run automatically in CI/CD on every push and PR
@@ -223,16 +223,14 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Covers: connections, queries, prepared statements, metadata, result sets
 - Requires Docker (available by default in GitHub Actions ubuntu-latest runners)
 
-**Test Structure:**
+**Test Structure:** (shrinking — see issue #118)
 - `AbstractBigQueryIntegrationTest` - Base with helper methods (`createTestTable`, `insertTestData`)
+- `ConcurrentQueryTest` - Query overlap; the #98 regression guard, and hermetic by design
+- `SimbaUrlConnectionTest` - Simba URL properties taking effect
 - `BasicConnectionTest` - Connection lifecycle
-- `SimpleQueryTest` - Query execution
-- `ParameterizedQueryTest` - PreparedStatement parameters
-- `MetadataTest` - DatabaseMetaData operations
-- `TypeMappingTest` - Type conversions
-- `ResultSetOperationsTest` - ResultSet navigation
+- `TransactionTest` - Not yet ported
 
-### Real BigQuery Integration Tests (155 tests, 10 classes)
+### Real BigQuery Integration Tests (319 tests, 16 classes)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/real/`
 - Run locally: `gcloud auth application-default login`, `export BQ_TEST_PROJECT=...`,
   then `./mvnw verify -Preal-integration-tests`

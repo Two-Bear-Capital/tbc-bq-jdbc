@@ -565,4 +565,40 @@ class RealComplexTypesTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next(), "Should have exactly three rows");
 		}
 	}
+
+	// ── Array element types (from TypeMappingTest) ────────────────────────────
+	// Those versions probed with startsWith("["), endsWith("]") and contains(...),
+	// which cannot tell a correct array from a differently-wrong one. The
+	// contains("FieldValue") guard is preserved in spirit: exact equality rules out
+	// a raw FieldValue.toString() leaking into the output, which is what it watched
+	// for.
+
+	@Test
+	void testArrayOfBooleans() throws SQLException {
+		firstRow("SELECT [true, false, true] AS bool_array",
+				rs -> assertEquals("[true,false,true]", rs.getString("bool_array"), "ARRAY<BOOL> as JSON"));
+	}
+
+	@Test
+	void testArrayOfFloats() throws SQLException {
+		firstRow("SELECT [1.5, 2.7, 3.14] AS float_array",
+				rs -> assertEquals("[1.5,2.7,3.14]", rs.getString("float_array"), "ARRAY<FLOAT64> as JSON"));
+	}
+
+	// testArrayWithNulls and testMixedNullAndValues are deliberately absent.
+	//
+	// Their emulator versions selected ['first', NULL, 'third'] and
+	// [NULL, 'value', NULL, 'another'], but real BigQuery rejects both outright:
+	//
+	// Array cannot have a null element; error in writing field array_with_nulls
+	//
+	// A BigQuery ARRAY cannot contain NULL elements at all, so those tests were
+	// asserting how the driver serialises input that cannot reach it. The emulator
+	// accepted the query because it is more permissive than the service.
+	//
+	// The null-element branch in FieldValueConverter.arrayToJson is therefore
+	// unreachable from real BigQuery. A NULL *array* is a different thing and is
+	// still covered, by testNullArrayIsNormalisedToEmpty; so is a STRUCT with a
+	// null
+	// field, which BigQuery does allow.
 }

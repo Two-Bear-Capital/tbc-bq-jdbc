@@ -25,10 +25,10 @@ The driver has two integration test tiers:
 ```
 src/test/java/vc/tbc/bq/jdbc/integration/
 ├── AbstractBigQueryIntegrationTest.java     # Emulator base class (image pinned by digest)
-├── ...17 emulator test classes, 319 tests
+├── ...4 emulator test classes, 42 tests
 └── real/
     ├── AbstractRealBigQueryIntegrationTest.java  # Real BQ base class
-    └── ...10 test classes, 155 tests
+    └── ...16 test classes, 319 tests
 ```
 
 Run `ls src/test/java/vc/tbc/bq/jdbc/integration/` for the current inventory — an
@@ -36,16 +36,17 @@ explicit list here goes stale, as this document repeatedly has.
 
 ### Real BigQuery test classes
 
-`RealBasicConnectionTest`, `RealComplexTypesTest`, `RealMetadataTest`,
-`RealMetadataEnhancedTest`, `RealParameterizedQueryTest`, `RealResultSetOperationsTest`,
-`RealSimpleQueryTest`, `RealTransactionTest`, `RealTypeMappingTest`,
-`RealUpdateCountTest`.
+`RealBasicConnectionTest`, `RealBatchExecutionTest`, `RealComplexTypesTest`,
+`RealMetadataTest`, `RealMetadataEnhancedTest`, `RealParameterizedQueryTest`,
+`RealPreparedStatementAdvancedTest`, `RealQueryCostEstimationTest`,
+`RealResultSetAdvancedTest`, `RealResultSetOperationsTest`, `RealSessionTest`,
+`RealSimpleQueryTest`, `RealStatementConfigurationTest`, `RealTransactionTest`,
+`RealTypeMappingTest`, `RealUpdateCountTest`.
 
-Most mirror an emulator class of the same name but assert more strongly —
-`RealUpdateCountTest` checks exact `numDmlAffectedRows` where the emulator version
-accepts `count == expected || count == 0`, and `RealParameterizedQueryTest` re-enables
-two tests the emulator forces disabled. **They are not a shared suite run against two
-backends**, and the assertion-strength differences are deliberate: do not collapse them.
+Most began as mirrors of an emulator class of the same name, but assert more strongly,
+and the emulator originals have largely been deleted as each was reconciled (#118).
+**They are not a shared suite run against two backends** — the assertion-strength
+differences are the point, so do not collapse them.
 
 ### Fixture helpers on the real base class
 
