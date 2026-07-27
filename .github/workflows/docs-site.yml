@@ -38,7 +38,7 @@ jobs:
 
       - name: Generate Javadoc API reference
         run: |
-          mvn -q -DskipTests javadoc:javadoc -B
+          ./mvnw -q -DskipTests javadoc:javadoc -B
           APIDIR=$(find target -type d -name apidocs | head -n 1)
           if [ -z "$APIDIR" ]; then
             echo "::error::Javadoc output (apidocs) not found under target/"

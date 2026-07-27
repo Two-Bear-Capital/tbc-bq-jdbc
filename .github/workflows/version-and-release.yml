@@ -72,7 +72,7 @@ jobs:
       - name: Compute new version
         id: new_version
         run: |
-          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          CURRENT_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Current version: $CURRENT_VERSION"
 
           # Strip any qualifier (-SNAPSHOT, -alpha, ...) and increment patch.
@@ -103,7 +103,7 @@ jobs:
           fi
 
       - name: Set pom.xml version
-        run: mvn versions:set -DnewVersion=${{ steps.new_version.outputs.new_version }} -DgenerateBackupPoms=false
+        run: ./mvnw versions:set -DnewVersion=${{ steps.new_version.outputs.new_version }} -DgenerateBackupPoms=false
 
       - name: Update documentation versions
         run: |
@@ -200,7 +200,7 @@ jobs:
           git push origin "v${VERSION}"
 
       - name: Build and package
-        run: mvn clean package -DskipTests -B
+        run: ./mvnw clean package -DskipTests -B
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v4
@@ -250,7 +250,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to GitHub Packages
-        run: mvn deploy -DskipTests -B
+        run: ./mvnw deploy -DskipTests -B
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

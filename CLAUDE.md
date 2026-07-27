@@ -348,7 +348,7 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Runs on: push to main/develop, PRs to main
 - Steps: checkout, setup Java 21, format check, build, unit tests, integration tests
 - **Integration Tests:** Run automatically in CI using Docker and BigQuery emulator
-- **Critical:** `mvn spotless:check` must pass (CI uses `mvn` directly; locally use `./mvnw`)
+- **Critical:** `./mvnw spotless:check` must pass (CI runs the wrapper too, so the Maven version matches yours)
 - Uploads test reports (unit tests, integration tests, coverage)
 
 ### Release Process
