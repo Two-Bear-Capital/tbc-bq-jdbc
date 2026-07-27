@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.105] - 2026-07-27
+
+### 🚀 Performance
+
+- **ci:** Stop the docs check paying for a second cold Maven build ([#101](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/101))
+
 ## [1.0.104] - 2026-07-27
 
 ### 📚 Documentation
@@ -2192,6 +2198,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.105]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.104...v1.0.105
 [1.0.104]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.103...v1.0.104
 [1.0.103]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.102...v1.0.103
 [1.0.102]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.101...v1.0.102
