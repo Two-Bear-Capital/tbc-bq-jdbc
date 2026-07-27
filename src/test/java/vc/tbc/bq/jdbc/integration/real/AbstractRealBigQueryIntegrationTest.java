@@ -117,7 +117,7 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 */
 	@BeforeEach
 	void setup() throws SQLException {
-		logger.info("Connecting to real BigQuery project: {}, dataset: {}", TEST_PROJECT_ID, TEST_DATASET);
+		logger.debug("Connecting to real BigQuery project: {}, dataset: {}", TEST_PROJECT_ID, TEST_DATASET);
 		connection = createTestConnection();
 		setupTestDataset();
 	}
@@ -150,7 +150,7 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 *             if setup fails
 	 */
 	protected void setupTestDataset() throws SQLException {
-		logger.info("Test dataset ready: {}.{}", TEST_PROJECT_ID, TEST_DATASET);
+		logger.debug("Test dataset ready: {}.{}", TEST_PROJECT_ID, TEST_DATASET);
 	}
 
 	/**
@@ -205,7 +205,7 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	protected void createSeededTable(Connection conn, String tableName) throws SQLException {
 		try (Statement stmt = conn.createStatement()) {
 			stmt.execute("CREATE OR REPLACE TABLE " + tableName + " " + EXPIRES_SOON + " AS " + SEED_ROWS_QUERY);
-			logger.info("Created seeded table: {}", tableName);
+			logger.debug("Created seeded table: {}", tableName);
 		}
 	}
 
@@ -274,7 +274,7 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 
 		try (Statement stmt = connection.createStatement()) {
 			stmt.execute(createTable);
-			logger.info("Created test table: {}", tableName);
+			logger.debug("Created test table: {}", tableName);
 		}
 	}
 
@@ -294,7 +294,7 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 
 		try (Statement stmt = connection.createStatement()) {
 			stmt.executeUpdate(insert);
-			logger.info("Inserted test data into: {}", tableName);
+			logger.debug("Inserted test data into: {}", tableName);
 		}
 	}
 

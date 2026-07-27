@@ -1,29 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Logback configuration for tests
+  Logback configuration for tests.
 
-  Uses standard (unshaded) logback class names and simple console output
+  Quiet by default. The integration suite opens a connection per test method, so
+  anything logged per-connection or per-query is multiplied by ~330 — a full run
+  at DEBUG produced 4,376 lines of CI log, which buries the failure you are
+  actually looking for.
+
+  Raise it when diagnosing:
+
+      ./mvnw verify -Preal-integration-tests -Dtest.log.level=DEBUG
+
+  Uses standard (unshaded) logback class names and simple console output.
 -->
 <configuration>
 
-    <!-- Console appender for test output -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
-    <!-- Logger for BigQuery JDBC driver -->
-    <logger name="vc.tbc.bq.jdbc" level="DEBUG" additivity="false">
+    <!-- Driver and tests. WARN unless -Dtest.log.level says otherwise. -->
+    <logger name="vc.tbc.bq.jdbc" level="${test.log.level:-WARN}" additivity="false">
         <appender-ref ref="CONSOLE"/>
     </logger>
 
-    <!-- Logger for Google Cloud BigQuery API (less verbose) -->
+    <!-- Google Cloud BigQuery client -->
     <logger name="com.google.cloud.bigquery" level="WARN" additivity="false">
         <appender-ref ref="CONSOLE"/>
     </logger>
 
-    <!-- Root logger - catches everything else -->
     <root level="WARN">
         <appender-ref ref="CONSOLE"/>
     </root>

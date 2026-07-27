@@ -279,7 +279,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				queryWarnings.setNextWarning(warning);
 			}
 
-			logger.info("Dry-run estimate: {}", message);
+			logger.debug("Dry-run estimate: {}", message);
 		} catch (Exception e) {
 			// Logged with the throwable, not just its message: an NPE here used to
 			// surface as "Dry-run estimation failed: null", which said nothing about
@@ -376,13 +376,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				Optional<ResultSet> cached = cache.get(cacheKey);
 				if (cached.isPresent()) {
 					IsSchemaMatch match = extractIsSchema(sql);
-					logger.info("IS cache hit [schema={}]: {}", match != null ? match.rawName() : "?", cacheKey);
+					logger.debug("IS cache hit [schema={}]: {}", match != null ? match.rawName() : "?", cacheKey);
 					currentResultSet = cached.get();
 					return currentResultSet;
 				}
 				// Log unexpected misses at INFO so new IDE query patterns are visible in logs.
 				if (!cache.getKnownSchemas().isEmpty()) {
-					logger.info("IS cache miss (new pattern?): {}", cacheKey);
+					logger.debug("IS cache miss (new pattern?): {}", cacheKey);
 				}
 			}
 		}
@@ -1015,7 +1015,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			// added nothing and implied an invariant that does not exist.
 			this.currentJob = job;
 
-			logger.info("{} job created: {}", getLogPrefix(), job.getJobId());
+			logger.debug("{} job created: {}", getLogPrefix(), job.getJobId());
 
 			job = job.waitFor();
 
