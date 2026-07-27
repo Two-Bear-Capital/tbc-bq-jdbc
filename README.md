@@ -485,27 +485,6 @@ See [Connection Properties - Performance Tuning](docs/CONNECTION_PROPERTIES.md#p
 
 See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 
-## Roadmap
-
-### Version 1.0 (Current) - IDE Integration Focus
-
-- ✅ Fast, comprehensive DatabaseMetaData implementation
-- ✅ Parallel dataset loading with intelligent caching
-- ✅ Core JDBC 4.3 implementation
-- ✅ All authentication methods
-- ✅ Session support
-- ✅ Complete type mapping
-- ✅ Native JDBC Array/Struct support (`nativeComplexTypes=true`)
-- ✅ Routine (UDF) metadata via `getProcedures()` / `getProcedureColumns()`
-- ✅ Enhanced DatabaseMetaData (9 formerly-unsupported methods now return compliant results)
-- ✅ Extensive testing (unit tests plus real BigQuery integration tests)
-- ✅ Comprehensive documentation
-
-### Future Versions
-
-- Complete Storage API Arrow deserialization
-- Additional authentication methods
-
 ## Contributing
 
 Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -539,16 +518,9 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 - 📖 [Documentation](docs/)
 - 🐛 [Issue Tracker](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues)
-- 💬 [Discussions](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/discussions)
 
 ## Acknowledgments
 
 - Architecture inspired by [looker-open-source/bqjdbc](https://github.com/looker-open-source/bqjdbc)
 - Built for Java 21+ with modern features
 - Uses Google Cloud BigQuery Client Library
-
-## Project Status
-
-**Status:** ✅ Version 1.0 Release - Optimized for Database IDEs
-
-This initial release focuses on providing fast, high-quality database metadata for development tools like JetBrains IDEs, DataGrip, and other database clients. Comprehensive JDBC 4.3 implementation with extensive unit and real-BigQuery integration test coverage.
