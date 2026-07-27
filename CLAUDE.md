@@ -41,11 +41,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Build Artifacts
 After `./mvnw clean package`, find these in `target/`:
-- `tbc-bq-jdbc-1.0.108.jar` - Slim JAR (60K, requires dependencies)
-- `tbc-bq-jdbc-1.0.108-shaded.jar` - Shaded JAR with all dependencies (38M)
-- `tbc-bq-jdbc-1.0.108-with-logging.jar` - Shaded JAR + Logback for IntelliJ (39M)
-- `tbc-bq-jdbc-1.0.108-sources.jar` - Source JAR
-- `tbc-bq-jdbc-1.0.108-javadoc.jar` - Javadoc JAR
+- `tbc-bq-jdbc-1.0.109.jar` - Slim JAR (60K, requires dependencies)
+- `tbc-bq-jdbc-1.0.109-shaded.jar` - Shaded JAR with all dependencies (38M)
+- `tbc-bq-jdbc-1.0.109-with-logging.jar` - Shaded JAR + Logback for IntelliJ (39M)
+- `tbc-bq-jdbc-1.0.109-sources.jar` - Source JAR
+- `tbc-bq-jdbc-1.0.109-javadoc.jar` - Javadoc JAR
 
 ### Running Tests
 ```bash
@@ -72,10 +72,18 @@ export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 # Check formatting without applying
 ./mvnw spotless:check
 
-# Generate coverage report
+# Generate coverage report (unit tests only)
 ./mvnw test
 # Report: target/site/jacoco/index.html
+
+# Generate coverage report including the emulator integration tests
+./mvnw verify -Pintegration-tests
+# Same path; the report is regenerated after integration-test, so it covers both suites
 ```
+
+**Note:** JaCoCo's `append` defaults to true, so re-running suites without `clean`
+accumulates coverage in `target/jacoco.exec` and inflates the report. Use `clean` for
+any figure you intend to quote.
 
 ## Architecture
 

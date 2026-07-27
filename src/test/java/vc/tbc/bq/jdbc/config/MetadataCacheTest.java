@@ -15,6 +15,10 @@
  */
 package vc.tbc.bq.jdbc.config;
 
+import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.Schema;
+import com.google.cloud.bigquery.StandardSQLTypeName;
+import com.google.cloud.bigquery.TableResult;
 import org.junit.jupiter.api.Test;
 import vc.tbc.bq.jdbc.metadata.MetadataResultSet;
 
@@ -33,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for MetadataCache.
@@ -410,5 +415,47 @@ class MetadataCacheTest {
 		// Then: Should not be cached (warning logged)
 		assertEquals(0, cache.size());
 		assertFalse(cache.get("key").isPresent());
+	}
+
+	// TableResult Caching Tests
+
+	@Test
+	void testPutTableResultReturnsAReadableCopy() {
+		// Given: a TableResult with a schema
+		MetadataCache cache = new MetadataCache();
+		TableResult result = tableResult(Schema.of(Field.of("name", StandardSQLTypeName.STRING)));
+
+		// When: caching it
+		Optional<ResultSet> returned = cache.put("key", result);
+
+		// Then: the caller gets the materialised copy back, so it never has to read
+		// it back with get() — caching drains the TableResult, and an eviction
+		// between the write and that read left callers wrapping a consumed result.
+		assertTrue(returned.isPresent());
+		assertEquals(1, cache.size());
+		assertNotSame(returned.get(), cache.get("key").orElseThrow(), "each caller must get an independent cursor");
+	}
+
+	@Test
+	void testPutTableResultWithoutSchemaReturnsEmpty() {
+		// Given: a TableResult BigQuery gave no schema for
+		MetadataCache cache = new MetadataCache();
+		TableResult result = tableResult(null);
+
+		// When: caching it
+		Optional<ResultSet> returned = cache.put("key", result);
+
+		// Then: nothing cached, and an empty return signals the result was NOT
+		// consumed — so falling back to the original TableResult stays safe.
+		assertTrue(returned.isEmpty());
+		assertEquals(0, cache.size());
+	}
+
+	private static TableResult tableResult(Schema schema) {
+		TableResult result = mock(TableResult.class);
+		when(result.getSchema()).thenReturn(schema);
+		when(result.getTotalRows()).thenReturn(0L);
+		when(result.iterateAll()).thenReturn(List.of());
+		return result;
 	}
 }
