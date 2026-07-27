@@ -111,18 +111,58 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 		}
 	}
 
+	/**
+	 * Resolves a column label to its 1-based index.
+	 *
+	 * <p>
+	 * The map is keyed by the column name exactly as declared, and the exact match
+	 * is tried first, because that is what every caller in practice asks for —
+	 * metadata column labels are fixed constants like {@code COLUMN_NAME} and are
+	 * passed through verbatim. That path allocates nothing.
+	 *
+	 * <p>
+	 * This used to lowercase both sides: the keys once per ResultSet, and <em>the
+	 * requested label on every single lookup</em>. Since by-name access is per row,
+	 * a {@code getColumns()} over a wide project allocated one throwaway String per
+	 * row — 11,735 of them per call against the project the benchmark baseline was
+	 * recorded on. That is the same shape as the per-row regex compilation found in
+	 * #99, and {@code getColumnsWarm} is the benchmark that shows it.
+	 *
+	 * <p>
+	 * JDBC requires the lookup to be case-insensitive, so a miss falls back to a
+	 * linear scan with {@link String#equalsIgnoreCase}. That allocates nothing
+	 * either, and over the couple of dozen columns a metadata result has it costs
+	 * nothing worth measuring on a path that is by definition not the common one.
+	 *
+	 * @param columnLabel
+	 *            the column name, matched case-insensitively
+	 * @return the 1-based column index
+	 * @throws SQLException
+	 *             if no column matches
+	 */
 	private int getColumnIndex(String columnLabel) throws SQLException {
 		if (columnIndexByName == null) {
 			columnIndexByName = new HashMap<>(columnNames.length * 2);
 			for (int i = 0; i < columnNames.length; i++) {
-				columnIndexByName.put(columnNames[i].toLowerCase(Locale.ROOT), i + 1);
+				// putIfAbsent, not put: JDBC says a duplicated label resolves to the
+				// first matching column. Lowercasing into the map previously let a
+				// later duplicate overwrite an earlier one, so this also corrects that.
+				columnIndexByName.putIfAbsent(columnNames[i], i + 1);
 			}
 		}
-		Integer index = columnIndexByName.get(columnLabel.toLowerCase(Locale.ROOT));
-		if (index == null) {
-			throw new SQLException("Column not found: " + columnLabel);
+
+		Integer index = columnIndexByName.get(columnLabel);
+		if (index != null) {
+			return index;
 		}
-		return index;
+
+		for (int i = 0; i < columnNames.length; i++) {
+			if (columnNames[i].equalsIgnoreCase(columnLabel)) {
+				return i + 1;
+			}
+		}
+
+		throw new SQLException("Column not found: " + columnLabel);
 	}
 
 	private Object getValue(int columnIndex) throws SQLException {
