@@ -32,6 +32,24 @@ public class BQSQLException extends SQLException {
 	/** SQLState for table not found. */
 	public static final String SQLSTATE_TABLE_NOT_FOUND = "42S02";
 
+	/** SQLState for an object that already exists. */
+	public static final String SQLSTATE_TABLE_ALREADY_EXISTS = "42S01";
+
+	/** SQLState for insufficient privilege on the target object. */
+	public static final String SQLSTATE_INSUFFICIENT_PRIVILEGE = "42501";
+
+	/** SQLState for exhausted quota, rate limit, or query resources. */
+	public static final String SQLSTATE_INSUFFICIENT_RESOURCES = "53000";
+
+	/** SQLState for an operation cancelled before it completed. */
+	public static final String SQLSTATE_OPERATION_CANCELED = "HY008";
+
+	/**
+	 * SQLState for a failure with no more specific mapping. Used in preference to a
+	 * misleading specific state such as {@link #SQLSTATE_SYNTAX_ERROR}.
+	 */
+	public static final String SQLSTATE_GENERAL_ERROR = "HY000";
+
 	/** SQLState for authentication failure. */
 	public static final String SQLSTATE_AUTH_FAILED = "28000";
 

@@ -29,9 +29,12 @@ import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
 import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 
 import java.sql.*;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -65,6 +68,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			.compile("(?:`[^`]+`|[^\\s.`]+)\\.(`[^`]+`|[^\\s.`]+)\\.INFORMATION_SCHEMA", Pattern.CASE_INSENSITIVE);
 
 	private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
+
+	/**
+	 * How long a query destination table created by
+	 * {@code useDestinationTables=true} is allowed to live. Long enough that a
+	 * ResultSet can page through it at leisure, short enough that abandoned tables
+	 * do not accumulate.
+	 */
+	private static final Duration TEMP_TABLE_TTL = Duration.ofHours(24);
 
 	/**
 	 * Threads that run query jobs.
@@ -285,20 +296,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if query fails
 	 */
-	@SuppressWarnings("PMD.NullAssignment")
 	protected ResultSet executeQueryInternal(String sql) throws SQLException {
 		checkClosed();
 		logger.debug("Executing {}: {}", getLogPrefix(), sql);
 
-		// Fix: Close previous ResultSet to prevent resource leak
-		if (currentResultSet != null) {
-			currentResultSet.close();
-			currentResultSet = null;
-		}
-
-		// Clear previous warnings and update count
-		queryWarnings = null;
-		currentUpdateCount = -1L;
+		discardPreviousResult();
 
 		// Serve INFORMATION_SCHEMA queries from the shared cache when available.
 		// These are read-only catalog views that IntelliJ executes on every
@@ -343,81 +345,36 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			}
 		}
 
-		QueryJobConfiguration.Builder configBuilder = buildQueryConfig(sql);
+		// fetchSize is a paging hint, applied when the results are read (see
+		// QueryResultsOption.pageSize below). It deliberately is NOT mapped to
+		// QueryJobConfiguration#setMaxResults: that property is only honoured on the
+		// fast-query (jobs.query) path, which this driver never takes because it always
+		// inserts an explicit job, so setting it here had no effect at all.
+		// maxRows remains enforced at the ResultSet level, not at query level.
+		final int effectiveFetchSize = getEffectiveFetchSize();
 
-		// Set default dataset if configured
-		if (properties.getDatasetId() != null) {
-			configBuilder.setDefaultDataset(properties.getDatasetId());
-		}
-
-		// Set labels
-		if (!properties.labels().isEmpty()) {
-			configBuilder.setLabels(properties.labels());
-		}
-
-		// Apply fetchSize for pagination (JDBC Statement.setFetchSize)
-		// Note: maxRows is enforced at ResultSet level, not at query level
-		int effectiveFetchSize = getEffectiveFetchSize();
-		if (effectiveFetchSize > 0) {
-			configBuilder.setMaxResults((long) effectiveFetchSize);
-		}
-
-		// Add session property if sessions are enabled, starting the transaction
-		// first when the connection is in manual-commit mode
-		SessionManager sessionManager = connection.getSessionManager();
-		if (sessionManager != null && sessionManager.hasSession()) {
-			connection.beginTransactionIfNeeded();
-			configBuilder = sessionManager.addSessionProperty(configBuilder);
-		}
-
-		// Set destination table for SELECT queries when configured
-		// Useful for BigQuery emulator compatibility (set UseDestinationTables=true)
-		// Only applies to SELECT queries; DDL/DML don't need destination tables
-		if (properties.useDestinationTables() && properties.datasetId() != null && isSelectQuery(sql)) {
-			// Generate unique temp table name
-			String tempTableName = "_jdbc_temp_" + System.currentTimeMillis() + "_" + Thread.currentThread().threadId();
-			TableId destinationTable = TableId.of(properties.projectId(), properties.datasetId(), tempTableName);
-			configBuilder.setDestinationTable(destinationTable)
-					.setCreateDisposition(JobInfo.CreateDisposition.CREATE_IF_NEEDED)
-					.setWriteDisposition(JobInfo.WriteDisposition.WRITE_TRUNCATE);
-		}
-
+		QueryJobConfiguration.Builder configBuilder = applyConnectionConfig(buildQueryConfig(sql));
+		TableId tempDestination = applyTempDestination(configBuilder, sql);
 		QueryJobConfiguration queryConfig = configBuilder.build();
-		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
 
 		CompletableFuture<JobResultPair> future = CompletableFuture.supplyAsync(() -> {
+			Job job = runJob(queryConfig, "Query");
 			try {
-				Job job = bigquery.create(JobInfo.of(queryConfig));
-
-				// Thread-safe assignment
-				synchronized (this) {
-					this.currentJob = job;
-				}
-
-				logger.info("{} job created: {}", getLogPrefix(), job.getJobId());
-
-				// Wait for job completion
-				job = job.waitFor();
-
-				if (job == null) {
-					throw new RuntimeException("Job no longer exists");
-				}
-
-				JobStatus status = job.getStatus();
-				if (status.getError() != null) {
-					BigQueryError error = status.getError();
-					throw new RuntimeException("Query failed (job: " + job.getJobId() + "): " + error.getMessage());
-				}
-
-				return new JobResultPair(job, job.getQueryResults());
-
+				TableResult result = effectiveFetchSize > 0
+						? job.getQueryResults(BigQuery.QueryResultsOption.pageSize(effectiveFetchSize))
+						: job.getQueryResults();
+				return new JobResultPair(job, result);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				throw new RuntimeException("Query interrupted", e);
+				throw new QueryJobFailure("Query interrupted", BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
 			}
 		}, QUERY_EXECUTOR);
 
-		JobResultPair pair = awaitWithTimeout(future, timeoutSeconds);
+		JobResultPair pair = awaitWithTimeout(future);
+
+		// The temp table exists now; give it an expiry so it cannot outlive the
+		// session and accumulate storage cost in the user's dataset.
+		scheduleTempTableExpiry(tempDestination);
 
 		// Record the DML affected-row count so getUpdateCount() and execute()
 		// can report per-spec results when the statement turned out to be DML
@@ -450,21 +407,21 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	}
 
 	/**
-	 * Awaits an async query job future with timeout enforcement. On timeout the
-	 * running BigQuery job is cancelled. ExecutionExceptions are unwrapped to
-	 * expose the root cause (the wrapper adds no diagnostic value).
+	 * Awaits an async query job future, bounded by the statement query timeout or,
+	 * when none is set, the connection default. On timeout the running BigQuery job
+	 * is cancelled. ExecutionExceptions are unwrapped to expose the root cause (the
+	 * wrapper adds no diagnostic value).
 	 *
 	 * @param future
 	 *            the future to await
-	 * @param timeoutSeconds
-	 *            maximum seconds to wait
 	 * @return the future's result
 	 * @throws SQLException
 	 *             if the wait times out, is interrupted, or the job fails
 	 */
 	@SuppressWarnings("PMD.PreserveStackTrace") // ExecutionException is deliberately unwrapped: its cause is the
 												// real failure and is passed through
-	private <T> T awaitWithTimeout(CompletableFuture<T> future, long timeoutSeconds) throws SQLException {
+	private <T> T awaitWithTimeout(CompletableFuture<T> future) throws SQLException {
+		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
 		try {
 			return future.get(timeoutSeconds, TimeUnit.SECONDS);
 		} catch (TimeoutException e) {
@@ -492,8 +449,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			throw new BQSQLException("Query interrupted", e);
 		} catch (ExecutionException e) {
 			Throwable cause = e.getCause();
+			if (cause instanceof QueryJobFailure failure) {
+				throw new BQSQLException(failure.getMessage(), failure.sqlState(), failure);
+			}
+			if (cause instanceof BigQueryException bqe) {
+				throw new BQSQLException(bqe.getMessage(), sqlStateFor(bqe.getError()), bqe);
+			}
 			if (cause instanceof RuntimeException) {
-				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_SYNTAX_ERROR, cause);
+				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_GENERAL_ERROR, cause);
 			}
 			throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
 		} catch (BigQueryException e) {
@@ -521,19 +484,12 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if the statement is closed or execution fails
 	 */
-	@SuppressWarnings("PMD.NullAssignment")
 	protected long executeDmlInternal(String sql, java.util.List<QueryParameterValue> positionalParameters)
 			throws SQLException {
 		checkClosed();
 		logger.debug("Executing {} DML: {}", getLogPrefix(), sql);
 
-		// Executing a statement implicitly closes the previous result
-		if (currentResultSet != null) {
-			currentResultSet.close();
-			currentResultSet = null;
-		}
-		queryWarnings = null;
-		currentUpdateCount = -1L;
+		discardPreviousResult();
 
 		QueryJobConfiguration.Builder configBuilder = QueryJobConfiguration.newBuilder(sql)
 				.setUseLegacySql(properties.useLegacySql());
@@ -542,69 +498,16 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			configBuilder.setPositionalParameters(positionalParameters);
 		}
 
-		// Set default dataset if configured
-		if (properties.getDatasetId() != null) {
-			configBuilder.setDefaultDataset(properties.getDatasetId());
-		}
-
-		// Set labels
-		if (!properties.labels().isEmpty()) {
-			configBuilder.setLabels(properties.labels());
-		}
-
-		// Add session property if sessions are enabled, starting the transaction
-		// first when the connection is in manual-commit mode
-		SessionManager sessionManager = connection.getSessionManager();
-		if (sessionManager != null && sessionManager.hasSession()) {
-			connection.beginTransactionIfNeeded();
-			configBuilder = sessionManager.addSessionProperty(configBuilder);
-		}
-
+		configBuilder = applyConnectionConfig(configBuilder);
 		// SELECT via executeUpdate() is tolerated (returns 0); apply the same
 		// destination-table workaround as the query path for emulator compatibility
-		if (properties.useDestinationTables() && properties.datasetId() != null && isSelectQuery(sql)) {
-			String tempTableName = "_jdbc_temp_" + System.currentTimeMillis() + "_" + Thread.currentThread().threadId();
-			TableId destinationTable = TableId.of(properties.projectId(), properties.datasetId(), tempTableName);
-			configBuilder.setDestinationTable(destinationTable)
-					.setCreateDisposition(JobInfo.CreateDisposition.CREATE_IF_NEEDED)
-					.setWriteDisposition(JobInfo.WriteDisposition.WRITE_TRUNCATE);
-		}
-
+		TableId tempDestination = applyTempDestination(configBuilder, sql);
 		QueryJobConfiguration queryConfig = configBuilder.build();
-		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
 
-		CompletableFuture<Job> future = CompletableFuture.supplyAsync(() -> {
-			try {
-				Job job = bigquery.create(JobInfo.of(queryConfig));
+		CompletableFuture<Job> future = CompletableFuture.supplyAsync(() -> runJob(queryConfig, "DML"), QUERY_EXECUTOR);
 
-				// Thread-safe assignment
-				synchronized (this) {
-					this.currentJob = job;
-				}
-
-				logger.info("{} DML job created: {}", getLogPrefix(), job.getJobId());
-
-				job = job.waitFor();
-
-				if (job == null) {
-					throw new RuntimeException("Job no longer exists");
-				}
-
-				JobStatus status = job.getStatus();
-				if (status.getError() != null) {
-					BigQueryError error = status.getError();
-					throw new RuntimeException("DML failed (job: " + job.getJobId() + "): " + error.getMessage());
-				}
-
-				return job;
-
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				throw new RuntimeException("Query interrupted", e);
-			}
-		}, QUERY_EXECUTOR);
-
-		Job job = awaitWithTimeout(future, timeoutSeconds);
+		Job job = awaitWithTimeout(future);
+		scheduleTempTableExpiry(tempDestination);
 		return readDmlAffectedRows(job);
 	}
 
@@ -779,7 +682,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *            the SQL string to inspect
 	 * @return the schema match, or {@code null} if no IS reference is found
 	 */
-	private static IsSchemaMatch extractIsSchema(String sql) {
+	static IsSchemaMatch extractIsSchema(String sql) {
 		Matcher m = IS_SCHEMA_EXTRACTOR.matcher(sql);
 		if (!m.find())
 			return null;
@@ -794,6 +697,15 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * original backtick-quoting style of the source schema token. All occurrences
 	 * are replaced to handle JOIN queries that reference the same schema twice.
 	 *
+	 * <p>
+	 * The {@code INFORMATION_SCHEMA} token is matched case-insensitively, to stay
+	 * consistent with {@link #IS_SCHEMA_EXTRACTOR}: a lowercase
+	 * {@code information_schema} in the source SQL must still be substituted, or
+	 * the SQL comes back unchanged and pre-warming silently does nothing. The
+	 * matched token is re-emitted verbatim, because the derived SQL has to
+	 * normalise to the same cache key the caller would later produce for that
+	 * schema. The dataset name stays case-sensitive, as BigQuery treats it.
+	 *
 	 * @param sql
 	 *            the original SQL
 	 * @param from
@@ -802,10 +714,12 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *            the target schema name to substitute
 	 * @return the SQL with the schema name replaced
 	 */
-	private static String substituteSchema(String sql, IsSchemaMatch from, String toSchema) {
+	static String substituteSchema(String sql, IsSchemaMatch from, String toSchema) {
 		String fromQuoted = from.backtickQuoted() ? "`" + from.rawName() + "`" : from.rawName();
 		String toQuoted = from.backtickQuoted() ? "`" + toSchema + "`" : toSchema;
-		return sql.replace("." + fromQuoted + ".INFORMATION_SCHEMA", "." + toQuoted + ".INFORMATION_SCHEMA");
+		Pattern reference = Pattern.compile(Pattern.quote("." + fromQuoted + ".") + "((?i:INFORMATION_SCHEMA))");
+		return reference.matcher(sql)
+				.replaceAll(match -> Matcher.quoteReplacement("." + toQuoted + "." + match.group(1)));
 	}
 
 	/**
@@ -883,12 +797,214 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @param backtickQuoted
 	 *            whether the original token was enclosed in backticks
 	 */
-	private record IsSchemaMatch(String rawName, boolean backtickQuoted) {
+	record IsSchemaMatch(String rawName, boolean backtickQuoted) {
 	}
 
 	/**
 	 * Helper class to hold both Job and TableResult from async execution.
 	 */
 	private record JobResultPair(Job job, TableResult result) {
+	}
+
+	/**
+	 * Unchecked carrier for a job failure raised inside the async execution body.
+	 * Holds the SQLState that {@link #awaitWithTimeout} should surface, so the
+	 * failure reason is decided where it is known rather than guessed from the
+	 * message afterwards.
+	 */
+	private static final class QueryJobFailure extends RuntimeException {
+
+		private static final long serialVersionUID = 1L;
+
+		private final String sqlState;
+
+		QueryJobFailure(String message, String sqlState, Throwable cause) {
+			super(message, cause);
+			this.sqlState = sqlState;
+		}
+
+		String sqlState() {
+			return sqlState;
+		}
+	}
+
+	/**
+	 * Maps a BigQuery error reason to the closest JDBC SQLState.
+	 *
+	 * @param error
+	 *            the BigQuery error, may be null
+	 * @return the mapped SQLState, never null
+	 */
+	static String sqlStateFor(BigQueryError error) {
+		String reason = error == null ? null : error.getReason();
+		if (reason == null) {
+			return BQSQLException.SQLSTATE_GENERAL_ERROR;
+		}
+		return switch (reason) {
+			case "invalidQuery", "invalid" -> BQSQLException.SQLSTATE_SYNTAX_ERROR;
+			case "notFound" -> BQSQLException.SQLSTATE_TABLE_NOT_FOUND;
+			case "duplicate" -> BQSQLException.SQLSTATE_TABLE_ALREADY_EXISTS;
+			case "accessDenied" -> BQSQLException.SQLSTATE_INSUFFICIENT_PRIVILEGE;
+			case "quotaExceeded", "rateLimitExceeded", "resourcesExceeded", "responseTooLarge" ->
+				BQSQLException.SQLSTATE_INSUFFICIENT_RESOURCES;
+			case "stopped" -> BQSQLException.SQLSTATE_OPERATION_CANCELED;
+			default -> BQSQLException.SQLSTATE_GENERAL_ERROR;
+		};
+	}
+
+	/**
+	 * Drops the result of the previous execution. Closing the old ResultSet is what
+	 * keeps repeated execution on one Statement from leaking, and the counters must
+	 * be cleared before the new job so a failure cannot leave stale values visible
+	 * through {@code getUpdateCount()} or {@code getWarnings()}.
+	 *
+	 * @throws SQLException
+	 *             if the previous ResultSet fails to close
+	 */
+	@SuppressWarnings("PMD.NullAssignment")
+	private void discardPreviousResult() throws SQLException {
+		if (currentResultSet != null) {
+			currentResultSet.close();
+			currentResultSet = null;
+		}
+		queryWarnings = null;
+		currentUpdateCount = -1L;
+	}
+
+	/**
+	 * Applies the connection-level settings every job carries: default dataset,
+	 * labels, and the session property when a session is active. Entering a session
+	 * also opens the transaction if the connection is in manual-commit mode.
+	 *
+	 * <p>
+	 * Returns the builder rather than mutating in place, because
+	 * {@link SessionManager#addSessionProperty} may hand back a different instance.
+	 *
+	 * @param configBuilder
+	 *            the job configuration to extend
+	 * @return the builder to keep building on
+	 * @throws SQLException
+	 *             if the deferred {@code BEGIN TRANSACTION} fails
+	 */
+	private QueryJobConfiguration.Builder applyConnectionConfig(QueryJobConfiguration.Builder configBuilder)
+			throws SQLException {
+		if (properties.getDatasetId() != null) {
+			configBuilder.setDefaultDataset(properties.getDatasetId());
+		}
+		if (!properties.labels().isEmpty()) {
+			configBuilder.setLabels(properties.labels());
+		}
+		SessionManager sessionManager = connection.getSessionManager();
+		if (sessionManager != null && sessionManager.hasSession()) {
+			connection.beginTransactionIfNeeded();
+			return sessionManager.addSessionProperty(configBuilder);
+		}
+		return configBuilder;
+	}
+
+	/**
+	 * Creates and awaits a BigQuery job, publishing it to {@link #currentJob} so
+	 * {@code cancel()} can reach it. Shared by the query and DML paths, which
+	 * differ only in what they do with the finished job.
+	 *
+	 * <p>
+	 * Runs inside {@link #QUERY_EXECUTOR}, so failures are reported as
+	 * {@link QueryJobFailure} — an unchecked carrier that {@link #awaitWithTimeout}
+	 * unwraps back into a {@link BQSQLException} with the right SQLState.
+	 *
+	 * @param config
+	 *            the job configuration to run
+	 * @param operation
+	 *            operation noun used in failure messages, e.g. "Query" or "DML"
+	 * @return the completed, successful job
+	 */
+	private Job runJob(QueryJobConfiguration config, String operation) {
+		try {
+			Job job = bigquery.create(JobInfo.of(config));
+
+			// Thread-safe assignment
+			synchronized (this) {
+				this.currentJob = job;
+			}
+
+			logger.info("{} job created: {}", getLogPrefix(), job.getJobId());
+
+			job = job.waitFor();
+
+			if (job == null) {
+				throw new QueryJobFailure("Job no longer exists", BQSQLException.SQLSTATE_GENERAL_ERROR, null);
+			}
+
+			JobStatus status = job.getStatus();
+			if (status.getError() != null) {
+				BigQueryError error = status.getError();
+				throw new QueryJobFailure(operation + " failed (job: " + job.getJobId() + "): " + error.getMessage(),
+						sqlStateFor(error), null);
+			}
+
+			return job;
+
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new QueryJobFailure(operation + " interrupted", BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
+		}
+	}
+
+	/**
+	 * Points the job at a uniquely named temp destination table when
+	 * {@code useDestinationTables} is set and the SQL is a SELECT. Needed for
+	 * BigQuery emulator compatibility; DDL/DML need no destination table.
+	 *
+	 * <p>
+	 * The name is a UUID rather than a timestamp plus thread id: that name was
+	 * built on the calling thread, so two statements issued back-to-back on the
+	 * same thread within a millisecond collided, and the second job's
+	 * {@code WRITE_TRUNCATE} destroyed the first one's results.
+	 *
+	 * @param configBuilder
+	 *            the job configuration to mutate
+	 * @param sql
+	 *            the SQL about to run
+	 * @return the destination table, or null if none was configured
+	 */
+	private TableId applyTempDestination(QueryJobConfiguration.Builder configBuilder, String sql) {
+		if (!properties.useDestinationTables() || properties.datasetId() == null || !isSelectQuery(sql)) {
+			return null;
+		}
+		TableId destination = TableId.of(properties.projectId(), properties.datasetId(),
+				"_jdbc_temp_" + UUID.randomUUID().toString().replace("-", ""));
+		configBuilder.setDestinationTable(destination).setCreateDisposition(JobInfo.CreateDisposition.CREATE_IF_NEEDED)
+				.setWriteDisposition(JobInfo.WriteDisposition.WRITE_TRUNCATE);
+		return destination;
+	}
+
+	/**
+	 * Best-effort: stamps an expiry on a query destination table so it cannot
+	 * outlive the connection.
+	 *
+	 * <p>
+	 * BigQuery cannot declare an expiry on a query job's destination table, and the
+	 * driver cannot drop it on the spot because the ResultSet pages from it lazily.
+	 * Without this, every query run with {@code useDestinationTables=true} leaves a
+	 * permanent table behind. Runs on a virtual thread and swallows failures: it
+	 * must not fail a query that already succeeded.
+	 *
+	 * @param tableId
+	 *            the destination table, or null when none was configured
+	 */
+	private void scheduleTempTableExpiry(TableId tableId) {
+		if (tableId == null) {
+			return;
+		}
+		long expiresAt = Instant.now().plus(TEMP_TABLE_TTL).toEpochMilli();
+		Thread.ofVirtual().name("temp-table-expiry-" + tableId.getTable()).start(() -> {
+			try {
+				bigquery.update(TableInfo.newBuilder(tableId, StandardTableDefinition.newBuilder().build())
+						.setExpirationTime(expiresAt).build());
+				logger.debug("Set expiry on temp table {}", tableId.getTable());
+			} catch (Exception e) {
+				logger.debug("Could not set expiry on temp table {}: {}", tableId.getTable(), e.getMessage());
+			}
+		});
 	}
 }

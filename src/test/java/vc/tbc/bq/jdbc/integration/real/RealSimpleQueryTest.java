@@ -85,6 +85,7 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertEquals(4, rs.getInt("sum"));
 			assertEquals(50, rs.getInt("product"));
 			assertEquals(25, rs.getInt("quotient"));
+			assertFalse(rs.next());
 		}
 	}
 
@@ -255,10 +256,11 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			boolean hasResultSet = stmt.execute(sql);
 			assertTrue(hasResultSet);
 
-			ResultSet rs = stmt.getResultSet();
-			assertNotNull(rs);
-			assertTrue(rs.next());
-			assertEquals(1, rs.getInt("num"));
+			try (ResultSet rs = stmt.getResultSet()) {
+				assertNotNull(rs);
+				assertTrue(rs.next());
+				assertEquals(1, rs.getInt("num"));
+			}
 		}
 	}
 }
