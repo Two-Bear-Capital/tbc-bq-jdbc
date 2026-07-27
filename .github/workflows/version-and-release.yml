@@ -303,6 +303,29 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.new_version.outputs.new_version }}"
 
+          # Describe each artifact from the file actually built, so the sizes
+          # cannot drift from reality. They were previously hardcoded, and had:
+          # every release advertised the slim JAR as "60K" when it was ~180K.
+          artifact_line() {
+            local file="target/tbc-bq-jdbc-${NEW_VERSION}$1.jar"
+            if [ ! -f "$file" ]; then
+              # stderr, not stdout: this runs inside a command substitution, so
+              # anything on stdout lands in the published release notes.
+              echo "::warning::Expected release artifact not found: $file" >&2
+              return
+            fi
+            printf -- '- **%s** - %s (%s)\n' \
+              "$(basename "$file")" "$2" "$(numfmt --to=iec --format='%.0f' "$(wc -c < "$file")")"
+          }
+
+          ARTIFACTS=$(
+            artifact_line ""             "Slim JAR, requires dependencies on classpath"
+            artifact_line "-shaded"      "Shaded JAR with all dependencies included"
+            artifact_line "-with-logging" "Shaded JAR + Logback for IntelliJ IDEA"
+            artifact_line "-sources"     "Source code"
+            artifact_line "-javadoc"     "Javadoc"
+          )
+
           # Append artifacts section to release notes
           gh release edit "v${NEW_VERSION}" --notes-file - << EOF
           $(gh release view "v${NEW_VERSION}" --json body -q .body)
@@ -311,11 +334,7 @@ jobs:
 
           ## 📦 Artifacts
 
-          - **tbc-bq-jdbc-${NEW_VERSION}.jar** - Slim JAR (60K, requires dependencies on classpath)
-          - **tbc-bq-jdbc-${NEW_VERSION}-shaded.jar** - Shaded JAR with all dependencies included (38M)
-          - **tbc-bq-jdbc-${NEW_VERSION}-with-logging.jar** - Shaded JAR + Logback for IntelliJ IDEA (39M)
-          - **tbc-bq-jdbc-${NEW_VERSION}-sources.jar** - Source code
-          - **tbc-bq-jdbc-${NEW_VERSION}-javadoc.jar** - Javadoc
+          ${ARTIFACTS}
 
           📖 **Full Changelog**: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/blob/main/CHANGELOG.md#${NEW_VERSION//.}---$(date +%Y-%m-%d)
           EOF
