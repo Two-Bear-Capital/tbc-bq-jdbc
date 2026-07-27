@@ -718,8 +718,8 @@
                 </executions>
             </plugin>
 
-            <!-- PMD Static Analysis (uses PMD 7.x) -->
-            <!-- Reports written to target/pmd.xml and target/site/pmd.html -->
+            <!-- PMD Static Analysis (uses PMD 7.x) + CPD copy-paste detection -->
+            <!-- Reports written to target/pmd.xml, target/cpd.xml and target/site/ -->
             <!-- To enforce failures on violations: set failOnViolation to true -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -735,6 +735,12 @@
                     <excludeRoots>
                         <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
                     </excludeRoots>
+                    <!-- CPD: report any duplicated block of 100+ tokens (~25 lines of Java).
+                         Chosen empirically: at this threshold CPD flags the query/DML duplication
+                         in AbstractBQStatement that #103 collapsed, with no false positives.
+                         Literals and identifiers are NOT ignored — normalising them makes CPD
+                         match blocks that merely rhyme, which is noise at this codebase's size. -->
+                    <minimumTokens>100</minimumTokens>
                 </configuration>
                 <executions>
                     <execution>
@@ -745,6 +751,8 @@
                             <!-- check reads the generated report and emits a WARNING per violation
                                  (respects printFailingErrors) so every violation appears in build output. -->
                             <goal>check</goal>
+                            <goal>cpd</goal>
+                            <goal>cpd-check</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -767,7 +775,7 @@
                             <executable>bash</executable>
                             <arguments>
                                 <argument>-c</argument>
-                                <argument><![CDATA[COUNT=$(grep -c 'beginline=' target/pmd.xml 2>/dev/null); echo "[PMD] ${COUNT:-0} violation(s)"]]></argument>
+                                <argument><![CDATA[COUNT=$(grep -c 'beginline=' target/pmd.xml 2>/dev/null); echo "[PMD] ${COUNT:-0} violation(s)"; DUPES=$(grep -c '<duplication' target/cpd.xml 2>/dev/null); LINES=$(grep -o 'lines="[0-9]*"' target/cpd.xml 2>/dev/null | grep -o '[0-9]*' | paste -sd+ - | bc 2>/dev/null); echo "[CPD] ${DUPES:-0} duplication(s), ${LINES:-0} duplicated line(s)"]]></argument>
                             </arguments>
                         </configuration>
                     </execution>

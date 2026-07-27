@@ -450,7 +450,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		} catch (ExecutionException e) {
 			Throwable cause = e.getCause();
 			if (cause instanceof QueryJobFailure failure) {
-				throw new BQSQLException(failure.getMessage(), failure.sqlState(), failure);
+				throw new BQSQLException(failure.getMessage(), failure.getSQLState(), failure);
 			}
 			if (cause instanceof BigQueryException bqe) {
 				throw new BQSQLException(bqe.getMessage(), sqlStateFor(bqe.getError()), bqe);
@@ -823,7 +823,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			this.sqlState = sqlState;
 		}
 
-		String sqlState() {
+		String getSQLState() {
 			return sqlState;
 		}
 	}
