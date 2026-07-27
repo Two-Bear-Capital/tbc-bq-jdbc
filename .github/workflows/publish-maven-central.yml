@@ -40,20 +40,20 @@ jobs:
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
             echo "Using manual version: $VERSION"
-            mvn versions:set -DnewVersion=$VERSION -DgenerateBackupPoms=false
+            ./mvnw versions:set -DnewVersion=$VERSION -DgenerateBackupPoms=false
           else
-            VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+            VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
             echo "Using POM version: $VERSION"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build and verify
         run: |
-          mvn clean verify -DskipTests -B
+          ./mvnw clean verify -DskipTests -B
 
       - name: Publish to Maven Central
         run: |
-          mvn deploy -Prelease -DskipTests -B
+          ./mvnw deploy -Prelease -DskipTests -B
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
