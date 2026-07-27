@@ -28,11 +28,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run unit tests only (integration tests excluded by default)
 ./mvnw test
 
-# Run integration tests (requires Docker for BigQuery emulator)
-./mvnw verify -Pintegration-tests
+# Run integration tests (requires ADC credentials — see below)
+./mvnw verify -Preal-integration-tests
 
 # Run specific integration test
-./mvnw verify -Pintegration-tests -Dit.test=BasicConnectionTest
+./mvnw verify -Preal-integration-tests -Dit.test=RealBasicConnectionTest
 
 # Check and apply code formatting (required before commits)
 ./mvnw spotless:check
@@ -52,8 +52,8 @@ After `./mvnw clean package`, find these in `target/`:
 # Unit tests only (fast, no Docker needed)
 ./mvnw test
 
-# Integration tests (requires Docker, uses BigQuery emulator)
-./mvnw verify -Pintegration-tests
+# Integration tests (requires ADC credentials)
+./mvnw verify -Preal-integration-tests
 
 # Skip tests during build
 ./mvnw clean install -DskipTests
@@ -76,8 +76,8 @@ export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 ./mvnw test
 # Report: target/site/jacoco/index.html
 
-# Generate coverage report including the emulator integration tests
-./mvnw verify -Pintegration-tests
+# Generate coverage report including the integration tests
+./mvnw verify -Preal-integration-tests
 # Same path; the report is regenerated after integration-test, so it covers both suites
 ```
 
@@ -105,7 +105,7 @@ src/main/java/vc/tbc/bq/jdbc/
 │   ├── UserOAuthAuth.java
 │   ├── WorkforceIdentityAuth.java
 │   ├── WorkloadIdentityAuth.java
-│   └── EmulatorAuth.java      # For testing with BigQuery emulator
+│   └── EmulatorAuth.java      # Deprecated; emulator support is being withdrawn
 │
 ├── base/                      # Abstract base classes (inheritance hierarchy)
 │   ├── BaseCloseable.java            # Lifecycle management (isClosed)
@@ -214,26 +214,6 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
-### Emulator Integration Tests (19 tests, 0 disabled)
-- Location: `src/test/java/vc/tbc/bq/jdbc/integration/`
-- Run locally: `./mvnw verify -Pintegration-tests`
-- Run automatically in CI/CD on every push and PR
-- Base class: `AbstractBigQueryIntegrationTest`
-- Uses Testcontainers with `recidiviz/bigquery-emulator` Docker image
-- Covers: connections, queries, prepared statements, metadata, result sets
-- Requires Docker (available by default in GitHub Actions ubuntu-latest runners)
-
-**Test Structure** — this tier is now complete and deliberately small (#118). It asserts
-no BigQuery semantics; everything that does lives in `integration/real`.
-- `AbstractBigQueryIntegrationTest` - Base with helper methods (`createTestTable`, `insertTestData`)
-- `EmulatorSupportTest` - That the driver's shipped emulator support works (`EmulatorAuth`, host-in-URL)
-- `ConcurrentQueryTest` - Query overlap; the #98 regression guard, hermetic by design
-- `SimbaUrlConnectionTest` - Simba URL properties taking effect
-
-**Do not add BigQuery-semantics tests here.** That is what #118 undid: the emulator
-diverges from the service, tests get weakened until they pass, and the weakened tests
-then hide real defects (#93, #98, #121, #123, #129).
-
 ### Real BigQuery Integration Tests (325 tests, 16 classes)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/real/`
 - Run locally: `gcloud auth application-default login`, `export BQ_TEST_PROJECT=...`,
@@ -242,13 +222,11 @@ then hide real defects (#93, #98, #121, #123, #129).
 - Base class: `AbstractRealBigQueryIntegrationTest`
 - Skips silently when `BQ_TEST_PROJECT` is unset — CI guards against that passing green
 
-**Which tier should a new test go in?** Default to the **real** tier. The emulator
-cannot verify BigQuery semantics — DML affected-row counts, session/transaction
-behaviour, NULL and temporal parameter binding, JSON/GEOGRAPHY, `INFORMATION_SCHEMA`
-— and tests written against it have historically been weakened until they passed,
-which shipped bugs (#93, #98). See issue #118. Use the emulator tier only for tests
-that assert no BigQuery behaviour at all: connection/URL plumbing, and concurrency
-*shape* (`ConcurrentQueryTest` measures query overlap, which needs no fidelity).
+**There is one integration tier, and it runs against real BigQuery.** The emulator
+tier was removed (#118): it could not verify BigQuery semantics, and tests written
+against it were weakened until they passed, which shipped bugs — #93, #98, #121,
+#123 and #129 all hid behind an "emulator limitation" comment, four of which turned
+out to describe BigQuery or the driver rather than the emulator.
 
 Real-tier fixture patterns to reuse rather than reinvent:
 `createSeededTable()` (CTAS + 2h expiry, one job instead of three), `tableName()` /
@@ -288,8 +266,8 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 - BigQuery assigns the session ID: the creating job sets `createSession=true` and the ID is
   read back from `JobStatistics.getSessionInfo()`, then sent as the `session_id` connection
   property on later jobs (clients cannot choose the ID)
-- The emulator returns no `sessionInfo`; `hasSession()` means "session-creating job
-  succeeded", and the `session_id` property is only attached when the ID is known
+- `hasSession()` means "the session-creating job succeeded"; the `session_id`
+  property is only attached once BigQuery reports the ID
 - `SessionManager.close()` terminates the session with `CALL BQ.ABORT_SESSION()` (best-effort)
 
 ### Transactions
@@ -379,7 +357,7 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 - File: `.github/workflows/build.yml`
 - Runs on: push to main/develop, PRs to main
 - Steps: checkout, setup Java 21, format check, build, unit tests, integration tests
-- **Integration Tests:** Run automatically in CI using Docker and BigQuery emulator
+- **Integration Tests:** Run automatically in CI against real BigQuery via Workload Identity Federation
 - **Critical:** `./mvnw spotless:check` must pass (CI runs the wrapper too, so the Maven version matches yours)
 - Uploads test reports (unit tests, integration tests, coverage)
 
@@ -432,7 +410,6 @@ User-facing documentation in `docs/` (synced to the Astro docs site):
 
 Contributor/maintainer documentation in `docs/contributing/` (NOT synced to the site; linked from `CONTRIBUTING.md`):
 - `INTEGRATION_TESTS.md` - Running and writing tests
-- `EMULATOR_LIMITATIONS.md` - BigQuery emulator gaps and test workarounds
 - `JAR_SIZE_OPTIMIZATION.md` - Shading/size strategy
 - `MAVEN_CENTRAL_PUBLISHING.md` - Release runbook
 

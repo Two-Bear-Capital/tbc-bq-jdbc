@@ -17,7 +17,7 @@ package vc.tbc.bq.jdbc.integration.real;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +60,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @since 1.0.68
  */
-@EnabledIfEnvironmentVariable(named = "BQ_TEST_PROJECT", matches = ".+", disabledReason = "BQ_TEST_PROJECT env var not set — skipping real BigQuery tests")
+@ExtendWith(RequiresBigQueryCredentials.class)
 public abstract class AbstractRealBigQueryIntegrationTest {
 
 	private static final Logger logger = LoggerFactory.getLogger(AbstractRealBigQueryIntegrationTest.class);
@@ -105,6 +105,16 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 
 	protected Connection connection;
 
+	/**
+	 * Opens the per-test connection.
+	 *
+	 * <p>
+	 * Skipping when credentials are absent is handled by
+	 * {@link RequiresBigQueryCredentials}, registered on this class.
+	 *
+	 * @throws SQLException
+	 *             if the connection cannot be opened
+	 */
 	@BeforeEach
 	void setup() throws SQLException {
 		logger.info("Connecting to real BigQuery project: {}, dataset: {}", TEST_PROJECT_ID, TEST_DATASET);

@@ -23,10 +23,6 @@
         <appender-ref ref="CONSOLE"/>
     </logger>
 
-    <!-- Suppress Testcontainers architecture mismatch warning (expected on Apple Silicon) -->
-    <logger name="tc" level="ERROR" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-    </logger>
 
     <logger name="org.testcontainers" level="ERROR" additivity="false">
         <appender-ref ref="CONSOLE"/>

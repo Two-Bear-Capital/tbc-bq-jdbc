@@ -2,7 +2,7 @@ name: Version Increment and Release
 
 # Direct-push releases — ported from tbc-mcp-server's pattern.
 #
-# main is protected (PR required + "Build and Emulator Integration Tests" status
+# main is protected (PR required + the Build and Real BigQuery status
 # check), and the default GITHUB_TOKEN cannot push a bump commit through that gate
 # (the old workflow's push was rejected, which orphaned tags). RELEASE_TOKEN is a
 # repo ADMIN's PAT: with admin bypass enabled, an admin push bypasses the required

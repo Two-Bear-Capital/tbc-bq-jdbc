@@ -31,8 +31,7 @@ Thank you for considering contributing to the BigQuery JDBC driver!
 Build, test, and release topics live under [`docs/contributing/`](docs/contributing/) (these are
 intentionally kept out of the user-facing documentation site):
 
-- [Integration Tests](docs/contributing/INTEGRATION_TESTS.md) — running and writing the emulator and real-BigQuery test tiers
-- [Emulator Limitations](docs/contributing/EMULATOR_LIMITATIONS.md) — known BigQuery emulator gaps and how tests handle them
+- [Integration Tests](docs/contributing/INTEGRATION_TESTS.md) — running and writing the real-BigQuery integration tests
 - [JAR Size Optimization](docs/contributing/JAR_SIZE_OPTIMIZATION.md) — the shading/size strategy for the distributed JARs
 - [Publishing to Maven Central](docs/contributing/MAVEN_CENTRAL_PUBLISHING.md) — the release runbook
 

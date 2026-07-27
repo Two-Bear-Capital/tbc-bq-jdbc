@@ -13,10 +13,10 @@ on:
 
 jobs:
   build:
-    name: Build and Emulator Integration Tests
+    name: Build and Unit Tests
     runs-on: ubuntu-latest
-    # Typical run is ~2.5 minutes. Without a limit a hung Testcontainers start or
-    # a wedged Maven download inherits GitHub's 6-hour default and burns runner time.
+    # Typical run is ~2 minutes. Without a limit a wedged Maven download inherits
+    # GitHub's 6-hour default and burns runner time.
     timeout-minutes: 20
     if: github.event_name != 'workflow_run'
     permissions:
@@ -34,17 +34,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # Fetch the emulator image while Maven compiles and runs the unit tests.
-      # Testcontainers starts the container from a static initializer in the first
-      # integration test class to load, so without this the pull lands on the
-      # critical path — it is why SessionTest reports ~26s in CI and 2s locally.
-      # Digest must match EMULATOR_IMAGE in AbstractBigQueryIntegrationTest — pulling
-      # a different one just wastes the pre-fetch, it does not change what runs.
-      - name: Pre-fetch the BigQuery emulator image
-        run: |
-          docker pull ghcr.io/recidiviz/bigquery-emulator@sha256:75b96f0061ddc9f9599a4bfc8fc282c9e9fd9358fc12151379998b63da69936b >/dev/null 2>&1 &
-
-      # One pass: compile, unit tests, then the emulator integration tests.
+      # One pass: compile, unit tests, static analysis, package.
       # This was `./mvnw clean install` followed by `./mvnw test` and `./mvnw verify`,
       # which ran the unit suite three times over and packaged the shaded JARs
       # twice. Nothing downstream consumes the installed artifact — the docs
@@ -56,8 +46,8 @@ jobs:
       # requests — the release build generates it, and it is not worth ~15s on
       # every push — but still runs on main so a javadoc break cannot reach a
       # release unnoticed.
-      - name: Build, unit tests and emulator integration tests
-        run: ./mvnw verify -Pintegration-tests -B -Dmaven.javadoc.skip=${{ github.event_name == 'pull_request' }}
+      - name: Build, unit tests and static analysis
+        run: ./mvnw verify -B -Dmaven.javadoc.skip=${{ github.event_name == 'pull_request' }}
 
       # Coverage goes up here rather than at the end so a failure in the docs
       # check below cannot cost us the report. `verify` above already produced
