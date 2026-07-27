@@ -285,7 +285,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if query fails
 	 */
-	@SuppressWarnings({"PMD.NullAssignment", "PMD.PreserveStackTrace"})
+	@SuppressWarnings("PMD.NullAssignment")
 	protected ResultSet executeQueryInternal(String sql) throws SQLException {
 		checkClosed();
 		logger.debug("Executing {}: {}", getLogPrefix(), sql);
@@ -462,7 +462,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if the wait times out, is interrupted, or the job fails
 	 */
-	@SuppressWarnings("PMD.PreserveStackTrace")
+	@SuppressWarnings("PMD.PreserveStackTrace") // ExecutionException is deliberately unwrapped: its cause is the
+												// real failure and is passed through
 	private <T> T awaitWithTimeout(CompletableFuture<T> future, long timeoutSeconds) throws SQLException {
 		try {
 			return future.get(timeoutSeconds, TimeUnit.SECONDS);

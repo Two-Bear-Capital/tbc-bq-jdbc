@@ -402,7 +402,11 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
-                        <phase>verify</phase>
+                        <!-- validate, not verify: formatting is checked before anything is
+                             compiled or run, so a stray tab fails in seconds instead of after
+                             the full test suite. CI relies on this rather than paying for a
+                             separate `mvn spotless:check` invocation. -->
+                        <phase>validate</phase>
                     </execution>
                 </executions>
             </plugin>

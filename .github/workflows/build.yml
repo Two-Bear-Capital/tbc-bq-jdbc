@@ -30,8 +30,12 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Check code formatting
-        run: mvn spotless:check
+      # Fetch the emulator image while Maven compiles and runs the unit tests.
+      # Testcontainers starts the container from a static initializer in the first
+      # integration test class to load, so without this the pull lands on the
+      # critical path — it is why SessionTest reports ~26s in CI and 2s locally.
+      - name: Pre-fetch the BigQuery emulator image
+        run: docker pull ghcr.io/recidiviz/bigquery-emulator:latest >/dev/null 2>&1 &
 
       - name: Check generated docs are up to date
         run: mvn test-compile exec:java -Pdocs -Dexec.args="--check" -B
@@ -42,8 +46,14 @@ jobs:
       # twice. Nothing downstream consumes the installed artifact — the docs
       # check runs off the test classpath and the real BigQuery job builds its
       # own — so `verify` is enough.
+      #
+      # spotless:check is bound to the verify phase, so this covers formatting
+      # too; it used to run again as its own step. Javadoc is skipped on pull
+      # requests — the release build generates it, and it is not worth ~15s on
+      # every push — but still runs on main so a javadoc break cannot reach a
+      # release unnoticed.
       - name: Build, unit tests and emulator integration tests
-        run: mvn verify -Pintegration-tests -B
+        run: mvn verify -Pintegration-tests -B -Dmaven.javadoc.skip=${{ github.event_name == 'pull_request' }}
 
       - name: Upload test reports
         uses: actions/upload-artifact@v7
