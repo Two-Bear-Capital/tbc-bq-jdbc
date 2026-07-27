@@ -565,4 +565,37 @@ class RealComplexTypesTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next(), "Should have exactly three rows");
 		}
 	}
+
+	// ── Array element types (from TypeMappingTest) ────────────────────────────
+	// Those versions probed with startsWith("["), endsWith("]") and contains(...),
+	// which cannot tell a correct array from a differently-wrong one. The
+	// contains("FieldValue") guard is preserved in spirit: exact equality rules out
+	// a raw FieldValue.toString() leaking into the output, which is what it watched
+	// for.
+
+	@Test
+	void testArrayOfBooleans() throws SQLException {
+		firstRow("SELECT [true, false, true] AS bool_array",
+				rs -> assertEquals("[true,false,true]", rs.getString("bool_array"), "ARRAY<BOOL> as JSON"));
+	}
+
+	@Test
+	void testArrayOfFloats() throws SQLException {
+		firstRow("SELECT [1.5, 2.7, 3.14] AS float_array",
+				rs -> assertEquals("[1.5,2.7,3.14]", rs.getString("float_array"), "ARRAY<FLOAT64> as JSON"));
+	}
+
+	@Test
+	void testArrayWithNulls() throws SQLException {
+		firstRow("SELECT ['first', NULL, 'third'] AS array_with_nulls",
+				rs -> assertEquals("[\"first\",null,\"third\"]", rs.getString("array_with_nulls"),
+						"A null element is an explicit JSON null, and does not shift its neighbours"));
+	}
+
+	@Test
+	void testMixedNullAndValues() throws SQLException {
+		firstRow("SELECT [NULL, 'value', NULL, 'another'] AS mixed_array",
+				rs -> assertEquals("[null,\"value\",null,\"another\"]", rs.getString("mixed_array"),
+						"Leading and interior nulls both keep their positions"));
+	}
 }

@@ -14,12 +14,10 @@ The integration test suite runs against the BigQuery emulator for fast, local te
 
 ## Summary Statistics
 
-- **Emulator integration tests:** 319 across 17 classes
-- **Real BigQuery integration tests:** 155 across 10 classes
-- **Tests affected by emulator limitations:** 36 compensation sites across 8 test files
-- **Disabled tests:** 6, all citing confirmed emulator bugs — `ComplexTypesTest` ×4
-  (the issue #39 regression tests) and `ParameterizedQueryTest` ×2. They are written
-  `@org.junit.jupiter.api.Disabled`, so a grep for `@Disabled` will not find them.
+- **Emulator integration tests:** 42 across 4 classes
+- **Real BigQuery integration tests:** 319 across 16 classes
+- **Disabled tests:** 0 — the six that cited confirmed emulator bugs were deleted along
+  with their classes as those ported (#118)
 
 > **This tier is being retired as a correctness oracle — see issue #118.** The
 > "log the limitation and continue" approach below is what let issue #93 ship: a
