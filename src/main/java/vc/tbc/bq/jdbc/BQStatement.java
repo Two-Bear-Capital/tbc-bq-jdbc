@@ -324,7 +324,8 @@ public class BQStatement extends AbstractBQStatement {
 		int[] updateCounts = new int[commands.size()];
 		for (int i = 0; i < commands.size(); i++) {
 			try {
-				updateCounts[i] = toUpdateCount(executeDmlInternal(commands.get(i), null));
+				// No per-entry estimate: this path is already one job per command (#140).
+				updateCounts[i] = toUpdateCount(executeDmlInternal(commands.get(i), null, false));
 			} catch (SQLException e) {
 				throw new BatchUpdateException("Batch entry " + i + " failed: " + e.getMessage(), e.getSQLState(),
 						e.getErrorCode(), Arrays.copyOf(updateCounts, i), e);

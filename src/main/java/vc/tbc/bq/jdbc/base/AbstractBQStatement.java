@@ -239,18 +239,101 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if dry-run fails
 	 */
-	protected QueryCostEstimate runDryRun(String sql) throws SQLException {
+	/**
+	 * Attaches a cost estimate as a {@link SQLWarning} when
+	 * {@code enableQueryCostEstimation} is on, for any statement — SELECT or DML.
+	 *
+	 * <p>
+	 * This used to live inline in {@code executeQueryInternal}, which is why DML
+	 * and batches were never estimated (#140): the property was read in exactly one
+	 * place, on the query path.
+	 *
+	 * <p>
+	 * A failed dry-run is logged and swallowed. An estimate is advisory, so it must
+	 * never be the reason a statement does not run.
+	 *
+	 * @param sql
+	 *            the statement about to be executed
+	 * @param positionalParameters
+	 *            parameters to bind for the estimate, or null to let
+	 *            {@link #buildQueryConfig(String)} supply them. Batches pass their
+	 *            chunk's parameters explicitly, because the instance parameters
+	 *            belong to a single row and would not match the chunk's SQL.
+	 */
+	protected void estimateCostIfEnabled(String sql, java.util.List<QueryParameterValue> positionalParameters) {
+		if (!properties.enableQueryCostEstimation()) {
+			return;
+		}
 		try {
-			QueryJobConfiguration.Builder dryRunConfigBuilder = buildQueryConfig(sql).setDryRun(true)
-					.setUseQueryCache(false);
+			QueryCostEstimate estimate = positionalParameters == null
+					? runDryRun(sql)
+					: runDryRun(sql, positionalParameters);
+			String message = estimate.formatWarning();
 
-			// Set default dataset if configured
-			if (properties.getDatasetId() != null) {
-				dryRunConfigBuilder.setDefaultDataset(properties.getDatasetId());
+			// Chain rather than overwrite: a batch produces one estimate per chunk,
+			// and getWarnings() is specified to return a chain.
+			SQLWarning warning = new SQLWarning(message, "01000", estimate.getMegabytes());
+			if (queryWarnings == null) {
+				queryWarnings = warning;
+			} else {
+				queryWarnings.setNextWarning(warning);
 			}
 
-			QueryJobConfiguration dryRunConfig = dryRunConfigBuilder.build();
+			logger.info("Dry-run estimate: {}", message);
+		} catch (Exception e) {
+			// Logged with the throwable, not just its message: an NPE here used to
+			// surface as "Dry-run estimation failed: null", which said nothing about
+			// where it came from.
+			logger.warn("Dry-run estimation failed", e);
+		}
+	}
 
+	/**
+	 * Dry-run for a statement whose parameters are supplied explicitly rather than
+	 * taken from {@link #buildQueryConfig(String)}.
+	 *
+	 * @param sql
+	 *            the statement to estimate
+	 * @param positionalParameters
+	 *            the parameters to bind
+	 * @return the estimate
+	 * @throws SQLException
+	 *             if the dry-run fails
+	 */
+	protected QueryCostEstimate runDryRun(String sql, java.util.List<QueryParameterValue> positionalParameters)
+			throws SQLException {
+		QueryJobConfiguration.Builder builder = QueryJobConfiguration.newBuilder(sql)
+				.setUseLegacySql(properties.useLegacySql()).setDryRun(true).setUseQueryCache(false);
+		if (positionalParameters != null && !positionalParameters.isEmpty()) {
+			builder.setPositionalParameters(positionalParameters);
+		}
+		if (properties.getDatasetId() != null) {
+			builder.setDefaultDataset(properties.getDatasetId());
+		}
+		return dryRunEstimate(builder.build());
+	}
+
+	protected QueryCostEstimate runDryRun(String sql) throws SQLException {
+		QueryJobConfiguration.Builder builder = buildQueryConfig(sql).setDryRun(true).setUseQueryCache(false);
+		if (properties.getDatasetId() != null) {
+			builder.setDefaultDataset(properties.getDatasetId());
+		}
+		return dryRunEstimate(builder.build());
+	}
+
+	/**
+	 * Submits a dry-run job and reads the estimate off its statistics. Shared by
+	 * both {@code runDryRun} overloads, which differ only in how the configuration
+	 * is built.
+	 *
+	 * @param dryRunConfig
+	 *            a configuration with {@code dryRun} already set
+	 * @return the estimate
+	 * @throws SQLException
+	 *             if BigQuery rejects the dry-run
+	 */
+	private QueryCostEstimate dryRunEstimate(QueryJobConfiguration dryRunConfig) throws SQLException {
+		try {
 			Job dryRunJob = bigquery.create(JobInfo.of(dryRunConfig));
 			JobStatistics.QueryStatistics stats = dryRunJob.getStatistics();
 
@@ -304,28 +387,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			}
 		}
 
-		// Run dry-run if cost estimation is enabled
-		if (properties.enableQueryCostEstimation()) {
-			try {
-				QueryCostEstimate estimate = runDryRun(sql);
-
-				// Create warning with cost information
-				String message = estimate.formatWarning();
-
-				queryWarnings = new SQLWarning(message, "01000", // Standard warning SQL state
-						estimate.getMegabytes() // MB as vendor code
-				);
-
-				logger.info("Dry-run estimate: {}", message);
-
-			} catch (Exception e) {
-				// Don't fail the query if the dry run fails — log and continue. Logged
-				// with the throwable, not just its message: an NPE here used to surface
-				// as "Dry-run estimation failed: null", which said nothing about where
-				// it came from.
-				logger.warn("Dry-run estimation failed", e);
-			}
-		}
+		// Estimate cost before running, when enabled. buildQueryConfig is overridden
+		// by BQPreparedStatement to attach the parameters already set, so a
+		// parameterized query estimates with them.
+		estimateCostIfEnabled(sql, null);
 
 		// fetchSize is a paging hint, applied when the results are read (see
 		// QueryResultsOption.pageSize below). It deliberately is NOT mapped to
@@ -478,10 +543,44 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 */
 	protected long executeDmlInternal(String sql, java.util.List<QueryParameterValue> positionalParameters)
 			throws SQLException {
+		return executeDmlInternal(sql, positionalParameters, true);
+	}
+
+	/**
+	 * As {@link #executeDmlInternal(String, java.util.List)}, with control over
+	 * cost estimation.
+	 *
+	 * <p>
+	 * Sequential batch paths pass {@code false}. They already run one job per
+	 * entry, so estimating each one would double the job count on the most
+	 * expensive path in the driver — and a per-entry estimate is not reachable
+	 * through {@code Statement.getWarnings()} in any useful way, since
+	 * {@code executeBatch} returns before a caller reads warnings per statement.
+	 * The collapsed multi-row INSERT path does estimate, because there the chunks
+	 * are the jobs: one extra dry-run per chunk, not per row.
+	 *
+	 * @param sql
+	 *            the DML to execute
+	 * @param positionalParameters
+	 *            parameters to bind, or null
+	 * @param estimateCost
+	 *            whether to attach a cost estimate when the property is enabled
+	 * @return affected row count
+	 * @throws SQLException
+	 *             if execution fails
+	 */
+	protected long executeDmlInternal(String sql, java.util.List<QueryParameterValue> positionalParameters,
+			boolean estimateCost) throws SQLException {
 		checkClosed();
 		logger.debug("Executing {} DML: {}", getLogPrefix(), sql);
 
 		discardPreviousResult();
+
+		// #140: DML is estimated too. A wide DELETE or a large INSERT batch is
+		// exactly the statement whose cost someone wants to see beforehand.
+		if (estimateCost) {
+			estimateCostIfEnabled(sql, positionalParameters);
+		}
 
 		QueryJobConfiguration.Builder configBuilder = QueryJobConfiguration.newBuilder(sql)
 				.setUseLegacySql(properties.useLegacySql());

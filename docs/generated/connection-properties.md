@@ -30,7 +30,7 @@ There are **26** connection properties.
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `jobCreationMode` | `REQUIRED` | `REQUIRED`, `OPTIONAL` | REQUIRED always creates a query job; OPTIONAL may skip it for small queries |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |
-| `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query to estimate cost; estimates are attached as SQLWarnings |
+| `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings. Sequential batches are not estimated (one job per entry already) |
 | `maxResults` | _(none)_ | any | Maximum number of query result rows to return (blank = unlimited) |
 | `maxBillingBytes` | _(none)_ | any | Maximum bytes billed per query; queries exceeding this limit are rejected (blank = unlimited) |
 | `labels` | _(none)_ | any | Comma-separated BigQuery job labels in key=value format (e.g., env=prod,team=data) |
