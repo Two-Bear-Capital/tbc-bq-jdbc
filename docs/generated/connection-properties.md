@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **26** connection properties.
+There are **25** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -36,5 +36,4 @@ There are **26** connection properties.
 | `labels` | _(none)_ | any | Comma-separated BigQuery job labels in key=value format (e.g., env=prod,team=data) |
 | `datasetId` | _(none)_ | any | Default dataset name used for unqualified table references in queries |
 | `datasetProjectId` | _(none)_ | any | Project ID for the default dataset when it differs from the connection project |
-| `useDestinationTables` | `false` | `true`, `false` | Write SELECT query results to an explicit temp destination table that expires after 24 hours |
 | `nativeComplexTypes` | `false` | `true`, `false` | Return ARRAY and STRUCT as native JDBC Array/Struct objects instead of JSON strings |

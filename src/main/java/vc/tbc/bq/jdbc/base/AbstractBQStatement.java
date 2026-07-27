@@ -78,14 +78,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	private static final AtomicBoolean STORAGE_API_UNSUPPORTED_WARNED = new AtomicBoolean(false);
 
 	/**
-	 * How long a query destination table created by
-	 * {@code useDestinationTables=true} is allowed to live. Long enough that a
-	 * ResultSet can page through it at leisure, short enough that abandoned tables
-	 * do not accumulate.
-	 */
-	private static final Duration TEMP_TABLE_TTL = Duration.ofHours(24);
-
-	/**
 	 * Threads that run query jobs.
 	 *
 	 * <p>
@@ -214,21 +206,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @return log message prefix (e.g., "Query" or "Prepared query")
 	 */
 	protected abstract String getLogPrefix();
-
-	/**
-	 * Checks if a SQL statement is a SELECT query (vs DDL/DML).
-	 *
-	 * @param sql
-	 *            the SQL statement
-	 * @return true if the statement is a SELECT query
-	 */
-	private boolean isSelectQuery(String sql) {
-		if (sql == null) {
-			return false;
-		}
-		String trimmed = sql.trim().toUpperCase(Locale.ROOT);
-		return trimmed.startsWith("SELECT") || trimmed.startsWith("WITH");
-	}
 
 	/**
 	 * Runs a dry-run query to estimate cost without executing.
@@ -400,9 +377,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		// maxRows remains enforced at the ResultSet level, not at query level.
 		final int effectiveFetchSize = getEffectiveFetchSize();
 
-		QueryJobConfiguration.Builder configBuilder = applyConnectionConfig(buildQueryConfig(sql));
-		TableId tempDestination = applyTempDestination(configBuilder, sql);
-		QueryJobConfiguration queryConfig = configBuilder.build();
+		QueryJobConfiguration queryConfig = applyConnectionConfig(buildQueryConfig(sql)).build();
 
 		CompletableFuture<JobResultPair> future = CompletableFuture.supplyAsync(() -> {
 			Job job = runJob(queryConfig, "Query");
@@ -418,10 +393,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		}, QUERY_EXECUTOR);
 
 		JobResultPair pair = awaitWithTimeout(future);
-
-		// The temp table exists now; give it an expiry so it cannot outlive the
-		// session and accumulate storage cost in the user's dataset.
-		scheduleTempTableExpiry(tempDestination);
 
 		// Record the DML affected-row count so getUpdateCount() and execute()
 		// can report per-spec results when the statement turned out to be DML
@@ -589,16 +560,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			configBuilder.setPositionalParameters(positionalParameters);
 		}
 
-		configBuilder = applyConnectionConfig(configBuilder);
-		// SELECT via executeUpdate() is tolerated (returns 0); apply the same
-		// destination-table workaround as the query path for emulator compatibility
-		TableId tempDestination = applyTempDestination(configBuilder, sql);
-		QueryJobConfiguration queryConfig = configBuilder.build();
+		QueryJobConfiguration queryConfig = applyConnectionConfig(configBuilder).build();
 
 		CompletableFuture<Job> future = CompletableFuture.supplyAsync(() -> runJob(queryConfig, "DML"), QUERY_EXECUTOR);
 
 		Job job = awaitWithTimeout(future);
-		scheduleTempTableExpiry(tempDestination);
 		return readDmlAffectedRows(job);
 	}
 
@@ -1038,61 +1004,4 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		}
 	}
 
-	/**
-	 * Points the job at a uniquely named temp destination table when
-	 * {@code useDestinationTables} is set and the SQL is a SELECT. Needed for
-	 * BigQuery emulator compatibility; DDL/DML need no destination table.
-	 *
-	 * <p>
-	 * The name is a UUID rather than a timestamp plus thread id: that name was
-	 * built on the calling thread, so two statements issued back-to-back on the
-	 * same thread within a millisecond collided, and the second job's
-	 * {@code WRITE_TRUNCATE} destroyed the first one's results.
-	 *
-	 * @param configBuilder
-	 *            the job configuration to mutate
-	 * @param sql
-	 *            the SQL about to run
-	 * @return the destination table, or null if none was configured
-	 */
-	private TableId applyTempDestination(QueryJobConfiguration.Builder configBuilder, String sql) {
-		if (!properties.useDestinationTables() || properties.datasetId() == null || !isSelectQuery(sql)) {
-			return null;
-		}
-		TableId destination = TableId.of(properties.projectId(), properties.datasetId(),
-				"_jdbc_temp_" + UUID.randomUUID().toString().replace("-", ""));
-		configBuilder.setDestinationTable(destination).setCreateDisposition(JobInfo.CreateDisposition.CREATE_IF_NEEDED)
-				.setWriteDisposition(JobInfo.WriteDisposition.WRITE_TRUNCATE);
-		return destination;
-	}
-
-	/**
-	 * Best-effort: stamps an expiry on a query destination table so it cannot
-	 * outlive the connection.
-	 *
-	 * <p>
-	 * BigQuery cannot declare an expiry on a query job's destination table, and the
-	 * driver cannot drop it on the spot because the ResultSet pages from it lazily.
-	 * Without this, every query run with {@code useDestinationTables=true} leaves a
-	 * permanent table behind. Runs on a virtual thread and swallows failures: it
-	 * must not fail a query that already succeeded.
-	 *
-	 * @param tableId
-	 *            the destination table, or null when none was configured
-	 */
-	private void scheduleTempTableExpiry(TableId tableId) {
-		if (tableId == null) {
-			return;
-		}
-		long expiresAt = Instant.now().plus(TEMP_TABLE_TTL).toEpochMilli();
-		Thread.ofVirtual().name("temp-table-expiry-" + tableId.getTable()).start(() -> {
-			try {
-				bigquery.update(TableInfo.newBuilder(tableId, StandardTableDefinition.newBuilder().build())
-						.setExpirationTime(expiresAt).build());
-				logger.debug("Set expiry on temp table {}", tableId.getTable());
-			} catch (Exception e) {
-				logger.debug("Could not set expiry on temp table {}: {}", tableId.getTable(), e.getMessage());
-			}
-		});
-	}
 }

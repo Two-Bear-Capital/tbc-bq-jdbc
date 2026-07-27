@@ -53,8 +53,7 @@ import java.sql.SQLException;
  * Finishing it means implementing Arrow deserialization plus {@code next()} and
  * the column accessors, pinning the {@code arrow-*} modules to one matched
  * version (they currently resolve to a mix of 17.0.0 and 19.0.0), and covering
- * it with a real-BigQuery integration test — the emulator cannot reach this
- * path because {@code BigQueryReadClient.create()} does not talk to it.
+ * it with a real-BigQuery integration test.
  *
  * <p>
  * The static {@link #shouldUseStorageApi} predicate is still live and still

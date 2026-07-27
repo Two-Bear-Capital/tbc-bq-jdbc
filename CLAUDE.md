@@ -105,7 +105,6 @@ src/main/java/vc/tbc/bq/jdbc/
 │   ├── UserOAuthAuth.java
 │   ├── WorkforceIdentityAuth.java
 │   ├── WorkloadIdentityAuth.java
-│   └── EmulatorAuth.java      # Deprecated; emulator support is being withdrawn
 │
 ├── base/                      # Abstract base classes (inheritance hierarchy)
 │   ├── BaseCloseable.java            # Lifecycle management (isClosed)

@@ -189,10 +189,6 @@ public final class BQDriver implements Driver {
 		props.add(prop(info, "datasetProjectId", "",
 				"Project ID for the default dataset when it differs from the connection project", false, null));
 
-		props.add(prop(info, "useDestinationTables", "false",
-				"Write SELECT query results to an explicit temp destination table that expires after 24 hours", false,
-				new String[]{"true", "false"}));
-
 		props.add(prop(info, "nativeComplexTypes", "false",
 				"Return ARRAY and STRUCT as native JDBC Array/Struct objects instead of JSON strings", false,
 				new String[]{"true", "false"}));

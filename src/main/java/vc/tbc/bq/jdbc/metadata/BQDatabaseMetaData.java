@@ -1172,10 +1172,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * Uses {@code INFORMATION_SCHEMA.COLUMNS} for performance: one query per
 	 * dataset instead of one {@code getTable()} API call per table. Falls back to
 	 * the legacy {@code getTable()} approach if the query fails — because the
-	 * endpoint does not implement {@code INFORMATION_SCHEMA} (the BigQuery emulator
-	 * does not), or because the caller lacks permission on the dataset. The failure
-	 * is logged at WARN so a genuine query defect is not mistaken for an endpoint
-	 * limitation.
+	 * endpoint does not implement {@code INFORMATION_SCHEMA}, or because the caller
+	 * lacks permission on the dataset. The failure is logged at WARN so a genuine
+	 * query defect is not mistaken for an endpoint limitation.
 	 */
 	private java.util.List<Object[]> queryColumnsForDataset(com.google.cloud.bigquery.BigQuery bigquery,
 			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
@@ -1244,8 +1243,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * table.
 	 *
 	 * <p>
-	 * Used when the {@code INFORMATION_SCHEMA.COLUMNS} query fails; the BigQuery
-	 * emulator is one endpoint that does not implement it.
+	 * Used when the {@code INFORMATION_SCHEMA.COLUMNS} query fails.
 	 */
 	private java.util.List<Object[]> queryColumnsViaGetTable(com.google.cloud.bigquery.BigQuery bigquery,
 			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {

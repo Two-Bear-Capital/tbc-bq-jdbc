@@ -28,9 +28,8 @@ import java.io.IOException;
  *
  * @since 1.0.0
  */
-@SuppressWarnings("removal") // EmulatorAuth is deprecated for removal but must stay permitted until it goes
-public sealed interface AuthType permits ServiceAccountAuth, ApplicationDefaultAuth, UserOAuthAuth,
-		WorkforceIdentityAuth, WorkloadIdentityAuth, EmulatorAuth {
+public sealed interface AuthType
+		permits ServiceAccountAuth, ApplicationDefaultAuth, UserOAuthAuth, WorkforceIdentityAuth, WorkloadIdentityAuth {
 
 	/**
 	 * Converts this authentication type to Google Cloud credentials.

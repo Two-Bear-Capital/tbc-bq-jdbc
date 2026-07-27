@@ -108,18 +108,20 @@ public class SessionManager {
 				throw new SQLException("Failed to create session: " + status.getError().getMessage());
 			}
 
-			this.sessionId = extractSessionId(queryJob);
-			this.initialized = true;
-
-			if (sessionId == null) {
-				// The BigQuery emulator does not report session info; statements then run
-				// without a session_id connection property (the emulator is stateful per
-				// endpoint, so session-scoped features still behave as expected there).
-				logger.warn("Endpoint did not return a session ID for a job with createSession=true; "
-						+ "statements will not be bound to a session");
-			} else {
-				logger.info("BigQuery session created: {}", sessionId);
+			String assignedSessionId = extractSessionId(queryJob);
+			if (assignedSessionId == null) {
+				// Without an ID there is nothing to attach to later jobs, so every
+				// statement would run outside the session while hasSession() claimed
+				// otherwise: CREATE TEMP TABLE would succeed and the next statement
+				// would report the table missing. Fail here, where the cause is still
+				// visible, rather than at some later statement (#148).
+				throw new SQLException("BigQuery created the session job but reported no session ID; "
+						+ "session-scoped statements would silently run unbound to it");
 			}
+
+			this.sessionId = assignedSessionId;
+			this.initialized = true;
+			logger.info("BigQuery session created: {}", sessionId);
 
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();

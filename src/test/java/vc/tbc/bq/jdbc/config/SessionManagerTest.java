@@ -72,7 +72,7 @@ class SessionManagerTest {
 		when(sessionInfo.getSessionId()).thenReturn(SERVER_SESSION_ID);
 	}
 
-	/** Stubs a successful job that reports no session info (e.g. the emulator). */
+	/** Stubs a successful job whose statistics carry no session info. */
 	private void stubSuccessfulJob() throws Exception {
 		when(bigquery.create(any(JobInfo.class))).thenReturn(job);
 		when(job.waitFor()).thenReturn(job);
@@ -219,7 +219,7 @@ class SessionManagerTest {
 	@Test
 	void testHasSessionAfterInitialization() throws Exception {
 		// Given: Session initialized
-		stubSuccessfulJob();
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 
@@ -233,7 +233,7 @@ class SessionManagerTest {
 	@Test
 	void testHasSessionAfterClose() throws Exception {
 		// Given: Session initialized and closed
-		stubSuccessfulJob();
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 		sessionManager.close();
@@ -280,17 +280,20 @@ class SessionManagerTest {
 	}
 
 	@Test
-	void testAddSessionPropertyWhenEndpointReportsNoSessionId() throws Exception {
-		// Given: An endpoint that creates the session but reports no session info
-		// (the BigQuery emulator behaves this way)
+	void testInitializeSessionFailsWhenNoSessionIdIsReported() throws Exception {
+		// Given: The session job succeeds but the service reports no session info
 		stubSuccessfulJob();
-		sessionManager.initializeSession();
-		QueryJobConfiguration.Builder builder = QueryJobConfiguration.newBuilder("SELECT 1");
 
-		// Then: The session is considered active but no session_id is attached
-		assertTrue(sessionManager.hasSession());
+		// Then: Initialization fails rather than continuing with an unbound session.
+		// This used to warn and carry on, leaving hasSession() true while no
+		// session_id was ever attached to any job — so CREATE TEMP TABLE succeeded
+		// and the next statement reported the table missing (#148).
+		SQLException thrown = assertThrows(SQLException.class, () -> sessionManager.initializeSession());
+		assertTrue(thrown.getMessage().contains("no session ID"), "Was: " + thrown.getMessage());
+
+		// And: Nothing is left half-established
+		assertFalse(sessionManager.hasSession());
 		assertNull(sessionManager.getSessionId());
-		assertSame(builder, sessionManager.addSessionProperty(builder));
 	}
 
 	// close() Tests
@@ -364,7 +367,7 @@ class SessionManagerTest {
 	@Test
 	void testBeginTransactionCreatesSessionIfNeeded() throws Exception {
 		// Given: No session initialized
-		stubSuccessfulJob();
+		stubSuccessfulJobWithSessionId();
 
 		// When: Beginning transaction
 		sessionManager.beginTransaction();
@@ -379,7 +382,7 @@ class SessionManagerTest {
 	@Test
 	void testBeginTransactionWithExistingSession() throws Exception {
 		// Given: Session already initialized
-		stubSuccessfulJob();
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 
@@ -402,7 +405,7 @@ class SessionManagerTest {
 	@Test
 	void testCommitWithSession() throws Exception {
 		// Given: Session initialized
-		stubSuccessfulJob();
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 
@@ -425,7 +428,7 @@ class SessionManagerTest {
 	@Test
 	void testRollbackWithSession() throws Exception {
 		// Given: Session initialized
-		stubSuccessfulJob();
+		stubSuccessfulJobWithSessionId();
 
 		sessionManager.initializeSession();
 

@@ -261,7 +261,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
-		// Use explicit type for better emulator compatibility
+		// Bind an explicit BigQuery type rather than letting the service infer one
 		setParameter(parameterIndex, QueryParameterValue.of((double) x, StandardSQLTypeName.FLOAT64));
 	}
 
@@ -323,7 +323,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setString(int parameterIndex, String x) throws SQLException {
-		// Use explicit type for better emulator compatibility
+		// Bind an explicit BigQuery type rather than letting the service infer one
 		if (x == null) {
 			setNull(parameterIndex, Types.VARCHAR);
 		} else {
@@ -347,7 +347,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setBytes(int parameterIndex, byte[] x) throws SQLException {
-		// Use explicit type for better emulator compatibility
+		// Bind an explicit BigQuery type rather than letting the service infer one
 		if (x == null) {
 			setNull(parameterIndex, Types.VARBINARY);
 		} else {
@@ -533,8 +533,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			return;
 		}
 
-		// Use explicit type information for better compatibility with BigQuery
-		// emulators
+		// Bind an explicit BigQuery type per Java type rather than letting the
+		// service infer one
 		switch (x) {
 			case String s -> setParameter(parameterIndex, QueryParameterValue.of(s, StandardSQLTypeName.STRING));
 			case Integer i ->
