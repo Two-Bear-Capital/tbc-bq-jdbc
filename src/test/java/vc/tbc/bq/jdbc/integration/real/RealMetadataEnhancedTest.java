@@ -166,15 +166,13 @@ class RealMetadataEnhancedTest extends AbstractRealBigQueryIntegrationTest {
 
 		ResultSet rs = metaData.getProcedures(TEST_PROJECT_ID, TEST_DATASET, ROUTINE_NAME);
 
+		// Assert rather than tolerate: treating "not found" as a pass let
+		// getProcedures() return zero rows for every real connection unnoticed
 		assertNotNull(rs);
-		if (rs.next()) {
-			String procedureName = rs.getString("PROCEDURE_NAME");
-			assertNotNull(procedureName, "PROCEDURE_NAME should not be null");
-			logger.info("Found procedure: {}", procedureName);
-		} else {
-			// Routine may not have been created if dataset doesn't exist yet; log and pass
-			logger.info("No procedures found for {} (dataset may not have routines yet)", ROUTINE_NAME);
-		}
+		assertTrue(rs.next(), "getProcedures() should find the routine created in @BeforeEach: " + ROUTINE_NAME);
+		assertEquals(ROUTINE_NAME, rs.getString("PROCEDURE_NAME"));
+		assertEquals(TEST_DATASET, rs.getString("PROCEDURE_SCHEM"));
+		assertEquals(ROUTINE_NAME, rs.getString("SPECIFIC_NAME"));
 	}
 
 	@Test
@@ -195,13 +193,14 @@ class RealMetadataEnhancedTest extends AbstractRealBigQueryIntegrationTest {
 		ResultSet rs = metaData.getProcedureColumns(TEST_PROJECT_ID, TEST_DATASET, ROUTINE_NAME, null);
 
 		assertNotNull(rs);
-		int count = 0;
+		java.util.List<String> parameters = new java.util.ArrayList<>();
 		while (rs.next()) {
-			count++;
-			String columnName = rs.getString("COLUMN_NAME");
-			logger.info("Found parameter: {}", columnName);
+			parameters.add(rs.getString("COLUMN_NAME"));
 		}
-		// The routine has 2 parameters (x, y); may be 0 if routine creation failed
-		logger.info("getProcedureColumns() found {} parameters for {}", count, ROUTINE_NAME);
+
+		// x, y, plus the unnamed return value row BigQuery reports for scalar UDFs
+		logger.info("getProcedureColumns() found parameters {} for {}", parameters, ROUTINE_NAME);
+		assertTrue(parameters.contains("x"), "Should find parameter x, found: " + parameters);
+		assertTrue(parameters.contains("y"), "Should find parameter y, found: " + parameters);
 	}
 }

@@ -735,8 +735,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
 			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-			String sql = String.format(
-					"SELECT routine_name, routine_type, routine_comment FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
+			// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
+			// routine's description lives in ROUTINE_OPTIONS under
+			// option_name = 'description', so REMARKS is reported as null
+			String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
 					projectId, datasetId);
 			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
 					.newBuilder(sql).build();
@@ -746,14 +748,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
 					continue;
 				}
-				String remarks = row.get("routine_comment").isNull()
-						? null
-						: row.get("routine_comment").getStringValue();
-				rows.add(buildProcedureRow(projectId, datasetId, routineName, remarks));
+				rows.add(buildProcedureRow(projectId, datasetId, routineName, null));
 			}
 		} catch (Exception e) {
-			logger.warn("Could not query INFORMATION_SCHEMA.ROUTINES for dataset {}: {} (emulator may not support)",
-					datasetId, e.getMessage());
+			logger.warn("Could not query INFORMATION_SCHEMA.ROUTINES for dataset {}: {}", datasetId, e.getMessage());
 		}
 		return rows;
 	}
@@ -837,8 +835,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 						dataType));
 			}
 		} catch (Exception e) {
-			logger.warn("Could not query INFORMATION_SCHEMA.PARAMETERS for dataset {}: {} (emulator may not support)",
-					datasetId, e.getMessage());
+			logger.warn("Could not query INFORMATION_SCHEMA.PARAMETERS for dataset {}: {}", datasetId, e.getMessage());
 		}
 		return rows;
 	}
