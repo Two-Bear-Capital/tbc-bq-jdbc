@@ -34,13 +34,16 @@ The integration test suite runs against the BigQuery emulator for fast, local te
 
 ### 1. Temporal Parameters with Calendar
 
+> **Ported (#118).** `PreparedStatementAdvancedTest` has been removed; this behaviour is now
+> asserted for real in `integration/real/RealPreparedStatementAdvancedTest`. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator has validation bugs for TIMESTAMP and TIME parameters created with Calendar objects.
 
 **Error:** `Cannot validate TIMESTAMP/TIME parameter format`
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testSetTimestampWithCalendar` (line 62)
-- `PreparedStatementAdvancedTest.testSetTimeWithCalendar` (line 107)
 
 **Compensation:**
 ```java
@@ -60,11 +63,14 @@ try {
 
 ### 2. NULL Value Handling
 
+> **Ported (#118).** `PreparedStatementAdvancedTest` has been removed; this behaviour is now
+> asserted for real in `integration/real/RealPreparedStatementAdvancedTest`. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may convert NULL values to default values (0 for numbers, empty string for strings).
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testSetObjectWithNullAndTargetType` (line 319)
-- `PreparedStatementAdvancedTest.testSetNullWithTypeName` (line 253)
 
 **Compensation:**
 ```java
@@ -83,10 +89,14 @@ if (value == 0 && isNull) {
 
 ### 3. Parameter Metadata
 
+> **Ported (#118).** `PreparedStatementAdvancedTest` has been removed; this behaviour is now
+> asserted for real in `integration/real/RealPreparedStatementAdvancedTest`. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may not return accurate parameter counts for prepared statements.
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testGetParameterMetaData` (line 279)
 
 **Compensation:**
 ```java
@@ -105,10 +115,14 @@ assertTrue(paramCount >= 0, "Parameter count should be non-negative");
 
 ### 4. Result Set Metadata Before Execution
 
+> **Ported (#118).** `PreparedStatementAdvancedTest` has been removed; this behaviour is now
+> asserted for real in `integration/real/RealPreparedStatementAdvancedTest`. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may not support `PreparedStatement.getMetaData()` before query execution.
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testGetMetaDataBeforeExecution` (line 301)
 
 **Compensation:**
 ```java
@@ -127,10 +141,14 @@ if (rsmd != null) {
 
 ### 5. Binary Data (BYTES Type)
 
+> **Partially ported (#118).** The `PreparedStatementAdvancedTest` half now lives in
+> `RealPreparedStatementAdvancedTest`; `ResultSetAdvancedTest.testGetBytes` is still on the
+> emulator tier and still tolerant.
+
+
 **Limitation:** The emulator has limited support for BYTES type operations.
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testSetBytes` (line 196)
 - `ResultSetAdvancedTest.testGetBytes` (line 189)
 
 **Compensation:**
@@ -150,10 +168,14 @@ try {
 
 ### 6. Numeric Scale Parameter
 
+> **Ported (#118).** `PreparedStatementAdvancedTest` has been removed; this behaviour is now
+> asserted for real in `integration/real/RealPreparedStatementAdvancedTest`. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may not support the scale parameter in `setObject()`.
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testSetObjectWithScaleParameter` (line 171)
 
 **Compensation:**
 ```java
@@ -172,10 +194,14 @@ try {
 
 ### 7. Float Parameter Precision
 
+> **Ported (#118).** `PreparedStatementAdvancedTest` has been removed; this behaviour is now
+> asserted for real in `integration/real/RealPreparedStatementAdvancedTest`. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may have precision issues with float values.
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testSetFloatParameter` (line 490)
 
 **Compensation:**
 ```java
@@ -194,10 +220,14 @@ try {
 
 ### 8. String to Timestamp Conversion
 
+> **Ported (#118).** `PreparedStatementAdvancedTest` has been removed; this behaviour is now
+> asserted for real in `integration/real/RealPreparedStatementAdvancedTest`. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may not support timestamp string parsing in setObject.
 
 **Affected Tests:**
-- `PreparedStatementAdvancedTest.testSetObjectStringToTimestamp` (line 270)
 
 **Compensation:**
 ```java
