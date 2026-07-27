@@ -80,9 +80,15 @@ class DriverRegistrationTest {
 		// Given: A BQDriver instance
 		BQDriver driver = new BQDriver();
 
-		// Then: Version should be set
-		assertEquals(1, driver.getMajorVersion());
-		assertEquals(0, driver.getMinorVersion());
+		// Then: The reported components must agree with the version the build
+		// stamped in. Pinning literals here (this asserted minor == 0) breaks on
+		// every minor release rather than on a real defect.
+		String[] parts = DriverVersion.getVersionString().split("\\.");
+		assertEquals(Integer.parseInt(parts[0]), driver.getMajorVersion(),
+				"Major version should match " + DriverVersion.getVersionString());
+		assertEquals(Integer.parseInt(parts[1]), driver.getMinorVersion(),
+				"Minor version should match " + DriverVersion.getVersionString());
+		assertTrue(driver.getMajorVersion() >= 1, "A released driver has a major version of at least 1");
 	}
 
 	@Test

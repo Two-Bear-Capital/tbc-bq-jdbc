@@ -61,14 +61,20 @@ class RealMetadataTest extends AbstractRealBigQueryIntegrationTest {
 		DatabaseMetaData metaData = connection.getMetaData();
 		String version = metaData.getDriverVersion();
 		assertNotNull(version);
-		assertTrue(version.startsWith("1."));
+		assertTrue(version.matches("\\d+\\.\\d+\\.\\d+.*"), "Version should be dotted numeric, was: " + version);
 	}
 
 	@Test
 	void testGetDriverMajorMinorVersion() throws SQLException {
 		DatabaseMetaData metaData = connection.getMetaData();
-		assertEquals(1, metaData.getDriverMajorVersion());
-		assertEquals(0, metaData.getDriverMinorVersion());
+
+		// Derived from the version string rather than pinned. This asserted
+		// minor == 0 and so broke on the 1.1.0 release, which is a release event
+		// and not a driver defect.
+		String[] parts = metaData.getDriverVersion().split("\\.");
+		assertEquals(Integer.parseInt(parts[0]), metaData.getDriverMajorVersion());
+		assertEquals(Integer.parseInt(parts[1]), metaData.getDriverMinorVersion());
+		assertTrue(metaData.getDriverMajorVersion() >= 1, "A released driver has a major version of at least 1");
 	}
 
 	@Test
