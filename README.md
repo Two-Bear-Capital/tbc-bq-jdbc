@@ -546,9 +546,3 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 - Architecture inspired by [looker-open-source/bqjdbc](https://github.com/looker-open-source/bqjdbc)
 - Built for Java 21+ with modern features
 - Uses Google Cloud BigQuery Client Library
-
-## Project Status
-
-**Status:** ✅ Version 1.0 Release - Optimized for Database IDEs
-
-This initial release focuses on providing fast, high-quality database metadata for development tools like JetBrains IDEs, DataGrip, and other database clients. Comprehensive JDBC 4.3 implementation with extensive unit and real-BigQuery integration test coverage.
