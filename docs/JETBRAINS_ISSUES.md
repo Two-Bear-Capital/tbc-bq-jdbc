@@ -54,7 +54,7 @@ reporting — so code completion and query builders get correct information.
 
 ## How this is verified
 
-These behaviors are covered by the driver's automated test suite (unit + emulator and real-BigQuery
+These behaviors are covered by the driver's automated test suite (unit and real-BigQuery
 integration tests) and JMH benchmarks. Representative benchmark targets:
 
 - List 90 datasets: < 3 seconds

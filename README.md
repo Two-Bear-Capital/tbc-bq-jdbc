@@ -349,8 +349,9 @@ See [Authentication Guide](docs/AUTHENTICATION.md) for all methods.
 # Run unit tests
 ./mvnw test
 
-# Run integration tests (requires Docker)
-./mvnw verify -Pintegration-tests
+# Run integration tests (requires BigQuery credentials)
+export BQ_TEST_PROJECT=my-gcp-project
+./mvnw verify -Preal-integration-tests
 ```
 
 ### Build Artifacts
@@ -377,25 +378,9 @@ After building:
 ./mvnw test
 ```
 
-### Emulator Integration Tests
-
-Integration tests run against the [BigQuery emulator](https://github.com/recidiviz/bigquery-emulator) via Docker/Testcontainers — no real GCP credentials required. A single shared container is started once for all test classes.
-
-Covers:
-- Connection lifecycle
-- Query execution
-- Prepared statements
-- Metadata operations
-- Type conversions
-- ResultSet operations
-
-```bash
-./mvnw verify -Pintegration-tests
-```
-
 ### Real BigQuery Integration Tests
 
-A separate suite runs against a live BigQuery instance to validate behavior that the emulator does not fully replicate (e.g., strict type enforcement, BigQuery-specific SQL constraints).
+Integration tests run against a live BigQuery instance. There is no emulator tier — it was removed because the emulator's behaviour diverges from the service, and tests written against it tended to be weakened until they passed.
 
 **Prerequisites:**
 
@@ -513,7 +498,7 @@ See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 - ✅ Native JDBC Array/Struct support (`nativeComplexTypes=true`)
 - ✅ Routine (UDF) metadata via `getProcedures()` / `getProcedureColumns()`
 - ✅ Enhanced DatabaseMetaData (9 formerly-unsupported methods now return compliant results)
-- ✅ Extensive testing (unit, emulator, and real BigQuery integration tests)
+- ✅ Extensive testing (unit tests plus real BigQuery integration tests)
 - ✅ Comprehensive documentation
 
 ### Future Versions
@@ -537,8 +522,8 @@ Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guideli
 # Unit tests
 ./mvnw test
 
-# Integration tests (requires Docker)
-./mvnw verify -Pintegration-tests
+# Integration tests (requires BigQuery credentials)
+./mvnw verify -Preal-integration-tests
 
 # Format code
 ./mvnw spotless:apply
@@ -566,4 +551,4 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 **Status:** ✅ Version 1.0 Release - Optimized for Database IDEs
 
-This initial release focuses on providing fast, high-quality database metadata for development tools like JetBrains IDEs, DataGrip, and other database clients. Comprehensive JDBC 4.3 implementation with extensive testing across unit, emulator-based integration, and real BigQuery integration test suites.
+This initial release focuses on providing fast, high-quality database metadata for development tools like JetBrains IDEs, DataGrip, and other database clients. Comprehensive JDBC 4.3 implementation with extensive unit and real-BigQuery integration test coverage.

@@ -215,7 +215,7 @@ unzip -l target/tbc-bq-jdbc-1.0.128.jar | grep "\.proto$" | wc -l
 unzip -l target/tbc-bq-jdbc-1.0.128-shaded.jar | grep -c "org/apache/arrow"
 
 # Run tests
-./mvnw verify -Pintegration-tests
+./mvnw verify -Preal-integration-tests
 ```
 
 ## Conclusion
