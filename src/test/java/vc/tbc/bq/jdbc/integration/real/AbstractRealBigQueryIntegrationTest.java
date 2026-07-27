@@ -142,14 +142,67 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	}
 
 	/**
+	 * The three fixture rows, as a query so a table can be created and populated by
+	 * a single {@code CREATE TABLE AS SELECT} job. Column types match the explicit
+	 * schema {@link #createTestTable(String)} declares: {@code INT64, STRING,
+	 * INT64, FLOAT64, BOOL, DATE}. Columns are nullable, so tests may insert
+	 * partial rows.
+	 */
+	private static final String SEED_ROWS_QUERY = "SELECT 1 AS id, 'Alice' AS name, 30 AS age, "
+			+ "75000.50 AS salary, true AS is_active, DATE '2024-01-15' AS created_date "
+			+ "UNION ALL SELECT 2, 'Bob', 25, 60000.00, true, DATE '2024-02-20' "
+			+ "UNION ALL SELECT 3, 'Charlie', 35, 85000.75, false, DATE '2024-03-10'";
+
+	/**
+	 * Makes fixture tables delete themselves. Cleanup then costs no BigQuery job,
+	 * and tables stranded by a cancelled CI run disappear on their own rather than
+	 * accumulating in the shared dataset.
+	 */
+	private static final String EXPIRES_SOON = "OPTIONS(expiration_timestamp = "
+			+ "TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR))";
+
+	/**
+	 * Creates a seeded fixture table in one BigQuery job.
+	 *
+	 * <p>
+	 * Creating the table and inserting its rows separately costs two jobs, each a
+	 * couple of seconds against real BigQuery; a {@code CREATE TABLE AS SELECT}
+	 * does both in one. Use this wherever a test needs its own copy of the fixture.
+	 *
+	 * @param conn
+	 *            the connection to create the table on
+	 * @param tableName
+	 *            the table name
+	 * @throws SQLException
+	 *             if creation fails
+	 */
+	protected void createSeededTable(Connection conn, String tableName) throws SQLException {
+		try (Statement stmt = conn.createStatement()) {
+			stmt.execute("CREATE OR REPLACE TABLE " + tableName + " " + EXPIRES_SOON + " AS " + SEED_ROWS_QUERY);
+			logger.info("Created seeded table: {}", tableName);
+		}
+	}
+
+	/**
+	 * Creates a seeded fixture table on this test's connection.
+	 *
+	 * @param tableName
+	 *            the table name
+	 * @throws SQLException
+	 *             if creation fails
+	 */
+	protected void createSeededTable(String tableName) throws SQLException {
+		createSeededTable(connection, tableName);
+	}
+
+	/**
 	 * Creates the shared read-only fixture table for a whole test class, using a
 	 * connection of its own so it can run from {@code @BeforeAll}.
 	 *
 	 * <p>
 	 * Classes whose tests only read the fixture should build it once here rather
-	 * than per test method: each {@code CREATE OR REPLACE TABLE} plus
-	 * {@code INSERT} is a pair of BigQuery jobs, and repeating them for every test
-	 * dominates the class's runtime.
+	 * than per test method: repeating the fixture for every test dominates the
+	 * class's runtime.
 	 *
 	 * @param tableName
 	 *            the table name
@@ -157,14 +210,8 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 *             if creation fails
 	 */
 	protected void createSharedTestTable(String tableName) throws SQLException {
-		try (Connection setup = createTestConnection(); Statement stmt = setup.createStatement()) {
-			stmt.execute(String.format("CREATE OR REPLACE TABLE %s (" + "id INT64, " + "name STRING, " + "age INT64, "
-					+ "salary FLOAT64, " + "is_active BOOL, " + "created_date DATE" + ")", tableName));
-			stmt.executeUpdate(String.format("INSERT INTO %s (id, name, age, salary, is_active, created_date) VALUES "
-					+ "(1, 'Alice', 30, 75000.50, true, DATE '2024-01-15'), "
-					+ "(2, 'Bob', 25, 60000.00, true, DATE '2024-02-20'), "
-					+ "(3, 'Charlie', 35, 85000.75, false, DATE '2024-03-10')", tableName));
-			logger.info("Created shared test table: {}", tableName);
+		try (Connection setup = createTestConnection()) {
+			createSeededTable(setup, tableName);
 		}
 	}
 
