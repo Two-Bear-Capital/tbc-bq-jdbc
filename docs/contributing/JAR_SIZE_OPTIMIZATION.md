@@ -6,9 +6,10 @@ The tbc-bq-jdbc shaded JARs have been optimized to reduce file size while mainta
 
 ## Current JAR Sizes
 
-After optimization (as of version 1.0.34):
-- **Standard shaded JAR**: 38.5 MB (was 39 MB)
-- **With-logging JAR**: 39.5 MB (was 40 MB)
+After optimization (measured on 1.0.110):
+- **Standard shaded JAR**: 36.4 MB (was 38.2 MB before Arrow was dropped)
+- **With-logging JAR**: 37.3 MB (was 39.1 MB)
+- **Slim JAR**: 180 KB (dependencies supplied by the host classpath)
 
 ## Size Breakdown
 
@@ -35,12 +36,11 @@ The largest component is platform-specific native libraries required for gRPC SS
 
 These native libraries are **required** for the BigQuery gRPC API to function correctly. All platform variants are bundled together so the driver works on any platform without requiring users to select platform-specific builds.
 
-### Compiled Classes: ~13 MB (34% of total)
+### Compiled Classes: ~11 MB (31% of total)
 
 Essential runtime dependencies:
 - Google Cloud BigQuery SDK
 - gRPC and Protocol Buffers
-- Apache Arrow (for Storage API)
 - Jackson (JSON processing)
 - HTTP client libraries
 - OpenTelemetry
@@ -71,15 +71,50 @@ After optimization:
 - ✅ Zero runtime impact
 - ✅ Safe and straightforward
 
-### 2. Metadata Cleanup (Already in Place)
+### 2. Exclude Apache Arrow (-1.8 MB)
+
+**What:** Excluded `org.apache.arrow:*` from both `google-cloud-bigquery` and
+`google-cloud-bigquerystorage`, removing 999 classes (~4.9 MB uncompressed).
+
+**Why:** Nothing in the driver referenced it — `grep -r org.apache.arrow src/main/java`
+returns nothing. `StorageReadResultSet` requests `DataFormat.ARROW` from the Storage API
+but never decodes the batches. Within `google-cloud-bigquerystorage`, only `StreamWriter`
+(the *write* API, which the driver never uses) links Arrow classes.
+
+Carrying it also left the classpath split across two incompatible Arrow majors:
+`arrow-vector`/`arrow-memory-netty` resolved to 19.0.0 while `arrow-memory-core`/
+`arrow-format` resolved to 17.0.0 via `libraries-bom`. Arrow does not support mixing
+module versions, and that combination fails at runtime with
+`Failed to initialize MemoryUtil`.
+
+**Implementation:**
+```xml
+<exclusions>
+    <exclusion>
+        <groupId>org.apache.arrow</groupId>
+        <artifactId>*</artifactId>
+    </exclusion>
+</exclusions>
+```
+
+Both artifacts need it — `google-cloud-bigquery` depends on `google-cloud-bigquerystorage`
+itself, so excluding on the direct dependency alone leaves Arrow on the classpath.
+
+**Impact:**
+- ✅ 1.8 MB size reduction (~4.7%)
+- ✅ Removes a broken mixed-version classpath
+- ⚠️ Re-add matched `arrow-*` modules (one version across every module) when Arrow
+  deserialization is implemented
+
+### 3. Metadata Cleanup (Already in Place)
 
 The Maven shade plugin configuration already implements:
 - Signature file removal (*.SF, *.DSA, *.RSA)
 - Duplicate manifest exclusion
 - Maven metadata stripping
-- Netty and Arrow version file removal
+- Netty version file removal
 
-### 3. Dependency Relocation (Already in Place)
+### 4. Dependency Relocation (Already in Place)
 
 All Google Cloud libraries are relocated to `vc.tbc.bq.jdbc.shaded.google` to prevent classpath conflicts. This increases size slightly but prevents version conflicts with user applications.
 
@@ -91,7 +126,7 @@ For context, the commercial Simba BigQuery JDBC driver:
 - **Architecture**: Classpath-based (separate JARs for each dependency)
 
 Our shaded JAR approach:
-- ✅ **7% smaller** (38.5 MB vs 41.7 MB)
+- ✅ **13% smaller** (36.4 MB vs 41.7 MB)
 - ✅ **Simpler distribution** (1 JAR vs 70+ files)
 - ✅ **Better for IntelliJ IDEA** (single file upload)
 - ✅ **Prevents classpath conflicts** (dependencies relocated)
@@ -104,7 +139,7 @@ Both drivers face the same fundamental constraint: gRPC requires platform-specif
 The size is fundamentally driven by:
 
 1. **Multi-platform native library support** (25 MB): Required for gRPC to work on Windows, macOS (x86_64 + aarch64), and Linux (x86_64 + aarch64)
-2. **Google Cloud SDK complexity** (13 MB): Comprehensive BigQuery API support with extensive features
+2. **Google Cloud SDK complexity** (11 MB): Comprehensive BigQuery API support with extensive features
 3. **Enterprise-grade security**: Full SSL/TLS support with all cryptographic libraries
 
 This is expected and competitive for enterprise-grade JDBC drivers using modern gRPC-based APIs.
@@ -129,7 +164,6 @@ This is expected and competitive for enterprise-grade JDBC drivers using modern 
 
 **Why not implemented:**
 - ❌ **HIGH RISK**: Google Cloud SDK uses extensive reflection
-- ❌ Apache Arrow uses dynamic class loading
 - ❌ Could break at runtime in subtle, hard-to-debug ways
 - ❌ Requires extensive testing across all features
 
@@ -149,18 +183,18 @@ This is expected and competitive for enterprise-grade JDBC drivers using modern 
 
 ### For IntelliJ IDEA Users
 
-The standard 38.5 MB shaded JAR is appropriate. This is actually smaller and simpler than the Simba commercial driver.
+The standard 36.4 MB shaded JAR is appropriate. This is actually smaller and simpler than the Simba commercial driver.
 
 ### For Server/CLI Deployments
 
 If JAR size is critical:
-1. Use the slim JAR (60 KB) with dependencies on your classpath
+1. Use the slim JAR (180 KB) with dependencies on your classpath
 2. Exclude unused platforms' native libraries if needed
 3. Contact maintainers if platform-specific builds would be valuable
 
 ### For Native Image Compilation
 
-The with-logging JAR (39.5 MB) includes GraalVM reflection metadata. Use this for native-image builds.
+The with-logging JAR (37.3 MB) includes GraalVM reflection metadata. Use this for native-image builds.
 
 ## Verification
 
@@ -176,14 +210,18 @@ ls -lh target/*.jar
 # Verify proto files excluded (should return 0)
 unzip -l target/tbc-bq-jdbc-1.0.125.jar | grep "\.proto$" | wc -l
 
+# Verify Arrow excluded (both should return 0)
+./mvnw dependency:tree | grep -c arrow
+unzip -l target/tbc-bq-jdbc-1.0.110-shaded.jar | grep -c "org/apache/arrow"
+
 # Run tests
 ./mvnw verify -Pintegration-tests
 ```
 
 ## Conclusion
 
-At 38.5 MB, the tbc-bq-jdbc shaded JAR is:
-- ✅ **Competitive**: 7% smaller than Simba's 41.7 MB distribution
+At 36.4 MB, the tbc-bq-jdbc shaded JAR is:
+- ✅ **Competitive**: 13% smaller than Simba's 41.7 MB distribution
 - ✅ **Optimized**: Protocol buffer source files excluded (like Simba)
 - ✅ **Necessary**: 65% is essential native libraries for gRPC SSL/TLS
 - ✅ **User-friendly**: Single JAR vs 70+ files
