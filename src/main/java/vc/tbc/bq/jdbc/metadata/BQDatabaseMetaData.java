@@ -41,6 +41,13 @@ import java.util.Locale;
 public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaData {
 
 	private static final Logger logger = LoggerFactory.getLogger(BQDatabaseMetaData.class);
+
+	/**
+	 * Ceiling on INFORMATION_SCHEMA queries issued at once when loading metadata
+	 * across datasets. Virtual threads make the tasks themselves cheap, but each
+	 * one is a BigQuery query, and BigQuery caps concurrent queries per project.
+	 */
+	private static final int MAX_CONCURRENT_METADATA_QUERIES = 16;
 	private static final int STATS_LOG_INTERVAL = 10; // Log stats every N cache operations
 
 	/**
@@ -2013,12 +2020,27 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		try (java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors
 				.newVirtualThreadPerTaskExecutor()) {
 
+			// One task per dataset, but only MAX_CONCURRENT_METADATA_QUERIES in flight:
+			// a project with hundreds of datasets would otherwise fire hundreds of
+			// INFORMATION_SCHEMA queries at once and run into BigQuery's concurrency
+			// limits, turning a metadata refresh into a wall of quota errors
+			java.util.concurrent.Semaphore permits = new java.util.concurrent.Semaphore(
+					MAX_CONCURRENT_METADATA_QUERIES);
+
 			java.util.List<java.util.concurrent.CompletableFuture<java.util.List<Object[]>>> futures = items.stream()
 					.map(item -> java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+						try {
+							permits.acquire();
+						} catch (InterruptedException e) {
+							Thread.currentThread().interrupt();
+							throw new RuntimeException(e);
+						}
 						try {
 							return processor.apply(item);
 						} catch (SQLException e) {
 							throw new RuntimeException(e);
+						} finally {
+							permits.release();
 						}
 					}, executor)).toList();
 
@@ -2100,10 +2122,36 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 *            the SQL LIKE pattern
 	 * @return true if value matches pattern
 	 */
+	/**
+	 * Compiled JDBC name patterns, keyed by the pattern as supplied.
+	 *
+	 * <p>
+	 * {@link #matchesPattern} runs once per row — per table in {@code getTables()},
+	 * per column in {@code getColumns()} — so on a project with many datasets it is
+	 * called hundreds of thousands of times, always with the same handful of
+	 * patterns. Translating the pattern and compiling the regex on each call made
+	 * metadata listing markedly slower for exactly the large projects this driver
+	 * exists to speed up.
+	 */
+	private static final java.util.Map<String, java.util.regex.Pattern> PATTERN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
 	private boolean matchesPattern(String value, String pattern) {
 		if (pattern == null) {
 			return true;
 		}
+
+		return PATTERN_CACHE.computeIfAbsent(pattern, p -> java.util.regex.Pattern.compile(translateLikePattern(p)))
+				.matcher(value).matches();
+	}
+
+	/**
+	 * Translates a JDBC/SQL {@code LIKE} pattern into a regular expression.
+	 *
+	 * @param pattern
+	 *            the SQL pattern, with {@code %} and {@code _} wildcards
+	 * @return the equivalent anchored regex
+	 */
+	private static String translateLikePattern(String pattern) {
 
 		// Handle SQL LIKE escape sequences before converting to regex
 		// Use unique Unicode placeholders that won't be affected by string replacements
@@ -2143,9 +2191,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		processed = processed.replace(escapedBackslash, "\\\\"); // Literal backslash (needs escaping)
 
 		// Step 5: Build final regex with anchors
-		String regex = "^" + processed + "$";
-
-		return value.matches(regex);
+		return "^" + processed + "$";
 	}
 
 	/**

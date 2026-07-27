@@ -15,9 +15,11 @@
  */
 package vc.tbc.bq.jdbc.integration.real;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -38,19 +40,25 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * @since 1.0.94
  */
+@Execution(ExecutionMode.CONCURRENT)
 class RealUpdateCountTest extends AbstractRealBigQueryIntegrationTest {
 
-	private final String testTable = tableName("update_count_test");
+	/**
+	 * Each test gets its own table, named after the test method.
+	 *
+	 * <p>
+	 * These tests mutate their fixture and assert exact affected-row counts, so
+	 * unlike the read-only classes they cannot share one table. A per-method name
+	 * is also what makes {@link Execution concurrent} methods safe: a single shared
+	 * name would have every test dropping and recreating the table the others are
+	 * asserting against.
+	 */
+	private String testTable;
 
 	@BeforeEach
-	void setupTestTable() throws SQLException {
-		createTestTable(testTable);
-		insertTestData(testTable); // ids 1-3
-	}
-
-	@AfterEach
-	void cleanupTestTable() {
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + testTable);
+	void setupTestTable(TestInfo testInfo) throws SQLException {
+		testTable = tableName("update_count_" + testInfo.getTestMethod().orElseThrow().getName());
+		createSeededTable(testTable); // ids 1-3, one job, expires on its own
 	}
 
 	@Test

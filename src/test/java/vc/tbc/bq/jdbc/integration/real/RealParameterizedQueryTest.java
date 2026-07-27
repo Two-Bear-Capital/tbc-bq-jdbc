@@ -15,7 +15,10 @@
  */
 package vc.tbc.bq.jdbc.integration.real;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.math.BigDecimal;
 import java.sql.*;
@@ -33,17 +36,27 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * @since 1.0.68
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	/**
 	 * Session-unique table name — prevents conflicts between concurrent CI runs.
 	 */
-	private static final String TABLE = tableName("users");
+	private static final String TABLE = tableName("users_params");
+
+	@BeforeAll
+	void createFixture() throws SQLException {
+		// Every test in this class only reads TABLE, so build it once
+		createSharedTestTable(TABLE);
+	}
+
+	@AfterAll
+	void dropFixture() {
+		dropSharedTestTable(TABLE);
+	}
 
 	@Test
 	void testPreparedStatementWithIntParameter() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name FROM " + TABLE + " WHERE age > ? ORDER BY name";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -60,13 +73,10 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testPreparedStatementWithStringParameter() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT age FROM " + TABLE + " WHERE name = ?";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -79,13 +89,10 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testPreparedStatementWithMultipleParameters() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name FROM " + TABLE + " WHERE age >= ? AND age <= ? ORDER BY name";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -103,13 +110,10 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testPreparedStatementWithBooleanParameter() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT COUNT(*) as count FROM " + TABLE + " WHERE is_active = ?";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -121,13 +125,10 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testPreparedStatementWithDoubleParameter() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name FROM " + TABLE + " WHERE salary > ? ORDER BY name";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -144,13 +145,10 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testPreparedStatementWithBigDecimalParameter() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name FROM " + TABLE + " WHERE salary >= ? ORDER BY name";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -167,13 +165,10 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testPreparedStatementWithDateParameter() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name FROM " + TABLE + " WHERE created_date >= ? ORDER BY name";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -190,7 +185,6 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
@@ -211,8 +205,6 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testPreparedStatementReuseWithDifferentParameters() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name FROM " + TABLE + " WHERE age = ?";
 		try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
@@ -231,7 +223,6 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
@@ -299,8 +290,6 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testPreparedStatementWithComplexQuery() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name, age, salary " + "FROM " + TABLE + " " + "WHERE age BETWEEN ? AND ? "
 				+ "  AND is_active = ? " + "  AND salary > ? " + "ORDER BY age";
@@ -324,6 +313,5 @@ class RealParameterizedQueryTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 }

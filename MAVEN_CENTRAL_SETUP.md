@@ -6,7 +6,7 @@ This project is now set up for publishing to **Maven Central** using the modern 
 
 ### 1. POM Configuration ✅
 
-**Added:** `central-publishing-maven-plugin` (v0.9.0)
+**Added:** `central-publishing-maven-plugin` (version from the `central-publishing-maven-plugin.version` property in `pom.xml`)
 - Replaces legacy OSSRH/Nexus Staging approach
 - Handles bundle creation, validation, and publishing automatically
 - Configured with `autoPublish=true` for CI/CD
@@ -207,7 +207,7 @@ Once published to Maven Central, users can add:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.95</version>
+    <version>1.0.103</version>
 </dependency>
 ```
 
@@ -215,14 +215,14 @@ Once published to Maven Central, users can add:
 
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.95'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.103'
 }
 ```
 
 ### Direct Download
 
 ```bash
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.95/tbc-bq-jdbc-1.0.95.jar
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.103/tbc-bq-jdbc-1.0.103.jar
 ```
 
 ## Troubleshooting

@@ -21,7 +21,11 @@
     <!-- EXPERIMENTAL category: ResultSet lifecycle is managed by the Statement
          per the JDBC spec. The methods flagged already carry @SuppressWarnings("resource")
          and SpotBugs EXPERIMENTAL findings are inherently lower confidence. -->
+    <!-- Scoped to the JDBC surface that must hand back open resources. A blanket
+         suppression also hid a genuine leak: two auth types passed an unclosed
+         FileInputStream to fromStream(). -->
     <Match>
+        <Package name="~vc\.tbc\.bq\.jdbc(\.base|\.metadata|\.storage)?"/>
         <Bug pattern="OBL_UNSATISFIED_OBLIGATION"/>
     </Match>
 

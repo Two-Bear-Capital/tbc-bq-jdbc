@@ -66,6 +66,28 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 
 	private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
 
+	/**
+	 * Threads that run query jobs.
+	 *
+	 * <p>
+	 * Query execution blocks for the whole BigQuery round-trip — job creation plus
+	 * {@code waitFor} polling — so it must not run on
+	 * {@link java.util.concurrent.ForkJoinPool#commonPool()}, whose parallelism is
+	 * {@code availableProcessors() - 1} and which is shared with the host
+	 * application. On the common pool, concurrent queries queue behind each other
+	 * and starve unrelated parallel work; a trivial {@code SELECT 1} was observed
+	 * taking over 30 seconds with eight callers on a four-core machine.
+	 *
+	 * <p>
+	 * Virtual threads suit blocking I/O and need no pooling, so a thread per task
+	 * requires no lifecycle management or shutdown.
+	 */
+	private static final java.util.concurrent.ThreadFactory QUERY_THREADS = Thread.ofVirtual().name("bq-jdbc-query-", 0)
+			.factory();
+
+	private static final java.util.concurrent.Executor QUERY_EXECUTOR = runnable -> QUERY_THREADS.newThread(runnable)
+			.start();
+
 	protected final BQConnection connection;
 	protected final BigQuery bigquery;
 	protected final ConnectionProperties properties;
@@ -263,7 +285,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if query fails
 	 */
-	@SuppressWarnings({"PMD.NullAssignment", "PMD.PreserveStackTrace"})
+	@SuppressWarnings("PMD.NullAssignment")
 	protected ResultSet executeQueryInternal(String sql) throws SQLException {
 		checkClosed();
 		logger.debug("Executing {}: {}", getLogPrefix(), sql);
@@ -393,7 +415,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				Thread.currentThread().interrupt();
 				throw new RuntimeException("Query interrupted", e);
 			}
-		});
+		}, QUERY_EXECUTOR);
 
 		JobResultPair pair = awaitWithTimeout(future, timeoutSeconds);
 
@@ -440,7 +462,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if the wait times out, is interrupted, or the job fails
 	 */
-	@SuppressWarnings("PMD.PreserveStackTrace")
+	@SuppressWarnings("PMD.PreserveStackTrace") // ExecutionException is deliberately unwrapped: its cause is the
+												// real failure and is passed through
 	private <T> T awaitWithTimeout(CompletableFuture<T> future, long timeoutSeconds) throws SQLException {
 		try {
 			return future.get(timeoutSeconds, TimeUnit.SECONDS);
@@ -579,7 +602,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				Thread.currentThread().interrupt();
 				throw new RuntimeException("Query interrupted", e);
 			}
-		});
+		}, QUERY_EXECUTOR);
 
 		Job job = awaitWithTimeout(future, timeoutSeconds);
 		return readDmlAffectedRows(job);

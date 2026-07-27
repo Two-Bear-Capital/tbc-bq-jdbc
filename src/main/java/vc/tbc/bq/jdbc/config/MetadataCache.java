@@ -136,6 +136,7 @@ public final class MetadataCache {
 
 		Instant expiresAt = Instant.now().plus(ttl);
 		cache.put(key, new CacheEntry(columnNames, columnTypes, rows, expiresAt));
+		evictExpired();
 		if (logger.isTraceEnabled()) {
 			logger.trace("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
 		}
@@ -189,6 +190,7 @@ public final class MetadataCache {
 
 		Instant expiresAt = Instant.now().plus(ttl);
 		cache.put(key, new CacheEntry(columnNames, columnTypes, Collections.unmodifiableList(rows), expiresAt));
+		evictExpired();
 		logger.debug("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
 
 	}
@@ -199,6 +201,25 @@ public final class MetadataCache {
 	 * <p>
 	 * This method removes all cached metadata results immediately.
 	 */
+	/**
+	 * Drops entries whose TTL has passed.
+	 *
+	 * <p>
+	 * Expiry was previously only noticed when the same key was read again, so an
+	 * entry nobody asked for a second time stayed in memory for the life of the
+	 * process — and these caches are static, shared between connections and
+	 * deliberately never cleared on close. A long-lived host such as IntelliJ,
+	 * which is the reason the cache is shared in the first place, would keep every
+	 * materialised metadata row it ever fetched.
+	 *
+	 * <p>
+	 * Called after each insert. The map is small (one entry per metadata query
+	 * shape) so the scan is cheap next to the BigQuery query that filled it.
+	 */
+	private void evictExpired() {
+		cache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+	}
+
 	public void clear() {
 		int size = cache.size();
 		cache.clear();

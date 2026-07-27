@@ -103,6 +103,10 @@ public record WorkforceIdentityAuth(String credentialConfigFile) implements Auth
 
 	@Override
 	public Credentials toCredentials() throws IOException {
-		return ExternalAccountCredentials.fromStream(new FileInputStream(credentialConfigFile));
+		// try-with-resources: the stream was previously left open, leaking a file
+		// descriptor for every connection opened with this auth type
+		try (FileInputStream configStream = new FileInputStream(credentialConfigFile)) {
+			return ExternalAccountCredentials.fromStream(configStream);
+		}
 	}
 }

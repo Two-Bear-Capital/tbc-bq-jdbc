@@ -5,7 +5,89 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.95] - 2026-07-26
+## [1.0.103] - 2026-07-27
+
+### 📦 Other
+
+- Potential fix for 1 code quality finding ([#89](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/89))
+
+* Apply suggested fix to MAVEN_CENTRAL_SETUP.md from Copilot Autofix
+
+Co-authored-by: Copilot Autofix powered by AI <223894421+github-code-quality[bot]@users.noreply.github.com>
+
+* docs: point at the pom for the publishing plugin version
+
+The suggested fix changed the hardcoded version from 0.9.0 to 1.0.88, but the
+pom pins 0.11.0 — 1.0.88 is a driver version that an earlier release script
+wrote into the doc by blind search-and-replace. Naming the pom property instead
+of a number removes the thing that keeps going stale.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Copilot Autofix powered by AI <223894421+github-code-quality[bot]@users.noreply.github.com>
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com>
+
+## [1.0.102] - 2026-07-27
+
+### 📦 Other
+
+- Potential fix for 1 code quality finding ([#88](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/88))
+
+* Apply suggested fix to src/test/java/vc/tbc/bq/jdbc/integration/real/RealSimpleQueryTest.java from Copilot Autofix
+
+Co-authored-by: Copilot Autofix powered by AI <223894421+github-code-quality[bot]@users.noreply.github.com>
+
+* style: apply project formatting to the try-with-resources refactor
+
+Spotless enforces tabs for continuation lines; the suggested fix used spaces,
+which failed the format check in CI.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Copilot Autofix powered by AI <223894421+github-code-quality[bot]@users.noreply.github.com>
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com>
+
+## [1.0.101] - 2026-07-27
+
+### 🚀 Performance
+
+- **ci:** Take the emulator bootstrap and duplicate work off the Build job ([#100](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/100))
+
+## [1.0.100] - 2026-07-27
+
+### 🚀 Performance
+
+- Fix concurrency and hot-path defects found by auditing after #98 ([#99](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/99))
+
+## [1.0.99] - 2026-07-27
+
+### 🚀 Performance
+
+- **test:** Table per test in RealUpdateCountTest + collapse the Build job's triple unit run ([#97](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/97))
+
+## [1.0.98] - 2026-07-27
+
+### 🚀 Performance
+
+- **ci:** Cut the real BigQuery job from ~8 minutes to roughly 2 ([#96](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/96))
+
+## [1.0.97] - 2026-07-27
+
+### 🐛 Bug Fixes
+
+- **ci:** Stop the release script stripping JAR classifiers from the docs ([#95](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/95))
+
+## [1.0.96] - 2026-07-27
+
+### 🧪 Testing
+
+- **real:** Isolate real BigQuery runs + fix getProcedures() returning zero rows ([#92](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/92))
+
+## [1.0.95] - 2026-07-27
 
 ### ⚡ Features
 
@@ -2103,6 +2185,14 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.103]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.102...v1.0.103
+[1.0.102]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.101...v1.0.102
+[1.0.101]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.100...v1.0.101
+[1.0.100]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.99...v1.0.100
+[1.0.99]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.98...v1.0.99
+[1.0.98]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.97...v1.0.98
+[1.0.97]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.96...v1.0.97
+[1.0.96]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.95...v1.0.96
 [1.0.95]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.94...v1.0.95
 [1.0.94]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.93...v1.0.94
 [1.0.92]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.91...v1.0.92
