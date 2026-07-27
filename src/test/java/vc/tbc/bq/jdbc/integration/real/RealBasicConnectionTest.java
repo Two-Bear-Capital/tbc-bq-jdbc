@@ -99,8 +99,24 @@ class RealBasicConnectionTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testSetTransactionIsolationUnsupportedLevelThrowsException() {
+		// The emulator version also covered SERIALIZABLE; folded in here (#118).
 		assertThrows(SQLFeatureNotSupportedException.class,
 				() -> connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED));
+		assertThrows(SQLFeatureNotSupportedException.class,
+				() -> connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE));
+		assertThrows(SQLFeatureNotSupportedException.class,
+				() -> connection.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED));
+	}
+
+	@Test
+	void testSetTransactionIsolationAcceptsSupportedLevels() throws SQLException {
+		// BigQuery gives snapshot isolation, reported as REPEATABLE_READ since JDBC
+		// has no snapshot constant. NONE is accepted and recorded but changes nothing.
+		connection.setTransactionIsolation(Connection.TRANSACTION_NONE);
+		assertEquals(Connection.TRANSACTION_NONE, connection.getTransactionIsolation());
+
+		connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+		assertEquals(Connection.TRANSACTION_REPEATABLE_READ, connection.getTransactionIsolation());
 	}
 
 	@Test
