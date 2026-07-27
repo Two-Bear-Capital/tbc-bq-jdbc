@@ -310,10 +310,14 @@ if (warning != null) {
 
 ### 11. Complex Type NULL Handling
 
+> **Ported (#118).** `ComplexTypesTest` has been removed; this behaviour is now asserted
+> for real in `integration/real/RealComplexTypesTest`, against exact JSON. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator returns empty arrays `[]` instead of NULL for ARRAY types.
 
 **Affected Tests:**
-- `ComplexTypesTest.testNullArrayHandling` (line 105)
 
 **Compensation:**
 ```java
@@ -332,12 +336,14 @@ if (arrayValue == null) {
 
 ### 12. JSON Type Support
 
+> **Ported (#118).** `ComplexTypesTest` has been removed; this behaviour is now asserted
+> for real in `integration/real/RealComplexTypesTest`, against exact JSON. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may not support the JSON data type (added in BigQuery relatively recently).
 
 **Affected Tests:**
-- `ComplexTypesTest.testJsonTypeSupport` (line 237)
-- `ComplexTypesTest.testJsonArraySupport` (line 258)
-- `ComplexTypesTest.testNullJsonHandling` (line 280)
 
 **Compensation:**
 ```java
@@ -355,12 +361,14 @@ try {
 
 ### 13. GEOGRAPHY Type Support
 
+> **Ported (#118).** `ComplexTypesTest` has been removed; this behaviour is now asserted
+> for real in `integration/real/RealComplexTypesTest`, against exact JSON. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator does not support the GEOGRAPHY data type and related functions.
 
 **Affected Tests:**
-- `ComplexTypesTest.testGeographyTypeSupport` (line 303)
-- `ComplexTypesTest.testGeographyFunctions` (line 324)
-- `ComplexTypesTest.testNullGeographyHandling` (line 345)
 
 **Compensation:**
 ```java
@@ -378,10 +386,14 @@ try {
 
 ### 14. Complex Types in PreparedStatements
 
+> **Ported (#118).** `ComplexTypesTest` has been removed; this behaviour is now asserted
+> for real in `integration/real/RealComplexTypesTest`, against exact JSON. The compensation
+> shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator may have issues with complex types (ARRAY, STRUCT) in prepared statement parameters.
 
 **Affected Tests:**
-- `ComplexTypesTest.testPreparedStatementWithArrayParameter` (line 438)
 
 **Compensation:**
 ```java
