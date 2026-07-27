@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.102] - 2026-07-27
+
+### 📦 Other
+
+- Potential fix for 1 code quality finding ([#88](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/88))
+
+* Apply suggested fix to src/test/java/vc/tbc/bq/jdbc/integration/real/RealSimpleQueryTest.java from Copilot Autofix
+
+Co-authored-by: Copilot Autofix powered by AI <223894421+github-code-quality[bot]@users.noreply.github.com>
+
+* style: apply project formatting to the try-with-resources refactor
+
+Spotless enforces tabs for continuation lines; the suggested fix used spaces,
+which failed the format check in CI.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Copilot Autofix powered by AI <223894421+github-code-quality[bot]@users.noreply.github.com>
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com>
+
 ## [1.0.101] - 2026-07-27
 
 ### 🚀 Performance
@@ -2139,6 +2161,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.102]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.101...v1.0.102
 [1.0.101]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.100...v1.0.101
 [1.0.100]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.99...v1.0.100
 [1.0.99]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.98...v1.0.99
