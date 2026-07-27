@@ -142,6 +142,48 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	}
 
 	/**
+	 * Creates the shared read-only fixture table for a whole test class, using a
+	 * connection of its own so it can run from {@code @BeforeAll}.
+	 *
+	 * <p>
+	 * Classes whose tests only read the fixture should build it once here rather
+	 * than per test method: each {@code CREATE OR REPLACE TABLE} plus
+	 * {@code INSERT} is a pair of BigQuery jobs, and repeating them for every test
+	 * dominates the class's runtime.
+	 *
+	 * @param tableName
+	 *            the table name
+	 * @throws SQLException
+	 *             if creation fails
+	 */
+	protected void createSharedTestTable(String tableName) throws SQLException {
+		try (Connection setup = createTestConnection(); Statement stmt = setup.createStatement()) {
+			stmt.execute(String.format("CREATE OR REPLACE TABLE %s (" + "id INT64, " + "name STRING, " + "age INT64, "
+					+ "salary FLOAT64, " + "is_active BOOL, " + "created_date DATE" + ")", tableName));
+			stmt.executeUpdate(String.format("INSERT INTO %s (id, name, age, salary, is_active, created_date) VALUES "
+					+ "(1, 'Alice', 30, 75000.50, true, DATE '2024-01-15'), "
+					+ "(2, 'Bob', 25, 60000.00, true, DATE '2024-02-20'), "
+					+ "(3, 'Charlie', 35, 85000.75, false, DATE '2024-03-10')", tableName));
+			logger.info("Created shared test table: {}", tableName);
+		}
+	}
+
+	/**
+	 * Drops a table created by {@link #createSharedTestTable(String)}, on its own
+	 * connection so it can run from {@code @AfterAll}. Errors are ignored.
+	 *
+	 * @param tableName
+	 *            the table name
+	 */
+	protected void dropSharedTestTable(String tableName) {
+		try (Connection cleanup = createTestConnection(); Statement stmt = cleanup.createStatement()) {
+			stmt.execute("DROP TABLE IF EXISTS " + tableName);
+		} catch (SQLException e) {
+			logger.debug("Ignoring error dropping {}: {}", tableName, e.getMessage());
+		}
+	}
+
+	/**
 	 * Creates a test table with sample data.
 	 *
 	 * @param tableName

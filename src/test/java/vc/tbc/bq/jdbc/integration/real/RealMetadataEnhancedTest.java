@@ -15,15 +15,18 @@
  */
 package vc.tbc.bq.jdbc.integration.real;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * @since 1.0.70
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RealMetadataEnhancedTest extends AbstractRealBigQueryIntegrationTest {
 
 	private static final Logger logger = LoggerFactory.getLogger(RealMetadataEnhancedTest.class);
@@ -53,16 +57,23 @@ class RealMetadataEnhancedTest extends AbstractRealBigQueryIntegrationTest {
 
 	private static final String TEST_ROUTINE = TEST_DATASET + "." + ROUTINE_NAME;
 
-	@BeforeEach
-	void createRoutine() {
-		createTestRoutine(TEST_ROUTINE,
-				"CREATE OR REPLACE FUNCTION " + TEST_ROUTINE + "(x INT64, y INT64) RETURNS INT64 AS (x + y)");
+	@BeforeAll
+	void createRoutine() throws SQLException {
+		// Once per class, not per test: no test here mutates the routine, and the
+		// drop/create pair was costing two BigQuery jobs for each of 13 tests
+		try (Connection setup = createTestConnection(); Statement stmt = setup.createStatement()) {
+			stmt.execute("CREATE OR REPLACE FUNCTION " + TEST_ROUTINE + "(x INT64, y INT64) RETURNS INT64 AS (x + y)");
+		}
 	}
 
-	@AfterEach
+	@AfterAll
 	void dropRoutine() {
 		// Run-scoped names would otherwise accumulate in the shared test dataset
-		executeIgnoreErrors("DROP FUNCTION IF EXISTS " + TEST_ROUTINE);
+		try (Connection cleanup = createTestConnection(); Statement stmt = cleanup.createStatement()) {
+			stmt.execute("DROP FUNCTION IF EXISTS " + TEST_ROUTINE);
+		} catch (SQLException e) {
+			logger.debug("Ignoring error dropping {}: {}", TEST_ROUTINE, e.getMessage());
+		}
 	}
 
 	// Group A: formerly-throwing methods now return empty ResultSets
