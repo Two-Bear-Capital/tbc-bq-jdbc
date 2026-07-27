@@ -137,7 +137,7 @@ public final class BQConnection extends AbstractBQConnection {
 			}
 
 			this.bigquery = builder.build().getService();
-			logger.info("Connected to BigQuery project: {}", properties.projectId());
+			logger.debug("Connected to BigQuery project: {}", properties.projectId());
 
 			// Initialize session manager
 			this.sessionManager = new SessionManager(bigquery);
@@ -145,7 +145,7 @@ public final class BQConnection extends AbstractBQConnection {
 			// Initialize session if enabled
 			if (properties.enableSessions()) {
 				sessionManager.initializeSession();
-				logger.info("BigQuery session mode enabled");
+				logger.debug("BigQuery session mode enabled");
 			}
 
 		} catch (IOException e) {
@@ -513,14 +513,14 @@ public final class BQConnection extends AbstractBQConnection {
 		if (metadata != null) {
 			String cacheStats = metadata.getCacheStats();
 			if (cacheStats != null) {
-				logger.info("Metadata cache statistics: {}", cacheStats);
+				logger.debug("Metadata cache statistics: {}", cacheStats);
 			}
 			// Note: Cache is NOT cleared on connection close - it persists across
 			// connections and expires based on TTL. This improves performance for
 			// applications (like IntelliJ) that frequently reopen connections.
 		}
 
-		logger.info("BigQuery connection closed");
+		logger.debug("BigQuery connection closed");
 	}
 
 	@Override
