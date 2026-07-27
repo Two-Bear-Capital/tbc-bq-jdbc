@@ -358,7 +358,7 @@ See [Authentication Guide](docs/AUTHENTICATION.md) for all methods.
 
 After building:
 - **Slim JAR:** `target/tbc-bq-jdbc-1.0.96.jar` (60K)
-- **Shaded JAR:** `target/tbc-bq-jdbc-1.0.96.jar` (51M)
+- **Shaded JAR:** `target/tbc-bq-jdbc-1.0.96-shaded.jar` (51M)
 - **Sources JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT-sources.jar` (41K)
 - **Javadoc JAR:** `target/tbc-bq-jdbc-1.0.2-SNAPSHOT-javadoc.jar` (267K)
 
