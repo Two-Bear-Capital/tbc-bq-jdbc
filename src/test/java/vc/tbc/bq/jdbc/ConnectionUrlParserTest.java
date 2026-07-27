@@ -292,7 +292,7 @@ class ConnectionUrlParserTest {
 		assertEquals(ConnectionProperties.DEFAULT_RETRY_COUNT, props.retryCount());
 		assertFalse(props.useLegacySql());
 		assertFalse(props.enableSessions());
-		assertEquals("auto", props.useStorageApi());
+		assertEquals("false", props.useStorageApi());
 		assertEquals(JobCreationMode.REQUIRED, props.jobCreationMode());
 	}
 

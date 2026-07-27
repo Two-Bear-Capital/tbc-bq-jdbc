@@ -56,7 +56,8 @@ import java.util.Objects;
  * @param pageSize
  *            result page size for pagination (default: 10000)
  * @param useStorageApi
- *            Storage API mode: auto, true, false (default: auto)
+ *            Storage API mode: auto, true, false (default: false — the Storage
+ *            Read API path is not implemented yet)
  * @param enableSessions
  *            whether to use BigQuery sessions (default: false)
  * @param connectionTimeout
@@ -124,7 +125,10 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			pageSize = DEFAULT_PAGE_SIZE;
 		}
 		if (useStorageApi == null) {
-			useStorageApi = "auto";
+			// Defaults to false while the Storage Read API path is unimplemented:
+			// "auto" silently routed large results into a ResultSet that could not
+			// iterate. Restore "auto" when StorageReadResultSet decodes rows.
+			useStorageApi = "false";
 		}
 		if (connectionTimeout == null) {
 			connectionTimeout = DEFAULT_CONNECTION_TIMEOUT;

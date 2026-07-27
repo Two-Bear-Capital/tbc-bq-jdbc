@@ -177,4 +177,30 @@ class BQResultSetTest {
 
 		assertEquals((byte) 10, rs.getByte("val"));
 	}
+
+	// ── null row iterator ─────────────────────────────────────────────────────
+
+	/**
+	 * A subclass that uses the null-TableResult constructor but forgets to override
+	 * {@code next()} — which is exactly what {@code StorageReadResultSet} did.
+	 */
+	private static final class IterationlessResultSet extends BQResultSet {
+		private IterationlessResultSet() {
+			super(null, null, true);
+		}
+	}
+
+	@Test
+	void testNextOnNullRowIteratorThrowsSqlExceptionNotNpe() {
+		// Given: a subclass constructed without a TableResult that does not
+		// override next() — rowIterator is null
+		BQResultSet rs = new IterationlessResultSet();
+
+		// When / Then: next() must report a checked SQLException. Before this guard
+		// it dereferenced the null iterator and threw NullPointerException, which
+		// surfaced to callers as an unchecked crash mid-iteration.
+		SQLException thrown = assertThrows(SQLException.class, rs::next);
+		assertTrue(thrown.getMessage().contains("no row iterator"),
+				"message should explain the cause, was: " + thrown.getMessage());
+	}
 }

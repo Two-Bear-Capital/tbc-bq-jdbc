@@ -190,18 +190,23 @@ Covers `useStorageApi`, `connectionTimeout`, `retryCount`, `metadataCacheEnabled
 
 **Example:**
 ```
-jdbc:bigquery:my-project/my_dataset?authType=ADC&useStorageApi=true&retryCount=5
+jdbc:bigquery:my-project/my_dataset?authType=ADC&pageSize=50000&retryCount=5
 ```
 
 **Storage API Modes:**
+
+> **Not implemented yet — `useStorageApi` currently has no effect.** The driver
+> always reads results through the Jobs API, whatever this property is set to.
+> Setting `auto` or `true` logs a warning once and is otherwise ignored. The
+> default is `false` so nothing changes silently.
+
+Once the Storage Read API path is finished, the modes will be:
 - `auto` - Automatically use Storage API for result sets > 10MB
 - `true` - Always use Storage API for reads
 - `false` - Never use Storage API (use Jobs API only)
 
-**Benefits of Storage API:**
-- 🚀 Faster data access for large result sets
-- 📊 Parallel stream reading
-- 💰 Lower costs for large queries
+and it is expected to give faster access to large result sets, parallel stream
+reading, and lower costs for large queries.
 
 **Metadata Caching (for IntelliJ/Database Tools):**
 
@@ -297,7 +302,6 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&location=US
 jdbc:bigquery:my-project/my_dataset?\
   authType=SERVICE_ACCOUNT&\
   credentials=/etc/secrets/bigquery.json&\
-  useStorageApi=auto&\
   pageSize=50000&\
   timeout=3600&\
   location=US&\
@@ -356,7 +360,6 @@ jdbc:bigquery:my-project/analytics?\
 jdbc:bigquery:my-project/reporting?\
   authType=SERVICE_ACCOUNT&\
   credentials=/opt/bi-tool/bigquery-ro.json&\
-  useStorageApi=true&\
   pageSize=100000&\
   timeout=600&\
   labels=source=looker,type=dashboard
@@ -450,7 +453,6 @@ driver's `getPropertyInfo()`, so it never goes stale.
 | Property | Impact on Performance | Impact on Cost |
 |----------|----------------------|----------------|
 | `pageSize` | Higher = faster iteration | None |
-| `useStorageApi=true` | Much faster for large results | Lower for large queries |
 | `timeout` | Higher allows longer queries | Indirectly (prevents partial work) |
 | `maxResults` | Lower = faster completion | Lower (less data processed) |
 | `connectionTimeout` | Higher = more resilient | None |
