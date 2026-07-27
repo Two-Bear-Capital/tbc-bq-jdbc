@@ -246,12 +246,14 @@ try {
 
 ### 9. Session Features
 
+> **Ported (#118).** `SessionTest` has been removed; session behaviour is now asserted for
+> real in `integration/real/RealSessionTest`, alongside `RealTransactionTest`. The
+> compensation shown below is kept only as a record of what the emulator tier used to do.
+
+
 **Limitation:** The emulator has limited session support, particularly for temp tables and session persistence.
 
 **Affected Tests:**
-- `SessionTest.testTempTablesInSession` (line 77)
-- `SessionTest.testSessionPersistenceAcrossStatements` (line 113)
-- `SessionTest.testSessionIsolation` (line 143)
 
 **Compensation:**
 ```java
@@ -267,7 +269,6 @@ try {
 
 **Real BigQuery Status:** ✅ Full session support with temp tables
 
-**Note:** `SessionTest` class documentation explicitly mentions emulator limitations (line 39-41).
 
 **Two further session gaps:**
 
