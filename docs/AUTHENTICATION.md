@@ -20,6 +20,12 @@ credentials, and examples for each method.
 
 <!-- @include: generated/authentication.md -->
 
+> **`authType=EMULATOR` is deprecated** and will be removed in the next major
+> release. The driver is no longer tested against the BigQuery emulator, so
+> continuing to advertise support for it would promise more than the project can
+> keep. Use `authType=ADC` — or any other real credential type — against BigQuery.
+> Selecting it logs a warning; behaviour is otherwise unchanged for now.
+
 ## Application Default Credentials (ADC)
 
 **Recommended for:** Local development, Google Cloud environments

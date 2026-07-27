@@ -178,7 +178,9 @@ public final class DocGen {
 		}
 		impls.sort(String::compareTo);
 		for (String impl : impls) {
-			String note = impl.contains("Emulator") ? "Testing only — not selectable via `authType`." : "";
+			String note = impl.contains("Emulator")
+					? "**Deprecated** — selectable as `authType=EMULATOR`, removed in the next major release."
+					: "";
 			sb.append("| `").append(impl).append("` | ").append(note).append(" |\n");
 		}
 

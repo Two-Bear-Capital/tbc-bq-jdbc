@@ -335,7 +335,9 @@ public final class ConnectionUrlParser {
 		// Parse authType (required)
 		String authTypeStr = properties.get("authType");
 		if (authTypeStr == null) {
-			// If host is specified, default to EMULATOR auth, otherwise ADC
+			// A host with no authType still implies EMULATOR, because changing that
+			// now would break emulator users before the deprecation period is up.
+			// EmulatorAuth logs a warning when it is actually used.
 			authTypeStr = (host != null) ? "EMULATOR" : "ADC";
 		}
 
@@ -368,8 +370,11 @@ public final class ConnectionUrlParser {
 				metadataLazyLoad, useDestinationTables, enableQueryCostEstimation, nativeComplexTypes);
 	}
 
+	@SuppressWarnings("removal") // EMULATOR mapping retained for the deprecation period
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
 		return switch (authTypeStr.toUpperCase(Locale.ROOT)) {
+			// Still honoured so existing emulator users keep working; EmulatorAuth
+			// itself logs the deprecation. Remove with the record.
 			case "EMULATOR" -> new EmulatorAuth();
 			case "SERVICE_ACCOUNT" -> {
 				String credentials = properties.get("credentials");
