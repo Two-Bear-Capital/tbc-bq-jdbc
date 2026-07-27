@@ -122,7 +122,7 @@ The POM is configured with the modern `central-publishing-maven-plugin`:
 <plugin>
     <groupId>org.sonatype.central</groupId>
     <artifactId>central-publishing-maven-plugin</artifactId>
-    <version>1.0.88</version>
+    <version>${central-publishing-maven-plugin.version}</version>
     <extensions>true</extensions>
     <configuration>
         <publishingServerId>central</publishingServerId>
@@ -201,15 +201,15 @@ The `release` profile activates:
 
 ## Artifact Variants
 
-Published artifacts for version `1.0.43`:
+Published artifacts, using version `1.0.103` as the example:
 
 | Artifact | Classifier | Size | Description |
 |----------|-----------|------|-------------|
 | `tbc-bq-jdbc-1.0.103.jar` | *(none)* | ~60KB | Slim JAR (requires dependencies) |
-| `tbc-bq-jdbc-1.0.103.jar` | `shaded` | ~38MB | Fat JAR with all dependencies |
+| `tbc-bq-jdbc-1.0.103-shaded.jar` | `shaded` | ~38MB | Fat JAR with all dependencies |
 | `tbc-bq-jdbc-1.0.103-with-logging.jar` | `with-logging` | ~39MB | Fat JAR + Logback (for IntelliJ) |
-| `tbc-bq-jdbc-1.0.103.jar` | `sources` | ~200KB | Source code |
-| `tbc-bq-jdbc-1.0.103.jar` | `javadoc` | ~500KB | Javadoc |
+| `tbc-bq-jdbc-1.0.103-sources.jar` | `sources` | ~200KB | Source code |
+| `tbc-bq-jdbc-1.0.103-javadoc.jar` | `javadoc` | ~500KB | Javadoc |
 
 Each artifact includes:
 - `.md5` - MD5 checksum
