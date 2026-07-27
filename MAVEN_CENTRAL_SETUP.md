@@ -207,7 +207,7 @@ Once published to Maven Central, users can add:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.119</version>
+    <version>1.0.120</version>
 </dependency>
 ```
 
@@ -215,14 +215,14 @@ Once published to Maven Central, users can add:
 
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:1.0.119'
+    implementation 'vc.tbc:tbc-bq-jdbc:1.0.120'
 }
 ```
 
 ### Direct Download
 
 ```bash
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.119/tbc-bq-jdbc-1.0.119.jar
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/1.0.120/tbc-bq-jdbc-1.0.120.jar
 ```
 
 ## Troubleshooting
