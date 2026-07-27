@@ -69,16 +69,54 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Install git-cliff
+        run: |
+          # Download and extract OUTSIDE the repo workspace so the tarball and
+          # extracted files never land in the working tree (they must not be
+          # committed by the bump step below).
+          cd "$RUNNER_TEMP"
+          wget -q https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
+          sudo mv git-cliff-2.7.0/git-cliff /usr/local/bin/
+          chmod +x /usr/local/bin/git-cliff
+          git-cliff --version
+
       - name: Compute new version
         id: new_version
         run: |
           CURRENT_VERSION=$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Current version: $CURRENT_VERSION"
-
-          # Strip any qualifier (-SNAPSHOT, -alpha, ...) and increment patch.
-          BASE_VERSION=$(echo "$CURRENT_VERSION" | cut -d'-' -f1)
+          BASE_VERSION="${CURRENT_VERSION%%-*}"          # drop -SNAPSHOT and friends
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
-          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          PATCH_BUMP="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "Current version: $CURRENT_VERSION (patch fallback would be $PATCH_BUMP)"
+
+          # Derive the bump from the Conventional Commits since the last tag, using
+          # the same cliff.toml commit_parsers that build the changelog — so the
+          # release name and the changelog cannot disagree. feat -> minor,
+          # BREAKING CHANGE or ! -> major, fix/perf/docs/test/refactor -> patch.
+          BUMPED=$(git-cliff --config cliff.toml --bumped-version 2>/dev/null | tail -1 || true)
+          BUMPED="${BUMPED#v}"
+          echo "git-cliff --bumped-version: ${BUMPED:-<none>}"
+
+          NEW_VERSION="$PATCH_BUMP"
+          if [[ ! "$BUMPED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::warning::git-cliff returned '${BUMPED:-<empty>}', which is not a semver. Falling back to a patch bump."
+          elif [ "$BUMPED" = "$BASE_VERSION" ]; then
+            # Every commit in the range is one cliff.toml skips (chore(deps), release
+            # prep). There is still a release to cut, and reusing the current version
+            # would collide with its existing tag, so move the patch.
+            echo "No bump-worthy commits since the last tag; using the patch fallback."
+          elif [ "$(printf '%s\n%s\n' "$BASE_VERSION" "$BUMPED" | sort -V | tail -1)" != "$BUMPED" ]; then
+            echo "::warning::git-cliff proposed $BUMPED which is not ahead of $BASE_VERSION. Falling back to a patch bump."
+          else
+            NEW_VERSION="$BUMPED"
+          fi
+
+          # The tag-healing step below assumes forward movement; make that explicit.
+          if [ "$(printf '%s\n%s\n' "$BASE_VERSION" "$NEW_VERSION" | sort -V | tail -1)" = "$BASE_VERSION" ]; then
+            echo "::error::Computed version $NEW_VERSION is not ahead of $BASE_VERSION. Refusing to release."
+            exit 1
+          fi
 
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "New version: $NEW_VERSION"
@@ -142,18 +180,6 @@ jobs:
 
           # Show what changed
           git diff --stat
-
-      - name: Install git-cliff
-        run: |
-          # Download and extract OUTSIDE the repo workspace so the tarball and
-          # extracted files never land in the working tree (they must not be
-          # committed by the bump step below).
-          cd "$RUNNER_TEMP"
-          wget -q https://github.com/orhun/git-cliff/releases/download/v2.7.0/git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
-          tar -xzf git-cliff-2.7.0-x86_64-unknown-linux-gnu.tar.gz
-          sudo mv git-cliff-2.7.0/git-cliff /usr/local/bin/
-          chmod +x /usr/local/bin/git-cliff
-          git-cliff --version
 
       - name: Update CHANGELOG.md
         run: |
