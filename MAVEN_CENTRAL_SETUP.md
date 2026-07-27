@@ -207,7 +207,7 @@ Once published to Maven Central, users can add:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>2.0.2</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 
@@ -215,14 +215,14 @@ Once published to Maven Central, users can add:
 
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:2.0.2'
+    implementation 'vc.tbc:tbc-bq-jdbc:2.1.0'
 }
 ```
 
 ### Direct Download
 
 ```bash
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.0.2/tbc-bq-jdbc-2.0.2.jar
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.1.0/tbc-bq-jdbc-2.1.0.jar
 ```
 
 ## Troubleshooting
