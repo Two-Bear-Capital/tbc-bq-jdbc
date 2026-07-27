@@ -23,11 +23,6 @@
         <appender-ref ref="CONSOLE"/>
     </logger>
 
-
-    <logger name="org.testcontainers" level="ERROR" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-    </logger>
-
     <!-- Root logger - catches everything else -->
     <root level="WARN">
         <appender-ref ref="CONSOLE"/>
