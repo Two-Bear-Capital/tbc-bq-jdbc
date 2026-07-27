@@ -106,7 +106,7 @@ When using the standard JAR, add an SLF4J implementation:
     <dependency>
         <groupId>ch.qos.logback</groupId>
         <artifactId>logback-classic</artifactId>
-        <version>1.5.34</version>
+        <version>1.6.0</version>
     </dependency>
 </dependencies>
 ```
@@ -115,7 +115,7 @@ When using the standard JAR, add an SLF4J implementation:
 ```groovy
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:1.0.108'
-    implementation 'ch.qos.logback:logback-classic:1.5.34'
+    implementation 'ch.qos.logback:logback-classic:1.6.0'
 }
 ```
 
