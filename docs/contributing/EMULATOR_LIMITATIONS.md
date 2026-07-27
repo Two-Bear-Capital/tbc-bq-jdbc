@@ -287,10 +287,13 @@ try {
 
 ### 10. Query Cost Estimation (Dry-Run)
 
+> **Ported (#118).** `QueryCostEstimationTest` has been removed; the warning is now
+> required rather than optional in `integration/real/RealQueryCostEstimationTest`.
+
+
 **Limitation:** The emulator may not support dry-run queries for cost estimation.
 
 **Affected Tests:**
-- `QueryCostEstimationTest.testDryRunQueryCostEstimation` (line 73)
 
 **Compensation:**
 ```java
@@ -401,6 +404,11 @@ try {
 
 ### 15. DML Statistics (numDmlAffectedRows)
 
+> **Partially ported (#118).** `BatchExecutionTest` has moved to
+> `integration/real/RealBatchExecutionTest`, which asserts exact per-row counts.
+> `UpdateCountTest` is still on the emulator tier and still tolerant.
+
+
 **Limitation:** The emulator does not populate `numDmlAffectedRows` in query job
 statistics. DML update counts therefore come back as 0 from `executeUpdate()`,
 and `execute()` cannot detect that a statement was DML (it falls back to
@@ -409,7 +417,6 @@ affected-row counts.
 
 **Affected Tests:**
 - `UpdateCountTest` (all DML count assertions are tolerant: `count == expected || count == 0`)
-- `BatchExecutionTest` (batch update counts assert `1` or `SUCCESS_NO_INFO`)
 
 **Compensation:**
 ```java
