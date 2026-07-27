@@ -164,11 +164,20 @@ throughput at N threads can exceed N times the single-threaded rate. The recorde
 baseline shows 25x at 16 threads. Superlinear here means the single-threaded number is
 mostly idle waiting — which it is.
 
-**Well below 100% is normal for the metadata benchmarks.** `getTablesWarm` and
-`getColumnsWarm` serve from an in-memory cache, so they are CPU- and allocation-bound
-rather than network-bound. They cannot exceed the core count, and in practice plateau
-well before it because each operation allocates a fresh `ResultSet` over the cached
-rows. The baseline plateaus around 4x.
+**Well below 100% is expected for the metadata benchmarks, but the exact ceiling is
+not explained.** `getTablesWarm` and `getColumnsWarm` serve from an in-memory cache,
+so they are CPU-bound rather than network-bound and cannot exceed the core count. The
+baseline plateaus around 4x on a 10-core machine, which is lower than that alone
+accounts for.
+
+A cache hit does *not* copy the rows — `MetadataCache.CacheEntry.createResultSet()`
+hands the shared `unmodifiableList` to a new `MetadataResultSet` wrapper — so this is
+not allocation of the result. The per-operation cost is iterating it: the baseline
+run reads 11,735 rows per `getColumnsWarm` operation, each with a by-name column
+lookup. `MetadataResultSet.findColumn` lowercases the requested label on every one of
+those lookups, which allocates a `String` per row. That is a plausible contributor,
+not a confirmed cause — nobody has profiled it. The JFR recording from a scale run is
+the way to settle it.
 
 **Near 1x on a latency-bound benchmark is the failure.** That is #98: throughput flat
 no matter how many callers.
@@ -348,6 +357,25 @@ User-facing documentation is in **[docs/OBSERVABILITY.md](../OBSERVABILITY.md)**
   unchanged.
 - **Should a regression fail a build?** Currently no, by decision: reported numbers a
   human reads. Revisit if someone starts ignoring the reports.
+- **Why do the metadata benchmarks plateau at 4x on ten cores?** Unexplained, see
+  above. The first real question these instruments have raised rather than answered,
+  which is what they are for.
+
+## What the instruments found on their first run
+
+Recorded here so the next person does not have to rediscover it:
+
+- `MetadataResultSet.findColumn` allocates a lowercased `String` on **every by-name
+  column access**, so a `getColumns()` over a wide project allocates one per row. This
+  is the same shape as the per-row regex compilation #99 found, and `getColumnsWarm`
+  is now the benchmark that would show a fix.
+- `MetadataCache` has **no size bound**. `evictExpired()` removes expired entries
+  only, so distinct query shapes accumulate within a TTL window, each holding every
+  materialised row of its result. On a wide project that is thousands of rows per
+  entry, in a cache that is static and shared for the life of the process.
+- `BQDatabaseMetaData` logs **31 times at INFO**, several per `getTables()` /
+  `getColumns()` miss — including one that builds a sublist-to-string of dataset IDs
+  before the level is checked. Routine library operations should not be INFO.
 
 [93]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/93
 [98]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/98
