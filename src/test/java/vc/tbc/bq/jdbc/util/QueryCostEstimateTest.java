@@ -113,4 +113,22 @@ class QueryCostEstimateTest {
 
 		assertEquals(0, estimate.getMegabytes());
 	}
+
+	@Test
+	void testFormatWarning() {
+		QueryCostEstimate estimate = new QueryCostEstimate(1_610_612_736L, // 1.5 GB
+				1_610_612_736L, 1_610_612_736L, new BigDecimal("0.0101"));
+
+		assertEquals("Query will process 1.50 GB (1610.61 MB), estimated cost: $0.0101", estimate.formatWarning());
+	}
+
+	@Test
+	void testFormatWarningWithNullBytesProcessed() {
+		// BigQuery omits totalBytesProcessed for some jobs. Unboxing it used to throw
+		// an NPE that the dry-run catch block swallowed, silently disabling cost
+		// estimation and logging "Dry-run estimation failed: null".
+		QueryCostEstimate estimate = new QueryCostEstimate(null, null, null, BigDecimal.ZERO);
+
+		assertEquals("Query will process 0 B (0.00 MB), estimated cost: $0", estimate.formatWarning());
+	}
 }

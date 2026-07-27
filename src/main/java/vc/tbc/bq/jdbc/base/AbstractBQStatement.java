@@ -51,7 +51,7 @@ import java.util.regex.Pattern;
  * Fixes:
  * <ul>
  * <li>ResultSet leak when executeQuery() called multiple times
- * <li>Thread-safe access to currentJob during cancel operations
+ * <li>Safe publication of currentJob for cancel operations
  * </ul>
  */
 public abstract class AbstractBQStatement extends BaseCloseable implements Statement {
@@ -104,8 +104,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected final ConnectionProperties properties;
 
 	/**
-	 * Volatile ensures visibility across threads for cancel operations.
-	 * Thread-safety fix for concurrent access during query execution.
+	 * The in-flight BigQuery job, or null when none is running.
+	 *
+	 * <p>
+	 * {@code volatile} is the whole synchronisation story here: the field is
+	 * written once per execution and read by {@code cancel()} on another thread,
+	 * with no read-modify-write anywhere, so visibility is all that is required.
+	 * Readers copy it into a local first so a concurrent write cannot change the
+	 * value between the null check and its use.
 	 */
 	protected volatile Job currentJob;
 
@@ -287,8 +293,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 
 	/**
 	 * Common query execution logic with resource leak fix. Closes previous
-	 * ResultSet before creating new one. Thread-safe access to currentJob for
-	 * cancel operations.
+	 * ResultSet before creating new one. Publishes currentJob for cancel
+	 * operations.
 	 *
 	 * @param sql
 	 *            the SQL query to execute
@@ -329,9 +335,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				QueryCostEstimate estimate = runDryRun(sql);
 
 				// Create warning with cost information
-				String message = String.format("Query will process %s (%.2f MB), estimated cost: $%s",
-						QueryCostEstimate.formatBytes(estimate.totalBytesProcessed()),
-						estimate.totalBytesProcessed() / 1_000_000.0, estimate.estimatedCostUSD());
+				String message = estimate.formatWarning();
 
 				queryWarnings = new SQLWarning(message, "01000", // Standard warning SQL state
 						estimate.getMegabytes() // MB as vendor code
@@ -340,8 +344,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				logger.info("Dry-run estimate: {}", message);
 
 			} catch (Exception e) {
-				// Don't fail query if dry-run fails - log and continue
-				logger.warn("Dry-run estimation failed: {}", e.getMessage());
+				// Don't fail the query if the dry run fails — log and continue. Logged
+				// with the throwable, not just its message: an NPE here used to surface
+				// as "Dry-run estimation failed: null", which said nothing about where
+				// it came from.
+				logger.warn("Dry-run estimation failed", e);
 			}
 		}
 
@@ -387,13 +394,18 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				MetadataCache cache = connection.getMetadataCache();
 				if (cache != null) {
 					String cacheKey = normalizeSqlCacheKey(sql);
-					cache.put(cacheKey, pair.result);
+					// Serve the materialised copy that put() hands back, so the cursor
+					// state is independent of TableResult. Reading it back with get()
+					// instead would race: caching drains the TableResult, so an eviction
+					// between the write and the read left the fallback below wrapping a
+					// consumed result. An empty return means nothing was cached and
+					// pair.result was not touched, so the fallback is safe.
+					Optional<ResultSet> cached = cache.put(cacheKey, pair.result);
 					// Adaptive pre-warming: propagate this IS query pattern to all other
 					// known schemas in the background so IntelliJ's next introspection pass
 					// finds warm cache entries instead of firing live BigQuery jobs.
 					triggerSpeculativePreWarm(sql, cache);
-					// Serve from cache so the cursor state is independent of TableResult
-					currentResultSet = cache.get(cacheKey).orElseGet(() -> createResultSet(pair.result, pair.job));
+					currentResultSet = cached.orElseGet(() -> createResultSet(pair.result, pair.job));
 					return currentResultSet;
 				}
 			}
@@ -412,6 +424,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * is cancelled. ExecutionExceptions are unwrapped to expose the root cause (the
 	 * wrapper adds no diagnostic value).
 	 *
+	 * <p>
+	 * An effective timeout of zero or less means wait indefinitely, the contract
+	 * documented for {@code timeout=0}. It previously reached
+	 * {@code future.get(0, SECONDS)}, which times out at once unless the job has
+	 * already finished, so {@code timeout=0} failed nearly every query with "Query
+	 * timeout after 0 seconds" — the exact opposite of what it promises.
+	 *
 	 * @param future
 	 *            the future to await
 	 * @return the future's result
@@ -423,16 +442,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	private <T> T awaitWithTimeout(CompletableFuture<T> future) throws SQLException {
 		long timeoutSeconds = queryTimeout > 0 ? queryTimeout : properties.timeoutSeconds();
 		try {
-			return future.get(timeoutSeconds, TimeUnit.SECONDS);
+			return timeoutSeconds > 0 ? future.get(timeoutSeconds, TimeUnit.SECONDS) : future.get();
 		} catch (TimeoutException e) {
 			// Cancel the future to interrupt the virtual thread
 			future.cancel(true);
 
-			// Thread-safe access to currentJob during cancel
-			Job jobToCancel;
-			synchronized (this) {
-				jobToCancel = currentJob;
-			}
+			// Read once into a local so the null check and the cancel below cannot
+			// see different values.
+			Job jobToCancel = currentJob;
 
 			if (jobToCancel != null) {
 				try {
@@ -577,14 +594,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	}
 
 	/**
-	 * Cancels the currently executing query. Thread-safe access to currentJob.
+	 * Cancels the currently executing query, if any.
 	 */
 	@Override
 	public void cancel() throws SQLException {
-		Job jobToCancel;
-		synchronized (this) {
-			jobToCancel = currentJob;
-		}
+		Job jobToCancel = currentJob;
 
 		if (jobToCancel != null) {
 			try {
@@ -922,10 +936,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		try {
 			Job job = bigquery.create(JobInfo.of(config));
 
-			// Thread-safe assignment
-			synchronized (this) {
-				this.currentJob = job;
-			}
+			// currentJob is volatile: this single reference write is already visible
+			// to cancel() on another thread. It used to also hold the monitor, which
+			// added nothing and implied an invariant that does not exist.
+			this.currentJob = job;
 
 			logger.info("{} job created: {}", getLogPrefix(), job.getJobId());
 

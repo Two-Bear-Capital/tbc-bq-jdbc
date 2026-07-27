@@ -422,9 +422,28 @@
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
+                    <!-- Unit-test coverage, available from a bare `mvn test`. -->
                     <execution>
                         <id>report</id>
                         <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <!-- Failsafe already runs with the JaCoCo agent attached (it uses
+                         @{argLine}) and appends to the same target/jacoco.exec, but the
+                         report above is written during `test`, which the lifecycle runs
+                         *before* integration-test. So everything the 319 emulator tests
+                         covered was recorded and then never reported: the published
+                         figure sat at 42.1% when the real number is 62.2%.
+
+                         Re-running the report after integration-test overwrites
+                         target/site/jacoco with the full picture. `mvn test` stops short
+                         of this phase, so the unit-only report above still stands on its
+                         own for the quick local loop. -->
+                    <execution>
+                        <id>report-with-integration-tests</id>
+                        <phase>post-integration-test</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>

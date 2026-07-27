@@ -110,6 +110,34 @@ public record QueryCostEstimate(Long totalBytesProcessed, Long estimatedBytesPro
 	}
 
 	/**
+	 * Formats the message carried by the query-cost {@link java.sql.SQLWarning},
+	 * which adds the raw megabyte figure to {@link #formatSummary()}.
+	 *
+	 * <p>
+	 * BigQuery omits {@code totalBytesProcessed} for some jobs, so the field is a
+	 * nullable {@link Long}. Formatting it here rather than at the call site keeps
+	 * the null handling in one place, next to {@link #getMegabytes()} which already
+	 * guards the same value.
+	 *
+	 * @return formatted warning (e.g., "Query will process 1.5 GB (1610.61 MB),
+	 *         estimated cost: $0.0094")
+	 */
+	public String formatWarning() {
+		return String.format("Query will process %s (%.2f MB), estimated cost: $%s", formatBytes(totalBytesProcessed),
+				megabytesProcessed(), estimatedCostUSD);
+	}
+
+	/**
+	 * Bytes processed expressed in megabytes, or {@code 0} when BigQuery did not
+	 * report the figure.
+	 *
+	 * @return megabytes processed
+	 */
+	private double megabytesProcessed() {
+		return totalBytesProcessed == null ? 0.0 : totalBytesProcessed / 1_000_000.0;
+	}
+
+	/**
 	 * Formats megabytes for use in SQLWarning vendor code.
 	 *
 	 * @return megabytes as integer
