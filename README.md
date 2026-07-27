@@ -67,7 +67,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
 
 1. **Download Driver JAR**
    ```bash
-   wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.1.0/tbc-bq-jdbc-2.1.0.jar
+   wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.1.1/tbc-bq-jdbc-2.1.1.jar
    ```
 
 2. **Add Driver in IntelliJ**
@@ -103,7 +103,7 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>2.1.0</version>
+    <version>2.1.1</version>
 </dependency>
 ```
 
@@ -111,7 +111,7 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ```gradle
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:2.1.0'
+    implementation 'vc.tbc:tbc-bq-jdbc:2.1.1'
 }
 ```
 
@@ -119,7 +119,7 @@ dependencies {
 
 ```bash
 # Download shaded JAR with all dependencies included
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.1.0/tbc-bq-jdbc-2.1.0.jar
+wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.1.1/tbc-bq-jdbc-2.1.1.jar
 ```
 
 ### Basic Usage
@@ -358,10 +358,10 @@ export BQ_TEST_PROJECT=my-gcp-project
 ### Build Artifacts
 
 After building:
-- **Slim JAR:** `target/tbc-bq-jdbc-2.1.0.jar` (60K)
-- **Shaded JAR:** `target/tbc-bq-jdbc-2.1.0-shaded.jar` (51M)
-- **Sources JAR:** `target/tbc-bq-jdbc-2.1.0-sources.jar` (41K)
-- **Javadoc JAR:** `target/tbc-bq-jdbc-2.1.0-javadoc.jar` (267K)
+- **Slim JAR:** `target/tbc-bq-jdbc-2.1.1.jar` (60K)
+- **Shaded JAR:** `target/tbc-bq-jdbc-2.1.1-shaded.jar` (51M)
+- **Sources JAR:** `target/tbc-bq-jdbc-2.1.1-sources.jar` (41K)
+- **Javadoc JAR:** `target/tbc-bq-jdbc-2.1.1-javadoc.jar` (267K)
 
 ## Testing
 
