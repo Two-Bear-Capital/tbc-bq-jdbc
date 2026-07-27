@@ -15,7 +15,10 @@
  */
 package vc.tbc.bq.jdbc.integration.real;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -33,17 +36,27 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * @since 1.0.68
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RealResultSetOperationsTest extends AbstractRealBigQueryIntegrationTest {
 
 	/**
 	 * Session-unique table name — prevents conflicts between concurrent CI runs.
 	 */
-	private static final String TABLE = tableName("users");
+	private static final String TABLE = tableName("users_resultset");
+
+	@BeforeAll
+	void createFixture() throws SQLException {
+		// Every test in this class only reads TABLE, so build it once
+		createSharedTestTable(TABLE);
+	}
+
+	@AfterAll
+	void dropFixture() {
+		dropSharedTestTable(TABLE);
+	}
 
 	@Test
 	void testResultSetNext() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT id FROM " + TABLE + " ORDER BY id";
 
@@ -60,7 +73,6 @@ class RealResultSetOperationsTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test

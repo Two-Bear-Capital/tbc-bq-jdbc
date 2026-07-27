@@ -121,10 +121,17 @@ jobs:
           # Matches: /tbc-bq-jdbc/X.Y.Z/ (Maven Central URLs)
           find . -name "*.md" -type f -exec sed -i "s/\/tbc-bq-jdbc\/[0-9]\+\.[0-9]\+\.[0-9]\+\(-[a-zA-Z0-9]*\)\?/\/tbc-bq-jdbc\/$NEW_VERSION/g" {} \;
 
-          # Matches: tbc-bq-jdbc-X.Y.Z.jar or tbc-bq-jdbc-X.Y.Z-SNAPSHOT.jar (artifact names)
-          find . -name "*.md" -type f -exec sed -i "s/tbc-bq-jdbc-[0-9]\+\.[0-9]\+\.[0-9]\+\(-[a-zA-Z0-9]*\)\?\.jar/tbc-bq-jdbc-$NEW_VERSION.jar/g" {} \;
-          find . -name "*.md" -type f -exec sed -i "s/tbc-bq-jdbc-[0-9]\+\.[0-9]\+\.[0-9]\+\(-[a-zA-Z0-9]*\)\?-shaded\.jar/tbc-bq-jdbc-$NEW_VERSION-shaded.jar/g" {} \;
-          find . -name "*.md" -type f -exec sed -i "s/tbc-bq-jdbc-[0-9]\+\.[0-9]\+\.[0-9]\+\(-[a-zA-Z0-9]*\)\?-with-logging\.jar/tbc-bq-jdbc-$NEW_VERSION-with-logging.jar/g" {} \;
+          # Matches the classifier-less artifact only: tbc-bq-jdbc-X.Y.Z.jar or
+          # tbc-bq-jdbc-X.Y.Z-SNAPSHOT.jar. The suffix group must NOT be a general
+          # '(-[a-zA-Z0-9]*)?' — that also matches '-shaded', '-sources' and
+          # '-javadoc', rewriting those filenames as plain JARs and silently
+          # stripping the classifier from the docs on every release.
+          find . -name "*.md" -type f -exec sed -i "s/tbc-bq-jdbc-[0-9]\+\.[0-9]\+\.[0-9]\+\(-SNAPSHOT\)\?\.jar/tbc-bq-jdbc-$NEW_VERSION.jar/g" {} \;
+
+          # Classifier variants, each matched on its own so the classifier survives
+          for CLASSIFIER in shaded with-logging sources javadoc; do
+            find . -name "*.md" -type f -exec sed -i "s/tbc-bq-jdbc-[0-9]\+\.[0-9]\+\.[0-9]\+\(-SNAPSHOT\)\?-$CLASSIFIER\.jar/tbc-bq-jdbc-$NEW_VERSION-$CLASSIFIER.jar/g" {} \;
+          done
 
           # Update "Driver Version" line in INTELLIJ.md
           sed -i "s/\*\*Driver Version\*\*: [0-9]\+\.[0-9]\+\.[0-9]\+\(-[a-zA-Z0-9]*\)\?/**Driver Version**: $NEW_VERSION/g" docs/INTELLIJ.md

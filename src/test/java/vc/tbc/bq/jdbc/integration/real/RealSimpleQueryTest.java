@@ -15,7 +15,10 @@
  */
 package vc.tbc.bq.jdbc.integration.real;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -33,9 +36,21 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * @since 1.0.68
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 
-	private static final String TABLE = tableName("users");
+	private static final String TABLE = tableName("users_simple");
+
+	@BeforeAll
+	void createFixture() throws SQLException {
+		// Every test in this class only reads TABLE, so build it once
+		createSharedTestTable(TABLE);
+	}
+
+	@AfterAll
+	void dropFixture() {
+		dropSharedTestTable(TABLE);
+	}
 
 	@Test
 	void testSelectLiteral() throws SQLException {
@@ -75,8 +90,6 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testSelectWithTableScan() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT id, name, age FROM " + TABLE + " ORDER BY id";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
@@ -98,13 +111,10 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectWithWhere() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT name, age FROM " + TABLE + " WHERE age > 25 ORDER BY age";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
@@ -119,13 +129,10 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectCount() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT COUNT(*) as total FROM " + TABLE;
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
@@ -133,13 +140,10 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertEquals(3, rs.getInt("total"));
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectWithAggregate() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT COUNT(*) as count, AVG(age) as avg_age, MAX(salary) as max_salary FROM " + TABLE;
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
@@ -149,13 +153,10 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertEquals(85000.75, rs.getDouble("max_salary"), 0.01);
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
 	void testSelectWithGroupBy() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 
 		String sql = "SELECT is_active, COUNT(*) as count FROM " + TABLE + " GROUP BY is_active ORDER BY is_active";
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
@@ -170,7 +171,6 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
@@ -188,15 +188,12 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testEmptyResultSet() throws SQLException {
-		createTestTable(TABLE);
-		insertTestData(TABLE);
 		String sql = "SELECT * FROM " + TABLE + " WHERE age > 100";
 
 		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
 			assertFalse(rs.next());
 		}
 
-		executeIgnoreErrors("DROP TABLE IF EXISTS " + TABLE);
 	}
 
 	@Test
@@ -237,22 +234,17 @@ class RealSimpleQueryTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testMultipleStatements() throws SQLException {
-		Statement stmt1 = connection.createStatement();
-		Statement stmt2 = connection.createStatement();
+		try (Statement stmt1 = connection.createStatement();
+				Statement stmt2 = connection.createStatement();
+				ResultSet rs1 = stmt1.executeQuery("SELECT 1 as num");
+				ResultSet rs2 = stmt2.executeQuery("SELECT 2 as num")) {
 
-		ResultSet rs1 = stmt1.executeQuery("SELECT 1 as num");
-		ResultSet rs2 = stmt2.executeQuery("SELECT 2 as num");
+			assertTrue(rs1.next());
+			assertEquals(1, rs1.getInt("num"));
 
-		assertTrue(rs1.next());
-		assertEquals(1, rs1.getInt("num"));
-
-		assertTrue(rs2.next());
-		assertEquals(2, rs2.getInt("num"));
-
-		rs1.close();
-		rs2.close();
-		stmt1.close();
-		stmt2.close();
+			assertTrue(rs2.next());
+			assertEquals(2, rs2.getInt("num"));
+		}
 	}
 
 	@Test
