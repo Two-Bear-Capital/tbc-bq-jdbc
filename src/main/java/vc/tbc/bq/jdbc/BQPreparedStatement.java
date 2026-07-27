@@ -1030,7 +1030,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		int[] updateCounts = new int[parameterSets.size()];
 		for (int i = 0; i < parameterSets.size(); i++) {
 			try {
-				updateCounts[i] = toUpdateCount(executeDmlInternal(sqlTemplate, parameterSets.get(i)));
+				// No per-entry estimate: this path is already one job per set (#140).
+				updateCounts[i] = toUpdateCount(executeDmlInternal(sqlTemplate, parameterSets.get(i), false));
 			} catch (SQLException e) {
 				throw new BatchUpdateException("Batch entry " + i + " failed: " + e.getMessage(), e.getSQLState(),
 						e.getErrorCode(), Arrays.copyOf(updateCounts, i), e);

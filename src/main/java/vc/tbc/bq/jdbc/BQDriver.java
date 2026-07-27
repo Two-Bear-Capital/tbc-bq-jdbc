@@ -170,8 +170,8 @@ public final class BQDriver implements Driver {
 				new String[]{"true", "false"}));
 
 		props.add(prop(info, "enableQueryCostEstimation", "false",
-				"Run a dry-run before each query to estimate cost; estimates are attached as SQLWarnings", false,
-				new String[]{"true", "false"}));
+				"Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings. Sequential batches are not estimated (one job per entry already)",
+				false, new String[]{"true", "false"}));
 
 		props.add(prop(info, "maxResults", "", "Maximum number of query result rows to return (blank = unlimited)",
 				false, null));

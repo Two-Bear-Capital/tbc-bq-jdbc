@@ -133,13 +133,11 @@ class RealQueryCostEstimationTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	@Test
-	void testDmlDoesNotCurrentlyRaiseACostWarning() throws SQLException {
-		// The emulator version of this test was called testWarningsForDMLStatements and
-		// commented "dry-run should work for DML too", but only logged the warning if
-		// it happened to exist. It never does: enableQueryCostEstimation is read in
-		// executeQueryInternal only, so the DML path never dry-runs. BigQuery does
-		// support dry-run for DML, so this is a gap rather than a constraint —
-		// recorded here as current behaviour so extending it is a visible change.
+	void testDmlRaisesACostWarning() throws SQLException {
+		// #140: enableQueryCostEstimation was read only on the query path, so DML got
+		// no dry-run. The emulator test that should have caught this was called
+		// testWarningsForDMLStatements and commented "dry-run should work for DML
+		// too", but only logged the warning if it happened to exist.
 		String table = tableName("cost_dml");
 		try (Statement stmt = costConnection.createStatement()) {
 			stmt.execute("CREATE OR REPLACE TABLE " + table + " (id INT64, name STRING) "
@@ -148,12 +146,69 @@ class RealQueryCostEstimationTest extends AbstractRealBigQueryIntegrationTest {
 
 			assertEquals(1, stmt.executeUpdate("INSERT INTO " + table + " (id, name) VALUES (4, 'David')"),
 					"INSERT should report one affected row");
-			assertNull(stmt.getWarnings(), "DML is not estimated today");
+			assertIsCostWarning(stmt.getWarnings());
 		} finally {
 			try (Statement cleanup = costConnection.createStatement()) {
 				cleanup.execute("DROP TABLE IF EXISTS " + table);
 			} catch (SQLException ignored) {
 				// best effort; the table expires on its own
+			}
+		}
+	}
+
+	@Test
+	void testParameterizedDmlIsEstimatedWithItsParameters() throws SQLException {
+		// The estimate binds the same parameters as the statement. A dry-run of a
+		// parameterized statement without them is rejected by BigQuery, so this
+		// failing would show up as a swallowed "Dry-run estimation failed" and no
+		// warning — which is exactly what the assertion catches.
+		String table = tableName("cost_dml_params");
+		try (Statement ddl = costConnection.createStatement()) {
+			ddl.execute("CREATE OR REPLACE TABLE " + table + " (id INT64, name STRING) "
+					+ "OPTIONS(expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR))");
+		}
+		try (PreparedStatement pstmt = costConnection
+				.prepareStatement("INSERT INTO " + table + " (id, name) VALUES (?, ?)")) {
+			pstmt.setInt(1, 7);
+			pstmt.setString(2, "estimated");
+			assertEquals(1, pstmt.executeUpdate());
+			assertIsCostWarning(pstmt.getWarnings());
+		} finally {
+			try (Statement cleanup = costConnection.createStatement()) {
+				cleanup.execute("DROP TABLE IF EXISTS " + table);
+			} catch (SQLException ignored) {
+				// best effort
+			}
+		}
+	}
+
+	@Test
+	void testCollapsedBatchIsEstimatedPerChunkNotPerRow() throws SQLException {
+		// The collapsed multi-row INSERT runs one job per chunk, so it estimates per
+		// chunk. Sequential batches deliberately do not estimate at all — doing so
+		// would double the job count on the driver's most expensive path.
+		String table = tableName("cost_batch");
+		try (Statement ddl = costConnection.createStatement()) {
+			ddl.execute("CREATE OR REPLACE TABLE " + table + " (id INT64, name STRING) "
+					+ "OPTIONS(expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR))");
+		}
+		try (PreparedStatement pstmt = costConnection
+				.prepareStatement("INSERT INTO " + table + " (id, name) VALUES (?, ?)")) {
+			for (int i = 1; i <= 3; i++) {
+				pstmt.setInt(1, i);
+				pstmt.setString(2, "row_" + i);
+				pstmt.addBatch();
+			}
+			assertEquals(3, pstmt.executeBatch().length);
+
+			SQLWarning warning = pstmt.getWarnings();
+			assertIsCostWarning(warning);
+			assertNull(warning.getNextWarning(), "Three rows collapse into one chunk, so one estimate");
+		} finally {
+			try (Statement cleanup = costConnection.createStatement()) {
+				cleanup.execute("DROP TABLE IF EXISTS " + table);
+			} catch (SQLException ignored) {
+				// best effort
 			}
 		}
 	}
