@@ -485,27 +485,6 @@ See [Connection Properties - Performance Tuning](docs/CONNECTION_PROPERTIES.md#p
 
 See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete list.
 
-## Roadmap
-
-### Version 1.0 (Current) - IDE Integration Focus
-
-- ✅ Fast, comprehensive DatabaseMetaData implementation
-- ✅ Parallel dataset loading with intelligent caching
-- ✅ Core JDBC 4.3 implementation
-- ✅ All authentication methods
-- ✅ Session support
-- ✅ Complete type mapping
-- ✅ Native JDBC Array/Struct support (`nativeComplexTypes=true`)
-- ✅ Routine (UDF) metadata via `getProcedures()` / `getProcedureColumns()`
-- ✅ Enhanced DatabaseMetaData (9 formerly-unsupported methods now return compliant results)
-- ✅ Extensive testing (unit tests plus real BigQuery integration tests)
-- ✅ Comprehensive documentation
-
-### Future Versions
-
-- Complete Storage API Arrow deserialization
-- Additional authentication methods
-
 ## Contributing
 
 Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
