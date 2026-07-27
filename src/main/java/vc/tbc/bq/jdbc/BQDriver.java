@@ -153,7 +153,8 @@ public final class BQDriver implements Driver {
 				"Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects)",
 				false, new String[]{"true", "false"}));
 
-		props.add(prop(info, "useStorageApi", "auto", "BigQuery Storage Read API mode for large result sets", false,
+		props.add(prop(info, "useStorageApi", "false",
+				"BigQuery Storage Read API mode for large result sets (not implemented yet; currently ignored)", false,
 				new String[]{"auto", "true", "false"}));
 
 		props.add(prop(info, "enableSessions", "false",

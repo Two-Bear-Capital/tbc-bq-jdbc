@@ -79,7 +79,7 @@ Details:
 | Temp tables | ✅ | Requires sessions |
 | Multi-statement SQL | ✅ | Requires sessions |
 | Transactions | ⚠️ | Session-backed; no isolation levels or savepoints |
-| Storage Read API | ⚠️ | Detection works; Arrow deserialization in progress |
+| Storage Read API | ❌ | Not implemented; `useStorageApi` is accepted but ignored (defaults to `false`) |
 | Query labels | ✅ | Job labels for tracking |
 | Location routing | ✅ | Multi-region support |
 | Query timeout | ✅ | Hard timeout enforcement |
@@ -273,7 +273,7 @@ IntelliJ is the primary use case and is fully supported — fast schema introspe
 
 ## Performance expectations
 
-Every query incurs BigQuery's job-creation latency: roughly 200–500 ms for trivial queries, 500 ms–2 s for small ones, and longer for large scans. Cached and repeated queries are much faster, and ResultSet iteration reaches 100K+ rows/s with the Storage API. The driver is not optimized for high query-per-second workloads — cache results and use connection pooling.
+Every query incurs BigQuery's job-creation latency: roughly 200–500 ms for trivial queries, 500 ms–2 s for small ones, and longer for large scans. Cached and repeated queries are much faster. The driver is not optimized for high query-per-second workloads — cache results and use connection pooling.
 
 ---
 

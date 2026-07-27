@@ -26,7 +26,7 @@ There are **26** connection properties.
 | `metadataCacheEnabled` | `true` | `true`, `false` | Cache schema introspection results to speed up IntelliJ IDEA's database tree |
 | `metadataCacheTtl` | `300` | any | How long (seconds) to keep metadata in the cache before re-fetching |
 | `metadataLazyLoad` | `false` | `true`, `false` | Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects) |
-| `useStorageApi` | `auto` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets |
+| `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets (not implemented yet; currently ignored) |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `jobCreationMode` | `REQUIRED` | `REQUIRED`, `OPTIONAL` | REQUIRED always creates a query job; OPTIONAL may skip it for small queries |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |

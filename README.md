@@ -35,7 +35,6 @@ Modern JDBC driver for Google BigQuery, optimized for development tools and data
 - Transaction support (`BEGIN`, `COMMIT`, `ROLLBACK`)
 
 ⚡ **Performance**
-- BigQuery Storage Read API for large result sets
 - Configurable result pagination
 - Connection pooling compatible
 - Query timeout enforcement with automatic cancellation
@@ -479,7 +478,6 @@ See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete details.
 ### Optimization Tips
 
 - Use `pageSize` property for large results
-- Enable Storage API for queries > 10MB
 - Use connection pooling
 - Cache frequently executed queries
 - Set appropriate timeouts

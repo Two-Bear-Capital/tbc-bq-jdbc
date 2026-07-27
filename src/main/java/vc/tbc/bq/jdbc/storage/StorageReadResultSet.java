@@ -41,13 +41,24 @@ import java.sql.SQLException;
  * </ul>
  *
  * <p>
- * This is automatically used when:
+ * <strong>Not implemented — this class is not wired up.</strong> It opens a
+ * read session and a row stream, but never decodes the Arrow batches into rows:
+ * it passes a {@code null} {@code TableResult} to {@code super} and does not
+ * override {@link #next()}, so iterating an instance cannot work.
+ * {@code AbstractBQStatement.createResultSet} therefore never constructs it and
+ * always returns a standard {@link BQResultSet}, whatever {@code useStorageApi}
+ * is set to.
  *
- * <ul>
- * <li>useStorageApi=true or auto (and result exceeds threshold)
- * <li>Result set is from a query with results stored in a table
- * <li>BigQuery Storage API is available
- * </ul>
+ * <p>
+ * Finishing it means implementing Arrow deserialization plus {@code next()} and
+ * the column accessors, pinning the {@code arrow-*} modules to one matched
+ * version (they currently resolve to a mix of 17.0.0 and 19.0.0), and covering
+ * it with a real-BigQuery integration test — the emulator cannot reach this
+ * path because {@code BigQueryReadClient.create()} does not talk to it.
+ *
+ * <p>
+ * The static {@link #shouldUseStorageApi} predicate is still live and still
+ * describes when the path <em>would</em> engage once it works.
  *
  * @since 1.0.0
  */

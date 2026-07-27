@@ -214,6 +214,14 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	public boolean next() throws SQLException {
 		checkClosed();
 
+		// Subclasses constructed with a null TableResult must supply their own
+		// iteration by overriding next(). Fail loudly rather than dereferencing null.
+		if (rowIterator == null) {
+			throw new BQSQLException(
+					"This ResultSet has no row iterator: a subclass was constructed without a TableResult "
+							+ "but did not override next()");
+		}
+
 		// Check if maxRows limit has been reached (JDBC Statement.setMaxRows)
 		if (maxRows > 0 && rowCount >= maxRows) {
 			currentRow = null;

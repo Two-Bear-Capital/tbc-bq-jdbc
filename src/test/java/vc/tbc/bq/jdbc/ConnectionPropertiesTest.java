@@ -73,7 +73,7 @@ class ConnectionPropertiesTest {
 		assertEquals(ConnectionProperties.DEFAULT_RETRY_COUNT, props.retryCount());
 		assertFalse(props.useLegacySql());
 		assertFalse(props.enableSessions());
-		assertEquals("auto", props.useStorageApi());
+		assertEquals("false", props.useStorageApi());
 		assertEquals(JobCreationMode.REQUIRED, props.jobCreationMode());
 		assertTrue(props.labels().isEmpty());
 	}
@@ -229,8 +229,9 @@ class ConnectionPropertiesTest {
 				null, null, null, null, false, null, null, null, null, null, // null useStorageApi
 				false, null, null, null, null, null, null, null, null, null);
 
-		// Then: Should default to "auto"
-		assertEquals("auto", props.useStorageApi());
+		// Then: Should default to "false" while the Storage Read API path is
+		// unimplemented (see StorageReadResultSet)
+		assertEquals("false", props.useStorageApi());
 	}
 
 	@Test

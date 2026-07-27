@@ -39,6 +39,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,6 +69,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			.compile("(?:`[^`]+`|[^\\s.`]+)\\.(`[^`]+`|[^\\s.`]+)\\.INFORMATION_SCHEMA", Pattern.CASE_INSENSITIVE);
 
 	private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
+
+	/**
+	 * Guards the "Storage Read API not implemented" warning so a connection that
+	 * asks for it does not log once per query. JVM-wide on purpose: the message is
+	 * about a driver capability, not about one statement.
+	 */
+	private static final AtomicBoolean STORAGE_API_UNSUPPORTED_WARNED = new AtomicBoolean(false);
 
 	/**
 	 * How long a query destination table created by
@@ -173,8 +181,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected abstract int getEffectiveFetchSize();
 
 	/**
-	 * Creates a ResultSet for the given query result and job. Determines whether to
-	 * use Storage API based on configuration and result size.
+	 * Creates a ResultSet for the given query result and job.
+	 *
+	 * <p>
+	 * The Storage Read API path is currently inert: {@link StorageReadResultSet}
+	 * opens a read session but never decodes rows, so it is not wired up here. When
+	 * {@code useStorageApi} asks for it we log once and return the standard
+	 * ResultSet instead of a result set that cannot iterate.
 	 *
 	 * @param result
 	 *            the table result from BigQuery
@@ -183,53 +196,15 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @return the JDBC ResultSet
 	 */
 	protected ResultSet createResultSet(TableResult result, Job job) {
-		// Check if we should use Storage API
 		String useStorageApiSetting = properties.useStorageApi();
-		if (useStorageApiSetting != null && StorageReadResultSet.shouldUseStorageApi(result, useStorageApiSetting)) {
-
-			// Extract destination table from job
-			TableId tableId = extractTableId(job);
-
-			if (tableId != null) {
-				try {
-					logger.debug("Using Storage API for result set (table: {})", tableId);
-					return new StorageReadResultSet((BQStatement) this, tableId);
-				} catch (SQLException e) {
-					// Fallback to standard result set on Storage API failure
-					logger.warn("Storage API initialization failed, falling back to standard ResultSet: {}",
-							e.getMessage());
-				}
-			} else {
-				logger.debug("Cannot use Storage API: no destination table found in job");
-			}
+		if (useStorageApiSetting != null && StorageReadResultSet.shouldUseStorageApi(result, useStorageApiSetting)
+				&& STORAGE_API_UNSUPPORTED_WARNED.compareAndSet(false, true)) {
+			logger.warn("useStorageApi={} requested, but the BigQuery Storage Read API path is not implemented yet "
+					+ "(row decoding is unfinished); using the standard ResultSet instead. "
+					+ "Set useStorageApi=false to silence this warning.", useStorageApiSetting);
 		}
 
-		// Default: use standard BQResultSet
 		return new BQResultSet((BQStatement) this, result);
-	}
-
-	/**
-	 * Extracts the destination TableId from a completed query job.
-	 *
-	 * @param job
-	 *            the query job (may be null)
-	 * @return the destination table ID, or null if not available
-	 */
-	private TableId extractTableId(Job job) {
-		if (job == null) {
-			return null;
-		}
-
-		try {
-			JobConfiguration configuration = job.getConfiguration();
-			if (configuration instanceof QueryJobConfiguration queryConfig) {
-				return queryConfig.getDestinationTable();
-			}
-		} catch (Exception e) {
-			logger.debug("Failed to extract destination table from job: {}", e.getMessage());
-		}
-
-		return null;
 	}
 
 	/**
