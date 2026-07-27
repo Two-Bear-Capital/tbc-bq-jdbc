@@ -6,7 +6,7 @@ This project is now set up for publishing to **Maven Central** using the modern 
 
 ### 1. POM Configuration ✅
 
-**Added:** `central-publishing-maven-plugin` (v1.0.88)
+**Added:** `central-publishing-maven-plugin` (version from the `central-publishing-maven-plugin.version` property in `pom.xml`)
 - Replaces legacy OSSRH/Nexus Staging approach
 - Handles bundle creation, validation, and publishing automatically
 - Configured with `autoPublish=true` for CI/CD
