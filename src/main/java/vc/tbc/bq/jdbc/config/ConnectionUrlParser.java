@@ -363,11 +363,12 @@ public final class ConnectionUrlParser {
 		Boolean metadataLazyLoad = parseBooleanObject(properties, "metadataLazyLoad");
 		Boolean enableQueryCostEstimation = parseBooleanObject(properties, "enableQueryCostEstimation");
 		Boolean nativeComplexTypes = parseBooleanObject(properties, "nativeComplexTypes");
+		Integer metadataCacheMaxRows = parseInteger(properties, "metadataCacheMaxRows");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, jobCreationMode, pageSize, useStorageApi, enableSessions,
 				connectionTimeout, retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled,
-				metadataLazyLoad, enableQueryCostEstimation, nativeComplexTypes);
+				metadataLazyLoad, enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {

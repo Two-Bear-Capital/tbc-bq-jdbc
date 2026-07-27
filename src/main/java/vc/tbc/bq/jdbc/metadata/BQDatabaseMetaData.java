@@ -76,10 +76,14 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		// Initialize cache if enabled
 		if (properties.metadataCacheEnabled()) {
-			// Create cache key based on project and TTL
-			this.cacheKey = properties.projectId() + ":" + properties.metadataCacheTtl();
+			// Cache key covers every setting that changes the cache's behaviour, not
+			// just the project. Caches are shared statically and created once, so a
+			// key that omitted the row ceiling would hand a connection asking for one
+			// bound a cache already built with another - first caller silently wins.
+			this.cacheKey = properties.projectId() + ":" + properties.metadataCacheTtl() + ":"
+					+ properties.metadataCacheMaxRows();
 			this.cache = getOrCreateSharedCache(cacheKey, java.time.Duration.ofSeconds(properties.metadataCacheTtl()),
-					properties.projectId());
+					properties.projectId(), properties.metadataCacheMaxRows());
 			logger.debug("Using shared metadata cache for project: {} (cache instances: {})", properties.projectId(),
 					SHARED_CACHES.size());
 		} else {
@@ -2252,7 +2256,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * different projects or with different TTL settings each get their own cache.
 	 *
 	 * @param cacheKey
-	 *            the cache key ({@code "projectId:ttlSeconds"})
+	 *            the cache key ({@code "projectId:ttlSeconds:maxRows"})
 	 * @param ttl
 	 *            the time-to-live for cache entries (used only when creating a new
 	 *            cache)
@@ -2261,9 +2265,30 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * @return the shared {@link MetadataCache} instance
 	 */
 	public static MetadataCache getOrCreateSharedCache(String cacheKey, java.time.Duration ttl, String projectId) {
+		return getOrCreateSharedCache(cacheKey, ttl, projectId, MetadataCache.DEFAULT_MAX_ROWS);
+	}
+
+	/**
+	 * Returns the shared {@link MetadataCache} for the given cache key, creating a
+	 * new instance with the given row ceiling if none exists yet.
+	 *
+	 * @param cacheKey
+	 *            the cache key ({@code "projectId:ttlSeconds:maxRows"})
+	 * @param ttl
+	 *            the time-to-live for cache entries (used only when creating a new
+	 *            cache)
+	 * @param projectId
+	 *            the project ID, used only for the creation log message
+	 * @param maxRows
+	 *            ceiling on total cached rows (used only when creating a new cache)
+	 * @return the shared {@link MetadataCache} instance
+	 */
+	public static MetadataCache getOrCreateSharedCache(String cacheKey, java.time.Duration ttl, String projectId,
+			int maxRows) {
 		return SHARED_CACHES.computeIfAbsent(cacheKey, k -> {
-			logger.info("Creating new shared metadata cache for project: {} with TTL: {}", projectId, ttl);
-			return new MetadataCache(ttl);
+			logger.debug("Creating new shared metadata cache for project: {} with TTL: {}, max rows: {}", projectId,
+					ttl, maxRows);
+			return new MetadataCache(ttl, maxRows);
 		});
 	}
 
