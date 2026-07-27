@@ -61,6 +61,27 @@ class RealUpdateCountTest extends AbstractRealBigQueryIntegrationTest {
 		createSeededTable(testTable); // ids 1-3, one job, expires on its own
 	}
 
+	/**
+	 * Asserts the table really holds {@code expected} rows.
+	 *
+	 * <p>
+	 * The count a statement reports and the rows it actually wrote are different
+	 * claims. The emulator class this replaced checked the second and could not
+	 * check the first; this class checked the first and not the second. Both now.
+	 *
+	 * @param expected
+	 *            the expected row count
+	 * @throws SQLException
+	 *             if the count query fails
+	 */
+	private void assertRowCount(int expected) throws SQLException {
+		try (Statement stmt = connection.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM " + testTable)) {
+			assertTrue(rs.next());
+			assertEquals(expected, rs.getInt("cnt"), "Row count after the statement");
+		}
+	}
+
 	@Test
 	void testExecuteUpdateReturnsInsertedRowCount() throws SQLException {
 		try (Statement stmt = connection.createStatement()) {
@@ -69,6 +90,7 @@ class RealUpdateCountTest extends AbstractRealBigQueryIntegrationTest {
 
 			assertEquals(3, count, "executeUpdate should return the number of inserted rows");
 		}
+		assertRowCount(6); // 3 seeded + 3 inserted
 	}
 
 	@Test
@@ -77,6 +99,12 @@ class RealUpdateCountTest extends AbstractRealBigQueryIntegrationTest {
 			int count = stmt.executeUpdate("UPDATE " + testTable + " SET age = 99 WHERE id <= 2");
 
 			assertEquals(2, count, "executeUpdate should return the number of updated rows");
+		}
+		assertRowCount(3); // UPDATE changes rows, it does not add or remove them
+		try (Statement stmt = connection.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM " + testTable + " WHERE age = 99")) {
+			assertTrue(rs.next());
+			assertEquals(2, rs.getInt("cnt"), "and the two rows really carry the new value");
 		}
 	}
 
@@ -87,6 +115,7 @@ class RealUpdateCountTest extends AbstractRealBigQueryIntegrationTest {
 
 			assertEquals(2, count, "executeUpdate should return the number of deleted rows");
 		}
+		assertRowCount(1); // 3 seeded - 2 deleted
 	}
 
 	@Test
@@ -97,6 +126,7 @@ class RealUpdateCountTest extends AbstractRealBigQueryIntegrationTest {
 			assertEquals(2, stmt.getUpdateCount(), "getUpdateCount should report the DML affected-row count");
 			assertEquals(2L, stmt.getLargeUpdateCount());
 		}
+		assertRowCount(5); // 3 seeded + 2 inserted
 	}
 
 	@Test
@@ -117,6 +147,7 @@ class RealUpdateCountTest extends AbstractRealBigQueryIntegrationTest {
 			assertNull(stmt.getResultSet(), "getResultSet() must return null when the result is an update count");
 			assertEquals(1, stmt.getUpdateCount());
 		}
+		assertRowCount(4); // 3 seeded + 1 inserted
 	}
 
 	@Test

@@ -416,9 +416,9 @@ try {
 
 ### 15. DML Statistics (numDmlAffectedRows)
 
-> **Partially ported (#118).** `BatchExecutionTest` has moved to
-> `integration/real/RealBatchExecutionTest`, which asserts exact per-row counts.
-> `UpdateCountTest` is still on the emulator tier and still tolerant.
+> **Ported (#118).** Both `BatchExecutionTest` and `UpdateCountTest` have moved to the
+> real tier — `RealBatchExecutionTest` and `RealUpdateCountTest` — and assert exact
+> affected-row counts. The `count == expected || count == 0` compensation below is gone.
 
 
 **Limitation:** The emulator does not populate `numDmlAffectedRows` in query job
@@ -428,7 +428,6 @@ returning `true` with an empty ResultSet). Real BigQuery returns exact
 affected-row counts.
 
 **Affected Tests:**
-- `UpdateCountTest` (all DML count assertions are tolerant: `count == expected || count == 0`)
 
 **Compensation:**
 ```java
@@ -450,7 +449,6 @@ in UPDATE statements (e.g. `UPDATE t SET name = ? WHERE id <= ?` with a STRING
 and an INT64 fails with `strconv.ParseInt: parsing "..."` errors).
 
 **Affected Tests:**
-- `UpdateCountTest.testPreparedStatementExecuteUpdateReportsCount` (uses a single INT64 parameter as a workaround)
 
 **Real BigQuery Status:** ✅ Mixed-type positional parameters work correctly
 
