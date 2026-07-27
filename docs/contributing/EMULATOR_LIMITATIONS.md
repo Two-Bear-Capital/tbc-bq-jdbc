@@ -141,15 +141,14 @@ if (rsmd != null) {
 
 ### 5. Binary Data (BYTES Type)
 
-> **Partially ported (#118).** The `PreparedStatementAdvancedTest` half now lives in
-> `RealPreparedStatementAdvancedTest`; `ResultSetAdvancedTest.testGetBytes` is still on the
-> emulator tier and still tolerant.
+> **Ported (#118).** Both halves now live in the real tier —
+> `RealPreparedStatementAdvancedTest` and `RealResultSetAdvancedTest` — and assert the bytes
+> round-trip rather than logging on failure.
 
 
 **Limitation:** The emulator has limited support for BYTES type operations.
 
 **Affected Tests:**
-- `ResultSetAdvancedTest.testGetBytes` (line 189)
 
 **Compensation:**
 ```java
