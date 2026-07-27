@@ -53,6 +53,33 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		this.sqlTemplate = sql;
 	}
 
+	/**
+	 * Formatter for TIME parameters. {@code QueryParameterValue.time} requires
+	 * exactly six fractional digits; {@code Time.toString()} emits none, which made
+	 * every {@code setTime} call throw (#123).
+	 */
+	private static final java.time.format.DateTimeFormatter TIME_FORMATTER = java.time.format.DateTimeFormatter
+			.ofPattern("HH:mm:ss.SSSSSS");
+
+	/**
+	 * Binds a Timestamp as epoch microseconds.
+	 *
+	 * <p>
+	 * {@code QueryParameterValue.of(instant.toString(), TIMESTAMP)} was rejected
+	 * client-side — the validator wants a space-separated format, not ISO-8601's
+	 * {@code T} separator, so every call threw (#123). The typed factory takes
+	 * microseconds and does its own formatting, which removes the question.
+	 *
+	 * @param value
+	 *            the timestamp to bind
+	 * @return a TIMESTAMP query parameter
+	 */
+	private static QueryParameterValue timestampParameter(Timestamp value) {
+		java.time.Instant instant = value.toInstant();
+		long micros = instant.getEpochSecond() * 1_000_000L + instant.getNano() / 1_000L;
+		return QueryParameterValue.timestamp(micros);
+	}
+
 	private void validateParameterIndex(int parameterIndex) throws SQLException {
 		if (parameterIndex < 1) {
 			throw new BQSQLException(String.format(ErrorMessages.INVALID_PARAMETER_INDEX, parameterIndex),
@@ -372,7 +399,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIME);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x.toString(), StandardSQLTypeName.TIME));
+			setParameter(parameterIndex, QueryParameterValue.time(TIME_FORMATTER.format(x.toLocalTime())));
 		}
 	}
 
@@ -396,8 +423,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIMESTAMP);
 		} else {
-			setParameter(parameterIndex,
-					QueryParameterValue.of(x.toInstant().toString(), StandardSQLTypeName.TIMESTAMP));
+			setParameter(parameterIndex, timestampParameter(x));
 		}
 	}
 
@@ -647,8 +673,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			return;
 		}
 
-		// Use utility to adjust date for Calendar's timezone
-		Date adjustedDate = TimezoneUtils.adjustDateToCalendar(x, cal);
+		// Reinterpret the wall clock as belonging to the Calendar's zone (#121)
+		Date adjustedDate = TimezoneUtils.dateToCalendarZone(x, cal);
 		setDate(parameterIndex, adjustedDate);
 	}
 
@@ -683,8 +709,8 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			return;
 		}
 
-		// Use utility to adjust time for Calendar's timezone
-		Time adjustedTime = TimezoneUtils.adjustTimeToCalendar(x, cal);
+		// Reinterpret the wall clock as belonging to the Calendar's zone (#121)
+		Time adjustedTime = TimezoneUtils.timeToCalendarZone(x, cal);
 		setTime(parameterIndex, adjustedTime);
 	}
 
@@ -720,16 +746,9 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			return;
 		}
 
-		// Adjust timestamp for Calendar's timezone and convert to Instant
-		Timestamp adjusted = TimezoneUtils.adjustTimestampToCalendar(x, cal);
-
-		// Create instant from adjusted timestamp
-		// Add back the nanosecond precision that was lost in millisecond conversion
-		java.time.Instant instant = java.time.Instant.ofEpochMilli(adjusted.getTime())
-				.plusNanos(adjusted.getNanos() % 1000000);
-
-		// Set parameter using instant string representation with explicit type
-		setParameter(parameterIndex, QueryParameterValue.of(instant.toString(), StandardSQLTypeName.TIMESTAMP));
+		// Reinterpret the wall clock as belonging to the Calendar's zone (#121)
+		Timestamp adjusted = TimezoneUtils.timestampToCalendarZone(x, cal);
+		setParameter(parameterIndex, timestampParameter(adjusted));
 	}
 
 	/**

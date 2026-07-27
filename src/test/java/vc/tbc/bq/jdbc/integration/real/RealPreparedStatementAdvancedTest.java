@@ -17,7 +17,6 @@ package vc.tbc.bq.jdbc.integration.real;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -96,12 +95,9 @@ class RealPreparedStatementAdvancedTest extends AbstractRealBigQueryIntegrationT
 	// Asserting instead of logging is what surfaced #121.
 
 	@Test
-	@Disabled("#123 — setTimestamp binds ISO-8601, which QueryParameterValue rejects; throws on every call")
 	void testSetTimestampWithCalendarBindsSuccessfully() throws SQLException {
-		// Deliberately does not assert the instant — that is #121's subject. It does
-		// assert what the emulator tier could not: that the call completes and binds a
-		// usable TIMESTAMP rather than throwing. The swallowed version passed either
-		// way.
+		// Smoke check that the call completes and binds a usable TIMESTAMP rather than
+		// throwing (#123). The swallowed emulator version passed either way.
 		Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 		Timestamp ts = Timestamp.valueOf("2024-02-01 12:34:56");
 
@@ -117,10 +113,9 @@ class RealPreparedStatementAdvancedTest extends AbstractRealBigQueryIntegrationT
 	}
 
 	@Test
-	@Disabled("#121 — Calendar-aware setters shift the instant the wrong way; re-enable with the fix")
 	void testSetTimestampWithCalendarUsesTheCalendarZone() throws SQLException {
-		// 12:34:56 in Tokyo is 03:34:56Z. The driver returns 21:34:56Z — the offset
-		// applied with the wrong sign.
+		// 12:34:56 in Tokyo is 03:34:56Z. Before #121 the driver returned 21:34:56Z —
+		// the offset applied with the wrong sign.
 		Calendar tokyo = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tokyo"));
 		Timestamp ts = Timestamp.valueOf("2024-02-01 12:34:56");
 		Instant expected = LocalDateTime.of(2024, 2, 1, 12, 34, 56).atZone(ZoneId.of("Asia/Tokyo")).toInstant();
@@ -137,11 +132,10 @@ class RealPreparedStatementAdvancedTest extends AbstractRealBigQueryIntegrationT
 	}
 
 	@Test
-	@Disabled("#121 — write and read apply the same adjustment instead of inverse ones")
 	void testSetTimestampWithCalendarRoundTrips() throws SQLException {
-		// Round-tripping through one Calendar must be identity in any JVM zone. It
-		// drifts by twice the offset, which is zero — and so invisible — only when the
-		// JVM default is UTC, as it is on CI runners.
+		// Round-tripping through one Calendar must be identity in any JVM zone. Before
+		// #121 it drifted by twice the offset, which is zero — and so invisible — when
+		// the JVM default is UTC, as it is on CI runners.
 		Calendar tokyo = Calendar.getInstance(TimeZone.getTimeZone("Asia/Tokyo"));
 		Timestamp ts = Timestamp.valueOf("2024-02-01 12:34:56");
 
@@ -180,9 +174,8 @@ class RealPreparedStatementAdvancedTest extends AbstractRealBigQueryIntegrationT
 	}
 
 	@Test
-	@Disabled("#123 — setTime binds HH:mm:ss without micros, which QueryParameterValue rejects")
 	void testSetTimeWithCalendarBindsSuccessfully() throws SQLException {
-		// As above: asserts the call works, not the instant (#121).
+		// Smoke check that the call completes and binds a usable TIME (#123).
 		Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
 		Time time = Time.valueOf("10:30:00");
 
@@ -300,7 +293,6 @@ class RealPreparedStatementAdvancedTest extends AbstractRealBigQueryIntegrationT
 	}
 
 	@Test
-	@Disabled("#123 — routes through setTimestamp, so it hits the same bind-time format rejection")
 	void testSetObjectStringToTimestamp() throws SQLException {
 		// Emulator tier logged and passed on any SQLException here.
 		try (PreparedStatement pstmt = connection.prepareStatement("SELECT ? AS value")) {
