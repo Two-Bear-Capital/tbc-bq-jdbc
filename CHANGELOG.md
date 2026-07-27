@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.123] - 2026-07-27
+
+### 🧪 Testing
+
+- **real:** Port TransactionTest, and delete the emulator copy ([#137](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/137))
+
 ## [1.0.122] - 2026-07-27
 
 ### 🧪 Testing
@@ -2301,6 +2307,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[1.0.123]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.122...v1.0.123
 [1.0.122]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.121...v1.0.122
 [1.0.121]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.120...v1.0.121
 [1.0.120]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.0.119...v1.0.120
