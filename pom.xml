@@ -434,17 +434,17 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
-                    <!-- Failsafe already runs with the JaCoCo agent attached (it uses
-                         @{argLine}) and appends to the same target/jacoco.exec, but the
-                         report above is written during `test`, which the lifecycle runs
-                         *before* integration-test. So everything the 319 emulator tests
-                         covered was recorded and then never reported: the published
-                         figure sat at 42.1% when the real number is 62.2%.
+                    <!-- Failsafe runs with the JaCoCo agent attached (it uses @{argLine})
+                         and appends to the same target/jacoco.exec, but the report above is
+                         written during `test`, which the lifecycle runs *before*
+                         integration-test — so integration coverage was recorded and then
+                         never reported. Re-running the report after integration-test
+                         overwrites target/site/jacoco with the full picture.
 
-                         Re-running the report after integration-test overwrites
-                         target/site/jacoco with the full picture. `mvn test` stops short
-                         of this phase, so the unit-only report above still stands on its
-                         own for the quick local loop. -->
+                         `mvn test` stops short of this phase, so the unit-only report above
+                         still stands on its own for the quick local loop. Note the
+                         integration tests only run under -Preal-integration-tests, so an
+                         ordinary `verify` reports unit coverage alone. -->
                     <execution>
                         <id>report-with-integration-tests</id>
                         <phase>post-integration-test</phase>
@@ -880,9 +880,7 @@
                                  test method). Cross-class isolation comes from RUN_ID-scoped
                                  table and routine names. Threads spend nearly all their time
                                  blocked on BigQuery, so the pool is sized well above the core
-                                 count. Only the real profile enables this; the emulator suite
-                                 shares one container and fixed table names, so it stays
-                                 sequential. -->
+                                 count. -->
                             <properties>
                                 <configurationParameters>
                                     junit.jupiter.execution.parallel.enabled=true
