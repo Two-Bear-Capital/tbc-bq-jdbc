@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-07-27
+
+### 📚 Documentation
+
+- Remove stale README sections and dead Discussions links ([#151](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/151))
+
 ## [2.0.1] - 2026-07-27
 
 ### 🐛 Bug Fixes
@@ -2367,6 +2373,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[2.0.2]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.1.2...v2.0.0
 [1.1.2]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v1.1.1...v1.1.2
