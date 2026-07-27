@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package vc.tbc.bq.jdbc.integration;
+package vc.tbc.bq.jdbc.integration.real;
 
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -44,11 +44,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * connection pool under load. This test measures overlap rather than elapsed
  * time, so it says something meaningful without being a timing assertion.
  *
+ * <p>
+ * Ported from the emulator tier when it was retired. The guard reads better
+ * here anyway: #98 was found by the real suite running its classes in parallel,
+ * not by the emulator, which is single-threaded by construction and could never
+ * have surfaced it. {@code SharedThreadPoolGuardTest} still guards the specific
+ * bytecode shape with no endpoint at all.
+ *
  * @since 1.0.99
  */
-class ConcurrentQueryTest extends AbstractBigQueryIntegrationTest {
+class RealConcurrentQueryTest extends AbstractRealBigQueryIntegrationTest {
 
-	private static final Logger logger = LoggerFactory.getLogger(ConcurrentQueryTest.class);
+	private static final Logger logger = LoggerFactory.getLogger(RealConcurrentQueryTest.class);
 
 	private static final int THREADS = 8;
 

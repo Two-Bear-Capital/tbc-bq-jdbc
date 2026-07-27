@@ -1,9 +1,8 @@
 name: Dependabot Auto-Merge
 
 # Enables auto-merge for Dependabot PRs that are patch or minor version bumps.
-# Auto-merge only completes once the required status check (Build and Emulator
-# Integration Tests) passes, per branch protection. Major version bumps are
-# intentionally left for manual review.
+# Auto-merge only completes once the required status checks pass, per branch
+# protection. Major version bumps are intentionally left for manual review.
 #
 # NOTE: We do not self-approve here. The enterprise policy "Allow GitHub Actions
 # to create or approve pull requests" is disabled and cannot be overridden at the
