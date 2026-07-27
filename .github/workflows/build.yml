@@ -73,14 +73,14 @@ jobs:
   real-integration-tests:
     name: Real BigQuery Integration Tests
     runs-on: ubuntu-latest
-    # Serialize real BigQuery runs across all PRs and pushes: they share one
-    # dataset, so this is the backstop for any test that forgets to scope its
-    # objects with RUN_ID. cancel-in-progress is false so a running suite is
-    # never killed mid-flight; note that if two runs queue behind a third,
-    # GitHub cancels the older queued one and that PR needs a re-run.
+    # Deduplicate runs per branch: a new push supersedes the previous run of the
+    # same ref. Isolation between concurrent PRs comes from RUN_ID-scoped table
+    # and routine names, not from serializing here — a repo-wide group cancels
+    # queued runs on OTHER pull requests, which reads as a failed required check
+    # on a PR that did nothing wrong.
     concurrency:
-      group: real-bigquery-tests
-      cancel-in-progress: false
+      group: real-bigquery-tests-${{ github.ref }}
+      cancel-in-progress: true
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
