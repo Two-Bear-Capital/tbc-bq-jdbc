@@ -17,7 +17,6 @@ package vc.tbc.bq.jdbc.integration.real;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
@@ -57,8 +56,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>
  * The Calendar tests here assert concrete instants, which is only meaningful
- * now that #121 is fixed. {@code getBoolean} on an INT64 column is covered
- * against #129, since it currently throws an unchecked exception.
+ * now that #121 is fixed, and {@code getBoolean} on an INT64 column asserts the
+ * coercion #129 introduced.
  *
  * @since 1.0.115
  */
@@ -266,14 +265,22 @@ class RealResultSetAdvancedTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	@Test
-	@Disabled("#129 — getBoolean on INT64 throws IllegalStateException, not SQLException")
-	void testGetBooleanFromIntegerReportsSqlException() throws SQLException {
+	void testGetBooleanFromIntegerCoerces() throws SQLException {
 		// The emulator tier caught `IllegalStateException | SQLException` by name and
-		// logged, which normalised a JDBC contract violation into a pass. Whether the
-		// driver should coerce 1/0 or reject the conversion is open (#129), but it
-		// must not throw unchecked.
-		firstRow("SELECT 1 AS true_val", rs -> assertThrows(SQLException.class, () -> rs.getBoolean("true_val"),
-				"A failed conversion must be reported as SQLException"));
+		// logged, normalising a JDBC contract violation into a pass. #129 made this
+		// spec-compliant: the JDBC conversion table lists getBoolean as supported for
+		// every numeric type, so non-zero is true and zero is false.
+		firstRow("SELECT 1 AS true_val, 0 AS false_val", rs -> {
+			assertTrue(rs.getBoolean("true_val"), "INT64 1 should read as true");
+			assertFalse(rs.getBoolean("false_val"), "INT64 0 should read as false");
+		});
+	}
+
+	@Test
+	void testGetBooleanOnUnconvertibleTextReportsSqlException() throws SQLException {
+		// Whatever cannot be coerced must still be an SQLException, never unchecked.
+		firstRow("SELECT 'banana' AS not_a_bool", rs -> assertThrows(SQLException.class,
+				() -> rs.getBoolean("not_a_bool"), "A failed conversion must be reported as SQLException"));
 	}
 
 	// ── NULL handling ─────────────────────────────────────────────────────────

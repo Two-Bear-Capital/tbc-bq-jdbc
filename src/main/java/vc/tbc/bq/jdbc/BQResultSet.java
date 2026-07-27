@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.sql.Date;
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * JDBC ResultSet implementation for BigQuery.
@@ -256,10 +257,87 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return FieldValueConverter.toString(value, getSchemaField(columnIndex));
 	}
 
+	/**
+	 * Runs a {@link FieldValue} accessor and reports failure as
+	 * {@link SQLException}.
+	 *
+	 * <p>
+	 * The BigQuery client signals a value it cannot interpret with unchecked
+	 * exceptions — {@code IllegalStateException} when the attribute is wrong for
+	 * the accessor, {@code NumberFormatException}/{@code ArithmeticException} when
+	 * the text will not parse. JDBC requires getters to report failure as
+	 * {@code SQLException}, so leaking those meant a caller's
+	 * {@code catch (SQLException)} never fired and a conversion error surfaced as
+	 * an unhandled crash (#129).
+	 *
+	 * @param <T>
+	 *            the converted type
+	 * @param columnIndex
+	 *            the 1-based column, for the message
+	 * @param targetType
+	 *            the JDBC type being converted to, for the message
+	 * @param conversion
+	 *            the accessor to run
+	 * @return the converted value
+	 * @throws SQLException
+	 *             if the conversion fails
+	 */
+	private <T> T convert(int columnIndex, String targetType, Supplier<T> conversion) throws SQLException {
+		try {
+			return conversion.get();
+		} catch (IllegalStateException | NumberFormatException | ArithmeticException e) {
+			throw new BQSQLException(String.format(ErrorMessages.CANNOT_CONVERT_COLUMN, columnLabelFor(columnIndex),
+					targetType, e.getMessage()), BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE, e);
+		}
+	}
+
+	/** Column name for an error message, falling back to the index. */
+	private String columnLabelFor(int columnIndex) {
+		Field field = getSchemaField(columnIndex);
+		return field != null ? field.getName() : String.valueOf(columnIndex);
+	}
+
+	/**
+	 * Coerces a value to boolean per the JDBC conversion table, which lists
+	 * {@code getBoolean} as supported for every numeric type as well as BOOL and
+	 * the character types. Non-zero is true, zero is false.
+	 */
+	private boolean toBoolean(FieldValue value, int columnIndex) throws SQLException {
+		Field field = getSchemaField(columnIndex);
+		StandardSQLTypeName type = field != null ? field.getType().getStandardType() : null;
+		if (type == null) {
+			return convert(columnIndex, "boolean", value::getBooleanValue);
+		}
+		return switch (type) {
+			case BOOL -> convert(columnIndex, "boolean", value::getBooleanValue);
+			case INT64 -> convert(columnIndex, "boolean", () -> value.getLongValue() != 0L);
+			case FLOAT64 -> convert(columnIndex, "boolean", () -> value.getDoubleValue() != 0.0d);
+			case NUMERIC, BIGNUMERIC -> convert(columnIndex, "boolean", () -> value.getNumericValue().signum() != 0);
+			case STRING -> parseBooleanText(value.getStringValue(), columnIndex);
+			default -> convert(columnIndex, "boolean", value::getBooleanValue);
+		};
+	}
+
+	/**
+	 * {@code "true"}/{@code "1"} and {@code "false"}/{@code "0"}, case-insensitive.
+	 */
+	private boolean parseBooleanText(String text, int columnIndex) throws SQLException {
+		String trimmed = text.trim();
+		if ("true".equalsIgnoreCase(trimmed) || "1".equals(trimmed)) {
+			return true;
+		}
+		if ("false".equalsIgnoreCase(trimmed) || "0".equals(trimmed)) {
+			return false;
+		}
+		throw new BQSQLException(
+				String.format(ErrorMessages.CANNOT_CONVERT_COLUMN, columnLabelFor(columnIndex), "boolean", text),
+				BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+	}
+
 	@Override
 	public boolean getBoolean(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return !value.isNull() && value.getBooleanValue();
+		return !value.isNull() && toBoolean(value, columnIndex);
 	}
 
 	@Override
@@ -268,7 +346,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return 0;
 		}
-		long longValue = toIntegralLong(value, getSchemaField(columnIndex));
+		long longValue = convert(columnIndex, "integer", () -> toIntegralLong(value, getSchemaField(columnIndex)));
 		if (longValue < Byte.MIN_VALUE || longValue > Byte.MAX_VALUE) {
 			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "byte", longValue),
 					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
@@ -282,7 +360,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return 0;
 		}
-		long longValue = toIntegralLong(value, getSchemaField(columnIndex));
+		long longValue = convert(columnIndex, "integer", () -> toIntegralLong(value, getSchemaField(columnIndex)));
 		if (longValue < Short.MIN_VALUE || longValue > Short.MAX_VALUE) {
 			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "short", longValue),
 					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
@@ -296,7 +374,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return 0;
 		}
-		long longValue = toIntegralLong(value, getSchemaField(columnIndex));
+		long longValue = convert(columnIndex, "integer", () -> toIntegralLong(value, getSchemaField(columnIndex)));
 		if (longValue < Integer.MIN_VALUE || longValue > Integer.MAX_VALUE) {
 			throw new BQSQLException(String.format(ErrorMessages.VALUE_OUT_OF_RANGE, "int", longValue),
 					BQSQLException.SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE);
@@ -307,19 +385,21 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public long getLong(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? 0 : toIntegralLong(value, getSchemaField(columnIndex));
+		return value.isNull()
+				? 0
+				: convert(columnIndex, "long", () -> toIntegralLong(value, getSchemaField(columnIndex)));
 	}
 
 	@Override
 	public float getFloat(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? 0 : (float) value.getDoubleValue();
+		return value.isNull() ? 0 : convert(columnIndex, "float", () -> (float) value.getDoubleValue());
 	}
 
 	@Override
 	public double getDouble(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? 0 : value.getDoubleValue();
+		return value.isNull() ? 0 : convert(columnIndex, "double", value::getDoubleValue);
 	}
 
 	@Deprecated
@@ -329,13 +409,13 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return null;
 		}
-		return value.getNumericValue();
+		return convert(columnIndex, "BigDecimal", value::getNumericValue);
 	}
 
 	@Override
 	public byte[] getBytes(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? null : value.getBytesValue();
+		return value.isNull() ? null : convert(columnIndex, "byte[]", value::getBytesValue);
 	}
 
 	@Override
@@ -503,7 +583,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
-		return value.isNull() ? null : value.getNumericValue();
+		return value.isNull() ? null : convert(columnIndex, "BigDecimal", value::getNumericValue);
 	}
 
 	@Override
