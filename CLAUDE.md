@@ -214,7 +214,7 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
-### Emulator Integration Tests (31 tests, 0 disabled)
+### Emulator Integration Tests (19 tests, 0 disabled)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/`
 - Run locally: `./mvnw verify -Pintegration-tests`
 - Run automatically in CI/CD on every push and PR
@@ -223,13 +223,18 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 - Covers: connections, queries, prepared statements, metadata, result sets
 - Requires Docker (available by default in GitHub Actions ubuntu-latest runners)
 
-**Test Structure:** (shrinking — see issue #118)
+**Test Structure** — this tier is now complete and deliberately small (#118). It asserts
+no BigQuery semantics; everything that does lives in `integration/real`.
 - `AbstractBigQueryIntegrationTest` - Base with helper methods (`createTestTable`, `insertTestData`)
-- `ConcurrentQueryTest` - Query overlap; the #98 regression guard, and hermetic by design
+- `EmulatorSupportTest` - That the driver's shipped emulator support works (`EmulatorAuth`, host-in-URL)
+- `ConcurrentQueryTest` - Query overlap; the #98 regression guard, hermetic by design
 - `SimbaUrlConnectionTest` - Simba URL properties taking effect
-- `BasicConnectionTest` - Connection lifecycle
 
-### Real BigQuery Integration Tests (326 tests, 16 classes)
+**Do not add BigQuery-semantics tests here.** That is what #118 undid: the emulator
+diverges from the service, tests get weakened until they pass, and the weakened tests
+then hide real defects (#93, #98, #121, #123, #129).
+
+### Real BigQuery Integration Tests (325 tests, 16 classes)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/real/`
 - Run locally: `gcloud auth application-default login`, `export BQ_TEST_PROJECT=...`,
   then `./mvnw verify -Preal-integration-tests`

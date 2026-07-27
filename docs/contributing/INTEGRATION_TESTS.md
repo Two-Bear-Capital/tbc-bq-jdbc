@@ -17,7 +17,8 @@ The driver has two integration test tiers:
 > `INFORMATION_SCHEMA` — and tests written against it were historically weakened until
 > they passed, which shipped real bugs (#93, #98). The emulator tier is being reduced
 > to tests that need an endpoint but not fidelity: connection/URL plumbing, and
-> `ConcurrentQueryTest`, which measures query *overlap*. See issue #118 and
+> `ConcurrentQueryTest`, which measures query *overlap*. That reduction is done —
+> three classes remain. See issue #118 and
 > [Emulator Limitations](EMULATOR_LIMITATIONS.md).
 
 ## Test structure
@@ -25,10 +26,10 @@ The driver has two integration test tiers:
 ```
 src/test/java/vc/tbc/bq/jdbc/integration/
 ├── AbstractBigQueryIntegrationTest.java     # Emulator base class (image pinned by digest)
-├── ...4 emulator test classes, 42 tests
+├── ...3 emulator test classes, 19 tests
 └── real/
     ├── AbstractRealBigQueryIntegrationTest.java  # Real BQ base class
-    └── ...16 test classes, 319 tests
+    └── ...16 test classes, 325 tests
 ```
 
 Run `ls src/test/java/vc/tbc/bq/jdbc/integration/` for the current inventory — an

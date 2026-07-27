@@ -14,12 +14,12 @@ The integration test suite runs against the BigQuery emulator for fast, local te
 
 ## Summary Statistics
 
-- **Emulator integration tests:** 31 across 3 classes
-- **Real BigQuery integration tests:** 326 across 16 classes
+- **Emulator integration tests:** 19 across 3 classes
+- **Real BigQuery integration tests:** 325 across 16 classes
 - **Disabled tests:** 0 — the six that cited confirmed emulator bugs were deleted along
   with their classes as those ported (#118)
 
-> **This tier is being retired as a correctness oracle — see issue #118.** The
+> **This tier has been retired as a correctness oracle — issue #118 is complete.** The
 > "log the limitation and continue" approach below is what let issue #93 ship: a
 > malformed `INFORMATION_SCHEMA.ROUTINES` query returned zero rows for every real
 > user while CI stayed green, because the failure was logged as an emulator gap and
