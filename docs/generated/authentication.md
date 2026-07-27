@@ -25,7 +25,6 @@ Authentication is selected with the `authType` connection property. The accepted
 | Implementation | Notes |
 | --- | --- |
 | `ApplicationDefaultAuth` |  |
-| `EmulatorAuth` | **Deprecated** — selectable as `authType=EMULATOR`, removed in the next major release. |
 | `ServiceAccountAuth` |  |
 | `UserOAuthAuth` |  |
 | `WorkforceIdentityAuth` |  |

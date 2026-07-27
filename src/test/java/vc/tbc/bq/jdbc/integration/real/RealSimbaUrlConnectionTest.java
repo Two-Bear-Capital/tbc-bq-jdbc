@@ -35,11 +35,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Simba-format URL properties against real BigQuery.
  *
  * <p>
- * Ported from the emulator tier when it was retired. The emulator version
- * relied on the host in a Simba URL defaulting {@code authType} to
- * {@code EMULATOR} (ConnectionUrlParser); here the URL carries
- * {@code OAuthType=3}, which maps to ADC, so the same parsing path is exercised
- * against the real service.
+ * Ported from the retired hermetic tier, which relied on a host in a Simba URL
+ * selecting a fabricated-credential auth type. That default is gone (a host no
+ * longer changes how you authenticate), so the URL carries {@code OAuthType=3}
+ * — ADC — and exercises the same parsing path against the real service.
  *
  * <p>
  * These assert plumbing — that a property named the Simba way reaches

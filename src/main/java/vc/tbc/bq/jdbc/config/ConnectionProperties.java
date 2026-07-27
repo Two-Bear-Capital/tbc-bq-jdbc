@@ -38,7 +38,8 @@ import java.util.Objects;
  * @param authType
  *            the authentication type (required)
  * @param host
- *            custom host for BigQuery API (e.g., for emulator) (optional)
+ *            custom BigQuery API endpoint, e.g. a proxy or Private Service
+ *            Connect (optional)
  * @param port
  *            custom port for BigQuery API (optional)
  * @param timeoutSeconds
@@ -72,9 +73,6 @@ import java.util.Objects;
  *            whether to enable metadata caching (default: true)
  * @param metadataLazyLoad
  *            whether to use lazy loading for metadata (default: false)
- * @param useDestinationTables
- *            whether to use destination tables for SELECT queries (default:
- *            false). Useful for BigQuery emulator compatibility.
  * @param enableQueryCostEstimation
  *            whether to run dry-run before each query to estimate cost
  *            (default: false). Cost estimates are attached as SQLWarnings.
@@ -89,7 +87,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
 		Map<String, String> labels, JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi,
 		boolean enableSessions, Integer connectionTimeout, Integer retryCount, Long maxBillingBytes,
-		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean useDestinationTables,
+		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad,
 		Boolean enableQueryCostEstimation, Boolean nativeComplexTypes) {
 
 	/** Default timeout in seconds. */
@@ -144,9 +142,6 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		}
 		if (metadataLazyLoad == null) {
 			metadataLazyLoad = false;
-		}
-		if (useDestinationTables == null) {
-			useDestinationTables = false;
 		}
 		if (enableQueryCostEstimation == null) {
 			enableQueryCostEstimation = false;

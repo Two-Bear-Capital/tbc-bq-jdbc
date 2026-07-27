@@ -220,10 +220,8 @@ public final class ConnectionUrlParser {
 		// Map Simba properties to tbc-bq-jdbc properties
 		Map<String, String> properties = mapSimbaProperties(simbaProperties);
 
-		// Add host and port to properties only for non-standard endpoints (e.g.,
-		// emulators).
-		// Standard Simba URLs use "https://www.googleapis.com/bigquery/v2:443" which is
-		// the
+		// Add host and port to properties only for non-standard endpoints. Standard
+		// Simba URLs use "https://www.googleapis.com/bigquery/v2:443", which is the
 		// Google BigQuery API — the SDK manages that connection natively.
 		if (host != null && !host.startsWith("http://") && !host.startsWith("https://")) {
 			properties.put("host", host);
@@ -286,7 +284,6 @@ public final class ConnectionUrlParser {
 				case "UseLegacySQL" -> properties.put("useLegacySql", value);
 				case "Location" -> properties.put("location", value);
 				case "DatasetProjectId" -> properties.put("datasetProjectId", value);
-				case "UseDestinationTables" -> properties.put("useDestinationTables", value);
 				case "EnableSessions" -> properties.put("enableSessions", value);
 				default -> properties.put(key, value); // Pass through — handles native tbc-bq-jdbc property names
 			}
@@ -328,17 +325,21 @@ public final class ConnectionUrlParser {
 	private static ConnectionProperties buildConnectionProperties(String projectId, String datasetId,
 			Map<String, String> properties) throws SQLException {
 
-		// Parse host and port (for emulator support)
+		// Parse host and port (a non-default BigQuery endpoint, e.g. a proxy or
+		// Private Service Connect)
 		String host = properties.get("host");
 		Integer port = parseInteger(properties, "port");
 
 		// Parse authType (required)
 		String authTypeStr = properties.get("authType");
 		if (authTypeStr == null) {
-			// A host with no authType still implies EMULATOR, because changing that
-			// now would break emulator users before the deprecation period is up.
-			// EmulatorAuth logs a warning when it is actually used.
-			authTypeStr = (host != null) ? "EMULATOR" : "ADC";
+			// A host no longer changes the default. It used to select a
+			// fabricated-token auth type (removed in 2.0.0, see #144), so anyone
+			// pointing the driver at a proxy or a private endpoint silently got that
+			// instead of their own credentials, and only found out when the request
+			// was rejected. A host now means "reach BigQuery here", not
+			// "authenticate differently".
+			authTypeStr = "ADC";
 		}
 
 		AuthType authType = parseAuthType(authTypeStr, properties);
@@ -360,22 +361,17 @@ public final class ConnectionUrlParser {
 		Integer metadataCacheTtl = parseInteger(properties, "metadataCacheTtl");
 		Boolean metadataCacheEnabled = parseBooleanObject(properties, "metadataCacheEnabled");
 		Boolean metadataLazyLoad = parseBooleanObject(properties, "metadataLazyLoad");
-		Boolean useDestinationTables = parseBooleanObject(properties, "useDestinationTables");
 		Boolean enableQueryCostEstimation = parseBooleanObject(properties, "enableQueryCostEstimation");
 		Boolean nativeComplexTypes = parseBooleanObject(properties, "nativeComplexTypes");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, jobCreationMode, pageSize, useStorageApi, enableSessions,
 				connectionTimeout, retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled,
-				metadataLazyLoad, useDestinationTables, enableQueryCostEstimation, nativeComplexTypes);
+				metadataLazyLoad, enableQueryCostEstimation, nativeComplexTypes);
 	}
 
-	@SuppressWarnings("removal") // EMULATOR mapping retained for the deprecation period
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
 		return switch (authTypeStr.toUpperCase(Locale.ROOT)) {
-			// Still honoured so existing emulator users keep working; EmulatorAuth
-			// itself logs the deprecation. Remove with the record.
-			case "EMULATOR" -> new EmulatorAuth();
 			case "SERVICE_ACCOUNT" -> {
 				String credentials = properties.get("credentials");
 				if (credentials == null) {

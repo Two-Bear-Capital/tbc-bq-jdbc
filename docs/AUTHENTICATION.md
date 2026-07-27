@@ -20,11 +20,17 @@ credentials, and examples for each method.
 
 <!-- @include: generated/authentication.md -->
 
-> **`authType=EMULATOR` is deprecated** and will be removed in the next major
-> release. The driver is no longer tested against the BigQuery emulator, so
-> continuing to advertise support for it would promise more than the project can
-> keep. Use `authType=ADC` — or any other real credential type — against BigQuery.
-> Selecting it logs a warning; behaviour is otherwise unchanged for now.
+> **`authType=EMULATOR` was removed in 2.0.0.** It was deprecated in 1.1.0. The
+> driver is not tested against the BigQuery emulator, so advertising support for
+> it promised more than the project could keep. Use `authType=ADC` — or any other
+> real credential type. A URL still asking for `EMULATOR` now fails with
+> *Unsupported authentication type* rather than silently using credentials it was
+> never meant to.
+>
+> **A `host` no longer changes how you authenticate.** It previously defaulted
+> `authType` to `EMULATOR`, so pointing the driver at a proxy or a private
+> endpoint quietly produced a fabricated token. A host now means only "reach
+> BigQuery at this address", and the default is `ADC` either way.
 
 ## Application Default Credentials (ADC)
 

@@ -393,11 +393,55 @@ class ConnectionUrlParserTest {
 		assertTrue(props.metadataLazyLoad());
 	}
 
+	// ── A host no longer selects an auth type (#144) ──────────────────────────
+
 	@Test
-	void testParseUrlWithUseDestinationTables() throws SQLException {
-		String url = "jdbc:bigquery:my-project?useDestinationTables=true";
-		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
-		assertTrue(props.useDestinationTables());
+	void testHostWithoutAuthTypeDefaultsToAdc() throws SQLException {
+		// A host used to imply the emulator's fabricated credentials, so anyone
+		// pointing the driver at a proxy or a private endpoint silently got a token
+		// that could not authenticate. It now means "reach BigQuery here".
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project?host=bq.internal", null);
+
+		assertInstanceOf(ApplicationDefaultAuth.class, props.authType());
+		assertEquals("bq.internal", props.host(), "The host is still honoured as an endpoint");
+	}
+
+	@Test
+	void testSimbaHostWithoutOAuthTypeDefaultsToAdc() throws SQLException {
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery://bq.internal:9050;ProjectId=my-project",
+				null);
+
+		assertInstanceOf(ApplicationDefaultAuth.class, props.authType());
+		assertEquals("bq.internal", props.host());
+		assertEquals(9050, props.port());
+	}
+
+	@Test
+	void testExplicitAuthTypeStillWinsOverTheDefault() throws SQLException {
+		ConnectionProperties props = ConnectionUrlParser.parse(
+				"jdbc:bigquery:my-project?host=bq.internal&authType=SERVICE_ACCOUNT&credentials=/key.json", null);
+
+		assertInstanceOf(ServiceAccountAuth.class, props.authType());
+	}
+
+	@Test
+	void testEmulatorAuthTypeIsRejected() {
+		// Removed in 2.0.0 (#144). A URL that still asks for it must fail loudly
+		// rather than fall back to real credentials it was never meant to use.
+		SQLException thrown = assertThrows(SQLException.class,
+				() -> ConnectionUrlParser.parse("jdbc:bigquery:my-project?authType=EMULATOR", null));
+		assertTrue(thrown.getMessage().contains("Unsupported authentication type"), "Was: " + thrown.getMessage());
+	}
+
+	@Test
+	void testUseDestinationTablesIsNoLongerAProperty() throws SQLException {
+		// Also removed in 2.0.0. Unknown properties are ignored rather than
+		// rejected, so the check is that parsing still succeeds and nothing about
+		// the connection changes.
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project?useDestinationTables=true",
+				null);
+
+		assertEquals("my-project", props.projectId());
 	}
 
 	@Test
@@ -437,8 +481,7 @@ class ConnectionUrlParserTest {
 				+ "&labels=env=prod,team=data&jobCreationMode=OPTIONAL&datasetProjectId=other-project"
 				+ "&pageSize=500&useStorageApi=false&enableSessions=true&connectionTimeout=45"
 				+ "&retryCount=2&maxBillingBytes=5000000&metadataCacheTtl=120&metadataCacheEnabled=false"
-				+ "&metadataLazyLoad=true&useDestinationTables=true&enableQueryCostEstimation=true"
-				+ "&nativeComplexTypes=true";
+				+ "&metadataLazyLoad=true&enableQueryCostEstimation=true" + "&nativeComplexTypes=true";
 
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
 
@@ -462,7 +505,6 @@ class ConnectionUrlParserTest {
 		assertEquals(120, props.metadataCacheTtl());
 		assertFalse(props.metadataCacheEnabled());
 		assertTrue(props.metadataLazyLoad());
-		assertTrue(props.useDestinationTables());
 		assertTrue(props.enableQueryCostEstimation());
 		assertTrue(props.nativeComplexTypes());
 	}

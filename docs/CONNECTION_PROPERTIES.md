@@ -52,7 +52,6 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 | `Location` | `location` | BigQuery location |
 | `DatasetProjectId` | `datasetProjectId` | Cross-project dataset access |
 | `EnableSessions` | `enableSessions` | Create a BigQuery session at connection open |
-| `UseDestinationTables` | `useDestinationTables` | Write SELECT results to a temp destination table (expires after 24 hours) |
 
 **OAuthType Values:**
 

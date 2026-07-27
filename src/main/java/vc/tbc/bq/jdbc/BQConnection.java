@@ -126,7 +126,7 @@ public final class BQConnection extends AbstractBQConnection {
 				builder.setLocation(properties.location());
 			}
 
-			// Set custom host for emulator support
+			// Point the client at a non-default BigQuery endpoint
 			if (properties.host() != null) {
 				String endpoint = properties.host();
 				if (properties.port() != null) {
