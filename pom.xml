@@ -6,7 +6,7 @@
 
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>1.0.97</version>
+    <version>1.0.98</version>
     <packaging>jar</packaging>
 
     <name>TBC BigQuery JDBC Driver</name>
@@ -37,7 +37,7 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.build.outputTimestamp>2026-07-27T01:04:57Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-07-27T01:36:31Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
         <google.cloud.bom.version>26.85.1</google.cloud.bom.version>
@@ -866,6 +866,26 @@
                             <includes>
                                 <include>**/integration/real/**/*Test.java</include>
                             </includes>
+                            <!-- Run test classes concurrently: the suite is dominated by BigQuery
+                                 round-trips, not CPU. Methods stay sequential within a class -
+                                 they share one connection, and BigQuery forbids concurrent
+                                 queries inside a session, so classes opt into concurrent
+                                 methods individually (RealUpdateCountTest does, with a table per
+                                 test method). Cross-class isolation comes from RUN_ID-scoped
+                                 table and routine names. Threads spend nearly all their time
+                                 blocked on BigQuery, so the pool is sized well above the core
+                                 count. Only the real profile enables this; the emulator suite
+                                 shares one container and fixed table names, so it stays
+                                 sequential. -->
+                            <properties>
+                                <configurationParameters>
+                                    junit.jupiter.execution.parallel.enabled=true
+                                    junit.jupiter.execution.parallel.mode.default=same_thread
+                                    junit.jupiter.execution.parallel.mode.classes.default=concurrent
+                                    junit.jupiter.execution.parallel.config.strategy=fixed
+                                    junit.jupiter.execution.parallel.config.fixed.parallelism=8
+                                </configurationParameters>
+                            </properties>
                         </configuration>
                         <executions>
                             <execution>

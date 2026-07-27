@@ -32,10 +32,27 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RealBasicConnectionTest extends AbstractRealBigQueryIntegrationTest {
 
+	/**
+	 * Budget for {@link Connection#isValid(int)}, which runs a real {@code SELECT
+	 * 1} against BigQuery.
+	 *
+	 * <p>
+	 * Deliberately generous: these tests run concurrently with the rest of the real
+	 * suite, and returning {@code false} once the budget expires is correct per the
+	 * JDBC contract. A tight value turns ordinary CI load into a failure — a
+	 * 5-second budget did exactly that, timing out at 5.025s. What these tests mean
+	 * to assert is that the connection is usable, not that BigQuery answers within
+	 * any particular time.
+	 */
+	private static final int VALIDATION_TIMEOUT_SECONDS = 30;
+
 	@Test
 	void testConnectionIsValid() throws SQLException {
-		assertTrue(connection.isValid(5));
+		assertTrue(connection.isValid(VALIDATION_TIMEOUT_SECONDS));
 		assertFalse(connection.isClosed());
+
+		// No timeout at all: validity must not depend on the budget
+		assertTrue(connection.isValid(0));
 	}
 
 	@Test
@@ -130,14 +147,14 @@ class RealBasicConnectionTest extends AbstractRealBigQueryIntegrationTest {
 		Connection conn1 = createTestConnection();
 		Connection conn2 = createTestConnection();
 
-		assertTrue(conn1.isValid(5));
-		assertTrue(conn2.isValid(5));
+		assertTrue(conn1.isValid(VALIDATION_TIMEOUT_SECONDS));
+		assertTrue(conn2.isValid(VALIDATION_TIMEOUT_SECONDS));
 
 		conn1.close();
 
 		assertTrue(conn1.isClosed());
 		assertFalse(conn2.isClosed());
-		assertTrue(conn2.isValid(5));
+		assertTrue(conn2.isValid(VALIDATION_TIMEOUT_SECONDS));
 
 		conn2.close();
 	}
@@ -156,7 +173,7 @@ class RealBasicConnectionTest extends AbstractRealBigQueryIntegrationTest {
 		connection.beginRequest();
 		connection.endRequest();
 
-		assertTrue(connection.isValid(5));
+		assertTrue(connection.isValid(VALIDATION_TIMEOUT_SECONDS));
 	}
 
 	@Test
