@@ -94,21 +94,22 @@ class BQDatabaseMetaDataTest {
 	}
 
 	@Test
-	void testGetDriverMajorVersion() {
+	void testGetDriverMajorVersion() throws SQLException {
 		// When: Getting major version
 		int major = metaData.getDriverMajorVersion();
 
-		// Then: Should return positive number
-		assertTrue(major >= 0);
+		// Then: It should agree with the version string. The previous assertion
+		// was `major >= 0` on an int, which no implementation can fail.
+		assertEquals(Integer.parseInt(metaData.getDriverVersion().split("\\.")[0]), major);
 	}
 
 	@Test
-	void testGetDriverMinorVersion() {
+	void testGetDriverMinorVersion() throws SQLException {
 		// When: Getting minor version
 		int minor = metaData.getDriverMinorVersion();
 
-		// Then: Should return positive number
-		assertTrue(minor >= 0);
+		// Then: It should agree with the version string (was `minor >= 0`).
+		assertEquals(Integer.parseInt(metaData.getDriverVersion().split("\\.")[1]), minor);
 	}
 
 	// JDBC Compliance Tests
