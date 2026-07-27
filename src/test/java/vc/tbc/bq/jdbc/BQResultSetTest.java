@@ -22,6 +22,8 @@ import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.google.cloud.bigquery.TableResult;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -202,5 +204,78 @@ class BQResultSetTest {
 		SQLException thrown = assertThrows(SQLException.class, rs::next);
 		assertTrue(thrown.getMessage().contains("no row iterator"),
 				"message should explain the cause, was: " + thrown.getMessage());
+	}
+
+	// ── Conversion failures report SQLException (#129) ────────────────────────
+	// The BigQuery client signals an uninterpretable value with unchecked
+	// exceptions. Leaking those meant a caller's catch (SQLException) never fired.
+	// The old integration test caught `IllegalStateException | SQLException` by
+	// name, which is how it stayed hidden.
+
+	private BQResultSet stringColumnContaining(String raw) throws SQLException {
+		Schema schema = Schema.of(Field.of("val", StandardSQLTypeName.STRING));
+		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, raw)),
+				schema.getFields());
+		BQResultSet rs = createResultSet(schema, row);
+		assertTrue(rs.next());
+		return rs;
+	}
+
+	@Test
+	void testGetBigDecimalOnUnparseableTextThrowsSqlException() throws SQLException {
+		BQResultSet rs = stringColumnContaining("hello");
+		SQLException thrown = assertThrows(SQLException.class, () -> rs.getBigDecimal("val"));
+		assertTrue(thrown.getMessage().contains("val"), "Message should name the column: " + thrown.getMessage());
+	}
+
+	@Test
+	void testGetIntOnUnparseableTextThrowsSqlException() throws SQLException {
+		BQResultSet rs = stringColumnContaining("hello");
+		assertThrows(SQLException.class, () -> rs.getInt("val"));
+	}
+
+	@Test
+	void testGetDoubleOnUnparseableTextThrowsSqlException() throws SQLException {
+		BQResultSet rs = stringColumnContaining("hello");
+		assertThrows(SQLException.class, () -> rs.getDouble("val"));
+	}
+
+	@Test
+	void testGetBooleanOnUnparseableTextThrowsSqlException() throws SQLException {
+		BQResultSet rs = stringColumnContaining("banana");
+		assertThrows(SQLException.class, () -> rs.getBoolean("val"));
+	}
+
+	@Test
+	void testGetBytesOnNonBytesColumnThrowsSqlException() throws SQLException {
+		BQResultSet rs = stringColumnContaining("hello");
+		assertThrows(SQLException.class, () -> rs.getBytes("val"));
+	}
+
+	// ── getBoolean coercion per the JDBC conversion table ─────────────────────
+
+	private BQResultSet singleValue(StandardSQLTypeName type, String raw) throws SQLException {
+		Schema schema = Schema.of(Field.of("flag", type));
+		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, raw)),
+				schema.getFields());
+		BQResultSet rs = createResultSet(schema, row);
+		assertTrue(rs.next());
+		return rs;
+	}
+
+	@ParameterizedTest
+	@CsvSource({"INT64,1,true", "INT64,0,false", "INT64,-5,true", "FLOAT64,1.5,true", "FLOAT64,0.0,false",
+			"NUMERIC,2.5,true", "NUMERIC,0,false", "BOOL,true,true", "BOOL,false,false", "STRING,true,true",
+			"STRING,false,false", "STRING,1,true", "STRING,0,false"})
+	void testGetBooleanCoercesPerJdbcConversionTable(String type, String raw, boolean expected) throws SQLException {
+		BQResultSet rs = singleValue(StandardSQLTypeName.valueOf(type), raw);
+		assertEquals(expected, rs.getBoolean("flag"), type + " '" + raw + "' should read as " + expected);
+	}
+
+	@Test
+	void testGetBooleanOnNullReturnsFalse() throws SQLException {
+		BQResultSet rs = singleValue(StandardSQLTypeName.INT64, null);
+		assertFalse(rs.getBoolean("flag"), "SQL NULL reads as false per the JDBC spec");
+		assertTrue(rs.wasNull());
 	}
 }

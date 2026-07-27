@@ -43,6 +43,7 @@ public final class ErrorMessages {
 
 	// Type conversion messages
 	public static final String VALUE_OUT_OF_RANGE = "Value out of range for type %s: %s";
+	public static final String CANNOT_CONVERT_COLUMN = "Cannot convert column %s to %s: %s";
 
 	private ErrorMessages() {
 		throw new AssertionError("Utility class should not be instantiated");
