@@ -161,23 +161,30 @@ is a diagnostic, not a score, and it lands in three regimes:
 nearly all of its time blocked on a BigQuery round trip, doing nothing. Adding threads
 fills that dead time, and HTTP connection reuse amortises better under concurrency, so
 throughput at N threads can exceed N times the single-threaded rate. The recorded
-baseline shows 25x at 16 threads. Superlinear here means the single-threaded number is
+baseline shows 22x at 16 threads. Superlinear here means the single-threaded number is
 mostly idle waiting — which it is.
 
-**Well below 100% is expected for the metadata benchmarks, but the exact ceiling is
-not explained.** `getTablesWarm` and `getColumnsWarm` serve from an in-memory cache,
-so they are CPU-bound rather than network-bound and cannot exceed the core count. The
-baseline plateaus around 4x on a 10-core machine, which is lower than that alone
+**Well below 100% is expected for the metadata benchmarks, and the exact ceiling is
+still unexplained.** `getTablesWarm` and `getColumnsWarm` serve from an in-memory
+cache, so they are CPU-bound rather than network-bound and cannot exceed the core
+count. They plateau around 4x on a 10-core machine, which is lower than that alone
 accounts for.
 
-A cache hit does *not* copy the rows — `MetadataCache.CacheEntry.createResultSet()`
-hands the shared `unmodifiableList` to a new `MetadataResultSet` wrapper — so this is
-not allocation of the result. The per-operation cost is iterating it: the baseline
-run reads 11,735 rows per `getColumnsWarm` operation, each with a by-name column
-lookup. `MetadataResultSet.findColumn` lowercases the requested label on every one of
-those lookups, which allocates a `String` per row. That is a plausible contributor,
-not a confirmed cause — nobody has profiled it. The JFR recording from a scale run is
-the way to settle it.
+One hypothesis has been tested and **refuted**, which is worth recording so it is not
+retried. `MetadataResultSet.findColumn` used to lowercase the requested label on every
+by-name lookup, allocating a `String` per row — over eleven thousand per
+`getColumnsWarm` operation against a project with a few hundred tables.
+Removing that allocation made these benchmarks roughly **three times faster at every
+thread count** (see the baseline's delta column), so it was a large real cost. But the
+scaling curve did not change shape at all: 1.71x / 2.79x / 3.69x / 4.02x after, against
+1.81x / 2.85x / 3.71x / 4.10x before, both measured against the same project.
+Allocation pressure was therefore not what limits the scaling.
+
+Whatever the ceiling is, it survives a 3x change in per-operation cost, which points at
+something structural rather than something on the hot path — plausibly memory bandwidth
+or L3 contention, since every thread iterates the *same* shared row list. That is a
+guess. The JFR recording from a scale run is the way to settle it, and nobody has done
+that yet.
 
 **Near 1x on a latency-bound benchmark is the failure.** That is #98: throughput flat
 no matter how many callers.
@@ -206,10 +213,17 @@ git commit -m "perf(benchmarks): refresh the thread-scaling baseline"
 Refresh it deliberately — after a change to the concurrency, dispatch or metadata
 paths — not on a schedule. A baseline that tracks noise is not a baseline.
 
-The committed baseline was recorded on a 10-core Apple Silicon laptop, not on a CI
-runner — the report's header records the JVM, OS and core count for exactly this
-reason. A sweep run on GitHub's 4-core `ubuntu-latest` will not match it and should
-not be expected to; compare like with like, or re-record.
+The committed baseline was recorded against the Terraform-managed integration
+project (`bigquery-jdbc-driver-test`, the one `BQ_TEST_PROJECT` points at), on a
+10-core Apple Silicon laptop rather than a CI runner. The report header records the
+JVM, OS and core count for exactly this reason.
+
+Two things therefore will not match it and should not be expected to: a sweep on
+GitHub's 4-core `ubuntu-latest`, and a sweep against any other project. The second
+matters more than it sounds — the metadata benchmarks scale inversely with how much
+metadata the project has, so pointing `BENCHMARK_JDBC_URL` at a different project can
+move them by an order of magnitude while the driver is unchanged. Compare like with
+like, or re-record.
 
 ### Note on the JMH harness
 
@@ -357,25 +371,55 @@ User-facing documentation is in **[docs/OBSERVABILITY.md](../OBSERVABILITY.md)**
   unchanged.
 - **Should a regression fail a build?** Currently no, by decision: reported numbers a
   human reads. Revisit if someone starts ignoring the reports.
-- **Why do the metadata benchmarks plateau at 4x on ten cores?** Unexplained, see
-  above. The first real question these instruments have raised rather than answered,
-  which is what they are for.
+- **Why do the metadata benchmarks plateau at 4x on ten cores?** Still unexplained —
+  and now known *not* to be allocation pressure, see above. The first real question
+  these instruments have raised rather than answered, which is what they are for.
 
 ## What the instruments found on their first run
 
-Recorded here so the next person does not have to rediscover it:
+**Fixed:** `MetadataResultSet.findColumn` lowercased the requested label on every
+by-name column access, allocating a throwaway `String` per lookup — and by-name access
+is per row, so a `getColumns()` over a project with a few hundred tables did it over
+eleven thousand times per call. The
+same shape as the per-row regex compilation #99 found. Resolving the exact match from a
+map keyed by the declared name, and falling back to a linear `equalsIgnoreCase` scan
+only on a miss, made `getColumnsWarm` **3.2x** faster and `getTablesWarm` **3.5x**
+faster — measured before and after against the same project, with no change to the
+query benchmarks, which is what tells you the gain is real and attributable rather
+than measurement drift. The absolute figures scale with how many rows a
+`getColumns()` returns, so the multiple is the durable part of that result, not the
+ops/s.
 
-- `MetadataResultSet.findColumn` allocates a lowercased `String` on **every by-name
-  column access**, so a `getColumns()` over a wide project allocates one per row. This
-  is the same shape as the per-row regex compilation #99 found, and `getColumnsWarm`
-  is now the benchmark that would show a fix.
-- `MetadataCache` has **no size bound**. `evictExpired()` removes expired entries
-  only, so distinct query shapes accumulate within a TTL window, each holding every
-  materialised row of its result. On a wide project that is thousands of rows per
-  entry, in a cache that is static and shared for the life of the process.
-- `BQDatabaseMetaData` logs **31 times at INFO**, several per `getTables()` /
-  `getColumns()` miss — including one that builds a sublist-to-string of dataset IDs
-  before the level is checked. Routine library operations should not be INFO.
+**Fixed:** `MetadataCache` had **no size bound**. `evictExpired()` removed expired
+entries only, so within a single TTL window every distinct query shape accumulated its
+own entry holding every materialised row of its result — thousands of rows per entry on
+a wide project, in a cache that is static and shared for the life of the process. It
+now carries a ceiling on total cached rows (`metadataCacheMaxRows`, default 50,000),
+evicting oldest-first once exceeded.
+
+Eviction is oldest-first rather than LRU on purpose: LRU needs the read path to record
+an access on every hit, which is a write to shared state on the one path that has to
+stay concurrent. Ordering by expiry costs the read path nothing and is exactly
+insertion order, since every entry in a cache takes the same TTL.
+
+**Fixed:** `BQDatabaseMetaData` logged **31 times at INFO**, several on every
+`getTables()` and `getColumns()`. Metadata methods are called constantly — an IDE
+walks them on every tree refresh — so the driver shouted through the host
+application's logs during ordinary operation. All 31 are now `debug`.
+
+Two of them also evaluated their arguments eagerly, which parameterised logging does
+*not* prevent: it defers formatting, not the expressions you hand it. One
+concatenated a sublist into a `String`; the other called `MetadataCache.getStats()`,
+which walks every entry to count expired ones and sum their rows. That one ran on
+schedule whether or not anything was listening. Both now sit behind
+`isDebugEnabled()`.
+
+`MetadataLoggingLevelGuardTest` keeps it that way. The failure mode here is
+copy-paste — every one of those 31 was added by matching the method next to it — and
+nothing else catches it: it is not a bug, and SpotBugs and PMD say nothing. Lifecycle
+and configuration events elsewhere in the driver (registration, session open, custom
+endpoint) are legitimately INFO and out of the guard's scope; the line it draws is
+per-call versus once-per-connection.
 
 [93]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/93
 [98]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/98

@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
+import vc.tbc.bq.jdbc.config.MetadataCache;
 
 import java.sql.*;
 import java.util.Properties;
@@ -148,6 +149,10 @@ public final class BQDriver implements Driver {
 
 		props.add(prop(info, "metadataCacheTtl", String.valueOf(ConnectionProperties.DEFAULT_METADATA_CACHE_TTL),
 				"How long (seconds) to keep metadata in the cache before re-fetching", false, null));
+
+		props.add(prop(info, "metadataCacheMaxRows", String.valueOf(MetadataCache.DEFAULT_MAX_ROWS),
+				"Ceiling on total rows held in the metadata cache; oldest entries are evicted above it. Set to 0 for no limit",
+				false, null));
 
 		props.add(prop(info, "metadataLazyLoad", "false",
 				"Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects)",

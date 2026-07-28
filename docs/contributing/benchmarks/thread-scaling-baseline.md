@@ -2,8 +2,8 @@
 
 | Field | Value |
 | --- | --- |
-| Generated | 2026-07-27T22:25:51.620730Z |
-| Driver version | 2.0.2 (68f6de1) |
+| Generated | 2026-07-27T23:56:17.806204Z |
+| Driver version | 2.1.0 (cb609e7) |
 | JVM | OpenJDK 64-Bit Server VM 25.0.3 |
 | OS | Mac OS X aarch64 |
 | Available processors | 10 |
@@ -11,26 +11,26 @@
 
 | Benchmark | Threads | Throughput (ops/s) | Error (±) | Scaling | Efficiency |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| getColumnsWarm | 1 | 6523.393 | 2775.990 | 1.00x | 100% |
-| getColumnsWarm | 2 | 11801.550 | 4400.106 | 1.81x | 90% |
-| getColumnsWarm | 4 | 18578.056 | 20479.676 | 2.85x | 71% |
-| getColumnsWarm | 8 | 24218.185 | 24111.030 | 3.71x | 46% |
-| getColumnsWarm | 16 | 26731.208 | 10474.726 | 4.10x | 26% |
-| getTablesWarm | 1 | 125366.171 | 15887.564 | 1.00x | 100% |
-| getTablesWarm | 2 | 217642.175 | 31717.614 | 1.74x | 87% |
-| getTablesWarm | 4 | 337793.763 | 108578.089 | 2.69x | 67% |
-| getTablesWarm | 8 | 437370.153 | 118224.765 | 3.49x | 44% |
-| getTablesWarm | 16 | 474779.164 | 600034.215 | 3.79x | 24% |
-| iterateResultSet | 1 | 0.263 | 0.118 | 1.00x | 100% |
-| iterateResultSet | 2 | 0.598 | 0.432 | 2.28x | 114% |
-| iterateResultSet | 4 | 1.317 | 0.919 | 5.02x | 125% |
-| iterateResultSet | 8 | 2.779 | 1.623 | 10.58x | 132% |
-| iterateResultSet | 16 | 5.800 | 2.329 | 22.09x | 138% |
-| submitToFirstRow | 1 | 0.884 | 0.828 | 1.00x | 100% |
-| submitToFirstRow | 2 | 2.125 | 1.259 | 2.40x | 120% |
-| submitToFirstRow | 4 | 4.962 | 4.324 | 5.61x | 140% |
-| submitToFirstRow | 8 | 10.445 | 3.812 | 11.81x | 148% |
-| submitToFirstRow | 16 | 22.275 | 10.284 | 25.18x | 157% |
+| getColumnsWarm | 1 | 651974.245 | 307391.908 | 1.00x | 100% |
+| getColumnsWarm | 2 | 957529.228 | 3189648.152 | 1.47x | 73% |
+| getColumnsWarm | 4 | 1589831.210 | 1067030.493 | 2.44x | 61% |
+| getColumnsWarm | 8 | 1813643.580 | 1130313.604 | 2.78x | 35% |
+| getColumnsWarm | 16 | 2031465.558 | 776774.681 | 3.12x | 19% |
+| getTablesWarm | 1 | 2725667.468 | 104543.737 | 1.00x | 100% |
+| getTablesWarm | 2 | 4608157.916 | 713371.304 | 1.69x | 85% |
+| getTablesWarm | 4 | 7614654.892 | 1872224.227 | 2.79x | 70% |
+| getTablesWarm | 8 | 10131809.695 | 5267244.188 | 3.72x | 46% |
+| getTablesWarm | 16 | 11247262.953 | 6689509.079 | 4.13x | 26% |
+| iterateResultSet | 1 | 0.297 | 0.115 | 1.00x | 100% |
+| iterateResultSet | 2 | 0.647 | 0.461 | 2.18x | 109% |
+| iterateResultSet | 4 | 1.434 | 1.038 | 4.83x | 121% |
+| iterateResultSet | 8 | 2.884 | 1.989 | 9.70x | 121% |
+| iterateResultSet | 16 | 6.287 | 2.174 | 21.15x | 132% |
+| submitToFirstRow | 1 | 1.124 | 0.734 | 1.00x | 100% |
+| submitToFirstRow | 2 | 2.504 | 2.518 | 2.23x | 111% |
+| submitToFirstRow | 4 | 5.736 | 3.342 | 5.10x | 128% |
+| submitToFirstRow | 8 | 11.895 | 3.636 | 10.58x | 132% |
+| submitToFirstRow | 16 | 24.902 | 7.039 | 22.15x | 138% |
 
 **Scaling** is throughput at N threads over throughput at 1 thread; **Efficiency** is that
 divided by N. Efficiency well under 100% is normal — BigQuery, the network and the runner's

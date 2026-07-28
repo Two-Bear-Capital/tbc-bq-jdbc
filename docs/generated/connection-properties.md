@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **25** connection properties.
+There are **26** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -25,6 +25,7 @@ There are **25** connection properties.
 | `pageSize` | `10000` | any | Number of rows to fetch per page when iterating large result sets |
 | `metadataCacheEnabled` | `true` | `true`, `false` | Cache schema introspection results to speed up IntelliJ IDEA's database tree |
 | `metadataCacheTtl` | `300` | any | How long (seconds) to keep metadata in the cache before re-fetching |
+| `metadataCacheMaxRows` | `50000` | any | Ceiling on total rows held in the metadata cache; oldest entries are evicted above it. Set to 0 for no limit |
 | `metadataLazyLoad` | `false` | `true`, `false` | Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects) |
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets (not implemented yet; currently ignored) |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |

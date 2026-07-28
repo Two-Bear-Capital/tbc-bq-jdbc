@@ -76,10 +76,14 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		// Initialize cache if enabled
 		if (properties.metadataCacheEnabled()) {
-			// Create cache key based on project and TTL
-			this.cacheKey = properties.projectId() + ":" + properties.metadataCacheTtl();
+			// Cache key covers every setting that changes the cache's behaviour, not
+			// just the project. Caches are shared statically and created once, so a
+			// key that omitted the row ceiling would hand a connection asking for one
+			// bound a cache already built with another - first caller silently wins.
+			this.cacheKey = properties.projectId() + ":" + properties.metadataCacheTtl() + ":"
+					+ properties.metadataCacheMaxRows();
 			this.cache = getOrCreateSharedCache(cacheKey, java.time.Duration.ofSeconds(properties.metadataCacheTtl()),
-					properties.projectId());
+					properties.projectId(), properties.metadataCacheMaxRows());
 			logger.debug("Using shared metadata cache for project: {} (cache instances: {})", properties.projectId(),
 					SHARED_CACHES.size());
 		} else {
@@ -716,7 +720,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			throws SQLException {
 		checkClosed();
 
-		logger.info("getProcedures() called - catalog: [{}], schemaPattern: [{}], procedureNamePattern: [{}]", catalog,
+		logger.debug("getProcedures() called - catalog: [{}], schemaPattern: [{}], procedureNamePattern: [{}]", catalog,
 				schemaPattern, procedureNamePattern);
 
 		String cacheKey = "procedures:" + catalog + ":" + schemaPattern + ":" + procedureNamePattern;
@@ -733,7 +737,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				datasetId -> queryProceduresForDataset(projectId, datasetId, procedureNamePattern),
 				"Error querying procedures in parallel");
 
-		logger.info("getProcedures() returning {} routine(s)", rows.size());
+		logger.debug("getProcedures() returning {} routine(s)", rows.size());
 		return createResultSet(MetadataColumns.Procedures.COLUMN_NAMES, MetadataColumns.Procedures.COLUMN_TYPES, rows);
 	}
 
@@ -783,7 +787,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			String columnNamePattern) throws SQLException {
 		checkClosed();
 
-		logger.info(
+		logger.debug(
 				"getProcedureColumns() called - catalog: [{}], schemaPattern: [{}], procedureNamePattern: [{}], columnNamePattern: [{}]",
 				catalog, schemaPattern, procedureNamePattern, columnNamePattern);
 
@@ -804,7 +808,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 						columnNamePattern),
 				"Error querying procedure columns in parallel");
 
-		logger.info("getProcedureColumns() returning {} column(s)", rows.size());
+		logger.debug("getProcedureColumns() returning {} column(s)", rows.size());
 		return createResultSet(MetadataColumns.ProcedureColumns.COLUMN_NAMES,
 				MetadataColumns.ProcedureColumns.COLUMN_TYPES, rows);
 	}
@@ -939,7 +943,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		boolean lazyLoad = connection.getProperties().metadataLazyLoad();
 
 		// Enhanced logging to debug IntelliJ introspection
-		logger.info(
+		logger.debug(
 				"getTables() called - catalog: [{}], schemaPattern: [{}], tableNamePattern: [{}], types: [{}], lazyLoad: {}",
 				catalog, schemaPattern, tableNamePattern, types != null ? java.util.Arrays.toString(types) : "null",
 				lazyLoad);
@@ -948,7 +952,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// This allows IntelliJ to load the tree structure quickly without fetching all
 		// tables
 		if (lazyLoad && schemaPattern == null && tableNamePattern == null) {
-			logger.info("Lazy loading enabled: returning empty table list (no patterns specified) - catalog: [{}]",
+			logger.debug("Lazy loading enabled: returning empty table list (no patterns specified) - catalog: [{}]",
 					catalog);
 			return createResultSet(MetadataColumns.Tables.COLUMN_NAMES, MetadataColumns.Tables.COLUMN_TYPES,
 					new java.util.ArrayList<>());
@@ -957,14 +961,20 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// Get datasets matching schema pattern
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
 
-		logger.info("Found {} dataset(s) matching pattern [{}]: {}", datasetIds.size(), schemaPattern,
-				datasetIds.size() <= 10 ? datasetIds : datasetIds.subList(0, 10) + "...");
+		// Guarded, unlike the other debug calls here: the third argument concatenates
+		// a sublist into a String, and an argument is evaluated before the logging
+		// call whatever the level is. Parameterised logging only defers formatting,
+		// not the expressions you hand it.
+		if (logger.isDebugEnabled()) {
+			logger.debug("Found {} dataset(s) matching pattern [{}]: {}", datasetIds.size(), schemaPattern,
+					datasetIds.size() <= 10 ? datasetIds : datasetIds.subList(0, 10) + "...");
+		}
 
 		// Always use parallel loading for better performance with BigQuery API
-		logger.info("Using parallel loading for {} datasets", datasetIds.size());
+		logger.debug("Using parallel loading for {} datasets", datasetIds.size());
 		java.util.List<Object[]> rows = queryTablesParallel(projectId, datasetIds, tableNamePattern, types);
 
-		logger.info("getTables() returning {} table(s)", rows.size());
+		logger.debug("getTables() returning {} table(s)", rows.size());
 
 		return createResultSet(MetadataColumns.Tables.COLUMN_NAMES, MetadataColumns.Tables.COLUMN_TYPES, rows);
 	}
@@ -1367,7 +1377,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		boolean lazyLoad = connection.getProperties().metadataLazyLoad();
 
 		// Enhanced logging to debug IntelliJ introspection
-		logger.info(
+		logger.debug(
 				"getColumns() called - catalog: [{}], schemaPattern: [{}], tableNamePattern: [{}], columnNamePattern: [{}], lazyLoad: {}",
 				catalog, schemaPattern, tableNamePattern, columnNamePattern, lazyLoad);
 
@@ -1375,7 +1385,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// This allows IntelliJ to load the tree structure quickly without fetching all
 		// columns
 		if (lazyLoad && tableNamePattern == null) {
-			logger.info(
+			logger.debug(
 					"Lazy loading enabled: returning empty column list (no table pattern specified) - catalog: [{}], schemaPattern: [{}]",
 					catalog, schemaPattern);
 			return createResultSet(MetadataColumns.Columns.COLUMN_NAMES, MetadataColumns.Columns.COLUMN_TYPES,
@@ -1397,7 +1407,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getColumnPrivileges(String catalog, String schema, String table, String columnNamePattern)
 			throws SQLException {
 		checkClosed();
-		logger.info("getColumnPrivileges() called - not applicable to BigQuery (uses IAM), returning empty result");
+		logger.debug("getColumnPrivileges() called - not applicable to BigQuery (uses IAM), returning empty result");
 		return createResultSet(MetadataColumns.ColumnPrivileges.COLUMN_NAMES,
 				MetadataColumns.ColumnPrivileges.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
@@ -1406,7 +1416,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getTablePrivileges(String catalog, String schemaPattern, String tableNamePattern)
 			throws SQLException {
 		checkClosed();
-		logger.info("getTablePrivileges() called - not applicable to BigQuery (uses IAM), returning empty result");
+		logger.debug("getTablePrivileges() called - not applicable to BigQuery (uses IAM), returning empty result");
 		return createResultSet(MetadataColumns.TablePrivileges.COLUMN_NAMES,
 				MetadataColumns.TablePrivileges.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
@@ -1415,7 +1425,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable)
 			throws SQLException {
 		checkClosed();
-		logger.info("getBestRowIdentifier() called - not applicable to BigQuery (no PKs), returning empty result");
+		logger.debug("getBestRowIdentifier() called - not applicable to BigQuery (no PKs), returning empty result");
 		return createResultSet(MetadataColumns.BestRowIdentifier.COLUMN_NAMES,
 				MetadataColumns.BestRowIdentifier.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
@@ -1423,7 +1433,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getVersionColumns(String catalog, String schema, String table) throws SQLException {
 		checkClosed();
-		logger.info(
+		logger.debug(
 				"getVersionColumns() called - not applicable to BigQuery (no row versioning), returning empty result");
 		return createResultSet(MetadataColumns.VersionColumns.COLUMN_NAMES, MetadataColumns.VersionColumns.COLUMN_TYPES,
 				new java.util.ArrayList<>());
@@ -1433,7 +1443,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException {
 		checkClosed();
 
-		logger.info("getPrimaryKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
+		logger.debug("getPrimaryKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
 		// BigQuery doesn't have traditional primary keys, return empty result set
 		return createResultSet(MetadataColumns.PrimaryKeys.COLUMN_NAMES, MetadataColumns.PrimaryKeys.COLUMN_TYPES,
@@ -1444,7 +1454,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getImportedKeys(String catalog, String schema, String table) throws SQLException {
 		checkClosed();
 
-		logger.info("getImportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
+		logger.debug("getImportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
 		// BigQuery doesn't have foreign keys, return empty result set
 		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
@@ -1455,7 +1465,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getExportedKeys(String catalog, String schema, String table) throws SQLException {
 		checkClosed();
 
-		logger.info("getExportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
+		logger.debug("getExportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
 		// BigQuery doesn't have foreign keys, return empty result set (same structure
 		// as
@@ -1468,7 +1478,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getCrossReference(String parentCatalog, String parentSchema, String parentTable,
 			String foreignCatalog, String foreignSchema, String foreignTable) throws SQLException {
 		checkClosed();
-		logger.info(
+		logger.debug(
 				"getCrossReference() called - not applicable to BigQuery (no FK constraints), returning empty result");
 		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
 				new java.util.ArrayList<>());
@@ -1478,7 +1488,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getTypeInfo() throws SQLException {
 		checkClosed();
 
-		logger.info("getTypeInfo() called");
+		logger.debug("getTypeInfo() called");
 
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 
@@ -1547,7 +1557,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		rows.add(createTypeInfoRow("STRUCT", java.sql.Types.STRUCT, 1024 * 1024, "STRUCT(", ")", "field_list", true,
 				true, true, null, false));
 
-		logger.info("getTypeInfo() returning {} type(s)", rows.size());
+		logger.debug("getTypeInfo() returning {} type(s)", rows.size());
 
 		return createResultSet(
 				new String[]{"TYPE_NAME", "DATA_TYPE", "PRECISION", "LITERAL_PREFIX", "LITERAL_SUFFIX", "CREATE_PARAMS",
@@ -1630,7 +1640,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)
 			throws SQLException {
 		checkClosed();
-		logger.info("getIndexInfo() called - not applicable to BigQuery (no indexes), returning empty result");
+		logger.debug("getIndexInfo() called - not applicable to BigQuery (no indexes), returning empty result");
 		return createResultSet(MetadataColumns.IndexInfo.COLUMN_NAMES, MetadataColumns.IndexInfo.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
@@ -1707,7 +1717,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types)
 			throws SQLException {
 		checkClosed();
-		logger.info("getUDTs() called - not applicable to BigQuery, returning empty result");
+		logger.debug("getUDTs() called - not applicable to BigQuery, returning empty result");
 		return createResultSet(MetadataColumns.UDTs.COLUMN_NAMES, MetadataColumns.UDTs.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
@@ -1740,7 +1750,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getSuperTypes(String catalog, String schemaPattern, String typeNamePattern) throws SQLException {
 		checkClosed();
-		logger.info("getSuperTypes() called - not applicable to BigQuery, returning empty result");
+		logger.debug("getSuperTypes() called - not applicable to BigQuery, returning empty result");
 		return createResultSet(MetadataColumns.SuperTypes.COLUMN_NAMES, MetadataColumns.SuperTypes.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
@@ -1748,7 +1758,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	@Override
 	public ResultSet getSuperTables(String catalog, String schemaPattern, String tableNamePattern) throws SQLException {
 		checkClosed();
-		logger.info("getSuperTables() called - not applicable to BigQuery, returning empty result");
+		logger.debug("getSuperTables() called - not applicable to BigQuery, returning empty result");
 		return createResultSet(MetadataColumns.SuperTables.COLUMN_NAMES, MetadataColumns.SuperTables.COLUMN_TYPES,
 				new java.util.ArrayList<>());
 	}
@@ -1858,7 +1868,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException {
 		checkClosed();
 
-		logger.info("getSchemas() called - catalog: [{}], schemaPattern: [{}]", catalog, schemaPattern);
+		logger.debug("getSchemas() called - catalog: [{}], schemaPattern: [{}]", catalog, schemaPattern);
 
 		String cacheKey = "schemas:" + catalog + ":" + schemaPattern;
 
@@ -1878,7 +1888,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				cache.registerKnownSchemas(datasetIds);
 			}
 
-			logger.info("getSchemas() returning {} schema(s)", rows.size());
+			logger.debug("getSchemas() returning {} schema(s)", rows.size());
 
 			return createResultSet(MetadataColumns.Schemas.COLUMN_NAMES, MetadataColumns.Schemas.COLUMN_TYPES, rows);
 		});
@@ -1971,10 +1981,16 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private void logCacheStatsIfNeeded() {
 		int totalOps = cacheHits + cacheMisses;
-		if (totalOps > 0 && totalOps % STATS_LOG_INTERVAL == 0) {
+		// isDebugEnabled first, and it matters more here than anywhere else in this
+		// class: MetadataCache.getStats() walks every entry to count expired ones and
+		// sum their rows. As an argument it ran on schedule whether or not anything
+		// was listening, so a driver with logging off still paid for a diagnostic it
+		// then discarded. String.format on the hit rate was eager for the same reason.
+		if (logger.isDebugEnabled() && totalOps > 0 && totalOps % STATS_LOG_INTERVAL == 0) {
 			double hitRate = (double) cacheHits / totalOps * 100;
-			logger.info("Metadata cache performance: {} hits, {} misses, {}% hit rate, {}", cacheHits, cacheMisses,
-					String.format("%.1f", hitRate), cache != null ? cache.getStats() : "disabled");
+			logger.debug("Metadata cache performance: {} hits, {} misses, {}% hit rate, {}", cacheHits, cacheMisses,
+					String.format(java.util.Locale.ROOT, "%.1f", hitRate),
+					cache != null ? cache.getStats() : "disabled");
 		}
 	}
 
@@ -2208,7 +2224,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public void clearCache() {
 		if (cache != null) {
 			cache.clear();
-			logger.info("Shared metadata cache cleared for project (cache key: {})", cacheKey);
+			logger.debug("Shared metadata cache cleared for project (cache key: {})", cacheKey);
 		}
 	}
 
@@ -2252,7 +2268,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * different projects or with different TTL settings each get their own cache.
 	 *
 	 * @param cacheKey
-	 *            the cache key ({@code "projectId:ttlSeconds"})
+	 *            the cache key ({@code "projectId:ttlSeconds:maxRows"})
 	 * @param ttl
 	 *            the time-to-live for cache entries (used only when creating a new
 	 *            cache)
@@ -2261,9 +2277,30 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * @return the shared {@link MetadataCache} instance
 	 */
 	public static MetadataCache getOrCreateSharedCache(String cacheKey, java.time.Duration ttl, String projectId) {
+		return getOrCreateSharedCache(cacheKey, ttl, projectId, MetadataCache.DEFAULT_MAX_ROWS);
+	}
+
+	/**
+	 * Returns the shared {@link MetadataCache} for the given cache key, creating a
+	 * new instance with the given row ceiling if none exists yet.
+	 *
+	 * @param cacheKey
+	 *            the cache key ({@code "projectId:ttlSeconds:maxRows"})
+	 * @param ttl
+	 *            the time-to-live for cache entries (used only when creating a new
+	 *            cache)
+	 * @param projectId
+	 *            the project ID, used only for the creation log message
+	 * @param maxRows
+	 *            ceiling on total cached rows (used only when creating a new cache)
+	 * @return the shared {@link MetadataCache} instance
+	 */
+	public static MetadataCache getOrCreateSharedCache(String cacheKey, java.time.Duration ttl, String projectId,
+			int maxRows) {
 		return SHARED_CACHES.computeIfAbsent(cacheKey, k -> {
-			logger.info("Creating new shared metadata cache for project: {} with TTL: {}", projectId, ttl);
-			return new MetadataCache(ttl);
+			logger.debug("Creating new shared metadata cache for project: {} with TTL: {}, max rows: {}", projectId,
+					ttl, maxRows);
+			return new MetadataCache(ttl, maxRows);
 		});
 	}
 
@@ -2273,7 +2310,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			cache.clear();
 			clearedCount++;
 		}
-		logger.info("Cleared {} shared metadata cache instance(s)", clearedCount);
+		logger.debug("Cleared {} shared metadata cache instance(s)", clearedCount);
 	}
 
 	/**

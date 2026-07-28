@@ -55,8 +55,32 @@ public final class MetadataCache {
 	private static final Logger logger = LoggerFactory.getLogger(MetadataCache.class);
 	private static final Duration DEFAULT_TTL = Duration.ofMinutes(5);
 
+	/**
+	 * Default ceiling on total cached rows across all entries.
+	 *
+	 * <p>
+	 * The bound is rows rather than entries because entries are wildly uneven and
+	 * only rows track memory. A {@code getColumns()} over a wide project is tens of
+	 * thousands of rows while a {@code getSchemas()} is tens, so a limit of "N
+	 * entries" would permit anything between a few kilobytes and hundreds of
+	 * megabytes. Rows are also the one measure the cache can total cheaply, since
+	 * it already holds every row as an {@code Object[]}.
+	 *
+	 * <p>
+	 * 50,000 is chosen to stay useful rather than to be small. A project with a few
+	 * hundred tables produces on the order of ten thousand rows from a single
+	 * {@code getColumns()}, so the default still holds that result several times
+	 * over plus every smaller query — which is what stops the 90-second metadata
+	 * stalls the cache exists for. Worst case is a few tens of megabytes, against
+	 * an <em>unbounded</em> cache before this.
+	 */
+	public static final int DEFAULT_MAX_ROWS = 50_000;
+
 	private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
 	private final Duration ttl;
+
+	/** Ceiling on total cached rows; zero or less disables the bound. */
+	private final int maxRows;
 
 	// Schemas discovered via getSchemas(); used to drive speculative pre-warming.
 	private final Set<String> knownSchemas = ConcurrentHashMap.newKeySet();
@@ -71,8 +95,23 @@ public final class MetadataCache {
 	 *            the time-to-live for cache entries
 	 */
 	public MetadataCache(Duration ttl) {
+		this(ttl, DEFAULT_MAX_ROWS);
+	}
+
+	/**
+	 * Creates a new metadata cache with the specified TTL and row ceiling.
+	 *
+	 * @param ttl
+	 *            the time-to-live for cache entries
+	 * @param maxRows
+	 *            ceiling on total rows held across all entries; zero or less
+	 *            disables the bound
+	 */
+	public MetadataCache(Duration ttl, int maxRows) {
 		this.ttl = ttl != null ? ttl : DEFAULT_TTL;
-		logger.debug("Metadata cache initialized with TTL: {}", this.ttl);
+		this.maxRows = maxRows;
+		logger.debug("Metadata cache initialized with TTL: {}, max rows: {}", this.ttl,
+				maxRows > 0 ? maxRows : "unbounded");
 	}
 
 	/**
@@ -145,6 +184,9 @@ public final class MetadataCache {
 		Instant expiresAt = Instant.now().plus(ttl);
 		cache.put(key, new CacheEntry(columnNames, columnTypes, rows, expiresAt));
 		evictExpired();
+		// The other put() overload is not the only way in, so the bound is enforced
+		// on both. A ceiling applied on one of two insertion paths is not a ceiling.
+		enforceRowBound(key);
 		if (logger.isTraceEnabled()) {
 			logger.trace("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
 		}
@@ -211,6 +253,7 @@ public final class MetadataCache {
 		CacheEntry entry = new CacheEntry(columnNames, columnTypes, Collections.unmodifiableList(rows), expiresAt);
 		cache.put(key, entry);
 		evictExpired();
+		enforceRowBound(key);
 		logger.debug("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);
 
 		return Optional.of(entry.createResultSet());
@@ -239,6 +282,79 @@ public final class MetadataCache {
 	 */
 	private void evictExpired() {
 		cache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+	}
+
+	/**
+	 * Drops the oldest entries until the total row count is back under
+	 * {@link #maxRows}.
+	 *
+	 * <p>
+	 * Expiry alone did not bound this cache. Within a single TTL window every
+	 * distinct query shape gets its own entry holding every materialised row of its
+	 * result, nothing removes an entry that has not expired, and the cache is
+	 * static and shared for the life of the process. A host that issues many
+	 * different metadata patterns — which is exactly what an IDE does, and IDEs are
+	 * the reason the cache is shared in the first place — grew it without limit.
+	 *
+	 * <p>
+	 * <b>Eviction is oldest-first, not least-recently-used.</b> LRU would need the
+	 * read path to record an access on every hit, and that means a write to shared
+	 * state on the one path that must stay concurrent — these lookups are served
+	 * entirely from memory and are read by every connection at once. Ordering by
+	 * {@code expiresAt} costs the read path nothing and is exactly insertion order,
+	 * because every entry in a given cache takes the same TTL. Entries expire on
+	 * their own anyway; this is a ceiling, not the primary mechanism.
+	 *
+	 * <p>
+	 * The entry just inserted is never evicted. Without that, a single result
+	 * larger than the whole budget would be cached and immediately dropped on every
+	 * call, turning a wide project's {@code getColumns()} into a guaranteed miss
+	 * forever — the stall the cache exists to prevent. The bound is therefore a
+	 * ceiling on everything <em>except</em> one oversized entry, which is the safer
+	 * way to be wrong.
+	 *
+	 * @param justInserted
+	 *            key of the entry that must survive
+	 */
+	private void enforceRowBound(String justInserted) {
+		if (maxRows <= 0) {
+			return;
+		}
+
+		long total = 0;
+		for (CacheEntry entry : cache.values()) {
+			total += entry.rowCount();
+		}
+		if (total <= maxRows) {
+			return;
+		}
+
+		// Sorting the whole map on each insert is fine: inserts happen only on a
+		// cache miss, which just paid for a BigQuery round trip, and the map is
+		// bounded by this very method.
+		List<Map.Entry<String, CacheEntry>> oldestFirst = new ArrayList<>(cache.entrySet());
+		oldestFirst.sort(Comparator.comparing(e -> e.getValue().expiresAt()));
+
+		int evicted = 0;
+		for (Map.Entry<String, CacheEntry> candidate : oldestFirst) {
+			if (total <= maxRows) {
+				break;
+			}
+			if (candidate.getKey().equals(justInserted)) {
+				continue;
+			}
+			// Two-argument remove: another thread may have replaced this entry since
+			// the snapshot, and that newer entry must not be dropped on its behalf.
+			if (cache.remove(candidate.getKey(), candidate.getValue())) {
+				total -= candidate.getValue().rowCount();
+				evicted++;
+			}
+		}
+
+		if (evicted > 0) {
+			logger.debug("Metadata cache over its {}-row ceiling: evicted {} oldest entry(ies), now {} rows", maxRows,
+					evicted, total);
+		}
 	}
 
 	public void clear() {
@@ -329,7 +445,35 @@ public final class MetadataCache {
 	 */
 	public String getStats() {
 		long expired = cache.values().stream().filter(CacheEntry::isExpired).count();
-		return String.format("Cache size: %d, Expired: %d, TTL: %s", cache.size(), expired, ttl);
+		return String.format("Cache size: %d, Rows: %d/%s, Expired: %d, TTL: %s", cache.size(), totalRows(),
+				maxRows > 0 ? String.valueOf(maxRows) : "unbounded", expired, ttl);
+	}
+
+	/**
+	 * Total rows held across all entries.
+	 *
+	 * <p>
+	 * This, not {@link #size()}, is what tracks the cache's memory: entries range
+	 * from a handful of rows to tens of thousands, so an entry count says very
+	 * little about how much is being held.
+	 *
+	 * @return the summed row count of every entry
+	 */
+	public long totalRows() {
+		long total = 0;
+		for (CacheEntry entry : cache.values()) {
+			total += entry.rowCount();
+		}
+		return total;
+	}
+
+	/**
+	 * The configured row ceiling.
+	 *
+	 * @return the ceiling, or zero or less if the cache is unbounded
+	 */
+	public int getMaxRows() {
+		return maxRows;
 	}
 
 	/**
@@ -343,6 +487,11 @@ public final class MetadataCache {
 
 		boolean isExpired() {
 			return Instant.now().isAfter(expiresAt);
+		}
+
+		/** What this entry costs against the cache's row ceiling. */
+		int rowCount() {
+			return rows.size();
 		}
 
 		ResultSet createResultSet() {
