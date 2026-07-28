@@ -755,36 +755,82 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return createResultSet(MetadataColumns.Procedures.COLUMN_NAMES, MetadataColumns.Procedures.COLUMN_TYPES, rows);
 	}
 
-	private java.util.List<Object[]> queryProceduresForDataset(String projectId, String datasetId,
-			String procedureNamePattern) {
-		if (rejectsUnsafeIdentifiers(projectId, datasetId, "procedures")) {
+	/**
+	 * Runs one {@code INFORMATION_SCHEMA} query against a dataset and maps its
+	 * rows.
+	 *
+	 * <p>
+	 * Captures the shape shared by the per-dataset metadata reads: reject unsafe
+	 * identifiers, run a single query, map each row, and let one unreadable dataset
+	 * contribute no rows rather than sinking the whole call. The cause is logged at
+	 * WARN so a permissions problem is not mistaken for a dataset that simply has
+	 * nothing to report.
+	 *
+	 * <p>
+	 * Two nearby reads deliberately do <b>not</b> use this and should not be folded
+	 * in, because their error handling is the part that differs:
+	 * {@code queryColumnsViaInformationSchema} propagates so its caller can fall
+	 * back to the {@code getTable()} API, and {@code queryConstraintsForDataset}
+	 * returns an {@code Optional} so a failed read is distinguishable from a
+	 * dataset declaring no constraints — only the latter may be cached.
+	 *
+	 * @param projectId
+	 *            the project holding the dataset
+	 * @param datasetId
+	 *            the dataset to read
+	 * @param purpose
+	 *            what is being read, for the identifier-rejection log
+	 * @param view
+	 *            the {@code INFORMATION_SCHEMA} view name, for the failure log
+	 * @param sql
+	 *            the query to run
+	 * @param rowMapper
+	 *            maps one result row to a JDBC row, or returns null to skip it —
+	 *            which is how the callers apply their name-pattern filters
+	 * @return the rows mapped, or empty if the dataset could not be read
+	 */
+	private java.util.List<Object[]> queryInformationSchema(String projectId, String datasetId, String purpose,
+			String view, String sql, java.util.function.Function<FieldValueList, Object[]> rowMapper) {
+		if (rejectsUnsafeIdentifiers(projectId, datasetId, purpose)) {
 			return java.util.List.of();
 		}
 
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
 			BigQuery bigquery = connection.getBigQuery();
-			// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
-			// routine's description lives in ROUTINE_OPTIONS under
-			// option_name = 'description', so REMARKS is reported as null
-			String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
-					projectId, datasetId);
 			QueryJobConfiguration config = QueryJobConfiguration.newBuilder(sql).build();
 			TableResult result = bigquery.query(config);
 			for (FieldValueList row : result.iterateAll()) {
-				String routineName = row.get("routine_name").getStringValue();
-				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
-					continue;
+				Object[] mapped = rowMapper.apply(row);
+				if (mapped != null) {
+					rows.add(mapped);
 				}
-				rows.add(buildProcedureRow(projectId, datasetId, routineName, null));
 			}
 		} catch (Exception e) {
-			// One inaccessible dataset must not sink getProcedures() for the whole
-			// project, so this dataset contributes no rows — but the real error is
-			// logged rather than presented as an expected limitation
-			logger.warn("Could not query INFORMATION_SCHEMA.ROUTINES for dataset {}: {}", datasetId, e.getMessage());
+			// Preserves the existing swallow-and-log behaviour verbatim, including
+			// that an InterruptedException does not re-set the interrupt flag here.
+			// That is a real gap — queryConstraintsForDataset handles it properly —
+			// but fixing it is a behaviour change and belongs in its own issue.
+			// Having one place to fix rather than two is part of the point.
+			logger.warn("Could not query {} for dataset {}: {}", view, datasetId, e.getMessage());
 		}
 		return rows;
+	}
+
+	private java.util.List<Object[]> queryProceduresForDataset(String projectId, String datasetId,
+			String procedureNamePattern) {
+		// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
+		// routine's description lives in ROUTINE_OPTIONS under
+		// option_name = 'description', so REMARKS is reported as null
+		String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
+				projectId, datasetId);
+		return queryInformationSchema(projectId, datasetId, "procedures", "INFORMATION_SCHEMA.ROUTINES", sql, row -> {
+			String routineName = row.get("routine_name").getStringValue();
+			if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
+				return null;
+			}
+			return buildProcedureRow(projectId, datasetId, routineName, null);
+		});
 	}
 
 	private Object[] buildProcedureRow(String projectId, String datasetId, String routineName, String remarks) {
@@ -832,47 +878,36 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private java.util.List<Object[]> queryProcedureColumnsForDataset(String projectId, String datasetId,
 			String procedureNamePattern, String columnNamePattern) {
-		if (rejectsUnsafeIdentifiers(projectId, datasetId, "procedure columns")) {
-			return java.util.List.of();
-		}
-
-		java.util.List<Object[]> rows = new java.util.ArrayList<>();
-		try {
-			BigQuery bigquery = connection.getBigQuery();
-			String sql = String.format(
-					"SELECT specific_name, ordinal_position, parameter_name, parameter_mode, data_type "
-							+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.PARAMETERS ORDER BY specific_name, ordinal_position",
-					projectId, datasetId);
-			QueryJobConfiguration config = QueryJobConfiguration.newBuilder(sql).build();
-			TableResult result = bigquery.query(config);
-			for (FieldValueList row : result.iterateAll()) {
-				String routineName = row.get("specific_name").getStringValue();
-				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
-					continue;
-				}
-				String paramName = row.get("parameter_name").isNull() ? "" : row.get("parameter_name").getStringValue();
-				if (columnNamePattern != null && !matchesPattern(paramName, columnNamePattern)) {
-					continue;
-				}
-				String dataType = row.get("data_type").isNull() ? "STRING" : row.get("data_type").getStringValue();
-				TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
-				String paramMode = row.get("parameter_mode").isNull()
-						? "IN"
-						: row.get("parameter_mode").getStringValue();
-				short columnType = switch (paramMode.toUpperCase(Locale.ROOT)) {
-					case "IN" -> (short) DatabaseMetaData.procedureColumnIn;
-					case "OUT" -> (short) DatabaseMetaData.procedureColumnOut;
-					case "INOUT" -> (short) DatabaseMetaData.procedureColumnInOut;
-					default -> (short) DatabaseMetaData.procedureColumnUnknown;
-				};
-				rows.add(buildProcedureColumnRow(projectId, datasetId, routineName, paramName, columnType, typeInfo,
-						dataType));
-			}
-		} catch (Exception e) {
-			// Degrades per dataset like the ROUTINES query above; the cause is logged
-			logger.warn("Could not query INFORMATION_SCHEMA.PARAMETERS for dataset {}: {}", datasetId, e.getMessage());
-		}
-		return rows;
+		String sql = String.format(
+				"SELECT specific_name, ordinal_position, parameter_name, parameter_mode, data_type "
+						+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.PARAMETERS ORDER BY specific_name, ordinal_position",
+				projectId, datasetId);
+		return queryInformationSchema(projectId, datasetId, "procedure columns", "INFORMATION_SCHEMA.PARAMETERS", sql,
+				row -> {
+					String routineName = row.get("specific_name").getStringValue();
+					if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
+						return null;
+					}
+					String paramName = row.get("parameter_name").isNull()
+							? ""
+							: row.get("parameter_name").getStringValue();
+					if (columnNamePattern != null && !matchesPattern(paramName, columnNamePattern)) {
+						return null;
+					}
+					String dataType = row.get("data_type").isNull() ? "STRING" : row.get("data_type").getStringValue();
+					TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+					String paramMode = row.get("parameter_mode").isNull()
+							? "IN"
+							: row.get("parameter_mode").getStringValue();
+					short columnType = switch (paramMode.toUpperCase(Locale.ROOT)) {
+						case "IN" -> (short) DatabaseMetaData.procedureColumnIn;
+						case "OUT" -> (short) DatabaseMetaData.procedureColumnOut;
+						case "INOUT" -> (short) DatabaseMetaData.procedureColumnInOut;
+						default -> (short) DatabaseMetaData.procedureColumnUnknown;
+					};
+					return buildProcedureColumnRow(projectId, datasetId, routineName, paramName, columnType, typeInfo,
+							dataType);
+				});
 	}
 
 	private Object[] buildProcedureColumnRow(String projectId, String datasetId, String routineName, String paramName,
