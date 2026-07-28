@@ -15,6 +15,19 @@
  */
 package vc.tbc.bq.jdbc.metadata;
 
+import com.google.cloud.bigquery.BigQuery;
+import com.google.cloud.bigquery.Dataset;
+import com.google.cloud.bigquery.DatasetId;
+import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.FieldValueList;
+import com.google.cloud.bigquery.MaterializedViewDefinition;
+import com.google.cloud.bigquery.QueryJobConfiguration;
+import com.google.cloud.bigquery.Schema;
+import com.google.cloud.bigquery.StandardSQLTypeName;
+import com.google.cloud.bigquery.Table;
+import com.google.cloud.bigquery.TableDefinition;
+import com.google.cloud.bigquery.TableResult;
+import com.google.cloud.bigquery.ViewDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.BQConnection;
@@ -731,7 +744,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private ResultSet executeGetProcedures(String catalog, String schemaPattern, String procedureNamePattern)
 			throws SQLException {
 		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+		BigQuery bigquery = connection.getBigQuery();
 
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
 		java.util.List<Object[]> rows = executeInParallel(datasetIds,
@@ -750,16 +763,15 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
-			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+			BigQuery bigquery = connection.getBigQuery();
 			// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
 			// routine's description lives in ROUTINE_OPTIONS under
 			// option_name = 'description', so REMARKS is reported as null
 			String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
 					projectId, datasetId);
-			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
-					.newBuilder(sql).build();
-			com.google.cloud.bigquery.TableResult result = bigquery.query(config);
-			for (com.google.cloud.bigquery.FieldValueList row : result.iterateAll()) {
+			QueryJobConfiguration config = QueryJobConfiguration.newBuilder(sql).build();
+			TableResult result = bigquery.query(config);
+			for (FieldValueList row : result.iterateAll()) {
 				String routineName = row.get("routine_name").getStringValue();
 				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
 					continue;
@@ -805,7 +817,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private ResultSet executeGetProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern,
 			String columnNamePattern) throws SQLException {
 		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+		BigQuery bigquery = connection.getBigQuery();
 
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
 		java.util.List<Object[]> rows = executeInParallel(datasetIds,
@@ -826,15 +838,14 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
-			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+			BigQuery bigquery = connection.getBigQuery();
 			String sql = String.format(
 					"SELECT specific_name, ordinal_position, parameter_name, parameter_mode, data_type "
 							+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.PARAMETERS ORDER BY specific_name, ordinal_position",
 					projectId, datasetId);
-			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
-					.newBuilder(sql).build();
-			com.google.cloud.bigquery.TableResult result = bigquery.query(config);
-			for (com.google.cloud.bigquery.FieldValueList row : result.iterateAll()) {
+			QueryJobConfiguration config = QueryJobConfiguration.newBuilder(sql).build();
+			TableResult result = bigquery.query(config);
+			for (FieldValueList row : result.iterateAll()) {
 				String routineName = row.get("specific_name").getStringValue();
 				if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
 					continue;
@@ -948,7 +959,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			throws SQLException {
 		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
 
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+		BigQuery bigquery = connection.getBigQuery();
 		boolean lazyLoad = connection.getProperties().metadataLazyLoad();
 
 		// Enhanced logging to debug IntelliJ introspection
@@ -997,21 +1008,21 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private java.util.List<Object[]> queryTablesParallel(String projectId, java.util.List<String> datasetIds,
 			String tableNamePattern, String[] types) throws SQLException {
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+		BigQuery bigquery = connection.getBigQuery();
 		return executeInParallel(datasetIds,
 				datasetId -> queryTablesForDataset(bigquery, projectId, datasetId, tableNamePattern, types),
 				"Error querying tables in parallel");
 	}
 
 	/** Query tables for a single dataset. */
-	private java.util.List<Object[]> queryTablesForDataset(com.google.cloud.bigquery.BigQuery bigquery,
-			String projectId, String datasetId, String tableNamePattern, String[] types) throws SQLException {
+	private java.util.List<Object[]> queryTablesForDataset(BigQuery bigquery, String projectId, String datasetId,
+			String tableNamePattern, String[] types) throws SQLException {
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 
 		// List tables in dataset
-		var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
+		var tables = bigquery.listTables(DatasetId.of(projectId, datasetId));
 
-		for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
+		for (Table table : tables.iterateAll()) {
 			String tableName = table.getTableId().getTable();
 
 			// Apply table name pattern filter
@@ -1021,10 +1032,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 			// Map BigQuery table type to JDBC type
 			String tableType;
-			com.google.cloud.bigquery.TableDefinition def = table.getDefinition();
-			if (def instanceof com.google.cloud.bigquery.ViewDefinition) {
+			TableDefinition def = table.getDefinition();
+			if (def instanceof ViewDefinition) {
 				tableType = "VIEW";
-			} else if (def instanceof com.google.cloud.bigquery.MaterializedViewDefinition) {
+			} else if (def instanceof MaterializedViewDefinition) {
 				tableType = "MATERIALIZED VIEW";
 			} else {
 				tableType = "TABLE";
@@ -1179,7 +1190,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private java.util.List<Object[]> queryColumnsParallel(String projectId, java.util.List<String> datasetIds,
 			String tableNamePattern, String columnNamePattern) throws SQLException {
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+		BigQuery bigquery = connection.getBigQuery();
 		return executeInParallel(datasetIds, datasetId -> queryColumnsForDataset(bigquery, projectId, datasetId,
 				tableNamePattern, columnNamePattern), "Error querying columns in parallel");
 	}
@@ -1195,8 +1206,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * lacks permission on the dataset. The failure is logged at WARN so a genuine
 	 * query defect is not mistaken for an endpoint limitation.
 	 */
-	private java.util.List<Object[]> queryColumnsForDataset(com.google.cloud.bigquery.BigQuery bigquery,
-			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
+	private java.util.List<Object[]> queryColumnsForDataset(BigQuery bigquery, String projectId, String datasetId,
+			String tableNamePattern, String columnNamePattern) throws SQLException {
 		// Unlike the other metadata queries, this one has a non-SQL route to the same
 		// answer, so a name that cannot be safely interpolated does not have to cost
 		// the caller their columns — it costs them the fast path instead.
@@ -1228,19 +1239,17 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * Replaces N individual {@code getTable()} API calls (one per table) with a
 	 * single metadata query, reducing API round-trips by ~50x for typical datasets.
 	 */
-	private java.util.List<Object[]> queryColumnsViaInformationSchema(com.google.cloud.bigquery.BigQuery bigquery,
-			String projectId, String datasetId, String tableNamePattern, String columnNamePattern)
-			throws InterruptedException {
+	private java.util.List<Object[]> queryColumnsViaInformationSchema(BigQuery bigquery, String projectId,
+			String datasetId, String tableNamePattern, String columnNamePattern) throws InterruptedException {
 		String sql = "SELECT table_name, column_name, ordinal_position, is_nullable, data_type" + " FROM `" + projectId
 				+ "." + datasetId + ".INFORMATION_SCHEMA.COLUMNS`" + " ORDER BY table_name, ordinal_position";
 
-		com.google.cloud.bigquery.QueryJobConfiguration queryConfig = com.google.cloud.bigquery.QueryJobConfiguration
-				.newBuilder(sql).setUseLegacySql(false).build();
+		QueryJobConfiguration queryConfig = QueryJobConfiguration.newBuilder(sql).setUseLegacySql(false).build();
 
-		com.google.cloud.bigquery.TableResult results = bigquery.query(queryConfig);
+		TableResult results = bigquery.query(queryConfig);
 
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
-		for (com.google.cloud.bigquery.FieldValueList row : results.iterateAll()) {
+		for (FieldValueList row : results.iterateAll()) {
 			String tableName = row.get("table_name").getStringValue();
 			if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
 				continue;
@@ -1271,11 +1280,11 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * <p>
 	 * Used when the {@code INFORMATION_SCHEMA.COLUMNS} query fails.
 	 */
-	private java.util.List<Object[]> queryColumnsViaGetTable(com.google.cloud.bigquery.BigQuery bigquery,
-			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
-		var tables = bigquery.listTables(com.google.cloud.bigquery.DatasetId.of(projectId, datasetId));
-		java.util.List<com.google.cloud.bigquery.Table> tablesToQuery = new java.util.ArrayList<>();
-		for (com.google.cloud.bigquery.Table table : tables.iterateAll()) {
+	private java.util.List<Object[]> queryColumnsViaGetTable(BigQuery bigquery, String projectId, String datasetId,
+			String tableNamePattern, String columnNamePattern) throws SQLException {
+		var tables = bigquery.listTables(DatasetId.of(projectId, datasetId));
+		java.util.List<Table> tablesToQuery = new java.util.ArrayList<>();
+		for (Table table : tables.iterateAll()) {
 			String tableName = table.getTableId().getTable();
 			if (tableNamePattern == null || matchesPattern(tableName, tableNamePattern)) {
 				tablesToQuery.add(table);
@@ -1328,9 +1337,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * This provides nested parallelization: parallel across datasets AND parallel
 	 * across tables within each dataset.
 	 */
-	private java.util.List<Object[]> fetchAndProcessTablesParallel(com.google.cloud.bigquery.BigQuery bigquery,
-			String projectId, String datasetId, java.util.List<com.google.cloud.bigquery.Table> tablesToQuery,
-			String columnNamePattern) throws SQLException {
+	private java.util.List<Object[]> fetchAndProcessTablesParallel(BigQuery bigquery, String projectId,
+			String datasetId, java.util.List<Table> tablesToQuery, String columnNamePattern) throws SQLException {
 		return executeInParallel(tablesToQuery,
 				table -> processTableColumns(bigquery, projectId, datasetId, table, columnNamePattern),
 				"Error fetching table columns in parallel");
@@ -1341,38 +1349,38 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 *
 	 * @return list of column rows for this table
 	 */
-	private java.util.List<Object[]> processTableColumns(com.google.cloud.bigquery.BigQuery bigquery, String projectId,
-			String datasetId, com.google.cloud.bigquery.Table table, String columnNamePattern) throws SQLException {
+	private java.util.List<Object[]> processTableColumns(BigQuery bigquery, String projectId, String datasetId,
+			Table table, String columnNamePattern) throws SQLException {
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 
 		String tableName = table.getTableId().getTable();
 
 		// Get full table with schema
-		com.google.cloud.bigquery.Table fullTable = bigquery.getTable(table.getTableId());
+		Table fullTable = bigquery.getTable(table.getTableId());
 		if (fullTable == null) {
 			return rows;
 		}
 
-		com.google.cloud.bigquery.Schema schema = fullTable.getDefinition().getSchema();
+		Schema schema = fullTable.getDefinition().getSchema();
 		if (schema == null) {
 			return rows;
 		}
 
 		int ordinalPosition = 1;
-		for (com.google.cloud.bigquery.Field field : schema.getFields()) {
+		for (Field field : schema.getFields()) {
 			String columnName = field.getName();
 
 			if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
 				continue;
 			}
 
-			com.google.cloud.bigquery.StandardSQLTypeName type = field.getType().getStandardType();
+			StandardSQLTypeName type = field.getType().getStandardType();
 			int jdbcType = TypeMapper.toJdbcType(field); // Use field to detect REPEATED mode
 			String typeName = TypeMapper.getTypeName(field); // Use utility method for type name
 
 			int columnSize = TypeMapper.getColumnSize(type);
 			int decimalDigits = TypeMapper.getDecimalDigits(type);
-			int nullable = field.getMode() == com.google.cloud.bigquery.Field.Mode.REQUIRED
+			int nullable = field.getMode() == Field.Mode.REQUIRED
 					? DatabaseMetaData.columnNoNulls
 					: DatabaseMetaData.columnNullable;
 
@@ -1389,7 +1397,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			String columnNamePattern) throws SQLException {
 		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
 
-		com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+		BigQuery bigquery = connection.getBigQuery();
 		boolean lazyLoad = connection.getProperties().metadataLazyLoad();
 
 		// Enhanced logging to debug IntelliJ introspection
@@ -1829,11 +1837,11 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
-			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
-			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
+			BigQuery bigquery = connection.getBigQuery();
+			QueryJobConfiguration config = QueryJobConfiguration
 					.newBuilder(KeyConstraints.constraintQuery(projectId, datasetId)).build();
-			com.google.cloud.bigquery.TableResult result = bigquery.query(config);
-			for (com.google.cloud.bigquery.FieldValueList row : result.iterateAll()) {
+			TableResult result = bigquery.query(config);
+			for (FieldValueList row : result.iterateAll()) {
 				rows.add(KeyConstraints.snapshotRow(row, datasetId));
 			}
 		} catch (InterruptedException e) {
@@ -2243,7 +2251,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		return getCachedOrExecute(cacheKey, () -> {
 			String projectId = catalog != null ? catalog : connection.getProperties().projectId();
-			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+			BigQuery bigquery = connection.getBigQuery();
 
 			java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
 			java.util.List<Object[]> rows = new java.util.ArrayList<>(datasetIds.size());
@@ -2511,12 +2519,11 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 *            the schema pattern to match (or null for all)
 	 * @return list of dataset IDs matching the pattern
 	 */
-	private java.util.List<String> listDatasetsForProject(com.google.cloud.bigquery.BigQuery bigQuery, String projectId,
-			String schemaPattern) {
+	private java.util.List<String> listDatasetsForProject(BigQuery bigQuery, String projectId, String schemaPattern) {
 		var datasets = bigQuery.listDatasets(projectId);
 		java.util.List<String> datasetIds = new java.util.ArrayList<>();
 
-		for (com.google.cloud.bigquery.Dataset dataset : datasets.iterateAll()) {
+		for (Dataset dataset : datasets.iterateAll()) {
 			String datasetId = dataset.getDatasetId().getDataset();
 
 			// Apply schema pattern filter
