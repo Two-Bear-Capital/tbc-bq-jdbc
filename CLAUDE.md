@@ -39,14 +39,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ./mvnw spotless:apply
 ```
 
-### Build Artifacts
-After `./mvnw clean package`, find these in `target/`:
-- `tbc-bq-jdbc-2.3.0.jar` - Slim JAR (180K, requires dependencies)
-- `tbc-bq-jdbc-2.3.0-shaded.jar` - Shaded JAR with all dependencies (36M)
-- `tbc-bq-jdbc-2.3.0-with-logging.jar` - Shaded JAR + Logback for IntelliJ (37M)
-- `tbc-bq-jdbc-2.3.0-sources.jar` - Source JAR
-- `tbc-bq-jdbc-2.3.0-javadoc.jar` - Javadoc JAR
-
 ### Running Tests
 ```bash
 # Unit tests only (fast, no Docker needed)
@@ -101,65 +93,6 @@ accumulates coverage in `target/jacoco.exec` and inflates the report. Use `clean
 any figure you intend to quote.
 
 ## Architecture
-
-### Core Package Structure
-```
-src/main/java/vc/tbc/bq/jdbc/
-├── BQDriver.java              # JDBC Driver entry point, URL parsing
-├── BQConnection.java          # Connection implementation with session management
-├── BQStatement.java           # Statement execution
-├── BQPreparedStatement.java   # Parameterized queries
-├── BQResultSet.java           # Query result iteration
-├── TypeMapper.java            # BigQuery ↔ JDBC type conversions
-├── DriverVersion.java         # Version information from git.properties
-│
-├── auth/                      # Authentication implementations
-│   ├── AuthType.java          # Enum: ADC, SERVICE_ACCOUNT, USER_OAUTH, etc.
-│   ├── ApplicationDefaultAuth.java
-│   ├── ServiceAccountAuth.java
-│   ├── UserOAuthAuth.java
-│   ├── WorkforceIdentityAuth.java
-│   ├── WorkloadIdentityAuth.java
-│
-├── base/                      # Abstract base classes (inheritance hierarchy)
-│   ├── BaseCloseable.java            # Lifecycle management (isClosed)
-│   ├── BaseJdbcWrapper.java          # JDBC wrapper pattern
-│   ├── AbstractBQConnection.java     # Connection base with validation
-│   ├── AbstractBQStatement.java      # Statement base with query execution
-│   ├── AbstractBQPreparedStatement.java  # PreparedStatement parameter handling
-│   ├── BaseReadOnlyResultSet.java    # ResultSet base implementation
-│   └── ReadOnlyResultSetMixin.java   # Shared read-only behavior
-│
-├── config/                    # Configuration and connection management
-│   ├── ConnectionProperties.java     # Immutable record with all settings
-│   ├── ConnectionUrlParser.java      # Traditional + Simba format parsing
-│   ├── JobCreationMode.java          # REQUIRED vs JOB_CREATION_OPTIONAL
-│   ├── SessionManager.java           # BigQuery session lifecycle
-│   └── MetadataCache.java            # TTL-based metadata caching
-│
-├── metadata/                  # JDBC metadata implementation
-│   ├── BQDatabaseMetaData.java       # DatabaseMetaData with caching
-│   ├── BQResultSetMetaData.java      # ResultSet column metadata
-│   ├── BQParameterMetaData.java      # PreparedStatement parameter info
-│   ├── MetadataResultSet.java        # In-memory ResultSet for metadata
-│   ├── MetadataColumns.java          # Column metadata builders
-│   └── KeyConstraints.java           # Unenforced PK/FK constraints from INFORMATION_SCHEMA
-│
-├── storage/                   # BigQuery Storage Read API
-│   ├── StorageReadResultSet.java     # Arrow-backed ResultSet (opt-in, falls back)
-│   ├── ArrowRowConverter.java        # Arrow row -> FieldValueList; eligibility rules
-│   └── ArrowSupport.java             # One-shot probe: can Arrow allocate here?
-│
-├── exception/                 # Exception handling
-│   ├── BQSQLException.java           # SQLException with SQL states
-│   └── BQSQLFeatureNotSupportedException.java
-│
-└── util/                      # Utilities
-    ├── ErrorMessages.java            # Centralized error messages
-    ├── UnsupportedOperations.java    # Standard exceptions for unsupported ops
-    ├── SQLStates.java                # SQL state constants
-    └── NumberParser.java             # Safe numeric parsing
-```
 
 ### Key Architectural Patterns
 
@@ -409,39 +342,10 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 - CallableStatement (limited UDF support)
 - Full Array/Struct JDBC support (returned as JSON)
 
-## Key Files to Understand
-
-1. **BQDriver.java** - Entry point, URL acceptance, driver registration
-2. **ConnectionUrlParser.java** - URL parsing logic for both formats
-3. **ConnectionProperties.java** - All configuration options and defaults
-4. **BQConnection.java** - Connection lifecycle, BigQuery client setup, session management
-5. **BQDatabaseMetaData.java** - Metadata implementation with caching (critical for IntelliJ)
-6. **TypeMapper.java** - Type conversion logic
-7. **UnsupportedOperations.java** - Standard responses for unsupported JDBC features
-8. **AbstractBigQueryIntegrationTest.java** - Base for adding integration tests
-
 ## Adding New Features
 
-### Adding a New Connection Property
-1. Add field to `ConnectionProperties` record
-2. Add default value in canonical constructor if needed
-3. Update `ConnectionUrlParser` to parse the property
-4. Add Simba property mapping if applicable
-5. Update `docs/CONNECTION_PROPERTIES.md`
-
-### Adding a New Authentication Method
-1. Create new class in `auth/` package
-2. Add enum value to `AuthType`
-3. Implement `toCredentials()` method
-4. Update `ConnectionUrlParser` for URL property parsing
-5. Add integration test
-6. Update `docs/AUTHENTICATION.md`
-
-### Adding an Integration Test
-1. Extend `AbstractBigQueryIntegrationTest`
-2. Use helper methods: `createTestTable()`, `insertTestData()`
-3. Clean up test data in `@AfterEach`
-4. Name test descriptively: `testFeatureDoesExpectedBehavior()`
+See the `adding-features` skill (`.claude/skills/adding-features/SKILL.md`) for the
+connection-property, authentication-method and integration-test checklists.
 
 ## CI/CD
 
@@ -489,22 +393,4 @@ patch bump so the tag still advances. Mislabelling a feature as `fix` silently
 understates the release, so pick the prefix deliberately.
 
 ## Documentation
-
-User-facing documentation in `docs/` (synced to the Astro docs site):
-- `QUICKSTART.md` - Getting started guide
-- `AUTHENTICATION.md` - All auth methods with examples
-- `CONNECTION_PROPERTIES.md` - Complete property reference
-- `TYPE_MAPPING.md` - BigQuery ↔ JDBC type conversions
-- `COMPATIBILITY.md` - JDBC feature support matrix
-- `INTELLIJ.md` - IntelliJ IDEA setup and optimization
-- `JETBRAINS_ISSUES.md` - Why tbc-bq-jdbc over JetBrains' built-in driver
-- `LOGGING.md` - Logging configuration and JAR variants
-- `OBSERVABILITY.md` - Driver metrics (`DriverMetrics`/`MetricsSnapshot`) for diagnosing a workload
-
-Contributor/maintainer documentation in `docs/contributing/` (NOT synced to the site; linked from `CONTRIBUTING.md`):
-- `INTEGRATION_TESTS.md` - Running and writing tests
-- `PERFORMANCE.md` - JFR, thread-scaling benchmarks and baseline, scale and load tests
-- `JAR_SIZE_OPTIMIZATION.md` - Shading/size strategy
-- `MAVEN_CENTRAL_PUBLISHING.md` - Release runbook
-
 **Doc scoping convention:** top-level `docs/*.md` is end-user content (how to *use* the driver) and is synced to the website; anything about building, testing, or releasing belongs in `docs/contributing/`.
