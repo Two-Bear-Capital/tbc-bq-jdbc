@@ -119,55 +119,7 @@ public final class BQConnection extends AbstractBQConnection {
 			// Shared across connections authenticating the same way: building these
 			// means an ADC probe plus token fetch, or reading and parsing a key file
 			Credentials credentials = CredentialsCache.forAuthType(properties.authType());
-			BigQueryOptions.Builder builder = BigQueryOptions.newBuilder().setProjectId(properties.projectId())
-					.setCredentials(credentials);
-
-			if (properties.location() != null) {
-				builder.setLocation(properties.location());
-			}
-
-			// retryCount is the total number of attempts, not retries after the first:
-			// that is what RetrySettings#setMaxAttempts means, and a driver property
-			// called "retryCount" set to 0 must not mean "never try at all". The rest
-			// of the client's backoff policy is kept by building on the defaults.
-			if (properties.retryCount() != null) {
-				builder.setRetrySettings(BigQueryOptions.getDefaultRetrySettings().toBuilder()
-						.setMaxAttempts(Math.max(1, properties.retryCount())).build());
-			}
-
-			// Applies to establishing the HTTP connection only. Query duration is
-			// governed by the `timeout` property, enforced by the driver itself, so the
-			// read timeout is deliberately left alone — capping it here would sever
-			// long-running queries that are behaving exactly as configured.
-			if (properties.connectionTimeout() != null) {
-				builder.setTransportOptions(BigQueryOptions.getDefaultHttpTransportOptions().toBuilder()
-						.setConnectTimeout(Math.toIntExact(properties.connectionTimeout() * 1000L)).build());
-			}
-
-			// Point the client at a non-default BigQuery endpoint.
-			//
-			// A host that already carries a scheme is used verbatim. Otherwise the
-			// scheme defaults to https: this used to hard-code http:// whenever a port
-			// was present, which silently sent credentials over an unencrypted
-			// connection. Set an explicit "http://" host to opt into plaintext.
-			if (properties.host() != null) {
-				String endpoint = properties.host();
-				boolean explicitScheme = endpoint.startsWith("http://") || endpoint.startsWith("https://");
-				if (!explicitScheme) {
-					endpoint = "https://" + endpoint;
-				}
-				if (properties.port() != null) {
-					endpoint = endpoint + ":" + properties.port();
-				}
-				builder.setHost(endpoint);
-				if (endpoint.startsWith("http://")) {
-					logger.warn("Using an unencrypted BigQuery endpoint: {}", endpoint);
-				} else {
-					logger.info("Using custom BigQuery endpoint: {}", endpoint);
-				}
-			}
-
-			this.bigquery = builder.build().getService();
+			this.bigquery = buildOptions(properties, credentials).build().getService();
 			logger.debug("Connected to BigQuery project: {}", properties.projectId());
 
 			// Initialize session manager
@@ -190,6 +142,71 @@ public final class BQConnection extends AbstractBQConnection {
 	 *
 	 * @return the BigQuery client
 	 */
+	/**
+	 * Builds the BigQuery client options for a connection.
+	 *
+	 * <p>
+	 * Extracted from the constructor so the mapping from connection properties to
+	 * client settings can be asserted without opening a connection — a unit test
+	 * must not depend on ambient credentials being present.
+	 *
+	 * @param properties
+	 *            the parsed connection properties
+	 * @param credentials
+	 *            credentials for the connection
+	 * @return the configured options builder
+	 */
+	static BigQueryOptions.Builder buildOptions(ConnectionProperties properties, Credentials credentials) {
+		BigQueryOptions.Builder builder = BigQueryOptions.newBuilder().setProjectId(properties.projectId())
+				.setCredentials(credentials);
+
+		if (properties.location() != null) {
+			builder.setLocation(properties.location());
+		}
+
+		// retryCount is the total number of attempts, not retries after the first:
+		// that is what RetrySettings#setMaxAttempts means, and a driver property
+		// called "retryCount" set to 0 must not mean "never try at all". The rest of
+		// the client's backoff policy is kept by building on the defaults.
+		if (properties.retryCount() != null) {
+			builder.setRetrySettings(BigQueryOptions.getDefaultRetrySettings().toBuilder()
+					.setMaxAttempts(Math.max(1, properties.retryCount())).build());
+		}
+
+		// Applies to establishing the HTTP connection only. Query duration is
+		// governed by the `timeout` property, enforced by the driver itself, so the
+		// read timeout is deliberately left alone — capping it here would sever
+		// long-running queries that are behaving exactly as configured.
+		if (properties.connectionTimeout() != null) {
+			builder.setTransportOptions(BigQueryOptions.getDefaultHttpTransportOptions().toBuilder()
+					.setConnectTimeout(Math.toIntExact(properties.connectionTimeout() * 1000L)).build());
+		}
+
+		// Point the client at a non-default BigQuery endpoint.
+		//
+		// A host that already carries a scheme is used verbatim. Otherwise the scheme
+		// defaults to https: hard-coding http:// whenever a port was present sent
+		// credentials over an unencrypted connection. Write an explicit "http://"
+		// host to opt into plaintext.
+		if (properties.host() != null) {
+			String endpoint = properties.host();
+			boolean explicitScheme = endpoint.startsWith("http://") || endpoint.startsWith("https://");
+			if (!explicitScheme) {
+				endpoint = "https://" + endpoint;
+			}
+			if (properties.port() != null) {
+				endpoint = endpoint + ":" + properties.port();
+			}
+			builder.setHost(endpoint);
+			if (endpoint.startsWith("http://")) {
+				logger.warn("Using an unencrypted BigQuery endpoint: {}", endpoint);
+			} else {
+				logger.info("Using custom BigQuery endpoint: {}", endpoint);
+			}
+		}
+		return builder;
+	}
+
 	public BigQuery getBigQuery() {
 		return bigquery;
 	}
