@@ -58,8 +58,8 @@ import java.util.Set;
  * the same value</b>, byte for byte, with one carefully bounded exception noted
  * below. Where BigQuery's REST encoding is merely odd, this class reproduces
  * the oddity rather than improving on it — a value that reads a given way over
- * REST must read the same way here. {@code StorageApiParityIT} enforces that by
- * running the same query down both paths and comparing every cell.
+ * REST must read the same way here. {@code StorageApiParityTest} enforces that
+ * by running the same query down both paths and comparing every cell.
  *
  * <p>
  * Two encodings are easy to get wrong, and both were caught by that parity test

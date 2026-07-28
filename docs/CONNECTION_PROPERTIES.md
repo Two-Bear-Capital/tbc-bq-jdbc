@@ -218,7 +218,7 @@ Reads of query results are billed as reads of a temporary table, which BigQuery
 does not charge for — so enabling this does not add cost for ordinary queries.
 
 **Results are byte-for-byte identical on both paths**, which
-`StorageApiParityIT` verifies by running the same query down each and comparing
+`StorageApiParityTest` verifies by running the same query down each and comparing
 every cell.
 
 Achieving that required one change to `getString()` that also affects the

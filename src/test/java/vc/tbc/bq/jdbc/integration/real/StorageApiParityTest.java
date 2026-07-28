@@ -58,11 +58,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A precondition worth stating: if the Storage path silently fell back to REST,
  * every comparison here would trivially pass.
  * {@link #storagePathIsActuallyInUse()} exists so that cannot happen unnoticed.
+ *
+ * <p>
+ * <b>The name matters.</b> Failsafe includes
+ * {@code **}{@code /integration/real/**}{@code /*Test.java}, so a class named
+ * {@code ...IT} is silently excluded from the suite and only runs when named
+ * explicitly with {@code -Dit.test=}. This class spent its first day that way:
+ * green locally on targeted runs, absent from CI, with a stale report on disk
+ * making the suite look eight tests larger than it was. Keep the {@code Test}
+ * suffix.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class StorageApiParityIT extends AbstractRealBigQueryIntegrationTest {
+class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 
-	private static final Logger logger = LoggerFactory.getLogger(StorageApiParityIT.class);
+	private static final Logger logger = LoggerFactory.getLogger(StorageApiParityTest.class);
 
 	/**
 	 * Every scalar type the converter claims to support, including the values most

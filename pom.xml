@@ -52,7 +52,7 @@
         <hikaricp.version>7.0.2</hikaricp.version>
         <!-- Arrow cannot allocate without this on JDK 16+ (see ArrowSupport). Every
              argLine below must include it: without it the Storage Read API path
-             silently falls back, and StorageApiParityIT would compare the REST path
+             silently falls back, and StorageApiParityTest would compare the REST path
              with itself instead of comparing the two paths. -->
         <arrow.add.opens>--add-opens=java.base/java.nio=ALL-UNNAMED</arrow.add.opens>
 
@@ -540,7 +540,7 @@
                     <!-- Use @{argLine} to preserve JaCoCo's agent configuration.
                          The add-opens is what lets Arrow allocate, and so what lets the
                          Storage Read API path actually run under integration tests. Without
-                         it StorageApiParityIT would not compare the two paths - it would
+                         it StorageApiParityTest would not compare the two paths - it would
                          silently compare the REST path with itself. -->
                     <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens}</argLine>
                 </configuration>

@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>
  * The converter's whole contract is that its output is indistinguishable from
  * what the REST path delivers, so that every JDBC getter can be inherited
- * rather than reimplemented. {@code StorageApiParityIT} proves that against
+ * rather than reimplemented. {@code StorageApiParityTest} proves that against
  * real BigQuery, but it needs credentials and a network round trip, which makes
  * it a slow way to find out that a one-character format change broke every
  * timestamp.
