@@ -79,7 +79,7 @@ Details:
 | Temp tables | ✅ | Requires sessions |
 | Multi-statement SQL | ✅ | Requires sessions |
 | Transactions | ⚠️ | Session-backed; no isolation levels or savepoints |
-| Storage Read API | ❌ | Not implemented; `useStorageApi` is accepted but ignored (defaults to `false`) |
+| Storage Read API | ⚠️ | Opt-in via `useStorageApi=auto`; scalar columns only, and needs `--add-opens=java.base/java.nio=ALL-UNNAMED`. Falls back to the standard path when unavailable |
 | Query labels | ✅ | Job labels for tracking |
 | Location routing | ✅ | Multi-region support |
 | Query timeout | ✅ | Hard timeout enforcement |

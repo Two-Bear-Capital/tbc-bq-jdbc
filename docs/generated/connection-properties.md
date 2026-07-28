@@ -27,7 +27,7 @@ There are **26** connection properties.
 | `metadataCacheTtl` | `300` | any | How long (seconds) to keep metadata in the cache before re-fetching |
 | `metadataCacheMaxRows` | `50000` | any | Ceiling on total rows held in the metadata cache; oldest entries are evicted above it. Set to 0 for no limit |
 | `metadataLazyLoad` | `false` | `true`, `false` | Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects) |
-| `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets (not implemented yet; currently ignored) |
+| `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `jobCreationMode` | `REQUIRED` | `REQUIRED`, `OPTIONAL` | REQUIRED always creates a query job; OPTIONAL may skip it for small queries |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |

@@ -123,9 +123,11 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			pageSize = DEFAULT_PAGE_SIZE;
 		}
 		if (useStorageApi == null) {
-			// Defaults to false while the Storage Read API path is unimplemented:
-			// "auto" silently routed large results into a ResultSet that could not
-			// iterate. Restore "auto" when StorageReadResultSet decodes rows.
+			// The Storage Read API path works and is much faster on large results, but
+			// it stays opt-in for now: enabling it by default would change how every
+			// large query is fetched, and it needs a JVM flag (see ArrowSupport) that
+			// most environments do not pass. Moving this to "auto" is a deliberate
+			// follow-up once the path has seen real use, not something to drift into.
 			useStorageApi = "false";
 		}
 		if (connectionTimeout == null) {
