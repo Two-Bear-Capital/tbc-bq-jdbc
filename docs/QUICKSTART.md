@@ -13,9 +13,24 @@ Get started with tbc-bq-jdbc in 5 minutes.
 
 ## Installation
 
-### Maven
+### Download a JAR (GitHub Releases)
 
-Add to your `pom.xml`:
+The shaded JAR includes every dependency, so it works as a standalone driver:
+
+```bash
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-shaded.jar
+```
+
+For IntelliJ IDEA, DBeaver or DataGrip, use the `-with-logging` variant instead — it adds
+a preconfigured Logback. See [Logging](LOGGING.md#jar-variants).
+
+The shaded JARs are ~41 MB, mostly platform-specific native libraries for gRPC SSL/TLS.
+
+### Maven / Gradle
+
+> **Not yet published to Maven Central.** These coordinates are reserved for the first
+> Central release; until then use a GitHub Releases JAR, or run `./mvnw clean install`
+> to publish to your local repository.
 
 ```xml
 <dependency>
@@ -25,26 +40,11 @@ Add to your `pom.xml`:
 </dependency>
 ```
 
-### Gradle
-
-Add to your `build.gradle`:
-
 ```groovy
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:2.4.1'
 }
 ```
-
-### Fat JAR (Standalone)
-
-Download the shaded JAR that includes all dependencies:
-
-```bash
-# Download from Maven Central or GitHub Releases (note the -shaded classifier)
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.4.1/tbc-bq-jdbc-2.4.1-shaded.jar
-```
-
-**Note:** The shaded JAR is ~38 MB due to platform-specific native libraries required for gRPC SSL/TLS support. This is competitive with other enterprise JDBC drivers (e.g., Simba's BigQuery driver is 41.7 MB).
 
 ## Basic Usage
 
@@ -287,5 +287,6 @@ See [Connection Properties](CONNECTION_PROPERTIES.md) for all configuration opti
 
 ## Example Projects
 
-Complete example projects available at:
-- https://github.com/Two-Bear-Capital/tbc-bq-jdbc-examples
+Runnable examples live in the driver's own test suite — see
+[`src/test/java/vc/tbc/bq/jdbc/integration/real/`](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/tree/main/src/test/java/vc/tbc/bq/jdbc/integration/real)
+for connections, queries, transactions and metadata usage against real BigQuery.

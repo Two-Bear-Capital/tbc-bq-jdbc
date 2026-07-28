@@ -65,9 +65,10 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
 
 ### Quick Start for IntelliJ
 
-1. **Download Driver JAR**
+1. **Download Driver JAR** — use the `with-logging` variant, which bundles every
+   dependency plus a preconfigured Logback (see [Logging](docs/LOGGING.md)):
    ```bash
-   wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.4.1/tbc-bq-jdbc-2.4.1.jar
+   wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-with-logging.jar
    ```
 
 2. **Add Driver in IntelliJ**
@@ -97,7 +98,26 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ### Installation
 
-#### Maven
+#### Download a JAR (GitHub Releases)
+
+Every release attaches all five artifacts. Pick the variant that matches how you run the
+driver — see [Logging](docs/LOGGING.md#jar-variants) for the full comparison:
+
+```bash
+# Bundles all dependencies plus preconfigured logging — for IntelliJ, DBeaver, DataGrip
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-with-logging.jar
+
+# Bundles all dependencies, bring your own SLF4J binding — for standalone apps
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-shaded.jar
+```
+
+Or browse [all releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases).
+
+#### Maven / Gradle
+
+> **Not yet published to Maven Central.** The coordinates below are reserved for the
+> first Central release; until then, use a GitHub Releases JAR as shown above (or
+> `./mvnw clean install` to publish to your local repository).
 
 ```xml
 <dependency>
@@ -107,19 +127,10 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 </dependency>
 ```
 
-#### Gradle
-
 ```gradle
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:2.4.1'
 }
-```
-
-#### Standalone (Fat JAR)
-
-```bash
-# Download shaded JAR with all dependencies included
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.4.1/tbc-bq-jdbc-2.4.1.jar
 ```
 
 ### Basic Usage
@@ -335,8 +346,8 @@ See [Authentication Guide](docs/AUTHENTICATION.md) for all methods.
 ### Requirements
 
 - Java 21 or later
-- Maven 3.9+
-- Docker (for integration tests)
+- Maven 3.9+ (or use the bundled `./mvnw` wrapper)
+- A Google Cloud project with BigQuery enabled, for the integration tests
 
 ### Build Commands
 
@@ -357,11 +368,15 @@ export BQ_TEST_PROJECT=my-gcp-project
 
 ### Build Artifacts
 
-After building:
-- **Slim JAR:** `target/tbc-bq-jdbc-2.4.1.jar` (60K)
-- **Shaded JAR:** `target/tbc-bq-jdbc-2.4.1-shaded.jar` (51M)
-- **Sources JAR:** `target/tbc-bq-jdbc-2.4.1-sources.jar` (41K)
-- **Javadoc JAR:** `target/tbc-bq-jdbc-2.4.1-javadoc.jar` (267K)
+`./mvnw clean package` produces all five, with approximate sizes:
+
+| Artifact | Size | Contents |
+|----------|------|----------|
+| `target/tbc-bq-jdbc-2.4.1.jar` | ~220 KB | Driver classes only; dependencies must be on the classpath |
+| `target/tbc-bq-jdbc-2.4.1-shaded.jar` | ~41 MB | All dependencies relocated; bring your own SLF4J binding |
+| `target/tbc-bq-jdbc-2.4.1-with-logging.jar` | ~42 MB | Shaded, plus Logback preconfigured — the IDE variant |
+| `target/tbc-bq-jdbc-2.4.1-sources.jar` | ~185 KB | Sources |
+| `target/tbc-bq-jdbc-2.4.1-javadoc.jar` | ~610 KB | API reference |
 
 ## Testing
 

@@ -14,13 +14,13 @@ The driver is distributed in three variants:
 ### 2. Shaded JAR (`tbc-bq-jdbc-2.4.1-shaded.jar`)
 - **Use case:** Standalone usage with all dependencies bundled
 - **Logging:** Requires you to provide your own SLF4J implementation
-- **Size:** Large (~40MB, includes Google Cloud libraries)
+- **Size:** ~41 MB (includes Google Cloud libraries)
 - **Dependencies:** All dependencies relocated to avoid conflicts
 
 ### 3. Shaded JAR with Logging (`tbc-bq-jdbc-2.4.1-with-logging.jar`)
 - **Use case:** IntelliJ IDEA, DBeaver, and other database tools/IDEs
 - **Logging:** Includes Logback with sensible defaults
-- **Size:** Largest (~45MB, includes everything + Logback)
+- **Size:** ~42 MB (includes everything + Logback)
 - **Dependencies:** All dependencies including Logback relocated
 - **Default behavior:** Logs to `~/.bigquery-jdbc/logs/bigquery-jdbc.log` with daily rotation
 

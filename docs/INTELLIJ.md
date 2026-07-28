@@ -70,9 +70,26 @@ driver logs work out of the box. See [Logging in IntelliJ](#logging-in-intellij)
 
 ### Step 1: Download the Driver JAR
 
-Choose one of these methods:
+Choose one of these methods. Either way, use the **`with-logging`** variant — IntelliJ
+runs drivers with no logging backend of its own.
 
-**Option A: Maven Central** (when available)
+**Option A: Download a release**
+```bash
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-with-logging.jar
+```
+Or browse [GitHub Releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases).
+
+**Option B: Build from source**
+```bash
+git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
+cd tbc-bq-jdbc
+./mvnw clean package
+# Use target/tbc-bq-jdbc-2.4.1-with-logging.jar
+# (the classifier-less JAR holds driver classes only and will not work on its own)
+```
+
+**Option C: Maven / Gradle** — not yet published to Maven Central. These coordinates are
+reserved for the first Central release.
 ```xml
 <dependency>
     <groupId>vc.tbc</groupId>
@@ -81,18 +98,6 @@ Choose one of these methods:
     <classifier>shaded</classifier>
 </dependency>
 ```
-
-**Option B: Build from Source**
-```bash
-git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
-cd tbc-bq-jdbc
-./mvnw clean package
-# JAR will be in target/tbc-bq-jdbc-2.4.1.jar
-```
-
-**Option C: Download Release**
-- Visit [GitHub Releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases)
-- Download `tbc-bq-jdbc-X.Y.Z-shaded.jar`
 
 ### Step 2: Configure IntelliJ Driver
 
