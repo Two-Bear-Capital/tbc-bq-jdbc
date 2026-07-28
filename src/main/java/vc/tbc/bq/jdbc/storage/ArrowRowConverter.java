@@ -80,7 +80,7 @@ import java.util.Set;
  * types therefore only has to parse back correctly, which is why it keeps the
  * exact microsecond rather than imitating REST's lossy rendering.
  *
- * @since 2.3.0
+ * @since 2.4.0
  */
 final class ArrowRowConverter {
 

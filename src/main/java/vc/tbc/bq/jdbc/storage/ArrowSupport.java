@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * Repeating a failing allocation per statement would be pure overhead.
  * </ul>
  *
- * @since 2.3.0
+ * @since 2.4.0
  */
 public final class ArrowSupport {
 
