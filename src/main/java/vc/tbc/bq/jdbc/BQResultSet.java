@@ -209,19 +209,37 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return value.getLongValue();
 	}
 
+	/**
+	 * Produces the next row, or {@code null} once the rows are exhausted.
+	 *
+	 * <p>
+	 * This is the seam subclasses override to supply rows from somewhere other than
+	 * the REST pager — {@link vc.tbc.bq.jdbc.storage.StorageReadResultSet} decodes
+	 * them from Arrow record batches. Everything that makes a row behave like a
+	 * JDBC row (the {@code maxRows} limit, {@code wasNull} tracking, and every
+	 * getter's type coercion) stays in this class, so an alternative row source
+	 * cannot drift from the standard path's semantics.
+	 *
+	 * @return the next row, or null at end of rows
+	 * @throws SQLException
+	 *             if fetching fails
+	 */
+	protected FieldValueList fetchNextRow() throws SQLException {
+		// Subclasses constructed with a null TableResult must supply their own
+		// iteration by overriding this. Fail loudly rather than dereferencing null.
+		if (rowIterator == null) {
+			throw new BQSQLException(
+					"This ResultSet has no row iterator: a subclass was constructed without a TableResult "
+							+ "but did not override fetchNextRow()");
+		}
+		return rowIterator.hasNext() ? rowIterator.next() : null;
+	}
+
 	@Override
 	@SuppressWarnings("PMD.NullAssignment") // null-out currentRow to indicate end-of-rows; intentional JDBC iterator
 											// pattern
 	public boolean next() throws SQLException {
 		checkClosed();
-
-		// Subclasses constructed with a null TableResult must supply their own
-		// iteration by overriding next(). Fail loudly rather than dereferencing null.
-		if (rowIterator == null) {
-			throw new BQSQLException(
-					"This ResultSet has no row iterator: a subclass was constructed without a TableResult "
-							+ "but did not override next()");
-		}
 
 		// Check if maxRows limit has been reached (JDBC Statement.setMaxRows)
 		if (maxRows > 0 && rowCount >= maxRows) {
@@ -229,8 +247,9 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 			return false;
 		}
 
-		if (rowIterator.hasNext()) {
-			currentRow = rowIterator.next();
+		FieldValueList row = fetchNextRow();
+		if (row != null) {
+			currentRow = row;
 			rowCount++;
 			return true;
 		}

@@ -105,50 +105,39 @@
 
     <dependencies>
         <!--
-            Apache Arrow is excluded from both BigQuery artifacts below.
+            Apache Arrow is carried deliberately: StorageReadResultSet decodes Arrow
+            record batches from the Storage Read API, which measured 13-20x faster than
+            the REST result path on large results (#152).
 
-            Nothing in the driver references it — `grep -r org.apache.arrow src/main/java`
-            is empty. StorageReadResultSet asks the Storage API for DataFormat.ARROW but
-            never decodes the batches, and within google-cloud-bigquerystorage only
-            StreamWriter (the *write* API, which the driver never touches) links Arrow
-            classes, so dropping it cannot break the read path.
+            It costs 2.3 MB of the shaded jar, measured: 36.4 MB without, 38.7 MB with.
+            That is the price of the feature, not an oversight. (The comment this
+            replaced put the figure at "roughly 5 MB"; it was never measured against a
+            build with Arrow actually present.)
 
-            Carrying it cost ~5 MB of the shaded jar and left the classpath split across
-            two incompatible Arrow majors: arrow-vector/arrow-memory-netty resolved to
-            19.0.0 while arrow-memory-core/arrow-format resolved to 17.0.0 via
-            libraries-bom. Arrow does not support mixing module versions, and that exact
-            combination fails at runtime with "Failed to initialize MemoryUtil".
+            Arrow does not support mixing module versions across arrow-vector,
+            arrow-format, arrow-memory-core and arrow-memory-netty. libraries-bom
+            currently resolves all of them to a single consistent version, so nothing is
+            pinned here; if a future bom upgrade splits them, pin every arrow-* module to
+            one version rather than excluding some.
 
-            Both artifacts need the exclusion: google-cloud-bigquery depends on
-            google-cloud-bigquerystorage itself, so excluding it on the direct
-            bigquerystorage dependency alone leaves Arrow on the classpath.
-
-            Re-add matched arrow-* modules — one version across every module — when Arrow
-            deserialization is actually implemented.
+            NOTE: Arrow needs an add-opens of java.base/java.nio to ALL-UNNAMED on JDK 16+
+            (see ArrowSupport.REQUIRED_JVM_FLAG for the exact spelling; it cannot be written
+            here because XML comments may not contain a double hyphen). Without it,
+            allocation fails with "Failed to initialize MemoryUtil". The driver probes for
+            this at runtime and falls back to the REST path when the flag is absent, so a
+            missing flag is slow rather than broken.
         -->
 
         <!-- BigQuery Client -->
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-bigquery</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.arrow</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
-        <!-- BigQuery Storage API: read-session plumbing only -->
+        <!-- BigQuery Storage API: read sessions plus Arrow record batches -->
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-bigquerystorage</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.arrow</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <!-- Logging -->
@@ -538,8 +527,13 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <!-- Use @{argLine} to preserve JaCoCo's agent configuration -->
-                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
+                    <!-- Use @{argLine} to preserve JaCoCo's agent configuration.
+                         The add-opens is what lets Arrow allocate, and so what lets the
+                         Storage Read API path actually run under integration tests. Without
+                         it StorageApiParityIT would not compare the two paths - it would
+                         silently compare the REST path with itself. -->
+                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading
+                        --add-opens=java.base/java.nio=ALL-UNNAMED</argLine>
                 </configuration>
             </plugin>
 

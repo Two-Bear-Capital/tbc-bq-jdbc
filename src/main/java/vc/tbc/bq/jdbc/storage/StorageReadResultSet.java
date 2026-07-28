@@ -15,49 +15,69 @@
  */
 package vc.tbc.bq.jdbc.storage;
 
+import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.api.gax.rpc.ServerStream;
+import com.google.auth.Credentials;
+import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.FieldValueList;
+import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.TableId;
 import com.google.cloud.bigquery.TableResult;
 import com.google.cloud.bigquery.storage.v1.*;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.VectorLoader;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ReadChannel;
+import org.apache.arrow.vector.ipc.message.ArrowRecordBatch;
+import org.apache.arrow.vector.ipc.message.MessageSerializer;
+import org.apache.arrow.vector.util.ByteArrayReadableSeekableByteChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vc.tbc.bq.jdbc.BQConnection;
 import vc.tbc.bq.jdbc.BQResultSet;
 import vc.tbc.bq.jdbc.BQStatement;
+import vc.tbc.bq.jdbc.auth.CredentialsCache;
+import vc.tbc.bq.jdbc.exception.BQSQLException;
 
+import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Iterator;
 
 /**
- * ResultSet implementation using BigQuery Storage Read API for improved
- * performance.
+ * ResultSet backed by the BigQuery Storage Read API.
  *
  * <p>
- * The Storage Read API provides:
- *
- * <ul>
- * <li>Faster data access for large result sets
- * <li>Parallel stream reading
- * <li>Efficient Arrow or Avro serialization
- * <li>Reduced costs for large queries
- * </ul>
+ * The driver's standard path pages query results over
+ * {@code jobs.getQueryResults} as JSON, paying an HTTP round trip per page and
+ * parsing every value out of text. This class instead opens a read session on
+ * the completed job's destination table and streams Arrow record batches over
+ * gRPC. Measured against the REST path on large results, that was 13-20x faster
+ * end to end (#152).
  *
  * <p>
- * <strong>Not implemented — this class is not wired up.</strong> It opens a
- * read session and a row stream, but never decodes the Arrow batches into rows:
- * it passes a {@code null} {@code TableResult} to {@code super} and does not
- * override {@link #next()}, so iterating an instance cannot work.
- * {@code AbstractBQStatement.createResultSet} therefore never constructs it and
- * always returns a standard {@link BQResultSet}, whatever {@code useStorageApi}
- * is set to.
+ * <b>Rows go through {@link FieldValueList}, not straight into the getters.</b>
+ * This class overrides exactly one thing — where rows come from — by
+ * implementing {@link BQResultSet#fetchNextRow()}. Every getter, every type
+ * coercion and every error path is inherited unchanged from
+ * {@link BQResultSet}, so the two paths cannot disagree about what a value
+ * means. See {@link ArrowRowConverter} for why that trade is worth its cost.
  *
  * <p>
- * Finishing it means implementing Arrow deserialization plus {@code next()} and
- * the column accessors, pinning the {@code arrow-*} modules to one matched
- * version (they currently resolve to a mix of 17.0.0 and 19.0.0), and covering
- * it with a real-BigQuery integration test.
+ * <b>Single stream, deliberately.</b> {@code CreateReadSession} will partition
+ * a table across many streams, but a {@code java.sql.ResultSet} is one
+ * forward-only cursor: consuming several streams concurrently would interleave
+ * rows and silently reorder an {@code ORDER BY} result. The measured throughput
+ * on one stream is already several hundred thousand rows/s, so the ordering
+ * risk buys nothing. Google's own client library makes the same choice.
  *
  * <p>
- * The static {@link #shouldUseStorageApi} predicate is still live and still
- * describes when the path <em>would</em> engage once it works.
+ * <b>This path is never mandatory.</b> Construction can fail for reasons
+ * outside the caller's control — Arrow needing a JVM flag, the Storage API not
+ * being enabled, credentials lacking {@code bigquery.readsessions.create}.
+ * Callers are expected to catch {@link SQLException} and fall back to
+ * {@link BQResultSet}; {@code AbstractBQStatement.createResultSet} does exactly
+ * that.
  *
  * @since 1.0.0
  */
@@ -68,96 +88,174 @@ public class StorageReadResultSet extends BQResultSet {
 	/** Default threshold for using Storage API (10 MB). */
 	public static final long DEFAULT_SIZE_THRESHOLD = 10 * 1024 * 1024; // 10 MB
 
+	/**
+	 * Rough per-row size used by auto mode, which has no byte count to work from.
+	 */
+	private static final long ESTIMATED_BYTES_PER_ROW = 1024;
+
 	private final BigQueryReadClient readClient;
-	private final TableId tableId;
-	private ServerStream<ReadRowsResponse> currentStream;
+	private final BufferAllocator allocator;
+	private final ArrowRowConverter converter;
+	private final ServerStream<ReadRowsResponse> stream;
+	private final Iterator<ReadRowsResponse> responses;
+	private final VectorSchemaRoot root;
+	private final VectorLoader loader;
+
+	private int rowInBatch;
+	private int rowsInBatch;
 
 	/**
-	 * Creates a StorageReadResultSet for a table.
+	 * Opens a read session over a completed query's destination table.
 	 *
 	 * @param statement
-	 *            the parent statement
-	 * @param tableId
-	 *            reference to the table to read
+	 *            the statement that produced this result set
+	 * @param tableResult
+	 *            the query result, used for schema, metadata and {@code maxRows}
+	 * @param destination
+	 *            the job's destination table, typically an anonymous result table
 	 * @throws SQLException
-	 *             if initialization fails
+	 *             if the read session cannot be opened, in which case the caller
+	 *             should fall back to the standard ResultSet
 	 */
-	@SuppressWarnings("PMD.CloseResource") // tempClient intentionally kept open on success (assigned to
-											// this.readClient); closed in catch
-	public StorageReadResultSet(BQStatement statement, TableId tableId) throws SQLException {
-		super(statement, null, true); // Will override iteration logic
+	@SuppressWarnings("PMD.CloseResource") // resources are fields closed in close(); cleaned up here only on failure
+	public StorageReadResultSet(BQStatement statement, TableResult tableResult, TableId destination)
+			throws SQLException {
+		super(statement, tableResult);
 
-		// Validate tableId is not null
-		if (tableId == null) {
-			throw new SQLException("TableId cannot be null for Storage API result set");
+		if (destination == null) {
+			throw new BQSQLException("Storage Read API needs a destination table, but the job did not report one");
+		}
+		Schema schema = tableResult.getSchema();
+		if (!ArrowRowConverter.isSupported(schema)) {
+			throw new BQSQLException("Result schema contains types the Storage Read API path does not encode");
 		}
 
-		this.tableId = tableId;
-
-		BigQueryReadClient tempClient = null;
+		BigQueryReadClient clientBeingBuilt = null;
+		BufferAllocator allocatorBeingBuilt = null;
+		VectorSchemaRoot rootBeingBuilt = null;
 		try {
-			// Create Storage Read API client
-			tempClient = BigQueryReadClient.create();
+			this.converter = new ArrowRowConverter(schema);
+			clientBeingBuilt = openClient(statement);
+			ReadSession session = createReadSession(clientBeingBuilt, statement, destination, schema);
 
-			// Create read session
-			ReadSession readSession = createReadSession();
-
-			logger.info("Created Storage API read session: {} with {} streams", readSession.getName(),
-					readSession.getStreamsCount());
-
-			// For now, use first stream (can be enhanced for parallel reading)
-			if (readSession.getStreamsCount() > 0) {
-				String streamName = readSession.getStreams(0).getName();
-				ReadRowsRequest request = ReadRowsRequest.newBuilder().setReadStream(streamName).build();
-				this.currentStream = tempClient.readRowsCallable().call(request);
+			if (session.getStreamsCount() == 0) {
+				// An empty result yields no streams. Nothing to read, but the ResultSet must
+				// still behave: leave the batch empty and fetchNextRow() reports end of rows.
+				logger.debug("Storage read session {} returned no streams (empty result)", session.getName());
 			}
 
-			// Only assign to field after successful initialization
-			this.readClient = tempClient;
+			allocatorBeingBuilt = new RootAllocator(Long.MAX_VALUE);
+			org.apache.arrow.vector.types.pojo.Schema arrowSchema = MessageSerializer
+					.deserializeSchema(new ReadChannel(new ByteArrayReadableSeekableByteChannel(
+							session.getArrowSchema().getSerializedSchema().toByteArray())));
+			rootBeingBuilt = VectorSchemaRoot.create(arrowSchema, allocatorBeingBuilt);
 
+			this.allocator = allocatorBeingBuilt;
+			this.root = rootBeingBuilt;
+			this.loader = new VectorLoader(rootBeingBuilt);
+			this.readClient = clientBeingBuilt;
+			this.stream = session.getStreamsCount() == 0
+					? null
+					: clientBeingBuilt.readRowsCallable()
+							.call(ReadRowsRequest.newBuilder().setReadStream(session.getStreams(0).getName()).build());
+			this.responses = stream == null ? java.util.Collections.emptyIterator() : stream.iterator();
+
+			logger.debug("Storage read session {} open on {}.{}", session.getName(), destination.getDataset(),
+					destination.getTable());
+		} catch (SQLException e) {
+			closeQuietly(rootBeingBuilt, allocatorBeingBuilt, clientBeingBuilt, e);
+			throw e;
+		} catch (IOException | RuntimeException e) {
+			closeQuietly(rootBeingBuilt, allocatorBeingBuilt, clientBeingBuilt, e);
+			throw new BQSQLException("Failed to open a BigQuery Storage read session", e);
+		}
+	}
+
+	private static BigQueryReadClient openClient(BQStatement statement) throws SQLException {
+		try {
+			BQConnection connection = (BQConnection) statement.getConnection();
+			Credentials credentials = CredentialsCache.forAuthType(connection.getProperties().authType());
+			return BigQueryReadClient.create(BigQueryReadSettings.newBuilder()
+					.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build());
+		} catch (SQLException e) {
+			throw e;
 		} catch (Exception e) {
-			// Clean up on failure to prevent resource leak
-			if (tempClient != null) {
-				try {
-					tempClient.close();
-				} catch (Exception closeEx) {
-					// Log but don't mask original exception
-					e.addSuppressed(closeEx);
-				}
+			throw new BQSQLException("Failed to create a BigQuery Storage read client", e);
+		}
+	}
+
+	private static ReadSession createReadSession(BigQueryReadClient client, BQStatement statement, TableId destination,
+			Schema schema) throws SQLException {
+		BQConnection connection = (BQConnection) statement.getConnection();
+		String billingProject = connection.getProperties().projectId();
+		String tablePath = String.format("projects/%s/datasets/%s/tables/%s", destination.getProject(),
+				destination.getDataset(), destination.getTable());
+
+		ReadSession.TableReadOptions.Builder options = ReadSession.TableReadOptions.newBuilder();
+		// Ask for the columns in schema order. Without this the session returns the
+		// table's own column order, which for a destination table matches the query,
+		// but being explicit keeps column identity tied to the schema we convert with.
+		for (Field field : schema.getFields()) {
+			options.addSelectedFields(field.getName());
+		}
+
+		return client.createReadSession(CreateReadSessionRequest
+				.newBuilder().setParent("projects/" + billingProject).setReadSession(ReadSession.newBuilder()
+						.setTable(tablePath).setDataFormat(DataFormat.ARROW).setReadOptions(options.build()))
+				.setMaxStreamCount(1).build());
+	}
+
+	@Override
+	protected FieldValueList fetchNextRow() throws SQLException {
+		while (true) {
+			if (rowInBatch < rowsInBatch) {
+				return converter.convert(root, rowInBatch++);
 			}
-			throw new SQLException("Failed to initialize Storage API read session", e);
+			if (!loadNextBatch()) {
+				return null;
+			}
 		}
 	}
 
 	/**
-	 * Creates a Storage API read session for the table.
+	 * Pulls responses until one carries a record batch.
 	 *
-	 * @return the read session
+	 * @return false once the stream is exhausted
 	 */
-	private ReadSession createReadSession() {
-		String projectId = tableId.getProject();
-		String datasetId = tableId.getDataset();
-		String table = tableId.getTable();
-
-		String parent = String.format("projects/%s", projectId);
-		String tablePath = String.format("projects/%s/datasets/%s/tables/%s", projectId, datasetId, table);
-
-		ReadSession.Builder sessionBuilder = ReadSession.newBuilder().setTable(tablePath)
-				.setDataFormat(DataFormat.ARROW) // Use Arrow format for better performance
-				.setReadOptions(ReadSession.TableReadOptions.newBuilder()
-						// Can add column filtering here
-						.build());
-
-		CreateReadSessionRequest request = CreateReadSessionRequest.newBuilder().setParent(parent)
-				.setReadSession(sessionBuilder).setMaxStreamCount(1) // Start with 1 stream, can be enhanced for
-																		// parallel
-				.build();
-
-		return readClient.createReadSession(request);
+	private boolean loadNextBatch() throws SQLException {
+		while (responses.hasNext()) {
+			ReadRowsResponse response = responses.next();
+			if (!response.hasArrowRecordBatch()) {
+				continue;
+			}
+			try (ArrowRecordBatch batch = MessageSerializer
+					.deserializeRecordBatch(
+							new ReadChannel(new ByteArrayReadableSeekableByteChannel(
+									response.getArrowRecordBatch().getSerializedRecordBatch().toByteArray())),
+							allocator)) {
+				// load() retains the buffers it needs, so closing the batch here does not
+				// invalidate the vectors we are about to read.
+				loader.load(batch);
+			} catch (IOException | RuntimeException e) {
+				throw new BQSQLException("Failed to decode an Arrow record batch from the Storage Read API", e);
+			}
+			rowsInBatch = root.getRowCount();
+			rowInBatch = 0;
+			if (rowsInBatch > 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
 	 * Determines if Storage API should be used for a result.
+	 *
+	 * <p>
+	 * {@code false} never, {@code true} always, {@code auto} only for results large
+	 * enough that the read session's fixed setup cost is worth paying. Small
+	 * results are genuinely slower over the Storage API, so {@code true} is a blunt
+	 * instrument and {@code auto} is the setting to prefer.
 	 *
 	 * @param tableResult
 	 *            the query result
@@ -166,62 +264,69 @@ public class StorageReadResultSet extends BQResultSet {
 	 * @return true if Storage API should be used
 	 */
 	public static boolean shouldUseStorageApi(TableResult tableResult, String useStorageApiSetting) {
-		if ("false".equalsIgnoreCase(useStorageApiSetting)) {
-			return false;
-		}
-
 		if ("true".equalsIgnoreCase(useStorageApiSetting)) {
 			return true;
 		}
-
-		// Auto mode: use for large results
-		if ("auto".equalsIgnoreCase(useStorageApiSetting)) {
-			long totalRows = tableResult.getTotalRows();
-			// Estimate: assume 1KB per row on average
-			long estimatedSize = totalRows * 1024;
-			boolean shouldUse = estimatedSize > DEFAULT_SIZE_THRESHOLD;
-
-			if (shouldUse) {
-				logger.info("Auto-enabling Storage API for large result: {} rows (~{} MB)", totalRows,
-						estimatedSize / (1024 * 1024));
-			}
-
-			return shouldUse;
+		if (!"auto".equalsIgnoreCase(useStorageApiSetting)) {
+			return false;
 		}
-
-		return false;
+		if (tableResult == null) {
+			return false;
+		}
+		long estimatedSize = tableResult.getTotalRows() * ESTIMATED_BYTES_PER_ROW;
+		return estimatedSize > DEFAULT_SIZE_THRESHOLD;
 	}
 
 	@Override
 	@SuppressWarnings("PMD.UseTryWithResources") // multi-resource close with suppressed-exception chaining requires
 													// manual try/catch
-	public void close() throws SQLException {
+	protected void doClose() throws SQLException {
 		SQLException thrown = null;
 		try {
-			if (currentStream != null) {
-				currentStream.cancel();
+			if (stream != null) {
+				stream.cancel();
 			}
-		} catch (Exception e) {
-			thrown = new SQLException("Failed to cancel Storage API stream", e);
+		} catch (RuntimeException e) {
+			thrown = new BQSQLException("Failed to cancel the Storage Read API stream", e);
 		}
-		try {
-			if (readClient != null) {
-				readClient.close();
-			}
-		} catch (Exception e) {
-			if (thrown == null) {
-				thrown = new SQLException("Failed to close Storage API client", e);
-			} else {
-				thrown.addSuppressed(e);
-			}
-		} finally {
-			super.close();
-		}
+		thrown = closeAndCollect(root, "Arrow vectors", thrown);
+		thrown = closeAndCollect(allocator, "Arrow allocator", thrown);
+		thrown = closeAndCollect(readClient, "Storage Read API client", thrown);
+		super.doClose();
 		if (thrown != null) {
 			throw thrown;
 		}
 	}
 
-	// Note: Additional methods for Arrow deserialization would go here
-	// For now, this is a framework that can be enhanced with full Arrow support
+	private static SQLException closeAndCollect(AutoCloseable resource, String what, SQLException pending) {
+		if (resource == null) {
+			return pending;
+		}
+		try {
+			resource.close();
+			return pending;
+		} catch (Exception e) {
+			SQLException failure = new BQSQLException("Failed to close the " + what, e);
+			if (pending == null) {
+				return failure;
+			}
+			pending.addSuppressed(failure);
+			return pending;
+		}
+	}
+
+	/** Best-effort cleanup when construction fails partway through. */
+	private static void closeQuietly(VectorSchemaRoot root, BufferAllocator allocator, BigQueryReadClient client,
+			Exception primary) {
+		for (AutoCloseable resource : new AutoCloseable[]{root, allocator, client}) {
+			if (resource == null) {
+				continue;
+			}
+			try {
+				resource.close();
+			} catch (Exception e) {
+				primary.addSuppressed(e);
+			}
+		}
+	}
 }

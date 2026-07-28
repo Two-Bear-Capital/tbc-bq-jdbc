@@ -194,15 +194,28 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&pageSize=50000&retryCount=5
 
 **Storage API Modes:**
 
-> **Not implemented yet — `useStorageApi` currently has no effect.** The driver
-> always reads results through the Jobs API, whatever this property is set to.
-> Setting `auto` or `true` logs a warning once and is otherwise ignored. The
-> default is `false` so nothing changes silently.
+The BigQuery Storage Read API streams results as binary Arrow batches over gRPC
+instead of paging them as JSON over HTTPS. On large results that measured
+13-20x faster end to end. On small ones it is *slower*, because opening a read
+session costs a round trip before the first row arrives.
 
-Once the Storage Read API path is finished, the modes will be:
-- `auto` - Automatically use Storage API for result sets > 10MB
-- `true` - Always use Storage API for reads
-- `false` - Never use Storage API (use Jobs API only)
+- `auto` - use the Storage API only for result sets estimated over 10MB
+- `true` - always use it, even for small results where it will not pay off
+- `false` (default) - always use the standard Jobs API path
+
+**Two things to know before turning it on:**
+
+1. **It needs a JVM flag.** Arrow cannot allocate memory without
+   `--add-opens=java.base/java.nio=ALL-UNNAMED` on Java 16+. See
+   [INTELLIJ.md](INTELLIJ.md) for where to put it in IntelliJ or DataGrip.
+2. **It never breaks a query.** If Arrow is unusable, the query has column types
+   the path does not cover (arrays, structs, `INTERVAL`), the job produced no
+   destination table, or the read session cannot be opened, the driver logs once
+   and falls back to the standard path. The cost of a missing flag is speed, not
+   failure.
+
+Reads of query results are billed as reads of a temporary table, which BigQuery
+does not charge for — so enabling this does not add cost for ordinary queries.
 
 and it is expected to give faster access to large result sets, parallel stream
 reading, and lower costs for large queries.

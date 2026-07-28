@@ -26,6 +26,7 @@ import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.metrics.DriverMetrics;
+import vc.tbc.bq.jdbc.storage.ArrowSupport;
 import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
 import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 
@@ -177,10 +178,21 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * Creates a ResultSet for the given query result and job.
 	 *
 	 * <p>
-	 * The Storage Read API path is currently inert: {@link StorageReadResultSet}
-	 * opens a read session but never decodes rows, so it is not wired up here. When
-	 * {@code useStorageApi} asks for it we log once and return the standard
-	 * ResultSet instead of a result set that cannot iterate.
+	 * When {@code useStorageApi} asks for it and the result qualifies, rows are
+	 * streamed via the BigQuery Storage Read API instead of paged over REST — much
+	 * faster on large results (#152). That path is strictly optional: anything that
+	 * makes it unavailable falls back to the standard {@link BQResultSet}, so a
+	 * query always returns rows. The reasons it can be unavailable are all outside
+	 * the caller's control, which is why none of them is an error:
+	 *
+	 * <ul>
+	 * <li>Arrow cannot allocate without a JVM flag ({@link ArrowSupport})
+	 * <li>the job reported no destination table, e.g. under
+	 * {@code JOB_CREATION_OPTIONAL}
+	 * <li>the result contains types the Arrow encoder does not cover
+	 * <li>opening the read session fails — API disabled, or credentials without
+	 * {@code bigquery.readsessions.create}
+	 * </ul>
 	 *
 	 * @param result
 	 *            the table result from BigQuery
@@ -189,15 +201,35 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @return the JDBC ResultSet
 	 */
 	protected ResultSet createResultSet(TableResult result, Job job) {
-		String useStorageApiSetting = properties.useStorageApi();
-		if (useStorageApiSetting != null && StorageReadResultSet.shouldUseStorageApi(result, useStorageApiSetting)
-				&& STORAGE_API_UNSUPPORTED_WARNED.compareAndSet(false, true)) {
-			logger.warn("useStorageApi={} requested, but the BigQuery Storage Read API path is not implemented yet "
-					+ "(row decoding is unfinished); using the standard ResultSet instead. "
-					+ "Set useStorageApi=false to silence this warning.", useStorageApiSetting);
+		if (!StorageReadResultSet.shouldUseStorageApi(result, properties.useStorageApi())) {
+			return new BQResultSet((BQStatement) this, result);
+		}
+		if (!ArrowSupport.isUsable()) {
+			// ArrowSupport already logged why, once, with the flag to add.
+			return new BQResultSet((BQStatement) this, result);
 		}
 
-		return new BQResultSet((BQStatement) this, result);
+		TableId destination = destinationTableOf(job);
+		try {
+			return new StorageReadResultSet((BQStatement) this, result, destination);
+		} catch (SQLException | RuntimeException e) {
+			if (STORAGE_API_UNSUPPORTED_WARNED.compareAndSet(false, true)) {
+				logger.warn("Could not use the BigQuery Storage Read API for this query; falling back to the "
+						+ "standard result path (this is logged once per JVM). Set useStorageApi=false to stop "
+						+ "attempting it. Reason: {}", e.getMessage());
+			} else {
+				logger.debug("Storage Read API unavailable, using the standard result path", e);
+			}
+			return new BQResultSet((BQStatement) this, result);
+		}
+	}
+
+	/** The anonymous table a completed query wrote its results to, if any. */
+	private static TableId destinationTableOf(Job job) {
+		if (job == null || !(job.getConfiguration() instanceof QueryJobConfiguration config)) {
+			return null;
+		}
+		return config.getDestinationTable();
 	}
 
 	/**

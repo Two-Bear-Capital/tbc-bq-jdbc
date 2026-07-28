@@ -159,8 +159,10 @@ public final class BQDriver implements Driver {
 				false, new String[]{"true", "false"}));
 
 		props.add(prop(info, "useStorageApi", "false",
-				"BigQuery Storage Read API mode for large result sets (not implemented yet; currently ignored)", false,
-				new String[]{"auto", "true", "false"}));
+				"BigQuery Storage Read API mode for large result sets: much faster on big results, "
+						+ "but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED "
+						+ "and falls back to the standard path when unavailable",
+				false, new String[]{"auto", "true", "false"}));
 
 		props.add(prop(info, "enableSessions", "false",
 				"Enable BigQuery sessions to support transactions and temporary tables", false,

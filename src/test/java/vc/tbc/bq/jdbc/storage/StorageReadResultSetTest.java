@@ -118,15 +118,15 @@ class StorageReadResultSetTest {
 
 	@Test
 	void testShouldUseStorageApiWithNullTableResult() {
-		// Given: Null TableResult (defensive check)
-		TableResult nullResult = null;
-
-		// When: Checking with "auto" setting
-		// Then: Should handle null gracefully (expect NullPointerException or false)
-		// Current implementation will throw NPE - this documents expected behavior
-		assertThrows(NullPointerException.class, () -> {
-			StorageReadResultSet.shouldUseStorageApi(nullResult, "auto");
-		}, "Null TableResult should throw NPE in current implementation");
+		// Auto mode sizes the result to decide whether the read session is worth
+		// opening. With no result to size, the answer is "no" rather than a thrown
+		// NullPointerException — this used to NPE, which made a missing TableResult
+		// fatal on a path that is supposed to be an optional optimisation.
+		assertFalse(StorageReadResultSet.shouldUseStorageApi(null, "auto"),
+				"Auto mode with no TableResult should decline, not throw");
+		assertFalse(StorageReadResultSet.shouldUseStorageApi(null, "false"), "Explicit false always declines");
+		assertTrue(StorageReadResultSet.shouldUseStorageApi(null, "true"),
+				"Explicit true does not depend on result size");
 	}
 
 	@Test

@@ -146,7 +146,9 @@ src/main/java/vc/tbc/bq/jdbc/
 │   └── KeyConstraints.java           # Unenforced PK/FK constraints from INFORMATION_SCHEMA
 │
 ├── storage/                   # BigQuery Storage Read API
-│   └── StorageReadResultSet.java     # Arrow-based result reading
+│   ├── StorageReadResultSet.java     # Arrow-backed ResultSet (opt-in, falls back)
+│   ├── ArrowRowConverter.java        # Arrow row -> FieldValueList; eligibility rules
+│   └── ArrowSupport.java             # One-shot probe: can Arrow allocate here?
 │
 ├── exception/                 # Exception handling
 │   ├── BQSQLException.java           # SQLException with SQL states
@@ -330,6 +332,22 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 - Forward-only iteration (TYPE_FORWARD_ONLY)
 - Pagination via `pageSize` property (default: 10000)
 - Storage API optional for large results (>10MB)
+
+### Storage Read API path
+- Opt-in via `useStorageApi=auto|true`; default stays `false`
+- 13-20x faster than the REST result path on large results (#152)
+- **Rows are re-encoded into `FieldValueList` rather than read straight from Arrow.**
+  That looks wasteful and is deliberate: every getter, coercion rule and error
+  path is then inherited from `BQResultSet`, so the two paths cannot drift. The
+  contract is that `ArrowRowConverter` reproduces BigQuery's REST encoding
+  exactly — `StorageApiParityIT` compares both paths cell by cell to prove it
+- `BQResultSet.fetchNextRow()` is the only seam; do not override `next()`
+- Scalar columns only. Arrays, structs and INTERVAL fall back to REST
+- **Needs `--add-opens=java.base/java.nio=ALL-UNNAMED`** or Arrow cannot allocate.
+  `ArrowSupport` probes for this once per JVM (it must actually *allocate* — merely
+  constructing a `RootAllocator` succeeds without the flag) and the driver falls
+  back rather than failing. Failsafe sets the flag; a missing flag in CI would make
+  the parity tests silently compare REST with itself
 
 ### Metadata Performance
 - **Critical for IntelliJ:** Metadata caching prevents 90+ second hangs with large projects
