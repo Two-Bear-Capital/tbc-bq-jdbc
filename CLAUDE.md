@@ -120,7 +120,7 @@ any figure you intend to quote.
 - This design is critical for IntelliJ IDEA which frequently reopens connections
 - `BQDatabaseMetaData` reuses single instance per connection (fixes IntelliJ slowness)
 - Configurable via `metadataCacheEnabled`, `metadataCacheTtl`, `metadataLazyLoad`
-- Parallel dataset loading for projects with 50+ datasets
+- Parallel `INFORMATION_SCHEMA` fan-out in `getTables`/`getColumns`/`getProcedures`, capped at 16 in flight (`getSchemas()` itself is a sequential dataset list)
 - Static methods: `clearAllSharedCaches()` and `getSharedCacheCount()` for testing/debugging
 
 #### Exception Handling
@@ -290,10 +290,12 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
   the parity tests silently compare REST with itself
 
 ### Metadata Performance
-- **Critical for IntelliJ:** Metadata caching prevents 90+ second hangs with large projects
+- **Critical for IntelliJ:** metadata caching keeps introspection off the hot path
 - Cache TTL default: 5 minutes
-- Lazy loading option: `metadataLazyLoad=true`
-- Parallel dataset loading in `BQDatabaseMetaData.getSchemas()`
+- Lazy loading option: `metadataLazyLoad=true` — note `getTables`/`getColumns` return an
+  **empty** result when called with no schema or table pattern
+- Parallel loading lives in `getTables`/`getColumns`/`getProcedures` and the key-constraint
+  scans, **not** in `getSchemas()`, which is a single sequential dataset listing
 
 ### Key Constraints (PK/FK)
 - BigQuery supports `PRIMARY KEY`/`FOREIGN KEY ... NOT ENFORCED` and never validates

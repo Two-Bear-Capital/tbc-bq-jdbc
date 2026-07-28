@@ -17,8 +17,8 @@ A comprehensive guide for using **tbc-bq-jdbc** as a superior alternative to Jet
 
 ## Why Use tbc-bq-jdbc with IntelliJ?
 
-JetBrains' built-in BigQuery driver hangs on large projects, has unreliable schema introspection,
-crashes on STRUCT columns, and drops authentication after about an hour. tbc-bq-jdbc fixes these with:
+JetBrains' BigQuery support has open gaps around introspection, nested types,
+authentication prompts and temp tables. tbc-bq-jdbc addresses them with:
 
 - **Production-grade performance** — cached, parallel metadata loading (and optional lazy loading)
 - **Complete JDBC compliance** — all metadata methods, full `ResultSetMetaData`, proper type mapping
