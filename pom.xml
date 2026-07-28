@@ -49,6 +49,8 @@
         <slf4j.version>2.0.18</slf4j.version>
         <junit.version>6.1.2</junit.version>
         <jmh.version>1.37</jmh.version>
+        <!-- SPIKE ONLY (#152): matches what libraries-bom resolves Arrow to. -->
+        <arrow.spike.version>17.0.0</arrow.spike.version>
         <hikaricp.version>7.0.2</hikaricp.version>
 
         <!-- Plugin versions -->
@@ -164,6 +166,26 @@
             <artifactId>logback-classic</artifactId>
             <version>1.6.0</version>
             <optional>true</optional>
+        </dependency>
+
+        <!--
+            SPIKE ONLY (#152): Arrow at test scope so StorageReadApiSpike can decode
+            record batches without putting 5 MB of Arrow back into the shipped jars.
+            The compile-scope exclusions above are deliberately left intact.
+            Delete this block, or promote it to compile scope, once the spike's
+            numbers decide the issue.
+        -->
+        <dependency>
+            <groupId>org.apache.arrow</groupId>
+            <artifactId>arrow-vector</artifactId>
+            <version>${arrow.spike.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.arrow</groupId>
+            <artifactId>arrow-memory-netty</artifactId>
+            <version>${arrow.spike.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- Test Dependencies -->
@@ -910,6 +932,34 @@
                             <classpathScope>test</classpathScope>
                             <commandlineArgs>-classpath %classpath
                                 vc.tbc.bq.jdbc.benchmark.ThreadScalingRunner
+                                ${benchmark.args}</commandlineArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- SPIKE ONLY (#152): Storage Read API vs the REST result path.                       -->
+        <!-- Delete with StorageReadApiSpike and the test-scoped Arrow deps once the            -->
+        <!-- implement-or-remove question is settled. Requires BQ_TEST_PROJECT.                 -->
+        <!-- Usage: ./mvnw test-compile exec:exec -Pstorage-spike                               -->
+        <profile>
+            <id>storage-spike</id>
+            <properties>
+                <benchmark.args></benchmark.args>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <configuration>
+                            <executable>${java.home}/bin/java</executable>
+                            <classpathScope>test</classpathScope>
+                            <commandlineArgs>-classpath %classpath
+                                --add-opens=java.base/java.nio=ALL-UNNAMED
+                                -Dio.netty.tryReflectionSetAccessible=true
+                                vc.tbc.bq.jdbc.benchmark.StorageReadApiSpike
                                 ${benchmark.args}</commandlineArgs>
                         </configuration>
                     </plugin>
