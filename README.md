@@ -72,7 +72,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
 1. **Download Driver JAR** — use the `with-logging` variant, which bundles every
    dependency plus a preconfigured Logback (see [Logging](docs/LOGGING.md)):
    ```bash
-   wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.3-with-logging.jar
+   wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.4-with-logging.jar
    ```
 
 2. **Add Driver in IntelliJ**
@@ -109,10 +109,10 @@ driver — see [Logging](docs/LOGGING.md#jar-variants) for the full comparison:
 
 ```bash
 # Bundles all dependencies plus preconfigured logging — for IntelliJ, DBeaver, DataGrip
-wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.3-with-logging.jar
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.4-with-logging.jar
 
 # Bundles all dependencies, bring your own SLF4J binding — for standalone apps
-wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.3-shaded.jar
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.4-shaded.jar
 ```
 
 Or browse [all releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases).
@@ -127,13 +127,13 @@ Or browse [all releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/release
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>3.0.3</version>
+    <version>3.0.4</version>
 </dependency>
 ```
 
 ```gradle
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:3.0.3'
+    implementation 'vc.tbc:tbc-bq-jdbc:3.0.4'
 }
 ```
 
@@ -378,11 +378,11 @@ export BQ_TEST_PROJECT=my-gcp-project
 
 | Artifact | Size | Contents |
 |----------|------|----------|
-| `target/tbc-bq-jdbc-3.0.3.jar` | ~220 KB | Driver classes only; dependencies must be on the classpath |
-| `target/tbc-bq-jdbc-3.0.3-shaded.jar` | ~41 MB | All dependencies relocated; bring your own SLF4J binding |
-| `target/tbc-bq-jdbc-3.0.3-with-logging.jar` | ~42 MB | Shaded, plus Logback preconfigured — the IDE variant |
-| `target/tbc-bq-jdbc-3.0.3-sources.jar` | ~185 KB | Sources |
-| `target/tbc-bq-jdbc-3.0.3-javadoc.jar` | ~610 KB | API reference |
+| `target/tbc-bq-jdbc-3.0.4.jar` | ~220 KB | Driver classes only; dependencies must be on the classpath |
+| `target/tbc-bq-jdbc-3.0.4-shaded.jar` | ~41 MB | All dependencies relocated; bring your own SLF4J binding |
+| `target/tbc-bq-jdbc-3.0.4-with-logging.jar` | ~42 MB | Shaded, plus Logback preconfigured — the IDE variant |
+| `target/tbc-bq-jdbc-3.0.4-sources.jar` | ~185 KB | Sources |
+| `target/tbc-bq-jdbc-3.0.4-javadoc.jar` | ~610 KB | API reference |
 
 ## Testing
 
