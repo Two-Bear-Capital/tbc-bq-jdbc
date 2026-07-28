@@ -216,12 +216,40 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			if (STORAGE_API_UNSUPPORTED_WARNED.compareAndSet(false, true)) {
 				logger.warn("Could not use the BigQuery Storage Read API for this query; falling back to the "
 						+ "standard result path (this is logged once per JVM). Set useStorageApi=false to stop "
-						+ "attempting it. Reason: {}", e.getMessage());
+						+ "attempting it. Reason: {}", describeCause(e));
 			} else {
 				logger.debug("Storage Read API unavailable, using the standard result path", e);
 			}
 			return new BQResultSet((BQStatement) this, result);
 		}
+	}
+
+	/**
+	 * Flattens an exception chain into one line for the fallback warning.
+	 *
+	 * <p>
+	 * The wrapper message alone is close to useless here — "Failed to open a
+	 * BigQuery Storage read session" does not distinguish an API that is not
+	 * enabled from credentials missing {@code bigquery.readsessions.create}, and
+	 * this warning is the only thing most users will ever see about it, since the
+	 * driver deliberately carries on rather than failing. The root cause is the
+	 * part that tells them what to fix.
+	 *
+	 * @param throwable
+	 *            the failure to describe
+	 * @return the message chain, outermost first
+	 */
+	private static String describeCause(Throwable throwable) {
+		StringBuilder description = new StringBuilder(
+				throwable.getMessage() == null ? throwable.getClass().getSimpleName() : throwable.getMessage());
+		Throwable cause = throwable.getCause();
+		// Bounded so a self-referential chain cannot spin.
+		for (int depth = 0; cause != null && depth < 5; depth++) {
+			String message = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+			description.append(" <- ").append(message);
+			cause = cause.getCause();
+		}
+		return description.toString();
 	}
 
 	/** The anonymous table a completed query wrote its results to, if any. */
