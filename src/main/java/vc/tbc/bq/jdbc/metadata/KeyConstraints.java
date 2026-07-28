@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Reads BigQuery's declarative key constraints and reshapes them into the
@@ -81,20 +80,6 @@ import java.util.regex.Pattern;
 final class KeyConstraints {
 
 	private static final Logger logger = LoggerFactory.getLogger(KeyConstraints.class);
-
-	/**
-	 * Identifiers accepted for interpolation into an {@code INFORMATION_SCHEMA}
-	 * query.
-	 *
-	 * <p>
-	 * Dataset names reach {@link #constraintQuery} straight from the caller —
-	 * {@code getPrimaryKeys(catalog, schema, table)} takes {@code schema} as a
-	 * literal name — and BigQuery has no parameter binding for the table path, so
-	 * the name has to be interpolated. Anything a project or dataset may legally be
-	 * called matches this pattern, and nothing matching it can close the
-	 * surrounding backticks.
-	 */
-	private static final Pattern SAFE_IDENTIFIER = Pattern.compile("[A-Za-z0-9_-]+");
 
 	/** {@code TABLE_CONSTRAINTS.constraint_type} for a primary key. */
 	private static final String PRIMARY_KEY = "PRIMARY KEY";
@@ -258,18 +243,6 @@ final class KeyConstraints {
 		String constraintName(String qualifiedTable) {
 			return nameByTable.get(qualifiedTable);
 		}
-	}
-
-	/**
-	 * Whether an identifier is safe to interpolate into a query.
-	 *
-	 * @param identifier
-	 *            a project or dataset name
-	 * @return true if the name is non-null and contains only characters BigQuery
-	 *         permits in one
-	 */
-	static boolean isSafeIdentifier(String identifier) {
-		return identifier != null && SAFE_IDENTIFIER.matcher(identifier).matches();
 	}
 
 	/**
