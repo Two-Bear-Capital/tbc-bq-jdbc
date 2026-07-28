@@ -208,11 +208,11 @@ After proto file exclusion, verify with:
 ls -lh target/*.jar
 
 # Verify proto files excluded (should return 0)
-unzip -l target/tbc-bq-jdbc-2.3.0.jar | grep "\.proto$" | wc -l
+unzip -l target/tbc-bq-jdbc-2.4.0.jar | grep "\.proto$" | wc -l
 
 # Verify Arrow excluded (both should return 0)
 ./mvnw dependency:tree | grep -c arrow
-unzip -l target/tbc-bq-jdbc-2.3.0-shaded.jar | grep -c "org/apache/arrow"
+unzip -l target/tbc-bq-jdbc-2.4.0-shaded.jar | grep -c "org/apache/arrow"
 
 # Run tests
 ./mvnw verify -Preal-integration-tests
