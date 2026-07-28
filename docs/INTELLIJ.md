@@ -217,7 +217,7 @@ The `with-logging` JAR writes driver logs to a predictable location, created aut
 - **macOS/Linux:** `~/.bigquery-jdbc/logs/bigquery-jdbc.log`
 - **Windows:** `C:\Users\<you>\.bigquery-jdbc\logs\bigquery-jdbc.log`
 
-Defaults: `DEBUG` for driver code, `WARN` for Google Cloud APIs, daily rotation with 30-day retention (500 MB cap). To change the location or level, add console output, or use a different JAR variant, supply your own `logback.xml` on IntelliJ's classpath — see the [Logging guide](LOGGING.md) for full configuration.
+Defaults: `DEBUG` for driver code and the bundled Google Cloud libraries, daily rotation with 30-day retention (500 MB cap). To change the location or level, add console output, or use a different JAR variant, supply your own `logback.xml` on IntelliJ's classpath — see the [Logging guide](LOGGING.md) for full configuration.
 
 ### Suppressing IntelliJ's built-in dialect warnings
 

@@ -23,13 +23,22 @@ This driver maps BigQuery types to standard JDBC types following the JDBC 4.3 sp
 | `DATETIME` | `TIMESTAMP` | `Timestamp` | `getTimestamp()` | `setTimestamp()` |
 | `GEOGRAPHY` | `VARCHAR` | `String` | `getString()` | `setString()` |
 | `JSON` | `VARCHAR` | `String` | `getString()` | `setString()` |
-| `ARRAY` | `ARRAY` | `Array` | `getArray()` | `setArray()` * |
-| `STRUCT` | `STRUCT` | `Object` | `getObject()` | `setObject()` * |
+| `ARRAY` | `ARRAY` | `List` | `getString()` * | `setArray()` |
+| `STRUCT` | `STRUCT` | `Map` | `getString()` * | not supported ** |
 | `INTERVAL` | `VARCHAR` | `String` | `getString()` | `setString()` |
 
-\* By default, ARRAY and STRUCT are returned as JSON strings (use `getString()`). Native
-`java.sql.Array` / `java.sql.Struct` access (`getArray()` / `getObject()` / `setArray()`) requires the
-`nativeComplexTypes=true` connection property — see [Complex Types](#complex-types).
+\* By default ARRAY and STRUCT come back as JSON strings, from `getString()` or
+`getObject()`. Set `nativeComplexTypes=true` to have `getArray()` return a
+`java.sql.Array` and `getObject()` return a `java.sql.Struct`; with the default,
+`getArray()` throws rather than returning a string. See [Complex Types](#complex-types).
+
+The "Java Type" column is what `ResultSetMetaData.getColumnClassName()` reports. The
+object `getObject()` actually returns is a `String` unless `nativeComplexTypes=true`.
+
+\*\* `PreparedStatement.setArray()` and `Connection.createArrayOf()` work regardless of
+`nativeComplexTypes`. There is no equivalent for STRUCT: `Connection.createStruct()` is
+not supported, and passing a `java.sql.Struct` to `setObject()` throws. Pass struct
+values as SQL literals or build them in the query.
 
 ## Primitive Types
 
@@ -100,7 +109,7 @@ SELECT 42 as count, -100 as delta
 ResultSet rs = stmt.executeQuery("SELECT 42 as count");
 while (rs.next()) {
     long count = rs.getLong("count");
-    int countAsInt = rs.getInt("count"); // Narrowing conversion
+    int countAsInt = rs.getInt("count"); // Throws if outside int range
 }
 ```
 
@@ -111,7 +120,9 @@ pstmt.setLong(1, 123456789L);
 // or: pstmt.setInt(1, 123);  // Widening conversion
 ```
 
-**Note:** `getInt()` works but may overflow for large values. Use `getLong()` for safety.
+**Note:** `getInt()` throws a `SQLException` (SQLState `22003`, numeric value out of range)
+when the value does not fit in an `int`; it never silently overflows. The same applies to
+`getByte()` and `getShort()`. Use `getLong()` for INT64 columns.
 
 ---
 
@@ -391,10 +402,13 @@ while (rs.next()) {
 }
 ```
 
-**Default vs native:** By default ARRAY columns return a JSON string (parse it with your JSON library).
-Set `nativeComplexTypes=true` on the connection to get a real `java.sql.Array` from `getArray()` (and
-to use `setArray()` / `Connection.createArrayOf()`). The JSON-string default keeps IDEs such as
-IntelliJ from crashing — see [Connection Properties](CONNECTION_PROPERTIES.md).
+**Default vs native:** By default ARRAY columns return a JSON string (parse it with your JSON
+library), and `getArray()` throws. Set `nativeComplexTypes=true` on the connection to get a real
+`java.sql.Array` from `getArray()`. The JSON-string default keeps IDEs such as IntelliJ from
+crashing — see [Connection Properties](CONNECTION_PROPERTIES.md).
+
+Writing is unaffected by the property: `PreparedStatement.setArray()` and
+`Connection.createArrayOf()` work either way.
 
 ---
 
@@ -420,8 +434,12 @@ while (rs.next()) {
 ```
 
 **Default vs native:** By default STRUCT columns return a JSON object string. Set
-`nativeComplexTypes=true` to have `getObject()` return a `java.sql.Struct`. You can also project
-fields directly in SQL when you only need a few:
+`nativeComplexTypes=true` to have `getObject()` return a `java.sql.Struct`.
+
+There is no write path for STRUCT parameters: `Connection.createStruct()` is not supported and
+passing a `java.sql.Struct` to `setObject()` throws. Build struct values in SQL instead.
+
+You can also project fields directly in SQL when you only need a few:
 
 ```sql
 SELECT person.id, person.name FROM table
@@ -550,7 +568,7 @@ The driver supports standard JDBC type conversions:
 ```java
 // INT64 → various Java types
 long l = rs.getLong("int64_col");      // Natural
-int i = rs.getInt("int64_col");        // Narrowing (may overflow)
+int i = rs.getInt("int64_col");        // Narrowing (throws if out of range)
 String s = rs.getString("int64_col");  // String conversion
 BigDecimal bd = rs.getBigDecimal("int64_col"); // Widening
 
@@ -570,8 +588,9 @@ String s = rs.getString("string_col");
 ❌ These will throw `SQLException`:
 
 ```java
-// Cannot convert STRING to binary types
-byte[] b = rs.getBytes("string_col"); // SQLException
+// getBytes() on a STRING column base64-decodes it, so this succeeds only when the
+// text is valid base64 — it is not a general STRING-to-binary conversion
+byte[] b = rs.getBytes("string_col");
 
 // Cannot convert non-numeric STRING to number
 int i = rs.getInt("non_numeric_string"); // SQLException
