@@ -58,7 +58,7 @@ import java.util.Iterator;
  * <p>
  * For context on that number: a spike that read Arrow vectors directly, with no
  * JDBC layer, reached 19.6x. The difference is the cost of re-encoding each row
- * through {@link FieldValue} instead of reading vectors straight into the
+ * through {@link com.google.cloud.bigquery.FieldValue} instead of reading
  * getters — deliberate, and explained in {@link ArrowRowConverter}. Closing
  * that gap means duplicating the accessor semantics, which is a trade worth
  * making only with the parity test in place to catch the divergence it invites.
