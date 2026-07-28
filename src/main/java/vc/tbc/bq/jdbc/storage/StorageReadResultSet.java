@@ -52,8 +52,16 @@ import java.util.Iterator;
  * {@code jobs.getQueryResults} as JSON, paying an HTTP round trip per page and
  * parsing every value out of text. This class instead opens a read session on
  * the completed job's destination table and streams Arrow record batches over
- * gRPC. Measured against the REST path on large results, that was 13-20x faster
- * end to end (#152).
+ * gRPC. Measured end to end on a 1M-row result, that is 11.7x faster than the
+ * REST path (57s to 4.8s; #152).
+ *
+ * <p>
+ * For context on that number: a spike that read Arrow vectors directly, with no
+ * JDBC layer, reached 19.6x. The difference is the cost of re-encoding each row
+ * through {@link FieldValue} instead of reading vectors straight into the
+ * getters — deliberate, and explained in {@link ArrowRowConverter}. Closing
+ * that gap means duplicating the accessor semantics, which is a trade worth
+ * making only with the parity test in place to catch the divergence it invites.
  *
  * <p>
  * <b>Rows go through {@link FieldValueList}, not straight into the getters.</b>

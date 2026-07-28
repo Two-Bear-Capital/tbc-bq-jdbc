@@ -232,8 +232,8 @@ IntelliJ's own BigQuery dialect can log harmless warnings such as `WARNING: Coul
 ### Faster large result sets (Storage Read API)
 
 If you regularly pull large result sets, the BigQuery Storage Read API is worth
-enabling — it measured 13-20x faster than the default result path on big
-queries. It needs one JVM flag, because Apache Arrow cannot allocate memory
+enabling — it measured 11.7x faster than the default result path on a 1M-row
+query (57s down to 4.8s). It needs one JVM flag, because Apache Arrow cannot allocate memory
 without it on Java 16+.
 
 IntelliJ and DataGrip run JDBC drivers in a **separate process** from the IDE, so

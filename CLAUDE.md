@@ -335,13 +335,20 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 
 ### Storage Read API path
 - Opt-in via `useStorageApi=auto|true`; default stays `false`
-- 13-20x faster than the REST result path on large results (#152)
+- 11.7x faster than the REST result path on a 1M-row result (#152); a raw-Arrow
+  spike reached 19.6x, and the gap is the FieldValue re-encoding below
 - **Rows are re-encoded into `FieldValueList` rather than read straight from Arrow.**
   That looks wasteful and is deliberate: every getter, coercion rule and error
   path is then inherited from `BQResultSet`, so the two paths cannot drift. The
   contract is that `ArrowRowConverter` reproduces BigQuery's REST encoding
   exactly — `StorageApiParityIT` compares both paths cell by cell to prove it
 - `BQResultSet.fetchNextRow()` is the only seam; do not override `next()`
+- **`getString` canonicalises FLOAT64 and TIMESTAMP** in `FieldValueConverter`,
+  rendering both from the parsed value rather than the text BigQuery delivered.
+  Without this the two paths disagree: REST prints these through a `double`
+  (`-0.66666666666666663`, and a TIMESTAMP 0.1us short of the stored value) while
+  Arrow carries the exact value. This is why `StorageApiParityIT` can assert byte
+  equality with no exemptions — do not reintroduce one, fix the encoding instead
 - Scalar columns only. Arrays, structs and INTERVAL fall back to REST
 - **Needs `--add-opens=java.base/java.nio=ALL-UNNAMED`** or Arrow cannot allocate.
   `ArrowSupport` probes for this once per JVM (it must actually *allocate* — merely

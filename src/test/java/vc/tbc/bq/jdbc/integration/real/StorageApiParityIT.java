@@ -143,14 +143,53 @@ class StorageApiParityIT extends AbstractRealBigQueryIntegrationTest {
 	void allScalarTypesMatchTheRestPath() throws SQLException {
 		List<List<String>> viaRest = readAllAsStrings(restConnection(), ALL_TYPES_SQL);
 		List<List<String>> viaStorage = readAllAsStrings(storageConnection(), ALL_TYPES_SQL);
+		List<Integer> types = columnTypes(restConnection(), ALL_TYPES_SQL);
 
 		assertEquals(viaRest.size(), viaStorage.size(), "row count differs between the two paths");
 		assertFalse(viaRest.isEmpty(), "fixture produced no rows");
 
 		for (int row = 0; row < viaRest.size(); row++) {
-			assertEquals(viaRest.get(row), viaStorage.get(row), "row " + row + " differs between REST and Storage");
+			for (int col = 0; col < types.size(); col++) {
+				assertCellsMatch(types.get(col), viaRest.get(row).get(col), viaStorage.get(row).get(col),
+						"row " + row + ", column " + (col + 1));
+			}
 		}
-		logger.info("compared {} rows x {} columns across both paths", viaRest.size(), viaRest.get(0).size());
+		logger.info("compared {} rows x {} columns across both paths", viaRest.size(), types.size());
+	}
+
+	/**
+	 * Byte for byte, with no exceptions.
+	 *
+	 * <p>
+	 * FLOAT64 and TIMESTAMP were briefly exempted here, because REST renders both
+	 * by printing a {@code double} and Java prints doubles differently — REST
+	 * returns {@code -0.66666666666666663} where Java's shortest round-trip form is
+	 * {@code -0.6666666666666666}, and a TIMESTAMP of {@code ...999981}
+	 * microseconds comes back from REST as {@code 1582934399.9999809}, which is 0.1
+	 * microseconds short of the true value.
+	 *
+	 * <p>
+	 * Exempting them was the wrong fix. {@code getString} now renders both types
+	 * from the parsed value rather than the delivered text, in code both paths
+	 * share, so they agree exactly — and agree on the more accurate rendering. This
+	 * assertion is deliberately strict again so that any future divergence fails
+	 * rather than being explained away.
+	 */
+	private static void assertCellsMatch(int sqlType, String rest, String storage, String where) {
+		assertEquals(rest, storage, where + " differs between REST and Storage");
+	}
+
+	private static List<Integer> columnTypes(Connection connection, String sql) throws SQLException {
+		List<Integer> types = new ArrayList<>();
+		try (Connection conn = connection;
+				Statement stmt = conn.createStatement();
+				ResultSet rs = stmt.executeQuery(sql)) {
+			ResultSetMetaData meta = rs.getMetaData();
+			for (int i = 1; i <= meta.getColumnCount(); i++) {
+				types.add(meta.getColumnType(i));
+			}
+		}
+		return types;
 	}
 
 	@Test

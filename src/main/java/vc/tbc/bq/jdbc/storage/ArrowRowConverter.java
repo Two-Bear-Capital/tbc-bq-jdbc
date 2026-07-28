@@ -54,19 +54,31 @@ import java.util.Set;
  *
  * <p>
  * The contract that makes that work is narrow and strict: <b>every string
- * produced here must match byte for byte what {@code tabledata.list} would have
- * returned for the same value.</b> Where BigQuery's REST encoding is odd, this
- * class reproduces the oddity rather than improving on it — a value that reads
- * a given way over REST must read the same way here, bugs included.
- * {@code StorageApiParityIT} enforces that by running the same query down both
- * paths and comparing every cell.
+ * produced here must match what {@code tabledata.list} would have returned for
+ * the same value</b>, byte for byte, with one carefully bounded exception noted
+ * below. Where BigQuery's REST encoding is merely odd, this class reproduces
+ * the oddity rather than improving on it — a value that reads a given way over
+ * REST must read the same way here. {@code StorageApiParityIT} enforces that by
+ * running the same query down both paths and comparing every cell.
  *
  * <p>
- * Timestamps are the one place this does not round-trip through a decimal
- * string: BigQuery's REST form is fractional epoch seconds, which cannot
- * represent microseconds exactly once parsed as a double. {@link FieldValue}
- * has an int64-microseconds mode for precisely this reason, and it is used
- * here.
+ * Two encodings are easy to get wrong, and both were caught by that parity test
+ * rather than by reading documentation:
+ *
+ * <ul>
+ * <li><b>NUMERIC</b> arrives from Arrow at its full declared scale
+ * ({@code -2.000000000}) where REST strips trailing zeros ({@code -2}).
+ * <li><b>TIMESTAMP</b> is fractional epoch seconds, not microseconds.
+ * </ul>
+ *
+ * <p>
+ * FLOAT64 and TIMESTAMP used to be a documented exception to byte parity,
+ * because REST renders both by printing a {@code double} and does not print it
+ * the way Java does. That is no longer true: {@code getString} now renders both
+ * from the parsed value in {@code FieldValueConverter}, so the two paths agree
+ * exactly and the more accurate form wins. What this class stores for those two
+ * types therefore only has to parse back correctly, which is why it keeps the
+ * exact microsecond rather than imitating REST's lossy rendering.
  *
  * @since 2.3.0
  */
@@ -153,12 +165,6 @@ final class ArrowRowConverter {
 		}
 		Object raw = vector.getObject(rowIndex);
 		StandardSQLTypeName type = field.getType().getStandardType();
-
-		// TIMESTAMP is the one type carried as int64 microseconds rather than a
-		// decimal string, so that microsecond precision survives.
-		if (type == StandardSQLTypeName.TIMESTAMP) {
-			return FieldValue.of(FieldValue.Attribute.PRIMITIVE, Long.toString(toEpochMicros(raw, field)), true);
-		}
 		return FieldValue.of(FieldValue.Attribute.PRIMITIVE, encode(raw, type, field));
 	}
 
@@ -167,15 +173,34 @@ final class ArrowRowConverter {
 		return switch (type) {
 			case INT64 -> raw.toString();
 			case FLOAT64 -> raw.toString();
-			case NUMERIC, BIGNUMERIC -> asBigDecimal(raw, field).toPlainString();
+			case NUMERIC, BIGNUMERIC -> formatNumeric(asBigDecimal(raw, field));
 			case BOOL -> Boolean.TRUE.equals(asBoolean(raw, field)) ? "true" : "false";
 			case STRING, GEOGRAPHY, JSON -> raw.toString();
 			case BYTES -> Base64.getEncoder().encodeToString(asBytes(raw, field));
 			case DATE -> asLocalDate(raw, field).toString();
 			case TIME -> formatTime(asLocalTime(raw, field));
 			case DATETIME -> formatDateTime(asLocalDateTime(raw, field));
+			case TIMESTAMP -> formatTimestamp(toEpochMicros(raw, field));
 			default -> throw unsupported(field, type);
 		};
+	}
+
+	/**
+	 * Arrow reports a NUMERIC at its full declared scale ({@code -2.000000000});
+	 * BigQuery's REST encoding strips trailing zeros ({@code -2}). Since the two
+	 * forms parse to equal {@link BigDecimal}s but differ under {@code getString},
+	 * the REST form is the one to reproduce.
+	 */
+	private static String formatNumeric(BigDecimal value) {
+		return value.stripTrailingZeros().toPlainString();
+	}
+
+	/**
+	 * Delegates to the one renderer both paths share, so the text a TIMESTAMP is
+	 * stored as cannot drift between them.
+	 */
+	private static String formatTimestamp(long epochMicros) {
+		return vc.tbc.bq.jdbc.util.FieldValueConverter.epochSeconds(epochMicros);
 	}
 
 	/**

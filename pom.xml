@@ -50,6 +50,11 @@
         <junit.version>6.1.2</junit.version>
         <jmh.version>1.37</jmh.version>
         <hikaricp.version>7.0.2</hikaricp.version>
+        <!-- Arrow cannot allocate without this on JDK 16+ (see ArrowSupport). Every
+             argLine below must include it: without it the Storage Read API path
+             silently falls back, and StorageApiParityIT would compare the REST path
+             with itself instead of comparing the two paths. -->
+        <arrow.add.opens>--add-opens=java.base/java.nio=ALL-UNNAMED</arrow.add.opens>
 
         <!-- Plugin versions -->
         <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
@@ -106,8 +111,11 @@
     <dependencies>
         <!--
             Apache Arrow is carried deliberately: StorageReadResultSet decodes Arrow
-            record batches from the Storage Read API, which measured 13-20x faster than
-            the REST result path on large results (#152).
+            record batches from the Storage Read API, which measured 11.7x faster than
+            the REST result path on a 1M-row result (#152). A spike reading Arrow
+            directly reached 19.6x; the shipped path gives some of that back by
+            re-encoding through FieldValue, which is what keeps the two paths from
+            diverging. See ArrowRowConverter for that trade.
 
             It costs 2.3 MB of the shaded jar, measured: 36.4 MB without, 38.7 MB with.
             That is the price of the feature, not an oversight. (The comment this
@@ -532,8 +540,7 @@
                          Storage Read API path actually run under integration tests. Without
                          it StorageApiParityIT would not compare the two paths - it would
                          silently compare the REST path with itself. -->
-                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading
-                        --add-opens=java.base/java.nio=ALL-UNNAMED</argLine>
+                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens}</argLine>
                 </configuration>
             </plugin>
 
@@ -963,8 +970,7 @@
                                  and target/ is guaranteed to exist by the integration-test phase.
                                  CI uploads target/*.jfr as an artifact; see docs/contributing/PERFORMANCE.md
                                  for how to read one. -->
-                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading
-                                -XX:StartFlightRecording:name=real-integration-tests,settings=profile,dumponexit=true,filename=target/real-integration-tests-%p.jfr</argLine>
+                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens} -XX:StartFlightRecording:name=real-integration-tests,settings=profile,dumponexit=true,filename=target/real-integration-tests-%p.jfr</argLine>
                             <includes>
                                 <include>**/integration/real/**/*Test.java</include>
                             </includes>

@@ -188,8 +188,64 @@ public final class FieldValueConverter {
 		return switch (value.getAttribute()) {
 			case REPEATED -> arrayToJson(value, field);
 			case RECORD -> recordToJson(value, field);
-			default -> value.getStringValue();
+			default -> canonicalScalar(value, field);
 		};
+	}
+
+	/**
+	 * Renders a scalar, canonicalising the two types whose stored text depends on
+	 * which API delivered the row.
+	 *
+	 * <p>
+	 * Everything BigQuery sends is already a string, so the obvious implementation
+	 * is to hand it back untouched. That works for every type except FLOAT64 and
+	 * TIMESTAMP, where the REST and Storage Read API paths do not agree on the
+	 * text:
+	 *
+	 * <ul>
+	 * <li>REST renders a FLOAT64 by printing a {@code double} with 17 significant
+	 * digits ({@code -0.66666666666666663}); Arrow gives the raw {@code double},
+	 * whose shortest round-trip form is {@code -0.6666666666666666}. Both denote
+	 * the identical 64-bit value.
+	 * <li>REST renders a TIMESTAMP as fractional epoch seconds that have been
+	 * through a {@code double}, so {@code ...999981} microseconds arrives as
+	 * {@code 1582934399.9999809} — as an exact decimal that is 0.1 microseconds
+	 * short of the true value. Arrow carries the microseconds exactly.
+	 * </ul>
+	 *
+	 * <p>
+	 * Rendering both from the parsed value rather than the delivered text makes
+	 * {@code getString} identical whichever path served the query, and picks the
+	 * more accurate form in both cases: the shortest text that round-trips to the
+	 * same double, and the exact microsecond. The alternative — teaching the
+	 * Storage path to imitate REST — was tried and abandoned: BigQuery's float
+	 * rendering is undocumented and did not match C, Java or Python conventions on
+	 * 41% of a 571-value sample, and imitating it would mean deliberately
+	 * reproducing the timestamp error.
+	 */
+	private static String canonicalScalar(FieldValue value, Field field) {
+		StandardSQLTypeName type = field == null || field.getType() == null ? null : field.getType().getStandardType();
+		if (type == StandardSQLTypeName.FLOAT64) {
+			return Double.toString(value.getDoubleValue());
+		}
+		if (type == StandardSQLTypeName.TIMESTAMP) {
+			return epochSeconds(value.getTimestampValue());
+		}
+		return value.getStringValue();
+	}
+
+	/**
+	 * Renders epoch microseconds as fractional seconds, trailing zeros stripped but
+	 * always at least one decimal place — the shape BigQuery uses, without the
+	 * float noise.
+	 *
+	 * @param epochMicros
+	 *            microseconds since the epoch
+	 * @return the timestamp as decimal seconds
+	 */
+	public static String epochSeconds(long epochMicros) {
+		java.math.BigDecimal seconds = java.math.BigDecimal.valueOf(epochMicros, 6).stripTrailingZeros();
+		return (seconds.scale() <= 0 ? seconds.setScale(1) : seconds).toPlainString();
 	}
 
 	/**
