@@ -1425,7 +1425,12 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	public ResultSet getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable)
 			throws SQLException {
 		checkClosed();
-		logger.debug("getBestRowIdentifier() called - not applicable to BigQuery (no PKs), returning empty result");
+		// Not "BigQuery has no primary keys" — since #84 it does, and getPrimaryKeys()
+		// reports them. A best row identifier is a column set that uniquely identifies
+		// a row, and BigQuery never enforces its keys, so nothing here can be promised
+		// to be unique. Reporting a candidate that turns out to be duplicated is worse
+		// than reporting none.
+		logger.debug("getBestRowIdentifier() called - BigQuery enforces no uniqueness, returning empty result");
 		return createResultSet(MetadataColumns.BestRowIdentifier.COLUMN_NAMES,
 				MetadataColumns.BestRowIdentifier.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
@@ -1439,49 +1444,395 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				new java.util.ArrayList<>());
 	}
 
+	/**
+	 * Retrieves the primary key of a table.
+	 *
+	 * <p>
+	 * BigQuery primary keys are declared {@code NOT ENFORCED} and are never
+	 * validated — see {@link KeyConstraints} for what that means for a caller. They
+	 * are read from the dataset's {@code INFORMATION_SCHEMA.TABLE_CONSTRAINTS} and
+	 * {@code KEY_COLUMN_USAGE} views.
+	 *
+	 * <p>
+	 * {@code PK_NAME} is BigQuery's own constraint name, which it qualifies with
+	 * the table and which is always {@code 
+	 * 
+	<table>
+	 * .pk$} — BigQuery does not accept a name for a primary key.
+	 *
+	 * <p>
+	 * Per the JDBC contract, {@code schema} and {@code table} are names rather than
+	 * patterns and are matched exactly; {@code _} in a name is a literal
+	 * underscore, not a wildcard. A null {@code schema} searches every dataset in
+	 * the project.
+	 *
+	 * @param catalog
+	 *            project ID (null = current project)
+	 * @param schema
+	 *            dataset name (null = all datasets)
+	 * @param table
+	 *            table name (null = all tables)
+	 * @return ResultSet with primary key columns, ordered by TABLE_SCHEM,
+	 *         TABLE_NAME, COLUMN_NAME
+	 * @throws SQLException
+	 *             if the connection is closed or the metadata query fails
+	 */
 	@Override
 	public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException {
 		checkClosed();
 
 		logger.debug("getPrimaryKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
-		// BigQuery doesn't have traditional primary keys, return empty result set
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId,
+				datasetsToScan(projectId, schema));
+
+		java.util.List<Object[]> rows = KeyConstraints.primaryKeyRows(projectId,
+				constraints.stream().filter(c -> c.primaryKey() && matchesName(c.table(), table)).toList());
+
+		logger.debug("getPrimaryKeys() returning {} column(s)", rows.size());
 		return createResultSet(MetadataColumns.PrimaryKeys.COLUMN_NAMES, MetadataColumns.PrimaryKeys.COLUMN_TYPES,
-				new java.util.ArrayList<>());
+				rows);
 	}
 
+	/**
+	 * Retrieves the foreign keys declared on a table, describing the tables it
+	 * references.
+	 *
+	 * <p>
+	 * BigQuery foreign keys are declared {@code NOT ENFORCED} and are never
+	 * validated; {@code UPDATE_RULE}, {@code DELETE_RULE} and {@code DEFERRABILITY}
+	 * reflect that. See {@link KeyConstraints}.
+	 *
+	 * <p>
+	 * A foreign key may reference a table in another dataset. The parent's primary
+	 * key is fetched from that dataset when needed, so composite keys are paired
+	 * correctly across datasets.
+	 *
+	 * @param catalog
+	 *            project ID (null = current project)
+	 * @param schema
+	 *            dataset holding the referencing table (null = all datasets)
+	 * @param table
+	 *            the referencing table (null = all tables)
+	 * @return ResultSet ordered by PKTABLE_CAT, PKTABLE_SCHEM, PKTABLE_NAME,
+	 *         KEY_SEQ
+	 * @throws SQLException
+	 *             if the connection is closed or the metadata query fails
+	 */
 	@Override
 	public ResultSet getImportedKeys(String catalog, String schema, String table) throws SQLException {
 		checkClosed();
 
 		logger.debug("getImportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
-		// BigQuery doesn't have foreign keys, return empty result set
-		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
-				new java.util.ArrayList<>());
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId,
+				datasetsToScan(projectId, schema));
+
+		java.util.List<KeyConstraints.Constraint> foreignKeys = constraints.stream()
+				.filter(c -> !c.primaryKey() && matchesName(c.table(), table)).toList();
+
+		return foreignKeyResult(projectId, constraints, foreignKeys, false);
 	}
 
+	/**
+	 * Retrieves the foreign keys that reference a table.
+	 *
+	 * <p>
+	 * A foreign key is recorded only in the {@code INFORMATION_SCHEMA} views of the
+	 * dataset holding the <em>referencing</em> table, so answering this means
+	 * reading every dataset in the project rather than just the one named by
+	 * {@code schema}, which identifies the referenced table. Per-dataset results
+	 * are cached, so the cost is paid once per dataset per TTL window rather than
+	 * once per table asked about.
+	 *
+	 * <p>
+	 * Foreign keys declared in <em>other projects</em> are not found: the scan
+	 * covers one project's datasets, and BigQuery offers no cross-project index of
+	 * constraints.
+	 *
+	 * @param catalog
+	 *            project ID (null = current project)
+	 * @param schema
+	 *            dataset holding the referenced table (null = all datasets)
+	 * @param table
+	 *            the referenced table (null = all tables)
+	 * @return ResultSet ordered by FKTABLE_CAT, FKTABLE_SCHEM, FKTABLE_NAME,
+	 *         KEY_SEQ
+	 * @throws SQLException
+	 *             if the connection is closed or the metadata query fails
+	 */
 	@Override
 	public ResultSet getExportedKeys(String catalog, String schema, String table) throws SQLException {
 		checkClosed();
 
 		logger.debug("getExportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
-		// BigQuery doesn't have foreign keys, return empty result set (same structure
-		// as
-		// getImportedKeys)
-		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
-				new java.util.ArrayList<>());
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId, allDatasets(projectId));
+
+		java.util.List<KeyConstraints.Constraint> foreignKeys = constraints.stream().filter(c -> !c.primaryKey()
+				&& matchesName(c.referencedSchema(), schema) && matchesName(c.referencedTable(), table)).toList();
+
+		return foreignKeyResult(projectId, constraints, foreignKeys, true);
 	}
 
+	/**
+	 * Retrieves the foreign keys on one table that reference another.
+	 *
+	 * <p>
+	 * The constraint is recorded in the foreign-key side's dataset, so
+	 * {@code foreignSchema} narrows which datasets are read while
+	 * {@code parentSchema} and {@code parentTable} filter the referenced side.
+	 *
+	 * @param parentCatalog
+	 *            project of the referenced table (unused; BigQuery reports the
+	 *            referenced table's own project)
+	 * @param parentSchema
+	 *            dataset of the referenced table (null = any)
+	 * @param parentTable
+	 *            the referenced table (null = any)
+	 * @param foreignCatalog
+	 *            project of the referencing table (null = current project)
+	 * @param foreignSchema
+	 *            dataset of the referencing table (null = all datasets)
+	 * @param foreignTable
+	 *            the referencing table (null = all tables)
+	 * @return ResultSet ordered by FKTABLE_CAT, FKTABLE_SCHEM, FKTABLE_NAME,
+	 *         KEY_SEQ
+	 * @throws SQLException
+	 *             if the connection is closed or the metadata query fails
+	 */
 	@Override
 	public ResultSet getCrossReference(String parentCatalog, String parentSchema, String parentTable,
 			String foreignCatalog, String foreignSchema, String foreignTable) throws SQLException {
 		checkClosed();
-		logger.debug(
-				"getCrossReference() called - not applicable to BigQuery (no FK constraints), returning empty result");
+
+		logger.debug("getCrossReference() called - parent: [{}].[{}].[{}], foreign: [{}].[{}].[{}]", parentCatalog,
+				parentSchema, parentTable, foreignCatalog, foreignSchema, foreignTable);
+
+		String projectId = foreignCatalog != null ? foreignCatalog : connection.getProperties().projectId();
+		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId,
+				datasetsToScan(projectId, foreignSchema));
+
+		java.util.List<KeyConstraints.Constraint> foreignKeys = constraints.stream()
+				.filter(c -> !c.primaryKey() && matchesName(c.table(), foreignTable)
+						&& matchesName(c.referencedSchema(), parentSchema)
+						&& matchesName(c.referencedTable(), parentTable))
+				.toList();
+
+		return foreignKeyResult(projectId, constraints, foreignKeys, true);
+	}
+
+	/**
+	 * Shared tail of the three foreign-key methods: resolve the referenced columns,
+	 * then shape the rows.
+	 *
+	 * @param projectId
+	 *            project the foreign-key side lives in
+	 * @param scanned
+	 *            every constraint read during the scan, the source of the primary
+	 *            keys already in hand
+	 * @param foreignKeys
+	 *            the foreign keys the caller asked about
+	 * @param orderByForeignKeyTable
+	 *            true for the {@code getExportedKeys}/{@code getCrossReference}
+	 *            ordering, false for {@code getImportedKeys}
+	 */
+	private ResultSet foreignKeyResult(String projectId, java.util.List<KeyConstraints.Constraint> scanned,
+			java.util.List<KeyConstraints.Constraint> foreignKeys, boolean orderByForeignKeyTable) throws SQLException {
+		KeyConstraints.PrimaryKeyIndex index = new KeyConstraints.PrimaryKeyIndex();
+		index.addAll(projectId, scanned);
+		resolveReferencedPrimaryKeys(foreignKeys, index);
+
+		java.util.List<Object[]> rows = KeyConstraints.foreignKeyRows(projectId, foreignKeys, index,
+				orderByForeignKeyTable);
+
+		logger.debug("Returning {} foreign key column(s)", rows.size());
 		return createResultSet(MetadataColumns.ForeignKeys.COLUMN_NAMES, MetadataColumns.ForeignKeys.COLUMN_TYPES,
-				new java.util.ArrayList<>());
+				rows);
+	}
+
+	/**
+	 * Loads the primary keys of any referenced table the scan did not already
+	 * cover.
+	 *
+	 * <p>
+	 * A foreign key may point into a dataset — or a project — that was never
+	 * scanned, and its parent's primary key is what gives the referenced column
+	 * names their order. Without this, every cross-dataset foreign key would fall
+	 * back to the single-column special case and composite ones would report a null
+	 * {@code PKCOLUMN_NAME}.
+	 */
+	private void resolveReferencedPrimaryKeys(java.util.List<KeyConstraints.Constraint> foreignKeys,
+			KeyConstraints.PrimaryKeyIndex index) throws SQLException {
+		// LinkedHashMap keyed by project so each missing dataset is fetched once even
+		// when a dozen foreign keys point at the same parent.
+		java.util.Map<String, java.util.Set<String>> missing = new java.util.LinkedHashMap<>();
+		for (KeyConstraints.Constraint fk : foreignKeys) {
+			String parent = fk.qualifiedReferencedTable();
+			if (parent == null || index.covers(parent) || fk.referencedSchema() == null) {
+				continue;
+			}
+			String parentProject = fk.referencedCatalog() != null
+					? fk.referencedCatalog()
+					: connection.getProperties().projectId();
+			missing.computeIfAbsent(parentProject, ignored -> new java.util.LinkedHashSet<>())
+					.add(fk.referencedSchema());
+		}
+
+		for (java.util.Map.Entry<String, java.util.Set<String>> entry : missing.entrySet()) {
+			String parentProject = entry.getKey();
+			java.util.List<KeyConstraints.Constraint> parents = loadConstraints(parentProject,
+					java.util.List.copyOf(entry.getValue()));
+			index.addAll(parentProject, parents);
+		}
+	}
+
+	/**
+	 * Datasets to read for a call whose {@code schema} argument names the dataset
+	 * holding the constraint.
+	 *
+	 * <p>
+	 * A named schema is used directly rather than matched against a listing. JDBC
+	 * specifies these arguments as names, not patterns, so an underscore in a
+	 * dataset name is a literal — and BigQuery dataset names are full of
+	 * underscores. Taking the name at face value is both correct and one API call
+	 * cheaper.
+	 *
+	 * <p>
+	 * An empty string means "without a schema", which no BigQuery table can be, so
+	 * nothing is read.
+	 */
+	private java.util.List<String> datasetsToScan(String projectId, String schema) {
+		if (schema == null) {
+			return allDatasets(projectId);
+		}
+		if (schema.isEmpty()) {
+			return java.util.List.of();
+		}
+		return java.util.List.of(schema);
+	}
+
+	private java.util.List<String> allDatasets(String projectId) {
+		return listDatasetsForProject(connection.getBigQuery(), projectId, null);
+	}
+
+	/** Exact, case-sensitive match; a null filter matches everything. */
+	private static boolean matchesName(String value, String filter) {
+		return filter == null || filter.equals(value);
+	}
+
+	/**
+	 * Reads the key constraints of several datasets, one query each, in parallel.
+	 *
+	 * @param projectId
+	 *            the project owning the datasets
+	 * @param datasetIds
+	 *            the datasets to read
+	 * @return every constraint found; datasets that could not be read contribute
+	 *         nothing
+	 * @throws SQLException
+	 *             if the parallel scan itself fails
+	 */
+	private java.util.List<KeyConstraints.Constraint> loadConstraints(String projectId,
+			java.util.List<String> datasetIds) throws SQLException {
+		if (datasetIds.isEmpty()) {
+			return java.util.List.of();
+		}
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> loadConstraintSnapshot(projectId, datasetId),
+				"Error querying key constraints in parallel");
+		return KeyConstraints.assemble(rows);
+	}
+
+	/**
+	 * The cached, per-dataset constraint snapshot.
+	 *
+	 * <p>
+	 * Caching is keyed by dataset rather than by the arguments of the call that
+	 * asked, because all four key methods are answered from the same read. An IDE
+	 * introspecting a dataset calls {@code getPrimaryKeys} and
+	 * {@code getImportedKeys} once per table; keyed by table, that would be two
+	 * BigQuery queries per table instead of one per dataset.
+	 *
+	 * <p>
+	 * This goes to {@link MetadataCache} directly rather than through
+	 * {@link #getCachedOrExecute}, which runs on the calling thread and keeps
+	 * non-atomic hit/miss counters. Snapshots are loaded from the parallel scan, so
+	 * they would race those counters; {@code MetadataCache} itself is thread-safe
+	 * and still records the hit or miss in {@code DriverMetrics}.
+	 */
+	private java.util.List<Object[]> loadConstraintSnapshot(String projectId, String datasetId) {
+		String key = "constraints:" + projectId + ":" + datasetId;
+
+		if (cache != null) {
+			java.util.Optional<ResultSet> cached = cache.get(key);
+			if (cached.isPresent() && cached.get() instanceof MetadataResultSet snapshot) {
+				return snapshot.getRows();
+			}
+		}
+
+		java.util.Optional<java.util.List<Object[]>> rows = queryConstraintsForDataset(projectId, datasetId);
+
+		// Only a successful read is cached. A dataset that genuinely declares no
+		// constraints still caches its empty snapshot — that is the common case and
+		// what makes repeat introspection free — but a read that failed must not
+		// install "this dataset has no keys" for the rest of the TTL window.
+		if (cache != null && rows.isPresent()) {
+			try {
+				cache.put(key, new MetadataResultSet(KeyConstraints.SNAPSHOT_COLUMN_NAMES,
+						KeyConstraints.SNAPSHOT_COLUMN_TYPES, rows.get()));
+			} catch (SQLException e) {
+				logger.debug("Could not cache key constraints for dataset {}: {}", datasetId, e.getMessage());
+			}
+		}
+		return rows.orElseGet(java.util.List::of);
+	}
+
+	/**
+	 * Reads one dataset's key constraints.
+	 *
+	 * <p>
+	 * Degrades per dataset like the {@code ROUTINES} and {@code PARAMETERS} queries
+	 * above: a dataset the caller cannot read, or an endpoint without the
+	 * constraint views, contributes no rows instead of failing the whole call. The
+	 * cause is logged rather than presented as an expected limitation.
+	 *
+	 * @return the rows read, or empty if the read failed — which is not the same
+	 *         answer as a dataset that declares no constraints, and only the latter
+	 *         may be cached
+	 */
+	private java.util.Optional<java.util.List<Object[]>> queryConstraintsForDataset(String projectId,
+			String datasetId) {
+		if (!KeyConstraints.isSafeIdentifier(projectId) || !KeyConstraints.isSafeIdentifier(datasetId)) {
+			logger.warn("Skipping key constraints for [{}].[{}]: not a valid BigQuery identifier", projectId,
+					datasetId);
+			return java.util.Optional.empty();
+		}
+
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+		try {
+			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
+			com.google.cloud.bigquery.QueryJobConfiguration config = com.google.cloud.bigquery.QueryJobConfiguration
+					.newBuilder(KeyConstraints.constraintQuery(projectId, datasetId)).build();
+			com.google.cloud.bigquery.TableResult result = bigquery.query(config);
+			for (com.google.cloud.bigquery.FieldValueList row : result.iterateAll()) {
+				rows.add(KeyConstraints.snapshotRow(row, datasetId));
+			}
+		} catch (InterruptedException e) {
+			// Swallowing this along with everything else would leave the thread's
+			// interrupt flag cleared, and these run on the virtual threads of the
+			// parallel scan — whoever asked for the cancellation would never see it.
+			Thread.currentThread().interrupt();
+			logger.warn("Interrupted reading key constraints for dataset {}.{}", projectId, datasetId);
+			return java.util.Optional.empty();
+		} catch (Exception e) {
+			logger.warn("Could not query key constraints for dataset {}.{}: {}", projectId, datasetId, e.getMessage());
+			return java.util.Optional.empty();
+		}
+		return java.util.Optional.of(rows);
 	}
 
 	@Override

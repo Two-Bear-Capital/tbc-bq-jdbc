@@ -476,7 +476,7 @@ See [Connection Properties - Performance Tuning](docs/CONNECTION_PROPERTIES.md#p
 
 - **No transactions** outside of sessions (use `enableSessions=true`)
 - **No indexes** (BigQuery auto-optimizes)
-- **No primary/foreign keys** (data warehouse, not OLTP)
+- **Primary/foreign keys are declarative only** — BigQuery accepts `PRIMARY KEY`/`FOREIGN KEY ... NOT ENFORCED` and never validates them. The driver reports them through `getPrimaryKeys()`, `getImportedKeys()`, `getExportedKeys()` and `getCrossReference()`, so ER diagrams and FK-aware tools work — but the constraints are a statement of intent, not a guarantee about the data. See [Compatibility](docs/COMPATIBILITY.md#unenforced-primary-and-foreign-keys).
 - **No row-level locking**
 
 ### JDBC Limitations

@@ -2,7 +2,7 @@
 
 What works, what doesn't, and how to work around BigQuery's constraints.
 
-**Specification:** JDBC 4.3 (Java 21+) · **Compliance:** partial — `Driver.jdbcCompliant()` returns `false` because BigQuery has no primary/foreign keys, no indexes, no savepoints or configurable isolation levels, no updatable result sets, and no stored procedures.
+**Specification:** JDBC 4.3 (Java 21+) · **Compliance:** partial — `Driver.jdbcCompliant()` returns `false` because BigQuery enforces no keys, has no indexes, no savepoints or configurable isolation levels, no updatable result sets, and no stored procedures.
 
 **Legend** — used in every support table below:
 
@@ -177,11 +177,58 @@ Metadata is cached and loaded in parallel (see [IntelliJ performance](INTELLIJ.m
 | `getProcedures()` / `getProcedureColumns()` | ✅ | From `INFORMATION_SCHEMA`, cached |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keywords, functions | ✅ | JDBC version reports 4.3 |
-| `getPrimaryKeys()`, `getBestRowIdentifier()` | ⚠️ | BigQuery has no primary keys; returns empty |
+| `getPrimaryKeys()` | ✅ | Declared `PRIMARY KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
+| `getImportedKeys()`, `getExportedKeys()`, `getCrossReference()` | ✅ | Declared `FOREIGN KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getIndexInfo()` | ⚠️ | BigQuery has no indexes; returns empty |
 | `getColumnPrivileges()`, `getTablePrivileges()` | ⚠️ | BigQuery uses IAM; returns empty |
-| `getCrossReference()`, `getUDTs()`, `getSuperTypes()`, `getSuperTables()` | ⚠️ | Not applicable; returns empty |
-| `getForeignKeys()`, `getImportedKeys()`, `getExportedKeys()` | ❌ | BigQuery has no foreign keys; returns empty |
+| `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
+| `getUDTs()`, `getSuperTypes()`, `getSuperTables()` | ⚠️ | Not applicable; returns empty |
+
+### Unenforced primary and foreign keys
+
+BigQuery accepts declarative key constraints, but only as `NOT ENFORCED`:
+
+```sql
+CREATE TABLE shop.customers (
+  id INT64 NOT NULL,
+  email STRING,
+  PRIMARY KEY (id) NOT ENFORCED
+);
+
+CREATE TABLE shop.orders (
+  order_id INT64 NOT NULL,
+  customer_id INT64,
+  PRIMARY KEY (order_id) NOT ENFORCED,
+  CONSTRAINT fk_customer FOREIGN KEY (customer_id)
+    REFERENCES shop.customers(id) NOT ENFORCED
+);
+```
+
+The driver reads these from `INFORMATION_SCHEMA` and reports them through the four
+JDBC key methods, so ER diagrams, query builders and FK-aware data generators see the
+relationships a schema author declared.
+
+**BigQuery never validates them.** Nothing stops an `orders` row from carrying a
+`customer_id` that no customer has. Treat these keys as a statement of intent about
+the data, not a guarantee about it. `UPDATE_RULE` and `DELETE_RULE` are reported as
+`importedKeyNoAction` and `DEFERRABILITY` as `importedKeyNotDeferrable` for the same
+reason: there is no referential action to take and nothing to defer.
+
+Things worth knowing:
+
+- **Constraint names are table-qualified**, because that is how BigQuery stores them.
+  A primary key is always `<table>.pk$` — BigQuery does not accept a name for one — and
+  a named foreign key appears as `<table>.fk_customer`. Reported verbatim so the value
+  joins back to `INFORMATION_SCHEMA`.
+- **`schema` and `table` arguments are names, not patterns**, per the JDBC contract. An
+  `_` is a literal underscore, which matters because BigQuery names are full of them.
+- **`getExportedKeys()` scans every dataset in the project.** A foreign key is recorded
+  only in the dataset holding the *referencing* table, so there is nowhere else to look.
+  Results are cached per dataset, so the cost lands once per TTL window rather than once
+  per table asked about. Foreign keys declared in *other projects* are not found.
+- **Constraints are cached** with the rest of the metadata, one snapshot per dataset
+  shared by all four methods. Setting `metadataCacheEnabled=false` makes each call
+  re-read from BigQuery.
 
 ---
 

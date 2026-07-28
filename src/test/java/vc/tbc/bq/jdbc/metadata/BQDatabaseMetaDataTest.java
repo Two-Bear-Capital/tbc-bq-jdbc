@@ -15,6 +15,11 @@
  */
 package vc.tbc.bq.jdbc.metadata;
 
+import com.google.api.gax.paging.Page;
+import com.google.cloud.bigquery.BigQuery;
+import com.google.cloud.bigquery.Dataset;
+import com.google.cloud.bigquery.QueryJobConfiguration;
+import com.google.cloud.bigquery.TableResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +33,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * Tests for BQDatabaseMetaData focusing on non-API-dependent methods.
@@ -43,6 +53,15 @@ class BQDatabaseMetaDataTest {
 
 	@Mock
 	private ConnectionProperties properties;
+
+	@Mock
+	private BigQuery bigQuery;
+
+	@Mock
+	private Page<Dataset> emptyDatasetPage;
+
+	@Mock
+	private TableResult tableResult;
 
 	private BQDatabaseMetaData metaData;
 
@@ -539,12 +558,84 @@ class BQDatabaseMetaDataTest {
 		assertFalse(rs.next());
 	}
 
+	/**
+	 * The key methods scan datasets, so with a project that has none they must
+	 * still produce a well-formed, empty result rather than failing. The rows
+	 * themselves need real constraint data and are covered by
+	 * {@link KeyConstraintsTest} and the real-BigQuery integration tier.
+	 */
 	@Test
-	void testGetCrossReferenceReturnsEmpty() throws SQLException {
+	void testGetCrossReferenceReturnsEmptyWhenProjectHasNoDatasets() throws SQLException {
 		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.listDatasets(anyString())).thenReturn(emptyDatasetPage);
+		lenient().when(emptyDatasetPage.iterateAll()).thenReturn(java.util.List.of());
+
 		ResultSet rs = metaData.getCrossReference(null, null, "parent", null, null, "child");
+
+		assertNotNull(rs);
+		assertEquals(14, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetPrimaryKeysReturnsEmptyWhenProjectHasNoDatasets() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.listDatasets(anyString())).thenReturn(emptyDatasetPage);
+		lenient().when(emptyDatasetPage.iterateAll()).thenReturn(java.util.List.of());
+
+		ResultSet rs = metaData.getPrimaryKeys(null, null, "orders");
+
+		assertNotNull(rs);
+		assertEquals(6, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	/**
+	 * An empty schema means "without a schema", which no BigQuery table can be, so
+	 * the answer is empty — and reaching it must cost no dataset listing and no
+	 * BigQuery query at all.
+	 */
+	@Test
+	void testGetImportedKeysWithEmptySchemaQueriesNothing() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+
+		ResultSet rs = metaData.getImportedKeys(null, "", "orders");
+
 		assertNotNull(rs);
 		assertFalse(rs.next());
+		verifyNoInteractions(bigQuery);
+	}
+
+	/**
+	 * The reason the constraint snapshot is cached per dataset rather than per
+	 * call: an IDE asks these questions once per table, so a cache keyed by the
+	 * arguments would turn introspecting a dataset of N tables into N BigQuery
+	 * queries. All four key methods are answered from one read per dataset.
+	 */
+	@Test
+	void testKeyLookupsShareOneQueryPerDataset() throws Exception {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(properties.metadataCacheEnabled()).thenReturn(true);
+		lenient().when(properties.metadataCacheTtl()).thenReturn(300);
+		lenient().when(properties.metadataCacheMaxRows()).thenReturn(50_000);
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class))).thenReturn(tableResult);
+		lenient().when(tableResult.iterateAll()).thenReturn(java.util.List.of());
+
+		// A cache instance is shared statically per project, so a key nobody else uses
+		// keeps this test independent of whatever else ran in this JVM.
+		lenient().when(properties.projectId()).thenReturn("cache-sharing-project");
+		BQDatabaseMetaData.clearAllSharedCaches();
+		BQDatabaseMetaData cached = new BQDatabaseMetaData(connection);
+
+		cached.getPrimaryKeys(null, "shop", "orders").close();
+		cached.getPrimaryKeys(null, "shop", "customers").close();
+		cached.getImportedKeys(null, "shop", "orders").close();
+		cached.getCrossReference(null, "shop", "customers", null, "shop", "orders").close();
+
+		verify(bigQuery, times(1)).query(any(QueryJobConfiguration.class));
 	}
 
 	@Test
