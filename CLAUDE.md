@@ -60,7 +60,7 @@ export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 # Verify the harness without the wait: -Dbenchmark.args="--quick"
 
 # Opt-in scale and load tests (slow, creates BigQuery datasets)
-export BQ_TEST_PROJECT=my-gcp-project BQ_SCALE_TESTS=true
+export BQ_TEST_PROJECT=bigquery-jdbc-driver-test BQ_SCALE_TESTS=true
 ./mvnw verify -Pscale-tests
 ```
 
@@ -166,8 +166,13 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 
 ### Real BigQuery Integration Tests (19 classes)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/real/`
-- Run locally: `gcloud auth application-default login`, `export BQ_TEST_PROJECT=...`,
-  then `./mvnw verify -Preal-integration-tests`
+- Run locally: `gcloud auth application-default login`, then
+  `export BQ_TEST_PROJECT=bigquery-jdbc-driver-test` and
+  `./mvnw verify -Preal-integration-tests`
+- **`terraform/` is the source of truth for that project and its dataset**
+  (`terraform/variables.tf`: `project_id`, `dataset_id`). It provisions the project,
+  the `tbc_bq_jdbc_integration_tests` dataset and the CI Workload Identity
+  Federation setup. Do not guess the project from `gcloud config`
 - Runs in CI on pushes to main, same-repo PRs, and manual dispatch (WIF auth)
 - Base class: `AbstractRealBigQueryIntegrationTest`
 - Skips silently when `BQ_TEST_PROJECT` is unset — CI guards against that passing green
