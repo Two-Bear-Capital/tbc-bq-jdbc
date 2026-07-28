@@ -18,11 +18,11 @@ package vc.tbc.bq.jdbc;
 import com.google.cloud.bigquery.BigQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import static vc.tbc.bq.jdbc.testsupport.TestConnectionProperties.props;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
-import vc.tbc.bq.jdbc.config.ConnectionProperties;
 
 import java.sql.SQLException;
 
@@ -48,9 +48,7 @@ class StatementEnquoteTest {
 	@BeforeEach
 	void setUp() {
 		when(connection.getBigQuery()).thenReturn(bigquery);
-		when(connection.getProperties()).thenReturn(
-				new ConnectionProperties("test-project", null, null, new ApplicationDefaultAuth(), null, null, null,
-						null, false, null, null, null, null, false, null, null, null, null, null, null, null, null));
+		when(connection.getProperties()).thenReturn(props().build());
 
 		statement = new BQStatement(connection);
 	}

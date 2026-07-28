@@ -19,8 +19,9 @@ import com.google.auth.Credentials;
 import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.http.HttpTransportOptions;
 import org.junit.jupiter.api.Test;
-import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
+
+import static vc.tbc.bq.jdbc.testsupport.TestConnectionProperties.props;
 
 import java.net.URI;
 import java.util.List;
@@ -81,9 +82,7 @@ class ClientTuningPropertiesTest {
 	/** Properties carrying only the fields under test. */
 	private static ConnectionProperties propertiesWith(Integer retryCount, Integer connectionTimeout, String host,
 			Integer port) {
-		return new ConnectionProperties("test-project", null, null, new ApplicationDefaultAuth(), host, port, null,
-				null, false, null, null, null, null, false, connectionTimeout, retryCount, null, null, null, null, null,
-				null);
+		return props().retryCount(retryCount).connectionTimeout(connectionTimeout).host(host).port(port).build();
 	}
 
 	private static BigQueryOptions optionsFor(Integer retryCount, Integer connectionTimeout, String host,
