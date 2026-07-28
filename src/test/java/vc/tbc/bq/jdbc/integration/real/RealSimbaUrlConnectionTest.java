@@ -135,13 +135,6 @@ class RealSimbaUrlConnectionTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	@Test
-	void testSimbaUrlWithJobCreationModeOptionalConnects() throws SQLException {
-		try (Connection conn = connect("jobCreationMode=OPTIONAL")) {
-			assertUsable(conn);
-		}
-	}
-
-	@Test
 	void testSimbaUrlWithDefaultDatasetSetsSchema() throws SQLException {
 		try (Connection conn = connect(null)) {
 			assertEquals(TEST_DATASET, conn.getSchema(), "DefaultDataset should become the schema");
@@ -167,8 +160,7 @@ class RealSimbaUrlConnectionTest extends AbstractRealBigQueryIntegrationTest {
 	@Test
 	void testSimbaUrlWithAllPassThroughPropertiesConnects() throws SQLException {
 		String extras = "pageSize=500;connectionTimeout=45;retryCount=2"
-				+ ";metadataCacheTtl=120;metadataCacheEnabled=true;metadataLazyLoad=false"
-				+ ";useStorageApi=false;jobCreationMode=OPTIONAL";
+				+ ";metadataCacheTtl=120;metadataCacheEnabled=true;metadataLazyLoad=false" + ";useStorageApi=false";
 		try (Connection conn = connect(extras)) {
 			assertUsable(conn);
 			assertEquals(TEST_DATASET, conn.getSchema());

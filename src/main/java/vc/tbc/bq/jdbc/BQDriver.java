@@ -127,6 +127,14 @@ public final class BQDriver implements Driver {
 		props.add(
 				prop(info, "refreshToken", "", "OAuth 2.0 refresh token (required for USER_OAUTH auth)", false, null));
 
+		props.add(
+				prop(info, "host", "",
+						"Alternative BigQuery endpoint, e.g. a proxy or Private Service Connect address. "
+								+ "Defaults to https when no scheme is given; blank uses Google's endpoints",
+						false, null));
+
+		props.add(prop(info, "port", "", "Port for the alternative endpoint set by 'host'", false, null));
+
 		props.add(prop(info, "location", "",
 				"BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location.",
 				false, null));
@@ -135,10 +143,10 @@ public final class BQDriver implements Driver {
 				"Query execution timeout in seconds", false, null));
 
 		props.add(prop(info, "connectionTimeout", String.valueOf(ConnectionProperties.DEFAULT_CONNECTION_TIMEOUT),
-				"Connection establishment timeout in seconds", false, null));
+				"Timeout in seconds for establishing the HTTP connection (not query duration)", false, null));
 
 		props.add(prop(info, "retryCount", String.valueOf(ConnectionProperties.DEFAULT_RETRY_COUNT),
-				"Number of retry attempts for transient errors", false, null));
+				"Total attempts per BigQuery API call, including the first", false, null));
 
 		props.add(prop(info, "pageSize", String.valueOf(ConnectionProperties.DEFAULT_PAGE_SIZE),
 				"Number of rows to fetch per page when iterating large result sets", false, null));
@@ -168,10 +176,6 @@ public final class BQDriver implements Driver {
 				"Enable BigQuery sessions to support transactions and temporary tables", false,
 				new String[]{"true", "false"}));
 
-		props.add(prop(info, "jobCreationMode", "REQUIRED",
-				"REQUIRED always creates a query job; OPTIONAL may skip it for small queries", false,
-				new String[]{"REQUIRED", "OPTIONAL"}));
-
 		props.add(prop(info, "useLegacySql", "false",
 				"Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL)", false,
 				new String[]{"true", "false"}));
@@ -197,8 +201,8 @@ public final class BQDriver implements Driver {
 				"Project ID for the default dataset when it differs from the connection project", false, null));
 
 		props.add(prop(info, "nativeComplexTypes", "false",
-				"Return ARRAY and STRUCT as native JDBC Array/Struct objects instead of JSON strings", false,
-				new String[]{"true", "false"}));
+				"Make getObject() return native JDBC Array/Struct for ARRAY and STRUCT columns instead of JSON strings",
+				false, new String[]{"true", "false"}));
 
 		return props.toArray(new DriverPropertyInfo[0]);
 	}

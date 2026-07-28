@@ -75,7 +75,7 @@ class StorageApiFallbackTest {
 
 	private static ConnectionProperties propertiesWith(String useStorageApi) {
 		return new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(), null, null, null, null,
-				false, null, null, null, null, useStorageApi, false, null, null, null, null, null, null, null, null);
+				false, null, null, null, useStorageApi, false, null, null, null, null, null, null, null, null);
 	}
 
 	/** Exposes the inherited protected factory so the test can call it. */

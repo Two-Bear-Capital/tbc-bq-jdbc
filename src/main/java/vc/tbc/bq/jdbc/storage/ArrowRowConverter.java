@@ -45,9 +45,9 @@ import java.util.Set;
  * straight into the JDBC getters?</b> Because the getters carry a lot of
  * hard-won behaviour — {@code getInt} on a FLOAT64 truncates, NUMERIC goes
  * through {@link BigDecimal}, out-of-range values raise a specific SQLState,
- * conversion failures are wrapped rather than leaked (#129). Re-implementing
- * that against Arrow would duplicate roughly twenty-five accessors and invite
- * the two paths to drift apart, which is exactly the class of bug a driver can
+ * conversion failures are wrapped rather than leaked. Re-implementing that
+ * against Arrow would duplicate roughly twenty-five accessors and invite the
+ * two paths to drift apart, which is exactly the class of bug a driver can
  * least afford. By producing the same {@code FieldValue} representation the
  * REST path produces, the Storage Read API path inherits all of it and cannot
  * diverge by construction.

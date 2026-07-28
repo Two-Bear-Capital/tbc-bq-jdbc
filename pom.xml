@@ -664,6 +664,17 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
                                     <addHeader>false</addHeader>
                                 </transformer>
+                                <!--
+                                    logback.xml lives outside src/main/resources so it is packaged
+                                    ONLY here. Its appender class names are the relocated ones below,
+                                    which exist in no other artifact; shipping it in the slim or plain
+                                    shaded JAR would put a config naming unloadable classes on the
+                                    user's classpath, ahead of their own.
+                                -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>logback.xml</resource>
+                                    <file>${project.basedir}/src/main/logback/logback.xml</file>
+                                </transformer>
                             </transformers>
                             <relocations>
                                 <relocation>

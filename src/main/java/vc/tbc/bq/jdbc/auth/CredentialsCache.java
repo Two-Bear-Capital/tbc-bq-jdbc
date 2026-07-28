@@ -20,6 +20,7 @@ import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Reuses {@link Credentials} across connections that authenticate the same way.
@@ -39,15 +40,32 @@ import java.util.concurrent.ConcurrentHashMap;
  * shared instance stays valid indefinitely.
  *
  * <p>
- * <b>Rotation:</b> entries live for the life of the JVM. Rotating a service
- * account key file on disk therefore requires a restart to take effect; call
- * {@link #clear()} to force credentials to be rebuilt.
+ * <b>Rotation:</b> entries expire after {@value #DEFAULT_TTL_SECONDS} seconds,
+ * so a rotated service account key is picked up without restarting the JVM. The
+ * window is configurable with the {@code tbc.bq.jdbc.credentials.ttl.seconds}
+ * system property; set it to {@code 0} to cache for the life of the process.
+ * {@link #clear()} discards everything immediately.
+ *
+ * <p>
+ * Expiry is unrelated to token refresh, which the credential object does for
+ * itself. This governs only how long the driver keeps reusing a credential
+ * built from a given source.
  *
  * @since 1.0.99
  */
 public final class CredentialsCache {
 
-	private static final ConcurrentHashMap<AuthType, Credentials> CACHE = new ConcurrentHashMap<>();
+	/** System property overriding how long a built credential is reused. */
+	public static final String TTL_PROPERTY = "tbc.bq.jdbc.credentials.ttl.seconds";
+
+	/** Default reuse window, in seconds. */
+	public static final long DEFAULT_TTL_SECONDS = 3600;
+
+	/** A cached credential and the time it was built. */
+	private record Entry(Credentials credentials, long builtAtNanos) {
+	}
+
+	private static final ConcurrentHashMap<AuthType, Entry> CACHE = new ConcurrentHashMap<>();
 
 	private CredentialsCache() {
 		throw new AssertionError("Utility class should not be instantiated");
@@ -70,20 +88,72 @@ public final class CredentialsCache {
 	 *             if credentials cannot be created
 	 */
 	public static Credentials forAuthType(AuthType authType) throws IOException {
-		Credentials cached = CACHE.get(authType);
-		if (cached != null) {
+		Entry cached = CACHE.get(authType);
+		if (cached != null && !isExpired(cached)) {
 			DriverMetrics.recordCredentialCacheHit();
-			return cached;
+			return cached.credentials();
 		}
 
+		// Counted as a miss whether the entry was absent or stale: both mean this
+		// call paid to build credentials, which is the cost worth seeing.
 		DriverMetrics.recordCredentialCacheMiss();
 		Credentials created = authType.toCredentials();
-		Credentials existing = CACHE.putIfAbsent(authType, created);
-		// A racing thread may have won the putIfAbsent, in which case this call did
-		// build credentials and is correctly counted as a miss even though the object
-		// it hands back came from the cache. The alternative - counting the loser as a
-		// hit - would understate exactly the duplicated work worth knowing about.
-		return existing != null ? existing : created;
+		// put rather than putIfAbsent: an expired entry must be replaced. Two threads
+		// racing here each build credentials and the last write wins, which is
+		// harmless — the discarded copy is equivalent.
+		CACHE.put(authType, new Entry(created, System.nanoTime()));
+		return created;
+	}
+
+	/** Whether an entry has outlived the configured reuse window. */
+	private static boolean isExpired(Entry entry) {
+		return isExpired(entry.builtAtNanos(), System.nanoTime());
+	}
+
+	/**
+	 * Whether something built at {@code builtAtNanos} is stale as of {@code now}.
+	 *
+	 * <p>
+	 * Package-private and taking an explicit clock reading so the expiry rule can
+	 * be tested without a sleep, and without needing an {@link AuthType} instance —
+	 * that interface is sealed, so no test double can implement it.
+	 *
+	 * @param builtAtNanos
+	 *            {@link System#nanoTime()} reading when the entry was built
+	 * @param nowNanos
+	 *            the current {@link System#nanoTime()} reading
+	 * @return true when the entry should be rebuilt
+	 */
+	static boolean isExpired(long builtAtNanos, long nowNanos) {
+		long ttlNanos = ttlNanos();
+		if (ttlNanos <= 0) {
+			return false;
+		}
+		return nowNanos - builtAtNanos >= ttlNanos;
+	}
+
+	/**
+	 * Reads the configured reuse window, in nanoseconds.
+	 *
+	 * <p>
+	 * Read per call rather than cached in a constant so the property can be changed
+	 * at runtime. This runs once per connection, not per query, so the lookup cost
+	 * is not worth avoiding. An unparseable value falls back to the default rather
+	 * than failing a connection over a diagnostic setting.
+	 *
+	 * @return the window in nanoseconds, or 0 to never expire
+	 */
+	static long ttlNanos() {
+		long seconds = DEFAULT_TTL_SECONDS;
+		String configured = System.getProperty(TTL_PROPERTY);
+		if (configured != null) {
+			try {
+				seconds = Long.parseLong(configured.trim());
+			} catch (NumberFormatException e) {
+				seconds = DEFAULT_TTL_SECONDS;
+			}
+		}
+		return seconds <= 0 ? 0 : TimeUnit.SECONDS.toNanos(seconds);
 	}
 
 	/** Discards all cached credentials, so the next use rebuilds them. */

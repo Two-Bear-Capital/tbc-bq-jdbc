@@ -93,9 +93,9 @@ translated automatically, so most connection strings work unchanged. Two things 
 
 **Host and port.** By default the driver talks to Google's BigQuery endpoints, and the
 `https://www.googleapis.com/bigquery/v2:443` authority in a typical Simba URL changes
-nothing. A *different* host is honoured, however: the driver will direct the client at it.
-When a port is given, that endpoint is contacted over plain **HTTP**, not HTTPS — only
-point this at a trusted address on a trusted network.
+nothing. A *different* host is honoured: the driver directs the client at it, over
+**HTTPS** unless you write an explicit `http://` scheme. Use `port` to set a non-default
+port. A plaintext endpoint is logged as a warning, since credentials travel over it.
 
 ## Required Components
 
@@ -147,13 +147,14 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
   caps a page by response bytes, so a very large `pageSize` stops adding rows per page once
   the payload hits that ceiling
 - `maxResults` limits total rows returned, regardless of pagination
-- `nativeComplexTypes=false` (default) returns ARRAY/STRUCT from `getObject()` as JSON
-  strings — safe for IntelliJ IDEA and tools that don't handle JDBC Array/Struct. With the
-  default, `rs.getArray()` throws rather than returning a string
-- `nativeComplexTypes=true` makes `rs.getArray()` return a `java.sql.Array` and
-  `rs.getObject()` return a `java.sql.Struct` for RECORD columns.
-  `PreparedStatement.setArray()` and `Connection.createArrayOf()` work regardless of this
-  setting; `Connection.createStruct()` is not supported
+- `nativeComplexTypes` governs **only what `getObject()` returns** for ARRAY and STRUCT
+  columns. With the default `false` it returns a JSON string, which keeps IntelliJ IDEA
+  and other result grids stable; with `true` it returns a `java.sql.Array` or
+  `java.sql.Struct`
+- `rs.getArray()`, `PreparedStatement.setArray()` and `Connection.createArrayOf()` work
+  regardless of the setting — an explicit typed call is never gated
+- There is no write path for STRUCT: `Connection.createStruct()` is unsupported and
+  passing a `java.sql.Struct` to `setObject()` throws. Build struct values in SQL
 
 ---
 

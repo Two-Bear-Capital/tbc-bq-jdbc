@@ -121,12 +121,9 @@ public final class MetadataResultSet extends BaseReadOnlyResultSet {
 	 * passed through verbatim. That path allocates nothing.
 	 *
 	 * <p>
-	 * This used to lowercase both sides: the keys once per ResultSet, and <em>the
-	 * requested label on every single lookup</em>. Since by-name access is per row,
-	 * a {@code getColumns()} over a wide project allocated one throwaway String per
-	 * row — measured at over eleven thousand per call against a project with a few
-	 * hundred tables. That is the same shape as the per-row regex compilation found
-	 * in #99, and {@code getColumnsWarm} is the benchmark that shows it.
+	 * The requested label is <em>not</em> lowercased on each lookup. By-name access
+	 * happens per row, so doing so would allocate one throwaway String per row — on
+	 * a {@code getColumns()} over a wide project, tens of thousands per call.
 	 *
 	 * <p>
 	 * JDBC requires the lookup to be case-insensitive, so a miss falls back to a

@@ -126,14 +126,45 @@ public final class BQConnection extends AbstractBQConnection {
 				builder.setLocation(properties.location());
 			}
 
-			// Point the client at a non-default BigQuery endpoint
+			// retryCount is the total number of attempts, not retries after the first:
+			// that is what RetrySettings#setMaxAttempts means, and a driver property
+			// called "retryCount" set to 0 must not mean "never try at all". The rest
+			// of the client's backoff policy is kept by building on the defaults.
+			if (properties.retryCount() != null) {
+				builder.setRetrySettings(BigQueryOptions.getDefaultRetrySettings().toBuilder()
+						.setMaxAttempts(Math.max(1, properties.retryCount())).build());
+			}
+
+			// Applies to establishing the HTTP connection only. Query duration is
+			// governed by the `timeout` property, enforced by the driver itself, so the
+			// read timeout is deliberately left alone — capping it here would sever
+			// long-running queries that are behaving exactly as configured.
+			if (properties.connectionTimeout() != null) {
+				builder.setTransportOptions(BigQueryOptions.getDefaultHttpTransportOptions().toBuilder()
+						.setConnectTimeout(Math.toIntExact(properties.connectionTimeout() * 1000L)).build());
+			}
+
+			// Point the client at a non-default BigQuery endpoint.
+			//
+			// A host that already carries a scheme is used verbatim. Otherwise the
+			// scheme defaults to https: this used to hard-code http:// whenever a port
+			// was present, which silently sent credentials over an unencrypted
+			// connection. Set an explicit "http://" host to opt into plaintext.
 			if (properties.host() != null) {
 				String endpoint = properties.host();
+				boolean explicitScheme = endpoint.startsWith("http://") || endpoint.startsWith("https://");
+				if (!explicitScheme) {
+					endpoint = "https://" + endpoint;
+				}
 				if (properties.port() != null) {
-					endpoint = "http://" + endpoint + ":" + properties.port();
+					endpoint = endpoint + ":" + properties.port();
 				}
 				builder.setHost(endpoint);
-				logger.info("Using custom BigQuery endpoint: {}", endpoint);
+				if (endpoint.startsWith("http://")) {
+					logger.warn("Using an unencrypted BigQuery endpoint: {}", endpoint);
+				} else {
+					logger.info("Using custom BigQuery endpoint: {}", endpoint);
+				}
 			}
 
 			this.bigquery = builder.build().getService();

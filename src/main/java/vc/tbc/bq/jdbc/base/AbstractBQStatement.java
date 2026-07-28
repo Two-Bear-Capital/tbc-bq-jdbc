@@ -180,10 +180,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * <p>
 	 * When {@code useStorageApi} asks for it and the result qualifies, rows are
 	 * streamed via the BigQuery Storage Read API instead of paged over REST — much
-	 * faster on large results (#152). That path is strictly optional: anything that
-	 * makes it unavailable falls back to the standard {@link BQResultSet}, so a
-	 * query always returns rows. The reasons it can be unavailable are all outside
-	 * the caller's control, which is why none of them is an error:
+	 * faster on large results. That path is strictly optional: anything that makes
+	 * it unavailable falls back to the standard {@link BQResultSet}, so a query
+	 * always returns rows. The reasons it can be unavailable are all outside the
+	 * caller's control, which is why none of them is an error:
 	 *
 	 * <ul>
 	 * <li>Arrow cannot allocate without a JVM flag ({@link ArrowSupport})
@@ -282,10 +282,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * {@code enableQueryCostEstimation} is on, for any statement — SELECT or DML.
 	 *
 	 * <p>
-	 * This used to live inline in {@code executeQueryInternal}, which is why DML
-	 * and batches were never estimated (#140): the property was read in exactly one
-	 * place, on the query path.
-	 *
 	 * <p>
 	 * A failed dry-run is logged and swallowed. An estimate is advisory, so it must
 	 * never be the reason a statement does not run.
@@ -1052,6 +1048,11 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		// next. See DriverMetrics.
 		long startNanos = System.nanoTime();
 		boolean succeeded = false;
+
+		// Counted before the call, not after it returns: this is what makes
+		// queriesInFlight() meaningful. Incrementing it alongside the terminal
+		// counters would make it their sum by construction and in-flight always zero.
+		DriverMetrics.recordQuerySubmitted();
 
 		try {
 			Job job = bigquery.create(JobInfo.of(config));

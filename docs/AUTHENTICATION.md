@@ -84,6 +84,11 @@ Service accounts are robot accounts for machine-to-machine authentication.
 The `credentials` property is a **filesystem path** to the JSON key file. Passing the key
 material inline is not supported.
 
+Credentials are built once and shared by every connection using the same authentication,
+then rebuilt after an hour so a rotated key takes effect without restarting the JVM. The
+window is set by the `tbc.bq.jdbc.credentials.ttl.seconds` system property; `0` disables
+expiry.
+
 ### Setup
 
 1. **Create Service Account:**

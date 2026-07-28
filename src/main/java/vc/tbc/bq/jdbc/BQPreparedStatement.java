@@ -55,8 +55,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 	/**
 	 * Formatter for TIME parameters. {@code QueryParameterValue.time} requires
-	 * exactly six fractional digits; {@code Time.toString()} emits none, which made
-	 * every {@code setTime} call throw (#123).
+	 * exactly six fractional digits, which {@code Time.toString()} does not emit.
 	 */
 	private static final java.time.format.DateTimeFormatter TIME_FORMATTER = java.time.format.DateTimeFormatter
 			.ofPattern("HH:mm:ss.SSSSSS");
@@ -65,10 +64,10 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 * Binds a Timestamp as epoch microseconds.
 	 *
 	 * <p>
-	 * {@code QueryParameterValue.of(instant.toString(), TIMESTAMP)} was rejected
-	 * client-side — the validator wants a space-separated format, not ISO-8601's
-	 * {@code T} separator, so every call threw (#123). The typed factory takes
-	 * microseconds and does its own formatting, which removes the question.
+	 * {@code QueryParameterValue.of(instant.toString(), TIMESTAMP)} is rejected
+	 * client-side: the validator wants a space-separated format, not ISO-8601's
+	 * {@code T} separator. The typed factory takes microseconds and does its own
+	 * formatting, which removes the question.
 	 *
 	 * @param value
 	 *            the timestamp to bind

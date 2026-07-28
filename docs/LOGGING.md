@@ -11,10 +11,6 @@ The driver is distributed in three variants:
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Smallest (runtime dependencies not included)
 
-> This JAR packages a `logback.xml` whose appender class names are the *relocated* ones
-> used by the `with-logging` variant. Outside that variant those classes do not exist, so
-> if you add your own Logback, put your `logback.xml` earlier on the classpath — or use
-> a different SLF4J binding — to make sure yours is the one Logback loads.
 
 ### 2. Shaded JAR (`tbc-bq-jdbc-2.4.2-shaded.jar`)
 - **Use case:** Standalone usage with all dependencies bundled
@@ -50,9 +46,7 @@ When using the `with-logging` variant in IntelliJ:
 
 2. **Default logging behavior:**
    - Driver logs are written to `~/.bigquery-jdbc/logs/bigquery-jdbc.log` (your home directory) — created automatically on first connection
-   - Log level: DEBUG for driver code, and for the bundled Google Cloud libraries, which
-     are relocated under the driver's own package prefix. Set a
-     `vc.tbc.bq.jdbc.shaded.google` logger to quieten them
+   - Log level: DEBUG for driver code, WARN for the bundled Google Cloud libraries
    - Daily rotation with 30-day retention
    - Maximum total size: 500MB
 
@@ -205,11 +199,11 @@ Increase the log level for Google Cloud libraries:
 ```
 
 This works with the **standard JAR**, where the Google libraries keep their own package
-names. In the **shaded** and **with-logging** JARs `com.google` is relocated to
+names. In the **shaded** and **with-logging** JARs `com.google` is relocated under
 `vc.tbc.bq.jdbc.shaded.google`, so use that prefix instead:
 
 ```xml
-<logger name="vc.tbc.bq.jdbc.shaded.google.cloud.bigquery" level="DEBUG"/>
+<logger name="vc.tbc.bq.jdbc.shaded.google" level="DEBUG"/>
 ```
 
 ## See Also

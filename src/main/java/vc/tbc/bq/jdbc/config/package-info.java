@@ -28,9 +28,7 @@
  * <li>{@link vc.tbc.bq.jdbc.config.SessionManager} - Manages BigQuery sessions
  * for connections
  * <li>{@link vc.tbc.bq.jdbc.config.MetadataCache} - Caches database metadata
- * for performance
- * <li>{@link vc.tbc.bq.jdbc.config.JobCreationMode} - Query job creation mode
- * configuration
+ * for performance configuration
  * </ul>
  *
  * @since 1.0.0
