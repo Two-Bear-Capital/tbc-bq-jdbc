@@ -96,6 +96,9 @@ public final class StorageReadApiSpike {
 	/** Use the string-heavy fixture shape; enable with --wide. */
 	private static boolean wide;
 
+	/** Sweep the REST path across page sizes instead of comparing paths. */
+	private static boolean sweep;
+
 	private StorageReadApiSpike() {
 	}
 
@@ -120,6 +123,18 @@ public final class StorageReadApiSpike {
 		final Table destTable = bigquery.getTable(destination);
 		final long bytes = destTable.getNumBytes() == null ? 0L : destTable.getNumBytes();
 		System.out.printf("  result table is %.1f MB (%,d rows)%n%n", bytes / 1024.0 / 1024.0, destTable.getNumRows());
+
+		if (sweep) {
+			// Follow-up to the main spike: how much of the REST cost is round trips,
+			// and where does raising pageSize stop paying? Storage API not involved.
+			System.out.printf("=== REST path across page sizes (default is %d) ===%n",
+					ConnectionProperties.DEFAULT_PAGE_SIZE);
+			for (int candidate : new int[]{10_000, 25_000, 50_000, 100_000, 200_000}) {
+				final double seconds = timeRestPath(sql, candidate);
+				System.out.printf("pageSize %,8d  %6.2f s  %,10.0f rows/s%n", candidate, seconds, rows / seconds);
+			}
+			return;
+		}
 
 		final List<Double> restSeconds = new ArrayList<>();
 		final List<Double> storageSeconds = new ArrayList<>();
@@ -376,6 +391,7 @@ public final class StorageReadApiSpike {
 				case "--runs" -> runs = Integer.parseInt(args[++i]);
 				case "--controls" -> controls = true;
 				case "--wide" -> wide = true;
+				case "--sweep" -> sweep = true;
 				default -> {
 					// ignore unrecognised tokens
 				}

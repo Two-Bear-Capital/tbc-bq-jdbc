@@ -956,9 +956,12 @@
                         <configuration>
                             <executable>${java.home}/bin/java</executable>
                             <classpathScope>test</classpathScope>
+                            <!-- Arrow needs the add-opens or MemoryUtil fails to           -->
+                            <!-- initialise on JDK 16+. Measured: this flag alone is         -->
+                            <!-- sufficient, and netty's tryReflectionSetAccessible          -->
+                            <!-- makes no difference either way.                             -->
                             <commandlineArgs>-classpath %classpath
                                 --add-opens=java.base/java.nio=ALL-UNNAMED
-                                -Dio.netty.tryReflectionSetAccessible=true
                                 vc.tbc.bq.jdbc.benchmark.StorageReadApiSpike
                                 ${benchmark.args}</commandlineArgs>
                         </configuration>
