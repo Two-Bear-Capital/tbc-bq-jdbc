@@ -143,18 +143,17 @@ class StorageApiParityIT extends AbstractRealBigQueryIntegrationTest {
 	void allScalarTypesMatchTheRestPath() throws SQLException {
 		List<List<String>> viaRest = readAllAsStrings(restConnection(), ALL_TYPES_SQL);
 		List<List<String>> viaStorage = readAllAsStrings(storageConnection(), ALL_TYPES_SQL);
-		List<Integer> types = columnTypes(restConnection(), ALL_TYPES_SQL);
 
 		assertEquals(viaRest.size(), viaStorage.size(), "row count differs between the two paths");
 		assertFalse(viaRest.isEmpty(), "fixture produced no rows");
 
 		for (int row = 0; row < viaRest.size(); row++) {
-			for (int col = 0; col < types.size(); col++) {
-				assertCellsMatch(types.get(col), viaRest.get(row).get(col), viaStorage.get(row).get(col),
+			for (int col = 0; col < viaRest.get(row).size(); col++) {
+				assertCellsMatch(viaRest.get(row).get(col), viaStorage.get(row).get(col),
 						"row " + row + ", column " + (col + 1));
 			}
 		}
-		logger.info("compared {} rows x {} columns across both paths", viaRest.size(), types.size());
+		logger.info("compared {} rows x {} columns across both paths", viaRest.size(), viaRest.get(0).size());
 	}
 
 	/**
@@ -175,21 +174,8 @@ class StorageApiParityIT extends AbstractRealBigQueryIntegrationTest {
 	 * assertion is deliberately strict again so that any future divergence fails
 	 * rather than being explained away.
 	 */
-	private static void assertCellsMatch(int sqlType, String rest, String storage, String where) {
+	private static void assertCellsMatch(String rest, String storage, String where) {
 		assertEquals(rest, storage, where + " differs between REST and Storage");
-	}
-
-	private static List<Integer> columnTypes(Connection connection, String sql) throws SQLException {
-		List<Integer> types = new ArrayList<>();
-		try (Connection conn = connection;
-				Statement stmt = conn.createStatement();
-				ResultSet rs = stmt.executeQuery(sql)) {
-			ResultSetMetaData meta = rs.getMetaData();
-			for (int i = 1; i <= meta.getColumnCount(); i++) {
-				types.add(meta.getColumnType(i));
-			}
-		}
-		return types;
 	}
 
 	@Test

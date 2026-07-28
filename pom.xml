@@ -520,8 +520,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- Use @{argLine} to preserve JaCoCo's agent configuration -->
-                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading</argLine>
+                    <!-- Use @{argLine} to preserve JaCoCo's agent configuration.
+                         The add-opens lets unit tests build Arrow vectors in memory, so
+                         ArrowRowConverter's encodings can be tested without BigQuery. -->
+                    <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens}</argLine>
                     <excludes>
                         <!-- Exclude integration tests from unit test phase -->
                         <exclude>**/*IntegrationTest.java</exclude>
@@ -1033,8 +1035,7 @@
 
                                  JFR is on here for the same reason it is on for the real suite: when
                                  a scale run is slow, the recording is the evidence. -->
-                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading -Xmx512m
-                                -XX:StartFlightRecording:name=scale-tests,settings=profile,dumponexit=true,filename=target/scale-tests-%p.jfr</argLine>
+                            <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens} -Xmx512m -XX:StartFlightRecording:name=scale-tests,settings=profile,dumponexit=true,filename=target/scale-tests-%p.jfr</argLine>
                             <includes>
                                 <include>**/integration/scale/**/*Test.java</include>
                             </includes>
