@@ -74,8 +74,14 @@ class LargeResultSetScaleTest extends AbstractScaleTest {
 	 * the point is to catch a collapse, not to police normal variance in BigQuery
 	 * latency, which would make this flake and get the assertion widened until it
 	 * meant nothing. That is precisely how #93 stayed hidden.
+	 *
+	 * <p>
+	 * Raised from 2,000 to 5,000 when the default page size went to 50,000 (#163),
+	 * so that the improvement is actually locked in rather than being free to
+	 * regress silently. Deliberately still far below the 17k-31k/s a healthy run
+	 * measured, keeping the headroom the paragraph above argues for.
 	 */
-	private static final long MIN_ROWS_PER_SECOND = envInt("BQ_SCALE_MIN_ROWS_PER_SEC", 2_000);
+	private static final long MIN_ROWS_PER_SECOND = envInt("BQ_SCALE_MIN_ROWS_PER_SEC", 5_000);
 
 	/**
 	 * How much retained heap may grow between the first checkpoint and the last.

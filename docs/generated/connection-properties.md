@@ -22,7 +22,7 @@ There are **26** connection properties.
 | `timeout` | `300` | any | Query execution timeout in seconds |
 | `connectionTimeout` | `30` | any | Connection establishment timeout in seconds |
 | `retryCount` | `3` | any | Number of retry attempts for transient errors |
-| `pageSize` | `10000` | any | Number of rows to fetch per page when iterating large result sets |
+| `pageSize` | `50000` | any | Number of rows to fetch per page when iterating large result sets |
 | `metadataCacheEnabled` | `true` | `true`, `false` | Cache schema introspection results to speed up IntelliJ IDEA's database tree |
 | `metadataCacheTtl` | `300` | any | How long (seconds) to keep metadata in the cache before re-fetching |
 | `metadataCacheMaxRows` | `50000` | any | Ceiling on total rows held in the metadata cache; oldest entries are evicted above it. Set to 0 for no limit |

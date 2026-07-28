@@ -125,7 +125,13 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
 
 **Notes:**
 - `timeout=0` means no timeout (wait indefinitely)
-- Smaller `pageSize` reduces memory usage but may increase latency
+- `pageSize` sets how many rows each `jobs.getQueryResults` call fetches, so it controls
+  how many HTTP round trips a large result costs. The default of 50,000 was measured as a
+  good balance: 1.65x faster than the old 10,000 default on a 1M-row result, and 1.30x on a
+  113 MB wide one, with the gain flattening above it
+- Lowering `pageSize` reduces peak memory per page but costs more round trips. BigQuery also
+  caps a page by response bytes, so a very large `pageSize` stops adding rows per page once
+  the payload hits that ceiling
 - `maxResults` limits total rows returned, regardless of pagination
 - `nativeComplexTypes=false` (default) returns ARRAY/STRUCT as JSON strings — safe for IntelliJ IDEA and tools that don't handle JDBC Array/Struct
 - `nativeComplexTypes=true` enables `rs.getArray()` returning `java.sql.Array` and `rs.getObject()` returning `java.sql.Struct` for RECORD columns; also enables `PreparedStatement.setArray()` and `Connection.createArrayOf()`
