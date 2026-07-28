@@ -263,7 +263,7 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 ### Result Iteration
 - `BQResultSet` wraps BigQuery TableResult
 - Forward-only iteration (TYPE_FORWARD_ONLY)
-- Pagination via `pageSize` property (default: 10000)
+- Pagination via `pageSize` property (default: 50000)
 - Storage API optional for large results (>10MB)
 
 ### Storage Read API path
