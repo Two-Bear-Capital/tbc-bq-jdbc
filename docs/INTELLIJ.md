@@ -38,7 +38,7 @@ Download the latest **with-logging** JAR from the [releases page](https://github
 
 ```bash
 # Recommended for IntelliJ — bundles a logging implementation
-tbc-bq-jdbc-2.4.1-with-logging.jar
+tbc-bq-jdbc-2.4.2-with-logging.jar
 ```
 
 IntelliJ runs JDBC drivers in a separate process with no logging backend, so the
@@ -74,7 +74,7 @@ runs drivers with no logging backend of its own.
 
 **Option A: Download a release**
 ```bash
-wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-with-logging.jar
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.2-with-logging.jar
 ```
 Or browse [GitHub Releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases).
 
@@ -83,7 +83,7 @@ Or browse [GitHub Releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/rele
 git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
 cd tbc-bq-jdbc
 ./mvnw clean package
-# Use target/tbc-bq-jdbc-2.4.1-with-logging.jar
+# Use target/tbc-bq-jdbc-2.4.2-with-logging.jar
 # (the classifier-less JAR holds driver classes only and will not work on its own)
 ```
 
@@ -93,7 +93,7 @@ reserved for the first Central release.
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>2.4.1</version>
+    <version>2.4.2</version>
     <classifier>shaded</classifier>
 </dependency>
 ```
