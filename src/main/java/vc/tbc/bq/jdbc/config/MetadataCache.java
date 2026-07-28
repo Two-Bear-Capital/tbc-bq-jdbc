@@ -130,6 +130,32 @@ public final class MetadataCache {
 	 *         expired, empty otherwise
 	 */
 	public Optional<ResultSet> get(String key) {
+		return lookup(key).map(CacheEntry::createResultSet);
+	}
+
+	/**
+	 * Gets the cached rows for a key, without materialising a {@link ResultSet}.
+	 *
+	 * <p>
+	 * For callers that want the data rather than a JDBC cursor over it — the key
+	 * constraint snapshots, which are reshaped into four different JDBC result sets
+	 * and are never handed to a caller as-is. {@link #get(String)} would hand back
+	 * a {@code ResultSet} nobody owns, opens or closes.
+	 *
+	 * @param key
+	 *            the cache key
+	 * @return the rows if present and unexpired, empty otherwise. The list is
+	 *         unmodifiable: it is the cache's own, not a copy.
+	 */
+	public Optional<List<Object[]>> getRows(String key) {
+		return lookup(key).map(entry -> Collections.unmodifiableList(entry.rows()));
+	}
+
+	/**
+	 * The shared read path behind {@link #get} and {@link #getRows}, so both count
+	 * the same way against the hit rate.
+	 */
+	private Optional<CacheEntry> lookup(String key) {
 		CacheEntry entry = cache.get(key);
 		if (entry == null) {
 			DriverMetrics.recordMetadataCacheMiss();
@@ -150,7 +176,7 @@ public final class MetadataCache {
 
 		DriverMetrics.recordMetadataCacheHit();
 		logger.trace("Cache hit for key: {}", key);
-		return Optional.of(entry.createResultSet());
+		return Optional.of(entry);
 	}
 
 	/**
@@ -177,15 +203,35 @@ public final class MetadataCache {
 		}
 
 		// Extract the data from MetadataResultSet
-		String[] columnNames = metadataResultSet.getColumnNames();
-		int[] columnTypes = metadataResultSet.getColumnTypes();
-		List<Object[]> rows = metadataResultSet.getRows();
+		putRows(key, metadataResultSet.getColumnNames(), metadataResultSet.getColumnTypes(),
+				metadataResultSet.getRows());
+	}
 
+	/**
+	 * Stores rows directly, without a {@link ResultSet} to carry them.
+	 *
+	 * <p>
+	 * The counterpart to {@link #getRows(String)}: a caller holding rows would
+	 * otherwise have to wrap them in a {@link MetadataResultSet} purely to satisfy
+	 * {@link #put(String, ResultSet)}, producing a closeable nobody owns and which
+	 * this method would immediately unwrap again.
+	 *
+	 * @param key
+	 *            the cache key
+	 * @param columnNames
+	 *            column names of the cached shape
+	 * @param columnTypes
+	 *            JDBC types of the cached shape
+	 * @param rows
+	 *            the rows to cache
+	 */
+	public void putRows(String key, String[] columnNames, int[] columnTypes, List<Object[]> rows) {
 		Instant expiresAt = Instant.now().plus(ttl);
 		cache.put(key, new CacheEntry(columnNames, columnTypes, rows, expiresAt));
 		evictExpired();
-		// The other put() overload is not the only way in, so the bound is enforced
-		// on both. A ceiling applied on one of two insertion paths is not a ceiling.
+		// The other put() overloads are not the only way in, so the bound is enforced
+		// on all of them. A ceiling applied on one of several insertion paths is not
+		// a ceiling.
 		enforceRowBound(key);
 		if (logger.isTraceEnabled()) {
 			logger.trace("Cached {} rows for key: {} (expires: {})", rows.size(), key, expiresAt);

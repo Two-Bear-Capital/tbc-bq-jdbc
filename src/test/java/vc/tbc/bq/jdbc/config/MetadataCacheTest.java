@@ -104,6 +104,81 @@ class MetadataCacheTest {
 		assertEquals(1, cache.size());
 	}
 
+	/**
+	 * The row-level API exists for callers that hold data rather than a cursor —
+	 * the key constraint snapshots, which are reshaped into four different JDBC
+	 * result sets and never handed to a caller as-is. Going through
+	 * {@code put(String, ResultSet)} would mean building a closeable nobody owns
+	 * just so the cache could unwrap it again.
+	 */
+	@Test
+	void testPutRowsAndGetRows() {
+		MetadataCache cache = new MetadataCache();
+		List<Object[]> rows = List.of(new Object[]{"a", 1L}, new Object[]{"b", 2L});
+
+		cache.putRows("rows-key", new String[]{"NAME", "SEQ"}, new int[]{Types.VARCHAR, Types.BIGINT}, rows);
+		Optional<List<Object[]>> cached = cache.getRows("rows-key");
+
+		assertTrue(cached.isPresent());
+		assertEquals(2, cached.get().size());
+		assertEquals("a", cached.get().get(0)[0]);
+		assertEquals(2L, cached.get().get(1)[1]);
+		assertEquals(1, cache.size());
+	}
+
+	/**
+	 * The returned list is the cache's own, so callers must not be able to edit it.
+	 */
+	@Test
+	void testGetRowsReturnsAnUnmodifiableView() {
+		MetadataCache cache = new MetadataCache();
+		cache.putRows("rows-key", new String[]{"NAME"}, new int[]{Types.VARCHAR},
+				new ArrayList<>(List.<Object[]>of(new Object[]{"a"})));
+
+		List<Object[]> cached = cache.getRows("rows-key").orElseThrow();
+
+		assertThrows(UnsupportedOperationException.class, () -> cached.add(new Object[]{"injected"}));
+	}
+
+	@Test
+	void testGetRowsWithMissingKey() {
+		MetadataCache cache = new MetadataCache();
+
+		assertFalse(cache.getRows("missing-key").isPresent());
+	}
+
+	/** Both read paths must see the same entry, whichever one wrote it. */
+	@Test
+	void testRowAndResultSetApisShareOneStore() throws SQLException {
+		MetadataCache cache = new MetadataCache();
+
+		cache.put("shared", createTestResultSet());
+
+		assertTrue(cache.getRows("shared").isPresent(), "rows must be readable from a ResultSet write");
+
+		cache.putRows("shared-2", new String[]{"NAME"}, new int[]{Types.VARCHAR}, List.<Object[]>of(new Object[]{"a"}));
+
+		assertTrue(cache.get("shared-2").isPresent(), "a ResultSet must be readable from a rows write");
+		assertEquals(2, cache.size());
+	}
+
+	/**
+	 * The row ceiling has to apply to every insertion path, not just the original
+	 * one.
+	 */
+	@Test
+	void testPutRowsIsSubjectToTheRowCeiling() {
+		MetadataCache cache = new MetadataCache(Duration.ofMinutes(5), 3);
+		String[] names = {"NAME"};
+		int[] types = {Types.VARCHAR};
+
+		cache.putRows("first", names, types, List.of(new Object[]{"a"}, new Object[]{"b"}));
+		cache.putRows("second", names, types, List.of(new Object[]{"c"}, new Object[]{"d"}));
+
+		assertTrue(cache.totalRows() <= 3, "expected eviction back under the ceiling, saw " + cache.totalRows());
+		assertTrue(cache.getRows("second").isPresent(), "the entry just inserted must survive");
+	}
+
 	@Test
 	void testGetWithMissingKey() {
 		// Given: An empty cache

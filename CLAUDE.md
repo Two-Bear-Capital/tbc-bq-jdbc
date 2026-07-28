@@ -142,7 +142,8 @@ src/main/java/vc/tbc/bq/jdbc/
 │   ├── BQResultSetMetaData.java      # ResultSet column metadata
 │   ├── BQParameterMetaData.java      # PreparedStatement parameter info
 │   ├── MetadataResultSet.java        # In-memory ResultSet for metadata
-│   └── MetadataColumns.java          # Column metadata builders
+│   ├── MetadataColumns.java          # Column metadata builders
+│   └── KeyConstraints.java           # Unenforced PK/FK constraints from INFORMATION_SCHEMA
 │
 ├── storage/                   # BigQuery Storage Read API
 │   └── StorageReadResultSet.java     # Arrow-based result reading
@@ -222,13 +223,13 @@ jdbc:bigquery://[Host]:[Port];ProjectId=[Project];OAuthType=[AuthValue];[Propert
 
 ## Testing Architecture
 
-### Unit Tests (964 tests)
+### Unit Tests (1,032 tests)
 - Location: `src/test/java/vc/tbc/bq/jdbc/`
 - Run: `./mvnw test`
 - Coverage: URL parsing, properties, type mapping, exception handling
 - No external dependencies (no Docker)
 
-### Real BigQuery Integration Tests (325 tests, 16 classes)
+### Real BigQuery Integration Tests (19 classes)
 - Location: `src/test/java/vc/tbc/bq/jdbc/integration/real/`
 - Run locally: `gcloud auth application-default login`, `export BQ_TEST_PROJECT=...`,
   then `./mvnw verify -Preal-integration-tests`
@@ -335,6 +336,25 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 - Cache TTL default: 5 minutes
 - Lazy loading option: `metadataLazyLoad=true`
 - Parallel dataset loading in `BQDatabaseMetaData.getSchemas()`
+
+### Key Constraints (PK/FK)
+- BigQuery supports `PRIMARY KEY`/`FOREIGN KEY ... NOT ENFORCED` and never validates
+  them; `getPrimaryKeys`/`getImportedKeys`/`getExportedKeys`/`getCrossReference` report
+  them from `INFORMATION_SCHEMA.TABLE_CONSTRAINTS`, `KEY_COLUMN_USAGE` and
+  `CONSTRAINT_COLUMN_USAGE` (#84)
+- **Composite foreign keys pair via `position_in_unique_constraint`, never row order.**
+  `CONSTRAINT_COLUMN_USAGE` carries no ordinal, so reading it positionally silently
+  transposes `FOREIGN KEY (b, a) REFERENCES parent(p2, p1)` into a wrong join. BigQuery
+  requires a FK to reference exactly the parent's PK columns, so that value indexes the
+  parent's `KEY_COLUMN_USAGE.ordinal_position`
+- Cached as **one snapshot per dataset**, shared by all four methods — keyed per call
+  it would be one query per table introspected. `KeyConstraints` owns the query,
+  assembly and row shaping; `BQDatabaseMetaData` owns dataset scanning and caching
+- `schema`/`table` arguments are matched **exactly**, not as LIKE patterns: JDBC
+  specifies them as names, and `_` is a literal in the underscore-heavy names BigQuery
+  encourages
+- `getExportedKeys` must scan every dataset — a FK is recorded only in the dataset of
+  the referencing table. Cross-*project* FKs are not discoverable
 
 ### Observability
 - `metrics/DriverMetrics` holds JVM-global `LongAdder` counters; `MetricsSnapshot` is
