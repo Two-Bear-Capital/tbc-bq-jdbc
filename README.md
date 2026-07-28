@@ -14,8 +14,8 @@ Modern JDBC driver for Google BigQuery, optimized for development tools and data
 🎯 **Database IDE Optimized**
 - Fast, comprehensive metadata operations
 - Parallel dataset loading with intelligent caching
-- Fixes critical JetBrains driver issues (DBE-18711, DBE-12954, DBE-22088, DBE-12749, DBE-19753)
-- 30x faster schema introspection for large projects
+- Addresses open JetBrains BigQuery issues (DBE-12808, DBE-12749, DBE-17806, DBE-14390, DBE-16410, DBE-18711)
+- Metadata loaded in parallel and cached, so schema introspection stays fast on large projects
 
 ✨ **Modern Java 21+**
 - Records, sealed classes, pattern matching
@@ -35,6 +35,8 @@ Modern JDBC driver for Google BigQuery, optimized for development tools and data
 - Transaction support (`BEGIN`, `COMMIT`, `ROLLBACK`)
 
 ⚡ **Performance**
+- Optional BigQuery Storage Read API for large result sets
+- Batched `INSERT`s collapsed into multi-row statements
 - Configurable result pagination
 - Connection pooling compatible
 - Query timeout enforcement with automatic cancellation
@@ -51,23 +53,26 @@ Modern JDBC driver for Google BigQuery, optimized for development tools and data
 
 This driver addresses critical limitations in existing BigQuery JDBC drivers for IntelliJ IDEA and other database IDEs, with a focus on fast metadata operations and schema introspection:
 
-✅ **Reliable Schema Introspection** - Complete DatabaseMetaData implementation (fixes [DBE-18711](https://youtrack.jetbrains.com/issue/DBE-18711), [DBE-12954](https://youtrack.jetbrains.com/issue/DBE-12954))
+✅ **Reliable Schema Introspection** - Complete `DatabaseMetaData` implementation ([DBE-18711](https://youtrack.jetbrains.com/issue/DBE-18711))
 
-✅ **High Performance with Large Projects** - Parallel loading + caching for 90+ datasets (fixes [DBE-22088](https://youtrack.jetbrains.com/issue/DBE-22088))
-- JetBrains driver: Hangs or takes 90+ seconds
-- tbc-bq-jdbc: 2-3 seconds (30x faster)
+✅ **Fast on Large Projects** - Table and column metadata fetched in parallel and cached, so introspection cost lands once per cache window rather than on every tree expansion
 
-✅ **Safe STRUCT/ARRAY Handling** - JSON representation prevents crashes (fixes [DBE-12749](https://youtrack.jetbrains.com/issue/DBE-12749)); native `java.sql.Array`/`java.sql.Struct` objects available via `nativeComplexTypes=true`
+✅ **Readable STRUCT/ARRAY** - JSON by default, keeping the result grid stable ([DBE-12749](https://youtrack.jetbrains.com/issue/DBE-12749), [DBE-17806](https://youtrack.jetbrains.com/issue/DBE-17806)); native `java.sql.Array`/`java.sql.Struct` via `nativeComplexTypes=true`
 
-✅ **Robust Authentication** - Automatic token refresh for long sessions (fixes [DBE-19753](https://youtrack.jetbrains.com/issue/DBE-19753))
+✅ **Query Cost Before You Run** - `enableQueryCostEstimation=true` reports bytes processed as a `SQLWarning` ([DBE-12808](https://youtrack.jetbrains.com/issue/DBE-12808))
+
+✅ **Stable Authentication** - Credentials cached and refreshed, without repeated prompts ([DBE-14390](https://youtrack.jetbrains.com/issue/DBE-14390))
+
+✅ **Temp Tables and Transactions** - Real BigQuery sessions ([DBE-16410](https://youtrack.jetbrains.com/issue/DBE-16410))
 
 📖 **[Complete IntelliJ Setup Guide →](docs/INTELLIJ.md)**
 
 ### Quick Start for IntelliJ
 
-1. **Download Driver JAR**
+1. **Download Driver JAR** — use the `with-logging` variant, which bundles every
+   dependency plus a preconfigured Logback (see [Logging](docs/LOGGING.md)):
    ```bash
-   wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.4.1/tbc-bq-jdbc-2.4.1.jar
+   wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-with-logging.jar
    ```
 
 2. **Add Driver in IntelliJ**
@@ -97,7 +102,26 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 
 ### Installation
 
-#### Maven
+#### Download a JAR (GitHub Releases)
+
+Every release attaches all five artifacts. Pick the variant that matches how you run the
+driver — see [Logging](docs/LOGGING.md#jar-variants) for the full comparison:
+
+```bash
+# Bundles all dependencies plus preconfigured logging — for IntelliJ, DBeaver, DataGrip
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-with-logging.jar
+
+# Bundles all dependencies, bring your own SLF4J binding — for standalone apps
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-shaded.jar
+```
+
+Or browse [all releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases).
+
+#### Maven / Gradle
+
+> **Not yet published to Maven Central.** The coordinates below are reserved for the
+> first Central release; until then, use a GitHub Releases JAR as shown above (or
+> `./mvnw clean install` to publish to your local repository).
 
 ```xml
 <dependency>
@@ -107,19 +131,10 @@ See **[IntelliJ Integration Guide](docs/INTELLIJ.md)** for:
 </dependency>
 ```
 
-#### Gradle
-
 ```gradle
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:2.4.1'
 }
-```
-
-#### Standalone (Fat JAR)
-
-```bash
-# Download shaded JAR with all dependencies included
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.4.1/tbc-bq-jdbc-2.4.1.jar
 ```
 
 ### Basic Usage
@@ -202,7 +217,9 @@ try (Connection conn = DriverManager.getConnection(url)) {
 - **[Connection Properties](docs/CONNECTION_PROPERTIES.md)** - Complete configuration reference
 - **[Type Mapping](docs/TYPE_MAPPING.md)** - BigQuery ↔ JDBC type conversions
 - **[Compatibility Matrix](docs/COMPATIBILITY.md)** - JDBC features and limitations
+- **[Logging](docs/LOGGING.md)** - JAR variants and logging configuration
 - **[Observability](docs/OBSERVABILITY.md)** - Driver metrics for diagnosing your own workload
+- **[Why tbc-bq-jdbc](docs/JETBRAINS_ISSUES.md)** - JetBrains driver issues this resolves
 - **[Integration Tests](docs/contributing/INTEGRATION_TESTS.md)** - Running integration tests
 
 ## URL Format
@@ -335,8 +352,8 @@ See [Authentication Guide](docs/AUTHENTICATION.md) for all methods.
 ### Requirements
 
 - Java 21 or later
-- Maven 3.9+
-- Docker (for integration tests)
+- Maven 3.9+ (or use the bundled `./mvnw` wrapper)
+- A Google Cloud project with BigQuery enabled, for the integration tests
 
 ### Build Commands
 
@@ -357,17 +374,21 @@ export BQ_TEST_PROJECT=my-gcp-project
 
 ### Build Artifacts
 
-After building:
-- **Slim JAR:** `target/tbc-bq-jdbc-2.4.1.jar` (60K)
-- **Shaded JAR:** `target/tbc-bq-jdbc-2.4.1-shaded.jar` (51M)
-- **Sources JAR:** `target/tbc-bq-jdbc-2.4.1-sources.jar` (41K)
-- **Javadoc JAR:** `target/tbc-bq-jdbc-2.4.1-javadoc.jar` (267K)
+`./mvnw clean package` produces all five, with approximate sizes:
+
+| Artifact | Size | Contents |
+|----------|------|----------|
+| `target/tbc-bq-jdbc-2.4.1.jar` | ~220 KB | Driver classes only; dependencies must be on the classpath |
+| `target/tbc-bq-jdbc-2.4.1-shaded.jar` | ~41 MB | All dependencies relocated; bring your own SLF4J binding |
+| `target/tbc-bq-jdbc-2.4.1-with-logging.jar` | ~42 MB | Shaded, plus Logback preconfigured — the IDE variant |
+| `target/tbc-bq-jdbc-2.4.1-sources.jar` | ~185 KB | Sources |
+| `target/tbc-bq-jdbc-2.4.1-javadoc.jar` | ~610 KB | API reference |
 
 ## Testing
 
 ### Unit Tests
 
-904 unit tests covering:
+Unit tests cover:
 - Driver registration and URL parsing
 - Connection property validation
 - Authentication configuration
@@ -381,7 +402,7 @@ After building:
 
 ### Real BigQuery Integration Tests
 
-Integration tests run against a live BigQuery instance. There is no emulator tier — it was removed because the emulator's behaviour diverges from the service, and tests written against it tended to be weakened until they passed.
+Integration tests run against a live BigQuery instance. There is no emulator tier: BigQuery's semantics cannot be reproduced faithfully enough for a test to mean anything.
 
 **Prerequisites:**
 
@@ -411,18 +432,24 @@ JMH benchmarks for performance testing against a real BigQuery connection:
 export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 
 # Run all benchmarks
-./mvnw test-compile exec:java -Pbenchmarks
+./mvnw test-compile exec:exec -Pbenchmarks
 
 # Run a specific benchmark class (glob pattern)
-./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="ResultSetIterationBenchmark"
-./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="QueryBenchmark"
-./mvnw test-compile exec:java -Pbenchmarks -Dexec.args="PreparedStatementBenchmark"
+./mvnw test-compile exec:exec -Pbenchmarks -Dbenchmark.args="ResultSetIterationBenchmark"
+
+# Thread-scaling sweep with a Markdown report
+./mvnw test-compile exec:exec -Pbenchmark-scaling
 ```
 
 **Available benchmarks:**
 - `ResultSetIterationBenchmark` — throughput of `next()`, column access by name vs. index (100/1000/10000 rows)
 - `QueryBenchmark` — latency of query execution and connection creation
 - `PreparedStatementBenchmark` — parameterized query throughput
+- `ThreadScalingBenchmark` — concurrent throughput across thread counts
+
+Benchmarks use `exec:exec`, not `exec:java`: JMH forks a JVM and rebuilds its classpath,
+which an in-process runner cannot supply. See
+[Performance](docs/contributing/PERFORMANCE.md) for the full harness.
 
 > **Note:** Benchmarks require a live BigQuery project and will submit real jobs. JMH forks separate JVMs per benchmark to avoid JIT bias — this is expected behavior.
 
@@ -439,31 +466,27 @@ export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 - ResultSet forward iteration (TYPE_FORWARD_ONLY)
 - ResultSetMetaData, DatabaseMetaData
 - JDBC 4.3 methods (beginRequest, endRequest, enquoteLiteral, etc.)
-- Sessions and transactions (with `enableSessions=true`)
+- Sessions and transactions
 - All BigQuery data types
 - Query timeout and cancellation
 
 ### ❌ Unsupported Features
 
-- Traditional transactions (without sessions)
 - Scrollable or updatable ResultSets
-- CallableStatement
+- CallableStatement and stored-procedure call syntax
+- Savepoints and configurable transaction isolation
 
 See [Compatibility Matrix](docs/COMPATIBILITY.md) for complete details.
 
 ## Performance
 
-### Query Latency
-
-| Query Type | Typical Latency |
-|------------|-----------------|
-| Small (SELECT 1) | 200-500ms |
-| Medium (< 100MB) | 2-10s |
-| Large (> 100MB) | 10s - minutes |
+Every statement runs as a BigQuery job and pays the service's job-creation latency
+before any data moves, so even trivial queries have a floor. The driver is not suited to
+high query-per-second workloads.
 
 ### Optimization Tips
 
-- Use `pageSize` property for large results
+- Enable `useStorageApi` for large result sets, and tune `pageSize`
 - Use connection pooling
 - Cache frequently executed queries
 - Set appropriate timeouts
@@ -474,7 +497,7 @@ See [Connection Properties - Performance Tuning](docs/CONNECTION_PROPERTIES.md#p
 
 ### BigQuery Architecture
 
-- **No transactions** outside of sessions (use `enableSessions=true`)
+- **Transactions require a BigQuery session**, which `setAutoCommit(false)` starts for you
 - **No indexes** (BigQuery auto-optimizes)
 - **Primary/foreign keys are declarative only** — BigQuery accepts `PRIMARY KEY`/`FOREIGN KEY ... NOT ENFORCED` and never validates them. The driver reports them through `getPrimaryKeys()`, `getImportedKeys()`, `getExportedKeys()` and `getCrossReference()`, so ER diagrams and FK-aware tools work — but the constraints are a statement of intent, not a guarantee about the data. See [Compatibility](docs/COMPATIBILITY.md#unenforced-primary-and-foreign-keys).
 - **No row-level locking**

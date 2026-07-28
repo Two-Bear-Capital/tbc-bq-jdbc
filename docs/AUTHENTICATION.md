@@ -6,13 +6,16 @@ Complete guide to all authentication methods supported by tbc-bq-jdbc.
 
 tbc-bq-jdbc supports all Google Cloud authentication methods:
 
-| Method | Use Case | Requires Credentials File |
-|--------|----------|---------------------------|
-| **ADC** | Local development, GCE/GKE | No (uses environment) |
-| **Service Account** | Production, automation | Yes (JSON key file) |
-| **User OAuth** | End-user applications | Yes (client ID/secret) |
-| **Workforce Identity** | Federated workforce access | Yes (config file) |
-| **Workload Identity** | GKE workload federation | No (uses metadata) |
+| Method | `authType` | Use Case | Required properties |
+|--------|-----------|----------|---------------------|
+| **ADC** | `ADC` | Local development, GCE/GKE | None — discovered from the environment |
+| **Service Account** | `SERVICE_ACCOUNT` | Production, automation | `credentials` (path to a JSON key file) |
+| **User OAuth** | `USER_OAUTH` | End-user applications | `clientId`, `clientSecret`, `refreshToken` |
+| **Workforce Identity** | `WORKFORCE` | Federated workforce access | `credentialConfigFile` |
+| **Workload Identity** | `WORKLOAD` | GKE / workload federation | `credentialConfigFile` |
+
+`authType` defaults to `ADC` when omitted, and its value is case-insensitive. Omitting a
+required property fails at connection time with a message naming the property.
 
 The accepted `authType` values and their underlying implementations are generated from the driver —
 see [the generated reference](generated/authentication.md). The sections below cover setup,
@@ -20,17 +23,8 @@ credentials, and examples for each method.
 
 <!-- @include: generated/authentication.md -->
 
-> **`authType=EMULATOR` was removed in 2.0.0.** It was deprecated in 1.1.0. The
-> driver is not tested against the BigQuery emulator, so advertising support for
-> it promised more than the project could keep. Use `authType=ADC` — or any other
-> real credential type. A URL still asking for `EMULATOR` now fails with
-> *Unsupported authentication type* rather than silently using credentials it was
-> never meant to.
->
-> **A `host` no longer changes how you authenticate.** It previously defaulted
-> `authType` to `EMULATOR`, so pointing the driver at a proxy or a private
-> endpoint quietly produced a fabricated token. A host now means only "reach
-> BigQuery at this address", and the default is `ADC` either way.
+A `host` in the URL controls only which address the driver reaches BigQuery at. It has no
+effect on how you authenticate.
 
 ## Application Default Credentials (ADC)
 
@@ -86,6 +80,9 @@ None required. ADC discovers credentials automatically.
 **Recommended for:** Production deployments, automation, CI/CD
 
 Service accounts are robot accounts for machine-to-machine authentication.
+
+The `credentials` property is a **filesystem path** to the JSON key file. Passing the key
+material inline is not supported.
 
 ### Setup
 
@@ -349,7 +346,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 | Service Account | File/Secret | ❌ | Service account |
 | User OAuth | Refresh token | ✅ | User specific |
 | Workforce | Config file | ✅ | User specific |
-| Workload | Metadata | ✅ | Workload specific |
+| Workload | Config file | ✅ | Workload specific |
 
 ### Use Case Matrix
 
@@ -376,10 +373,6 @@ String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
 try (Connection conn = DriverManager.getConnection(url)) {
     if (conn.isValid(5)) {
         System.out.println("✅ Authentication successful");
-
-        // Get authenticated user/service account
-        DatabaseMetaData meta = conn.getMetaData();
-        System.out.println("Connected as: " + meta.getUserName());
     }
 } catch (SQLException e) {
     System.err.println("❌ Authentication failed: " + e.getMessage());
@@ -388,12 +381,19 @@ try (Connection conn = DriverManager.getConnection(url)) {
 
 ### Common Authentication Errors
 
+The driver validates required properties before contacting BigQuery, so a missing one
+fails fast with a message naming it:
+
 | Error | Cause | Solution |
 |-------|-------|----------|
-| "Could not load credentials" | Missing credentials file | Check file path |
-| "Permission denied" | Insufficient IAM permissions | Grant BigQuery roles |
-| "Invalid authentication" | Expired/invalid credentials | Refresh credentials |
-| "Project not found" | Wrong project ID | Verify project ID |
+| `credentials property required for SERVICE_ACCOUNT authentication` | `authType=SERVICE_ACCOUNT` without `credentials` | Add `credentials=/path/to/key.json` |
+| `clientId, clientSecret, and refreshToken required for USER_OAUTH authentication` | `authType=USER_OAUTH` missing one of the three | Supply all three properties |
+| `credentialConfigFile required for WORKFORCE authentication` | `authType=WORKFORCE` without the config file | Add `credentialConfigFile=/path/to/config.json` |
+| `credentialConfigFile required for WORKLOAD authentication` | `authType=WORKLOAD` without the config file | Add `credentialConfigFile=/path/to/config.json` |
+| `Unsupported authentication type` | `authType` is not one of the five values | Use `ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`, `WORKFORCE` or `WORKLOAD` |
+
+Errors raised by Google Cloud rather than the driver — expired credentials, insufficient
+IAM permissions, a project that does not exist — surface with the service's own message.
 
 ---
 

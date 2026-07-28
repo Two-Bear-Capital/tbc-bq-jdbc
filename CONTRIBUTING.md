@@ -22,9 +22,13 @@ Thank you for considering contributing to the BigQuery JDBC driver!
 # Unit tests only
 ./mvnw test
 
-# All tests (including integration tests)
-./mvnw verify
+# Integration tests (real BigQuery; needs ADC and BQ_TEST_PROJECT)
+export BQ_TEST_PROJECT=my-gcp-project
+./mvnw verify -Preal-integration-tests
 ```
+
+`./mvnw verify` on its own runs the unit tests only — the integration tests need the
+`real-integration-tests` profile, and skip silently when `BQ_TEST_PROJECT` is unset.
 
 ### Detailed contributor guides
 
@@ -68,19 +72,33 @@ This project uses Google Java Format via Spotless:
 
 ### Commit Messages
 
-- Use clear, descriptive commit messages
-- Start with a verb in imperative form (Add, Fix, Update, etc.)
-- Keep first line under 70 characters
-- Add details in the body if needed
+**[Conventional Commits](https://www.conventionalcommits.org/) are required.** The same
+`cliff.toml` parsers drive both the generated changelog and the released version number,
+so the prefix you choose decides the next release.
+
+| Prefix | Meaning | Version bump |
+|---|---|---|
+| `feat(scope):` | New feature | **minor** (1.0.x → 1.1.0) |
+| `fix(scope):` | Bug fix | patch |
+| `perf(scope):` | Performance | patch |
+| `docs(scope):` | Documentation | patch |
+| `test(scope):` | Tests | patch |
+| `refactor(scope):` | Refactoring | patch |
+| `chore(scope):` | Maintenance | patch (`chore(deps)` is skipped) |
+| `feat(scope)!:` or a `BREAKING CHANGE:` footer | Breaking change | **major** (1.x → 2.0.0) |
+
+Keep the first line under 70 characters and put detail in the body.
 
 Example:
 ```
-Add support for ARRAY type in ResultSet
+feat(types): support ARRAY columns in ResultSet
 
-- Implement getArray() method
+- Implement getArray()
 - Add type mapping for BigQuery ARRAY
 - Include integration tests
 ```
+
+Labelling a feature as `fix` understates the release, so pick the prefix deliberately.
 
 ### Pull Requests
 

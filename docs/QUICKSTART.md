@@ -13,9 +13,24 @@ Get started with tbc-bq-jdbc in 5 minutes.
 
 ## Installation
 
-### Maven
+### Download a JAR (GitHub Releases)
 
-Add to your `pom.xml`:
+The shaded JAR includes every dependency, so it works as a standalone driver:
+
+```bash
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-shaded.jar
+```
+
+For IntelliJ IDEA, DBeaver or DataGrip, use the `-with-logging` variant instead — it adds
+a preconfigured Logback. See [Logging](LOGGING.md#jar-variants).
+
+The shaded JARs are ~41 MB, mostly platform-specific native libraries for gRPC SSL/TLS.
+
+### Maven / Gradle
+
+> **Not yet published to Maven Central.** These coordinates are reserved for the first
+> Central release; until then use a GitHub Releases JAR, or run `./mvnw clean install`
+> to publish to your local repository.
 
 ```xml
 <dependency>
@@ -25,26 +40,11 @@ Add to your `pom.xml`:
 </dependency>
 ```
 
-### Gradle
-
-Add to your `build.gradle`:
-
 ```groovy
 dependencies {
     implementation 'vc.tbc:tbc-bq-jdbc:2.4.1'
 }
 ```
-
-### Fat JAR (Standalone)
-
-Download the shaded JAR that includes all dependencies:
-
-```bash
-# Download from Maven Central or GitHub Releases (note the -shaded classifier)
-wget https://repo1.maven.org/maven2/vc/tbc/tbc-bq-jdbc/2.4.1/tbc-bq-jdbc-2.4.1-shaded.jar
-```
-
-**Note:** The shaded JAR is ~38 MB due to platform-specific native libraries required for gRPC SSL/TLS support. This is competitive with other enterprise JDBC drivers (e.g., Simba's BigQuery driver is 41.7 MB).
 
 ## Basic Usage
 
@@ -113,9 +113,10 @@ jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
 
 **Required:**
 - `project` - Google Cloud project ID
-- `authType` - Authentication method (ADC, SERVICE_ACCOUNT, USER_OAUTH, etc.)
 
 **Optional:**
+- `authType` - Authentication method (`ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`,
+  `WORKFORCE`, `WORKLOAD`). Defaults to `ADC`; the value is case-insensitive
 - `dataset` - Default dataset (can be omitted if queries specify dataset)
 - `credentials` - Path to service account JSON key (for SERVICE_ACCOUNT auth)
 - `timeout` - Query timeout in seconds (default: 300)
@@ -149,9 +150,13 @@ String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;Project
 - `0` = Service Account (requires `OAuthPvtKeyPath`)
 - `1` = User OAuth (requires `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken`)
 - `3` = Application Default Credentials (recommended)
-- `4` = External Account → Workload/Workforce Identity (set `credentialConfigFile` via `Properties`)
+- `4` = External Account → Workload/Workforce Identity (set `credentialConfigFile`)
 
-If you're migrating from Simba driver, simply replace the driver JAR - your existing connection strings will work without modification.
+`OAuthType=2` (pre-generated access tokens) is not supported and is rejected with an error.
+
+Migrating from Simba is usually a matter of swapping the JAR and setting the driver class
+to `vc.tbc.bq.jdbc.BQDriver`. Property names Simba defines are translated; anything else
+in the URL is accepted and ignored rather than rejected.
 
 See [Connection Properties - Simba Format](CONNECTION_PROPERTIES.md#simba-bigquery-driver-format) for complete property mapping.
 
@@ -249,10 +254,12 @@ recommended settings.
 Set credentials via environment:
 
 ```bash
-# Application Default Credentials
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+```
 
-# Then use ADC authentication
+Google's client library reads that variable itself, so the URL just selects ADC:
+
+```java
 String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
 ```
 
@@ -287,5 +294,6 @@ See [Connection Properties](CONNECTION_PROPERTIES.md) for all configuration opti
 
 ## Example Projects
 
-Complete example projects available at:
-- https://github.com/Two-Bear-Capital/tbc-bq-jdbc-examples
+Runnable examples live in the driver's own test suite — see
+[`src/test/java/vc/tbc/bq/jdbc/integration/real/`](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/tree/main/src/test/java/vc/tbc/bq/jdbc/integration/real)
+for connections, queries, transactions and metadata usage against real BigQuery.

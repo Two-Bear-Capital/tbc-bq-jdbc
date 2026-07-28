@@ -11,16 +11,21 @@ The driver is distributed in three variants:
 - **Logging:** Requires you to provide your own SLF4J implementation
 - **Size:** Smallest (runtime dependencies not included)
 
+> This JAR packages a `logback.xml` whose appender class names are the *relocated* ones
+> used by the `with-logging` variant. Outside that variant those classes do not exist, so
+> if you add your own Logback, put your `logback.xml` earlier on the classpath — or use
+> a different SLF4J binding — to make sure yours is the one Logback loads.
+
 ### 2. Shaded JAR (`tbc-bq-jdbc-2.4.1-shaded.jar`)
 - **Use case:** Standalone usage with all dependencies bundled
 - **Logging:** Requires you to provide your own SLF4J implementation
-- **Size:** Large (~40MB, includes Google Cloud libraries)
+- **Size:** ~41 MB (includes Google Cloud libraries)
 - **Dependencies:** All dependencies relocated to avoid conflicts
 
 ### 3. Shaded JAR with Logging (`tbc-bq-jdbc-2.4.1-with-logging.jar`)
 - **Use case:** IntelliJ IDEA, DBeaver, and other database tools/IDEs
 - **Logging:** Includes Logback with sensible defaults
-- **Size:** Largest (~45MB, includes everything + Logback)
+- **Size:** ~42 MB (includes everything + Logback)
 - **Dependencies:** All dependencies including Logback relocated
 - **Default behavior:** Logs to `~/.bigquery-jdbc/logs/bigquery-jdbc.log` with daily rotation
 
@@ -45,7 +50,9 @@ When using the `with-logging` variant in IntelliJ:
 
 2. **Default logging behavior:**
    - Driver logs are written to `~/.bigquery-jdbc/logs/bigquery-jdbc.log` (your home directory) — created automatically on first connection
-   - Log level: DEBUG for driver code, WARN for Google Cloud APIs
+   - Log level: DEBUG for driver code, and for the bundled Google Cloud libraries, which
+     are relocated under the driver's own package prefix. Set a
+     `vc.tbc.bq.jdbc.shaded.google` logger to quieten them
    - Daily rotation with 30-day retention
    - Maximum total size: 500MB
 
@@ -126,27 +133,29 @@ Then create your own `logback.xml` in `src/main/resources/`.
 The driver logs at various levels:
 
 ### DEBUG Level
-- Connection establishment details
-- SQL query execution
-- Session management operations
-- Metadata cache operations
-- Result set iterations
+- Connection opened and closed
+- Query job creation and SQL execution
+- Metadata lookups and cache operations
+- Result set closed
 
 ### INFO Level
 - Driver registration
-- Connection opened/closed
-- Query job creation
-- Session lifecycle events
+- Session lifecycle (created, closing, started on demand)
+- Query cancellation
+- Use of a custom BigQuery endpoint
 
 ### WARN Level
-- Query timeouts and cancellations
-- Metadata cache issues
-- Statement cleanup failures
+- Query timeouts and failed job cancellation
+- Metadata cache issues and `INFORMATION_SCHEMA` query failures
+- Storage Read API unavailable, falling back to the standard path
+- Statement cleanup failures during connection close
 
 ### ERROR Level
 - Driver registration failures
 - Connection creation failures
-- SQL exceptions
+- Driver version could not be loaded
+
+Failed queries surface as `SQLException` to the caller; the driver does not log them.
 
 ## Disabling Logging
 
@@ -193,6 +202,14 @@ Change the log level from DEBUG to INFO or WARN:
 Increase the log level for Google Cloud libraries:
 ```xml
 <logger name="com.google.cloud.bigquery" level="DEBUG"/>
+```
+
+This works with the **standard JAR**, where the Google libraries keep their own package
+names. In the **shaded** and **with-logging** JARs `com.google` is relocated to
+`vc.tbc.bq.jdbc.shaded.google`, so use that prefix instead:
+
+```xml
+<logger name="vc.tbc.bq.jdbc.shaded.google.cloud.bigquery" level="DEBUG"/>
 ```
 
 ## See Also

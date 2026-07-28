@@ -81,9 +81,21 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 
 **Migration from Simba:**
 
-Simply replace your existing Simba JDBC driver with tbc-bq-jdbc - your connection strings will work without modification.
+Replace the Simba JDBC driver with tbc-bq-jdbc and set the driver class to
+`vc.tbc.bq.jdbc.BQDriver`. The thirteen Simba property names in the table above are
+translated automatically, so most connection strings work unchanged. Two things to check:
 
-**Note:** The host and port in Simba URLs are validated but not used for actual connections (tbc-bq-jdbc always uses Google's BigQuery API endpoints).
+- `OAuthType=2` (pre-generated access tokens) is rejected with an error. Use `0` or `3`.
+- Any other property name is passed through untranslated. Native tbc-bq-jdbc property
+  names therefore work in a Simba-format URL, but Simba-only options the driver has no
+  equivalent for (`OAuthPvtKey`, `AllowLargeResults`, `LogLevel`, `ProxyHost`, …) are
+  accepted and ignored rather than rejected.
+
+**Host and port.** By default the driver talks to Google's BigQuery endpoints, and the
+`https://www.googleapis.com/bigquery/v2:443` authority in a typical Simba URL changes
+nothing. A *different* host is honoured, however: the driver will direct the client at it.
+When a port is given, that endpoint is contacted over plain **HTTP**, not HTTPS — only
+point this at a trusted address on a trusted network.
 
 ## Required Components
 
@@ -94,10 +106,12 @@ Simply replace your existing Simba JDBC driver with tbc-bq-jdbc - your connectio
 
 ## Complete Property Reference
 
-The full property table is generated directly from the driver's `Driver.getPropertyInfo()` (see
-[the generated reference](generated/connection-properties.md)), so it always matches what the driver
-accepts. The sections after it add the usage guidance, examples, and recommended configurations that
-a flat table can't capture.
+**→ [Full property table](generated/connection-properties.md)** — every property, with its
+type, default and allowed values.
+
+That table is generated from the driver's `Driver.getPropertyInfo()` and checked against it
+on every build, so it stays in step with the code. The sections below add the usage
+guidance, examples, and recommended configurations a flat table can't capture.
 
 <!-- @include: generated/connection-properties.md -->
 
@@ -124,17 +138,22 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
 ```
 
 **Notes:**
-- `timeout=0` means no timeout (wait indefinitely)
+- `timeout=0` means no timeout (wait indefinitely). Values are not range-checked, and a
+  negative value behaves the same as `0`
 - `pageSize` sets how many rows each `jobs.getQueryResults` call fetches, so it controls
-  how many HTTP round trips a large result costs. The default of 50,000 was measured as a
-  good balance: 1.65x faster than the old 10,000 default on a 1M-row result, and 1.30x on a
-  113 MB wide one, with the gain flattening above it
+  how many HTTP round trips a large result costs. The default of 50,000 balances round
+  trips against per-page memory; raising it further yields little
 - Lowering `pageSize` reduces peak memory per page but costs more round trips. BigQuery also
   caps a page by response bytes, so a very large `pageSize` stops adding rows per page once
   the payload hits that ceiling
 - `maxResults` limits total rows returned, regardless of pagination
-- `nativeComplexTypes=false` (default) returns ARRAY/STRUCT as JSON strings — safe for IntelliJ IDEA and tools that don't handle JDBC Array/Struct
-- `nativeComplexTypes=true` enables `rs.getArray()` returning `java.sql.Array` and `rs.getObject()` returning `java.sql.Struct` for RECORD columns; also enables `PreparedStatement.setArray()` and `Connection.createArrayOf()`
+- `nativeComplexTypes=false` (default) returns ARRAY/STRUCT from `getObject()` as JSON
+  strings — safe for IntelliJ IDEA and tools that don't handle JDBC Array/Struct. With the
+  default, `rs.getArray()` throws rather than returning a string
+- `nativeComplexTypes=true` makes `rs.getArray()` return a `java.sql.Array` and
+  `rs.getObject()` return a `java.sql.Struct` for RECORD columns.
+  `PreparedStatement.setArray()` and `Connection.createArrayOf()` work regardless of this
+  setting; `Connection.createStruct()` is not supported
 
 ---
 
@@ -189,23 +208,29 @@ or scripts before any transaction), or to make the session cost explicit at conn
 
 ### Performance Tuning
 
-Covers `useStorageApi`, `connectionTimeout`, `retryCount`, `metadataCacheEnabled`,
-`metadataCacheTtl`, and `metadataLazyLoad` (see the
+Covers `useStorageApi`, `metadataCacheEnabled`, `metadataCacheTtl`,
+`metadataCacheMaxRows`, and `metadataLazyLoad` (see the
 [generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
 ```
-jdbc:bigquery:my-project/my_dataset?authType=ADC&pageSize=50000&retryCount=5
+jdbc:bigquery:my-project/my_dataset?authType=ADC&pageSize=50000&metadataCacheTtl=600
 ```
+
+> **`connectionTimeout` and `retryCount` are accepted but not yet applied.** The driver
+> parses them, but neither changes its behaviour today; retries and timeouts come from
+> the Google Cloud client defaults. Use the `timeout` property for query timeouts.
 
 **Storage API Modes:**
 
 The BigQuery Storage Read API streams results as binary Arrow batches over gRPC
-instead of paging them as JSON over HTTPS. On a 1M-row result that measured
-11.7x faster end to end (57s down to 4.8s). On small ones it is *slower*, because opening a read
-session costs a round trip before the first row arrives.
+instead of paging them as JSON over HTTPS. It is dramatically faster on large result
+sets — an order of magnitude on a million rows. On small ones it is *slower*, because
+opening a read session costs a round trip before the first row arrives.
 
-- `auto` - use the Storage API only for result sets estimated over 10MB
+- `auto` - use the Storage API only for result sets estimated over 10 MB. The estimate is
+  the row count times a nominal 1 KB per row, so in practice this is a threshold of about
+  10,000 rows regardless of how wide they are
 - `true` - always use it, even for small results where it will not pay off
 - `false` (default) - always use the standard Jobs API path
 
@@ -225,32 +250,11 @@ does not charge for — so enabling this does not add cost for ordinary queries.
 
 **Results are byte-for-byte identical on both paths**, which
 `StorageApiParityTest` verifies by running the same query down each and comparing
-every cell.
-
-Achieving that required one change to `getString()` that also affects the
-default path, so it is worth knowing about even if you never enable the Storage
-API. BigQuery's REST encoding renders `FLOAT64` and `TIMESTAMP` by printing a
-`double`, which produces noisier text than the value warrants — and for
-`TIMESTAMP`, text that is very slightly wrong. `getString()` now renders both
-from the parsed value instead:
-
-| Column | Was (REST path) | Now (both paths) |
-|---|---|---|
-| `FLOAT64` | `-0.66666666666666663` | `-0.6666666666666666` |
-| `TIMESTAMP` | `1582934399.9999809` | `1582934399.999981` |
-
-Both `FLOAT64` forms denote the identical 64-bit double; the new one is the
-shortest text that round-trips to it. The old `TIMESTAMP` form was 0.1
-microseconds short of the stored value, because it had been through a `double`;
-the new one is exact. `getDouble()`, `getTimestamp()` and every other type are
-unaffected — only the string rendering of these two types changed.
-
-and it is expected to give faster access to large result sets, parallel stream
-reading, and lower costs for large queries.
+every cell. Switching this property on or off does not change the values your code sees.
 
 **Metadata Caching (for IntelliJ/Database Tools):**
 
-Dramatically improves schema introspection performance, especially for projects with many datasets.
+Improves schema introspection performance, especially for projects with many datasets.
 
 **`metadataCacheEnabled`:**
 - `true` (default) - Cache metadata queries (getCatalogs, getSchemas, getTables, getColumns)
@@ -267,30 +271,25 @@ Dramatically improves schema introspection performance, especially for projects 
 - Default: `50000`
 - Set to `0` for no limit
 
-The cache is shared by every connection to a project and deliberately outlives any
-of them — that is what makes reopening a connection fast. The cost is that only
-expiry ever removes anything, so within a single TTL window each distinct metadata
-query gets its own entry holding every row of its result, and a tool that issues many
-different patterns grows it steadily. This ceiling bounds that: once the total is
-exceeded, the oldest entries are dropped until it is not.
+The cache is shared by every connection to a project and outlives all of them, which is
+what makes reopening a connection fast. Entries are removed only by expiry, so within a
+TTL window each distinct metadata query holds its own entry containing every row of its
+result. `metadataCacheMaxRows` bounds the total: once it is exceeded, the oldest entries
+are dropped until it is not. A single entry larger than the whole ceiling is kept anyway.
 
-It is a row count rather than a byte count because rows are what the cache can
-measure exactly, and rather than an entry count because entries are wildly uneven —
-a `getColumns()` over a wide project is tens of thousands of rows while a
-`getSchemas()` is tens. Raise it if you have a very wide project and memory to
-spare; lower it if the driver is running somewhere memory-constrained.
-
-One entry larger than the whole ceiling is kept anyway rather than cached and
-immediately dropped, which would make every lookup of that query a guaranteed miss.
+Raise it for a very wide project with memory to spare; lower it when the driver runs
+somewhere memory-constrained.
 
 **`metadataLazyLoad`:**
-- `true` - Only load metadata when user expands tree nodes (best for 200+ datasets)
+- `true` - Defer loading until a specific schema or table is requested (best for very
+  large projects). `getTables()` and `getColumns()` return an **empty** result when
+  called with no schema or table pattern
 - `false` (default) - Load all metadata upfront (better for immediate visibility)
 
-**Performance Impact:**
-- **Without caching** (90 datasets): ~90 seconds to load schema tree
-- **With caching** (90 datasets): ~3 seconds first load, <10ms subsequent loads (900x faster)
-- **With lazy loading**: Instant initial connection, loads data on-demand
+**Performance impact:** on a project with many datasets, the first metadata load
+dominates the cost and every subsequent one within the TTL is served from memory.
+Lazy loading removes the upfront load entirely, at the cost of an empty result for
+tools that enumerate everything without a pattern.
 
 **Recommended Configurations:**
 
@@ -326,19 +325,21 @@ Covers `labels`, `jobCreationMode`, and `maxBillingBytes` (see the
 
 **Example:**
 ```
-jdbc:bigquery:my-project/my_dataset?authType=ADC&labels=env=prod,team=data&maxBillingBytes=1000000000
+jdbc:bigquery:my-project/my_dataset?authType=ADC&labels=env=prod,team=data
 ```
 
 **Job Labels:**
 Format: `key1=value1,key2=value2`
+- Attached to every job the connection submits
 - Used for tracking and billing
-- Visible in BigQuery console
-- Can be used in billing exports
+- Visible in BigQuery console and billing exports
 
-**Max Billing Bytes:**
-- Query fails if it would process more than this limit
-- Prevents runaway query costs
-- Set to `null` for no limit
+> **`maxBillingBytes` and `jobCreationMode` are accepted but not yet applied.** The driver
+> parses and validates them, but neither is currently sent to BigQuery. In particular,
+> **`maxBillingBytes` does not cap query cost** — do not rely on it as a spend guardrail.
+> To limit what a query may process, set a
+> [custom cost control](https://cloud.google.com/bigquery/docs/custom-quotas) on the
+> project, or use `enableQueryCostEstimation=true` to see the estimate before you run.
 
 ---
 
@@ -366,12 +367,13 @@ jdbc:bigquery:my-project/my_dataset?\
   pageSize=50000&\
   timeout=3600&\
   location=US&\
+  useStorageApi=auto&\
   labels=env=prod,service=analytics
 ```
 
 **Why:**
 - Service account for security
-- Storage API for large queries
+- Storage API on large result sets (needs `--add-opens=java.base/java.nio=ALL-UNNAMED`)
 - Large page size for throughput
 - Extended timeout for complex queries
 - Labels for cost tracking
@@ -386,14 +388,12 @@ jdbc:bigquery:my-project/staging_dataset?\
   credentials=/vault/keys/bigquery.json&\
   enableSessions=true&\
   timeout=7200&\
-  maxBillingBytes=10737418240&\
   labels=pipeline=etl,stage=transform
 ```
 
 **Why:**
 - Sessions for temp tables and transactions
 - Long timeout for complex ETL
-- Billing limit to prevent cost overruns
 - Labels for pipeline tracking
 
 ---
@@ -423,12 +423,13 @@ jdbc:bigquery:my-project/reporting?\
   credentials=/opt/bi-tool/bigquery-ro.json&\
   pageSize=100000&\
   timeout=600&\
+  useStorageApi=auto&\
   labels=source=looker,type=dashboard
 ```
 
 **Why:**
 - Read-only service account
-- Storage API for dashboard queries
+- Storage API on large result sets (needs `--add-opens=java.base/java.nio=ALL-UNNAMED`)
 - Large pages for throughput
 - Labels for usage tracking
 
@@ -442,39 +443,33 @@ The allowed values for each property (e.g. `authType`, `useStorageApi`, `jobCrea
 `useLegacySql`) are listed in the **[generated property table](generated/connection-properties.md)**,
 produced directly from the driver.
 
-### Invalid Combinations
+### What is validated
 
-❌ **Don't:**
-```
-authType=SERVICE_ACCOUNT (without credentials property)
-```
-**Error:** SQLException - credentials required
+`projectId` must be present and non-blank, and `authType` must be one of the five
+supported values. Each auth type's required properties are checked before the driver
+contacts BigQuery — see [Authentication](AUTHENTICATION.md#common-authentication-errors)
+for the exact messages.
 
-❌ **Don't:**
-```
-timeout=-1 or timeout=999999999
-```
-**Error:** IllegalArgumentException
+Numeric properties are parsed but not range-checked. A `timeout` of `0` or any negative
+value means "wait indefinitely"; an implausibly large value is accepted as given.
 
 ---
 
-## Environment Variable Substitution
+## Using environment variables
 
-You can reference environment variables in property values:
+The driver does not expand environment variables inside a URL. Read them in your
+application and build the URL yourself:
 
 ```java
-// Set environment variable
-System.setenv("BQ_KEY_PATH", "/secrets/bigquery.json");
-System.setenv("BQ_TIMEOUT", "600");
-
-// Use in URL (manual substitution)
-String keyPath = System.getenv("BQ_KEY_PATH");
-String timeout = System.getenv("BQ_TIMEOUT");
 String url = String.format(
     "jdbc:bigquery:my-project/my_dataset?authType=SERVICE_ACCOUNT&credentials=%s&timeout=%s",
-    keyPath, timeout
+    System.getenv("BQ_KEY_PATH"),
+    System.getenv("BQ_TIMEOUT")
 );
 ```
+
+For Application Default Credentials, Google's client library reads
+`GOOGLE_APPLICATION_CREDENTIALS` from the environment itself — no URL property needed.
 
 ---
 
@@ -513,15 +508,14 @@ driver's `getPropertyInfo()`, so it never goes stale.
 
 | Property | Impact on Performance | Impact on Cost |
 |----------|----------------------|----------------|
-| `pageSize` | Higher = faster iteration | None |
+| `useStorageApi` | Much faster on large result sets, slower on small ones | None |
+| `pageSize` | Higher = fewer round trips, more memory per page | None |
 | `timeout` | Higher allows longer queries | Indirectly (prevents partial work) |
-| `maxResults` | Lower = faster completion | Lower (less data processed) |
-| `connectionTimeout` | Higher = more resilient | None |
-| `enableSessions` | Slight overhead | Minimal |
-| `retryCount` | Higher = more resilient | Higher (retried queries billed) |
-| `metadataCacheEnabled=true` | 900x faster repeated metadata queries | None |
-| `metadataCacheTtl` | Higher = more cache hits | None |
-| `metadataLazyLoad=true` | Instant connection, load on-demand | Lower (fewer API calls) |
+| `maxResults` | Lower = faster completion | None — BigQuery still scans the full query |
+| `enableSessions` | One extra job at connection open | Minimal |
+| `metadataCacheEnabled=true` | Repeated metadata queries served from memory | Lower (fewer API calls) |
+| `metadataCacheTtl` | Higher = more cache hits, staler schema | Lower |
+| `metadataLazyLoad=true` | No upfront metadata load | Lower (fewer API calls) |
 
 ---
 

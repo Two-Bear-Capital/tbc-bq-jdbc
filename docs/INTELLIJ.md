@@ -10,7 +10,6 @@ A comprehensive guide for using **tbc-bq-jdbc** as a superior alternative to Jet
 - [Configuration](#configuration)
 - [Logging in IntelliJ](#logging-in-intellij)
 - [Performance Tuning](#performance-tuning)
-- [Feature Comparison](#feature-comparison)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
 
@@ -18,8 +17,8 @@ A comprehensive guide for using **tbc-bq-jdbc** as a superior alternative to Jet
 
 ## Why Use tbc-bq-jdbc with IntelliJ?
 
-JetBrains' built-in BigQuery driver hangs on large projects, has unreliable schema introspection,
-crashes on STRUCT columns, and drops authentication after about an hour. tbc-bq-jdbc fixes these with:
+JetBrains' BigQuery support has open gaps around introspection, nested types,
+authentication prompts and temp tables. tbc-bq-jdbc addresses them with:
 
 - **Production-grade performance** — cached, parallel metadata loading (and optional lazy loading)
 - **Complete JDBC compliance** — all metadata methods, full `ResultSetMetaData`, proper type mapping
@@ -70,9 +69,26 @@ driver logs work out of the box. See [Logging in IntelliJ](#logging-in-intellij)
 
 ### Step 1: Download the Driver JAR
 
-Choose one of these methods:
+Choose one of these methods. Either way, use the **`with-logging`** variant — IntelliJ
+runs drivers with no logging backend of its own.
 
-**Option A: Maven Central** (when available)
+**Option A: Download a release**
+```bash
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-2.4.1-with-logging.jar
+```
+Or browse [GitHub Releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases).
+
+**Option B: Build from source**
+```bash
+git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
+cd tbc-bq-jdbc
+./mvnw clean package
+# Use target/tbc-bq-jdbc-2.4.1-with-logging.jar
+# (the classifier-less JAR holds driver classes only and will not work on its own)
+```
+
+**Option C: Maven / Gradle** — not yet published to Maven Central. These coordinates are
+reserved for the first Central release.
 ```xml
 <dependency>
     <groupId>vc.tbc</groupId>
@@ -81,18 +97,6 @@ Choose one of these methods:
     <classifier>shaded</classifier>
 </dependency>
 ```
-
-**Option B: Build from Source**
-```bash
-git clone https://github.com/Two-Bear-Capital/tbc-bq-jdbc.git
-cd tbc-bq-jdbc
-./mvnw clean package
-# JAR will be in target/tbc-bq-jdbc-2.4.1.jar
-```
-
-**Option C: Download Release**
-- Visit [GitHub Releases](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases)
-- Download `tbc-bq-jdbc-X.Y.Z-shaded.jar`
 
 ### Step 2: Configure IntelliJ Driver
 
@@ -212,7 +216,7 @@ The `with-logging` JAR writes driver logs to a predictable location, created aut
 - **macOS/Linux:** `~/.bigquery-jdbc/logs/bigquery-jdbc.log`
 - **Windows:** `C:\Users\<you>\.bigquery-jdbc\logs\bigquery-jdbc.log`
 
-Defaults: `DEBUG` for driver code, `WARN` for Google Cloud APIs, daily rotation with 30-day retention (500 MB cap). To change the location or level, add console output, or use a different JAR variant, supply your own `logback.xml` on IntelliJ's classpath — see the [Logging guide](LOGGING.md) for full configuration.
+Defaults: `DEBUG` for driver code and the bundled Google Cloud libraries, daily rotation with 30-day retention (500 MB cap). To change the location or level, add console output, or use a different JAR variant, supply your own `logback.xml` on IntelliJ's classpath — see the [Logging guide](LOGGING.md) for full configuration.
 
 ### Suppressing IntelliJ's built-in dialect warnings
 
@@ -232,9 +236,9 @@ IntelliJ's own BigQuery dialect can log harmless warnings such as `WARNING: Coul
 ### Faster large result sets (Storage Read API)
 
 If you regularly pull large result sets, the BigQuery Storage Read API is worth
-enabling — it measured 11.7x faster than the default result path on a 1M-row
-query (57s down to 4.8s). It needs one JVM flag, because Apache Arrow cannot allocate memory
-without it on Java 16+.
+enabling — it is dramatically faster than the default result path once a result runs to
+hundreds of thousands of rows. It needs one JVM flag, because Apache Arrow cannot
+allocate memory without it on Java 16+.
 
 IntelliJ and DataGrip run JDBC drivers in a **separate process** from the IDE, so
 you set this per data source rather than in the IDE's own VM options:
@@ -289,15 +293,15 @@ jdbc:bigquery:my-project?authType=ADC&metadataCacheTtl=600
 **What it does**: Queries multiple datasets concurrently using virtual threads
 
 **Behavior**:
-- **Automatic**: Enables when ≥5 datasets detected
-- **Performance**: 6-9x faster for projects with 90+ datasets
-- **No configuration needed**: Works out of the box
+- **Always on**: there is no dataset-count threshold to cross
+- **No configuration needed**: works out of the box
+- **Applies to** `getTables()`, `getColumns()`, `getProcedures()` and key-constraint
+  scans, which is where introspection spends its time. Concurrency is capped at 16
+  in-flight `INFORMATION_SCHEMA` queries
 
-**Performance Impact**:
-- Sequential (old way): 90 datasets × 200ms = **18 seconds**
-- Parallel (tbc-bq-jdbc): **2-3 seconds**
-
-This directly addresses **JetBrains issue DBE-22088** (hangs with 90+ datasets).
+Introspecting a project one dataset at a time costs a round trip per dataset, so the
+saving grows with the number of datasets. Combined with the metadata cache, the cost
+lands once per TTL window rather than on every tree expansion.
 
 #### 3. Lazy Loading
 
@@ -375,14 +379,6 @@ jdbc:bigquery:my-project?authType=ADC&metadataCacheTtl=1800&metadataLazyLoad=tru
 
 ---
 
-## Feature Comparison
-
-tbc-bq-jdbc supports the full JDBC/BigQuery feature surface that IntelliJ's database tools use. See
-the [Compatibility](COMPATIBILITY.md) reference for the complete feature-support matrix, and
-[Why tbc-bq-jdbc](JETBRAINS_ISSUES.md) for the side-by-side comparison with JetBrains' built-in driver.
-
----
-
 ## Troubleshooting
 
 ### Connection Issues
@@ -441,9 +437,9 @@ SQLException: Project 'my-project' not found
    ?metadataCacheTtl=600
    ```
 
-3. **Check dataset count**:
+3. **Check how many datasets the project has** — introspection cost scales with it:
    ```sql
-   SELECT COUNT(*) FROM `my-project.__EMPTY__`;
+   SELECT COUNT(*) FROM `my-project`.INFORMATION_SCHEMA.SCHEMATA;
    ```
 
 #### Problem: Queries are slow
@@ -482,9 +478,10 @@ java.lang.OutOfMemoryError: Java heap space
 
 ### Type Display Issues
 
-#### Problem: STRUCT shows as "[object]"
+#### Problem: STRUCT columns show as JSON text
 
-**This is expected behavior** - STRUCT types show as JSON.
+**This is expected behavior.** By default STRUCT and ARRAY values render as JSON — for
+example `{"id":1,"name":"Alice"}` — which is what keeps IntelliJ's result grid stable.
 
 **To view STRUCT contents**:
 1. Double-click the cell
@@ -608,10 +605,9 @@ jdbc:bigquery:dev-project?authType=ADC&metadataCacheTtl=60
 
 ### 6. Monitor Your Queries
 
-**Enable query logging** to see actual BigQuery API calls:
-```
-?enableQueryLogging=true
-```
+**See the driver's own query logging** by using the `with-logging` JAR and reading
+`~/.bigquery-jdbc/logs/bigquery-jdbc.log`, or by setting the `vc.tbc.bq.jdbc` logger to
+DEBUG — see the [Logging guide](LOGGING.md).
 
 **Check query costs** in BigQuery Console:
 - Navigation Menu → BigQuery → Job History
@@ -674,9 +670,3 @@ For introspection performance issues:
 
 - GitHub Discussions (coming soon)
 - Stack Overflow: Tag with `tbc-bq-jdbc`
-
----
-
-**Last Updated**: 2026-07-28
-**Driver Version**: 2.4.1
-**IntelliJ Version Tested**: 2025.3.x

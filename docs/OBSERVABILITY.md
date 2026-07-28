@@ -3,9 +3,8 @@
 The driver keeps counters and timers describing what it is doing. Your application
 can read them at any time, with no configuration and no extra dependencies.
 
-They exist so you can answer questions about your own workload — why an IDE feels
-slow, whether a pool is sharing credentials, whether a session is leaking — instead
-of filing a bug nobody can reproduce.
+Use them to answer questions about your own workload: why an IDE feels slow, whether a
+pool is sharing credentials, whether a session is leaking.
 
 ## Reading them
 
@@ -18,11 +17,10 @@ System.out.println(metrics);
 ```
 
 ```
-queries[submitted=1420 succeeded=1418 failed=2 inFlight=0 mean=214.3ms max=3011.0ms]
-metadataCache[hits=880 misses=44 hitRate=95.2%]
-sessions[created=3 closed=3 open=0]
-credentialCache[hits=63 misses=1 hitRate=98.4%]
+queries[submitted=1420 succeeded=1418 failed=2 inFlight=0 mean=214.3ms max=3011.0ms] metadataCache[hits=880 misses=44 hitRate=95.2%] sessions[created=3 closed=3 open=0] credentialCache[hits=63 misses=1 hitRate=98.4%]
 ```
+
+`toString()` emits this as a single line; it is wrapped above for readability.
 
 Counters are cumulative for the life of the JVM, which answers "what has this process
 done". Usually the more useful question is "what happened during *this*", which is a
@@ -46,9 +44,9 @@ the hit rate *during* the workload, not since startup.
 
 | Accessor | Meaning |
 |---|---|
-| `queriesSubmitted()` | Query and DML jobs dispatched to BigQuery |
+| `queriesSubmitted()` | Query and DML jobs that have completed. Equals succeeded + failed |
 | `queriesSucceeded()` / `queriesFailed()` | Terminal outcomes. Failures include cancellations and timeouts |
-| `queriesInFlight()` | Dispatched but not yet finished |
+| `queriesInFlight()` | Always `0` — counters are incremented at completion, not dispatch |
 | `meanQueryMillis()` / `maxQueryMillis()` | Wall-clock job duration, successes and failures alike |
 | `metadataCacheHits()` / `metadataCacheMisses()` / `metadataCacheHitRate()` | Metadata lookups served from the shared cache. An expired entry counts as a miss — it costs a round trip either way |
 | `sessionsCreated()` / `sessionsClosed()` / `sessionsOpen()` | BigQuery sessions, used for transactions, temp tables and multi-statement SQL |
@@ -116,15 +114,13 @@ Disabling does not discard what was already counted. `DriverMetrics.reset()` zer
 everything — note that it is global, so prefer `minus()` if anything else in the JVM
 is also reading these.
 
-This is a system property rather than a connection property because the registry is
-JVM-wide: a per-connection setting could not meaningfully govern a cache shared with
-connections that set it differently.
+Metrics are controlled by a system property rather than a connection property, because
+the registry is JVM-wide and shared by every connection in the process.
 
 ## Exporting
 
-There is no JMX MBean and no Micrometer dependency, deliberately. A static accessor
-returning an immutable record has no registration lifecycle to get wrong and forwards
-to whatever you already use in a few lines:
+The driver exposes no JMX MBean and depends on no metrics library. `snapshot()` returns
+an immutable record, which you forward to whatever you already use:
 
 ```java
 // Micrometer
@@ -132,9 +128,6 @@ Gauge.builder("bq.metadata.cache.hit.rate",
         () -> DriverMetrics.snapshot().metadataCacheHitRate())
     .register(registry);
 
-Gauge.builder("bq.queries.inflight",
-        () -> DriverMetrics.snapshot().queriesInFlight())
-    .register(registry);
 ```
 
 ```java
@@ -146,10 +139,10 @@ Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(
 
 ## A note on precision
 
-Counters are read one after another rather than under a lock. A snapshot taken during
-active traffic may catch related counters an operation apart — `queriesSubmitted` can
-exceed the sum of succeeded and failed by the number of queries in flight.
+Counters are read one after another rather than under a lock, so a snapshot taken during
+active traffic may catch related counters an operation apart. Derived counts are clamped
+at zero, so a skewed read never reports a negative.
 
-That is a true statement about the system rather than an inconsistency, and it is the
-right trade against putting a lock on a hot path to make a diagnostic exact. Derived
-counts are clamped at zero so a skewed read never reports a negative.
+`queriesSubmitted` is incremented when a query finishes, not when it is dispatched, so it
+always equals `queriesSucceeded + queriesFailed` and `queriesInFlight()` always reports
+zero. Do not use it to measure concurrency.

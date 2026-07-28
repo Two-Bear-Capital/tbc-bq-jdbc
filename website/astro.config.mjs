@@ -49,6 +49,7 @@ export default defineConfig({
 						{ slug: 'guides/type-mapping' },
 						{ slug: 'guides/compatibility' },
 						{ slug: 'guides/logging' },
+						{ slug: 'guides/observability' },
 						{ slug: 'guides/intellij' },
 						{ slug: 'guides/jetbrains-issues' },
 					],

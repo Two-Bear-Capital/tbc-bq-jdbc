@@ -6,8 +6,8 @@ We release patches for security vulnerabilities for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+| 2.x.x   | :white_check_mark: |
+| < 2.0   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -44,7 +44,7 @@ Please include the following information in your report:
 
 ## Security Update Policy
 
-- Security updates will be released as patch versions (e.g., 1.0.1)
+- Security updates will be released as patch versions (e.g., 2.4.1)
 - Critical vulnerabilities will be prioritized and released as soon as possible
 - Security advisories will be published on GitHub Security Advisories
 - Release notes will clearly indicate security fixes
