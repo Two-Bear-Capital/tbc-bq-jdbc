@@ -100,6 +100,18 @@ final class KeyConstraints {
 	private static final String PRIMARY_KEY = "PRIMARY KEY";
 
 	/**
+	 * Separator joining schema, table and constraint name into a grouping key.
+	 *
+	 * <p>
+	 * Written as an escape rather than as the raw character: a NUL embedded in a
+	 * literal is invisible in every editor and diff, so the delimiter would be
+	 * unreadable and easy to damage silently. NUL is the right <em>value</em>,
+	 * because no BigQuery identifier can contain one and so no combination of parts
+	 * can collide with another.
+	 */
+	private static final String KEY_PART_SEPARATOR = "\0";
+
+	/**
 	 * Column layout of the per-dataset constraint snapshot.
 	 *
 	 * <p>
@@ -352,7 +364,7 @@ final class KeyConstraints {
 			// Keyed by table as well as name: names are unique within a dataset, but a
 			// scan spanning datasets merges snapshots that were each unique only
 			// locally, and two datasets both holding an "orders.pk$" is the norm.
-			String groupKey = schema + " " + table + " " + name;
+			String groupKey = schema + KEY_PART_SEPARATOR + table + KEY_PART_SEPARATOR + name;
 			Pending pending = byConstraint.computeIfAbsent(groupKey,
 					ignored -> new Pending(schema, table, name, asString(row[IDX_CONSTRAINT_TYPE]), new ArrayList<>(),
 							asString(row[IDX_REF_CATALOG]), asString(row[IDX_REF_SCHEM]), asString(row[IDX_REF_TABLE]),

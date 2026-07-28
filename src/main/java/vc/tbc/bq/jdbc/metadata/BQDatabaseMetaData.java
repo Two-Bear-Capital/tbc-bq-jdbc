@@ -1763,14 +1763,20 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * non-atomic hit/miss counters. Snapshots are loaded from the parallel scan, so
 	 * they would race those counters; {@code MetadataCache} itself is thread-safe
 	 * and still records the hit or miss in {@code DriverMetrics}.
+	 *
+	 * <p>
+	 * It uses the cache's row-level API rather than its {@code ResultSet} one. A
+	 * snapshot is reshaped into four different JDBC result sets and is never handed
+	 * to a caller as-is, so wrapping it would create a closeable that nobody owns,
+	 * opens or closes on either the read or the write path.
 	 */
 	private java.util.List<Object[]> loadConstraintSnapshot(String projectId, String datasetId) {
 		String key = "constraints:" + projectId + ":" + datasetId;
 
 		if (cache != null) {
-			java.util.Optional<ResultSet> cached = cache.get(key);
-			if (cached.isPresent() && cached.get() instanceof MetadataResultSet snapshot) {
-				return snapshot.getRows();
+			java.util.Optional<java.util.List<Object[]>> cached = cache.getRows(key);
+			if (cached.isPresent()) {
+				return cached.get();
 			}
 		}
 
@@ -1781,12 +1787,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// what makes repeat introspection free — but a read that failed must not
 		// install "this dataset has no keys" for the rest of the TTL window.
 		if (cache != null && rows.isPresent()) {
-			try {
-				cache.put(key, new MetadataResultSet(KeyConstraints.SNAPSHOT_COLUMN_NAMES,
-						KeyConstraints.SNAPSHOT_COLUMN_TYPES, rows.get()));
-			} catch (SQLException e) {
-				logger.debug("Could not cache key constraints for dataset {}: {}", datasetId, e.getMessage());
-			}
+			cache.putRows(key, KeyConstraints.SNAPSHOT_COLUMN_NAMES, KeyConstraints.SNAPSHOT_COLUMN_TYPES, rows.get());
 		}
 		return rows.orElseGet(java.util.List::of);
 	}
