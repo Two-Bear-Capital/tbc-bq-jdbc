@@ -50,7 +50,10 @@ scans a large table fails instead of billing for it.
 
 - Java 21+
 - Application Default Credentials for a project you can create tables in
-- `BQ_TEST_PROJECT` set (and optionally `BQ_TEST_DATASET`)
+- `BQ_TEST_PROJECT` set (and optionally `BQ_TEST_DATASET`). The project and dataset
+  are defined in [`terraform/variables.tf`](../../terraform/variables.tf) —
+  `bigquery-jdbc-driver-test` and `tbc_bq_jdbc_integration_tests`. That is the
+  source of truth; do not infer the project from `gcloud config`
 
 No Docker, and no container image.
 
@@ -60,9 +63,10 @@ No Docker, and no container image.
 # 1. Authenticate
 gcloud auth application-default login
 
-# 2. Point at a project
-export BQ_TEST_PROJECT=my-gcp-project
-export BQ_TEST_DATASET=tbc_bq_jdbc_integration_tests   # optional
+# 2. Point at a project. Maintainers use the one Terraform provisions; anyone
+#    without access to it can use any project where they can create datasets.
+export BQ_TEST_PROJECT=bigquery-jdbc-driver-test
+export BQ_TEST_DATASET=tbc_bq_jdbc_integration_tests   # optional, this is the default
 
 # 3. Run
 ./mvnw verify -Preal-integration-tests
