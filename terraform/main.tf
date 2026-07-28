@@ -33,6 +33,15 @@ resource "google_project_service" "bigquery" {
   disable_on_destroy = false
 }
 
+# The Storage Read API is a distinct service from bigquery.googleapis.com, with
+# its own permission (bigquery.readsessions.create). The driver uses it for the
+# useStorageApi result path (#152), so the integration suite needs it enabled.
+resource "google_project_service" "bigquery_storage" {
+  project            = google_project.integration.project_id
+  service            = "bigquerystorage.googleapis.com"
+  disable_on_destroy = false
+}
+
 resource "google_project_service" "iam_credentials" {
   project            = google_project.integration.project_id
   service            = "iamcredentials.googleapis.com"
@@ -83,6 +92,18 @@ resource "google_project_iam_member" "ci_job_user" {
   project = google_project.integration.project_id
   role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.ci.email}"
+}
+
+# bigquery.jobUser and dataEditor do not cover reading through the Storage Read
+# API; that needs bigquery.readsessions.create. Without this,
+# StorageApiParityTest fails with PERMISSION_DENIED and the driver quietly falls
+# back to the REST path, leaving the Storage path untested in CI.
+resource "google_project_iam_member" "ci_read_session_user" {
+  project = google_project.integration.project_id
+  role    = "roles/bigquery.readSessionUser"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+
+  depends_on = [google_project_service.bigquery_storage]
 }
 
 # ── Workload Identity Federation ─────────────────────────────────────────────
