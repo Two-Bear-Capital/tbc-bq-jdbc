@@ -988,8 +988,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 
 	/**
 	 * Applies the connection-level settings every job carries: default dataset,
-	 * labels, and the session property when a session is active. Entering a session
-	 * also opens the transaction if the connection is in manual-commit mode.
+	 * labels, the billing ceiling, and the session property when a session is
+	 * active. Entering a session also opens the transaction if the connection is in
+	 * manual-commit mode.
+	 *
+	 * <p>
+	 * This is the single point where connection-level job settings are applied. The
+	 * query and DML paths both route through it, so a setting added here reaches
+	 * every job the driver submits rather than only the path it was written for.
 	 *
 	 * <p>
 	 * Returns the builder rather than mutating in place, because
@@ -1008,6 +1014,12 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		}
 		if (!properties.labels().isEmpty()) {
 			configBuilder.setLabels(properties.labels());
+		}
+		// BigQuery fails the job outright when the estimate exceeds this, before any
+		// bytes are billed, so it is a spend ceiling rather than a hint. Applied here
+		// so it covers DML and batch-rewritten INSERTs, not just SELECT.
+		if (properties.maxBillingBytes() != null) {
+			configBuilder.setMaximumBytesBilled(properties.maxBillingBytes());
 		}
 		SessionManager sessionManager = connection.getSessionManager();
 		if (sessionManager != null && sessionManager.hasSession()) {
