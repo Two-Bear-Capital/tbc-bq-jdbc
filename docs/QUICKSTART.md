@@ -18,7 +18,7 @@ Get started with tbc-bq-jdbc in 5 minutes.
 The shaded JAR includes every dependency, so it works as a standalone driver:
 
 ```bash
-wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.1-shaded.jar
+wget https://github.com/Two-Bear-Capital/tbc-bq-jdbc/releases/latest/download/tbc-bq-jdbc-3.0.2-shaded.jar
 ```
 
 For IntelliJ IDEA, DBeaver or DataGrip, use the `-with-logging` variant instead — it adds
@@ -36,13 +36,13 @@ The shaded JARs are ~41 MB, mostly platform-specific native libraries for gRPC S
 <dependency>
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>3.0.1</version>
+    <version>3.0.2</version>
 </dependency>
 ```
 
 ```groovy
 dependencies {
-    implementation 'vc.tbc:tbc-bq-jdbc:3.0.1'
+    implementation 'vc.tbc:tbc-bq-jdbc:3.0.2'
 }
 ```
 
