@@ -25,6 +25,7 @@ import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
+import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
 
 import java.sql.*;
 import java.util.Locale;
@@ -743,6 +744,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private java.util.List<Object[]> queryProceduresForDataset(String projectId, String datasetId,
 			String procedureNamePattern) {
+		if (rejectsUnsafeIdentifiers(projectId, datasetId, "procedures")) {
+			return java.util.List.of();
+		}
+
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
 			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
@@ -815,6 +820,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private java.util.List<Object[]> queryProcedureColumnsForDataset(String projectId, String datasetId,
 			String procedureNamePattern, String columnNamePattern) {
+		if (rejectsUnsafeIdentifiers(projectId, datasetId, "procedure columns")) {
+			return java.util.List.of();
+		}
+
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
 			com.google.cloud.bigquery.BigQuery bigquery = connection.getBigQuery();
@@ -1188,6 +1197,13 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private java.util.List<Object[]> queryColumnsForDataset(com.google.cloud.bigquery.BigQuery bigquery,
 			String projectId, String datasetId, String tableNamePattern, String columnNamePattern) throws SQLException {
+		// Unlike the other metadata queries, this one has a non-SQL route to the same
+		// answer, so a name that cannot be safely interpolated does not have to cost
+		// the caller their columns — it costs them the fast path instead.
+		if (rejectsUnsafeIdentifiers(projectId, datasetId, "columns")) {
+			return queryColumnsViaGetTable(bigquery, projectId, datasetId, tableNamePattern, columnNamePattern);
+		}
+
 		try {
 			return queryColumnsViaInformationSchema(bigquery, projectId, datasetId, tableNamePattern,
 					columnNamePattern);
@@ -1807,9 +1823,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private java.util.Optional<java.util.List<Object[]>> queryConstraintsForDataset(String projectId,
 			String datasetId) {
-		if (!KeyConstraints.isSafeIdentifier(projectId) || !KeyConstraints.isSafeIdentifier(datasetId)) {
-			logger.warn("Skipping key constraints for [{}].[{}]: not a valid BigQuery identifier", projectId,
-					datasetId);
+		if (rejectsUnsafeIdentifiers(projectId, datasetId, "key constraints")) {
 			return java.util.Optional.empty();
 		}
 
@@ -2428,6 +2442,43 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 			return allRows;
 		}
+	}
+
+	/**
+	 * Guards every {@code INFORMATION_SCHEMA} query this class builds by
+	 * concatenation.
+	 *
+	 * <p>
+	 * BigQuery cannot parameterise the table path of a query, so these names have
+	 * to be interpolated, and several of them arrive from the caller — the JDBC
+	 * metadata methods take {@code catalog} and {@code schema} as literal names. A
+	 * name containing a backtick would close the quoting around it and turn the
+	 * rest into SQL.
+	 *
+	 * <p>
+	 * In most of these methods the value has already been through
+	 * {@code BigQuery.listDatasets()}, which rejects anything that is not a
+	 * well-formed project ID — so today this check does not fire. That is the point
+	 * of stating it: the protection was a side effect of an API call made for
+	 * another reason, invisible to anyone reading the query, and lost by any path
+	 * that skips the listing. {@code getPrimaryKeys} already takes such a path when
+	 * the caller names a schema.
+	 *
+	 * @param projectId
+	 *            the project about to be interpolated
+	 * @param datasetId
+	 *            the dataset about to be interpolated
+	 * @param what
+	 *            what the caller was reading, for the log message
+	 * @return true if the caller must <em>not</em> build the query
+	 */
+	private static boolean rejectsUnsafeIdentifiers(String projectId, String datasetId, String what) {
+		if (BigQueryIdentifiers.areSafe(projectId, datasetId)) {
+			return false;
+		}
+		logger.warn("Skipping {} for [{}].[{}]: not a valid BigQuery project or dataset name", what, projectId,
+				datasetId);
+		return true;
 	}
 
 	/**

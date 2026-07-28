@@ -305,18 +305,9 @@ class KeyConstraintsTest {
 		assertTrue(sql.contains("position_in_unique_constraint"));
 	}
 
-	/**
-	 * {@code schema} arrives from the caller and has to be interpolated, since
-	 * BigQuery cannot parameterise a table path.
-	 */
-	@Test
-	void unsafeIdentifiersAreRejected() {
-		assertTrue(KeyConstraints.isSafeIdentifier("my_dataset-1"));
-		assertFalse(KeyConstraints.isSafeIdentifier("shop`.INFORMATION_SCHEMA.TABLES UNION ALL SELECT 1 --"));
-		assertFalse(KeyConstraints.isSafeIdentifier("has space"));
-		assertFalse(KeyConstraints.isSafeIdentifier(""));
-		assertFalse(KeyConstraints.isSafeIdentifier(null));
-	}
+	// The guard on the identifiers this query interpolates now lives in
+	// vc.tbc.bq.jdbc.util.BigQueryIdentifiers, shared with the older metadata
+	// queries that build SQL the same way; see BigQueryIdentifiersTest.
 
 	private static List<KeyConstraints.Constraint> foreignKeysOf(List<KeyConstraints.Constraint> constraints) {
 		return constraints.stream().filter(c -> !c.primaryKey()).toList();

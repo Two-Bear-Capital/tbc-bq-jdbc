@@ -18,11 +18,15 @@ package vc.tbc.bq.jdbc.metadata;
 import com.google.api.gax.paging.Page;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.Dataset;
+import com.google.cloud.bigquery.DatasetId;
 import com.google.cloud.bigquery.QueryJobConfiguration;
+import com.google.cloud.bigquery.Table;
 import com.google.cloud.bigquery.TableResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vc.tbc.bq.jdbc.BQConnection;
@@ -36,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -59,6 +64,15 @@ class BQDatabaseMetaDataTest {
 
 	@Mock
 	private Page<Dataset> emptyDatasetPage;
+
+	@Mock
+	private Page<Dataset> datasetPage;
+
+	@Mock
+	private Dataset dataset;
+
+	@Mock
+	private Page<Table> emptyTablePage;
 
 	@Mock
 	private TableResult tableResult;
@@ -606,6 +620,74 @@ class BQDatabaseMetaDataTest {
 		assertNotNull(rs);
 		assertFalse(rs.next());
 		verifyNoInteractions(bigQuery);
+	}
+
+	/**
+	 * BigQuery cannot parameterise the table path of a query, so the metadata
+	 * methods interpolate {@code catalog} into {@code INFORMATION_SCHEMA} query
+	 * text. A catalog carrying a backtick would close the quoting around it and
+	 * append its own SQL.
+	 *
+	 * <p>
+	 * In production these methods are shielded by an accident:
+	 * {@code BigQuery.listDatasets()} runs first and rejects anything that is not a
+	 * well-formed project ID. Stubbing the listing is what makes the guard
+	 * reachable — and is the whole reason this test exists, since it reproduces
+	 * exactly the condition a future caller that skips the listing would create.
+	 */
+	@ParameterizedTest
+	@ValueSource(strings = {"proj`.`ds`.INFORMATION_SCHEMA.ROUTINES WHERE FALSE UNION ALL SELECT 'x', 'y' -- ",
+			"proj`; DROP TABLE t; --"})
+	void testUnsafeCatalogNeverReachesQueryText(String maliciousCatalog) throws Exception {
+		stubOneDataset();
+
+		metaData.getProcedures(maliciousCatalog, "shop", null).close();
+		metaData.getProcedureColumns(maliciousCatalog, "shop", null, null).close();
+
+		verify(bigQuery, never()).query(any(QueryJobConfiguration.class));
+	}
+
+	/**
+	 * The positive control for the test above. Without this, the guard could be
+	 * deleted and the assertion would still pass for the wrong reason — because
+	 * nothing was querying at all.
+	 */
+	@Test
+	void testSafeCatalogDoesReachQueryText() throws Exception {
+		stubOneDataset();
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class))).thenReturn(tableResult);
+		lenient().when(tableResult.iterateAll()).thenReturn(java.util.List.of());
+
+		metaData.getProcedures("safe-project", "shop", null).close();
+
+		verify(bigQuery).query(any(QueryJobConfiguration.class));
+	}
+
+	/**
+	 * {@code getColumns} has a second route to the same answer that uses the
+	 * BigQuery API rather than SQL, so a name it cannot safely interpolate costs
+	 * the caller the fast path, not their columns.
+	 */
+	@Test
+	void testUnsafeCatalogFallsBackToTheApiForColumns() throws Exception {
+		stubOneDataset();
+		lenient().when(bigQuery.listTables(any(DatasetId.class))).thenReturn(emptyTablePage);
+		lenient().when(emptyTablePage.iterateAll()).thenReturn(java.util.List.of());
+
+		metaData.getColumns("proj`.`ds`.INFORMATION_SCHEMA.COLUMNS` WHERE FALSE -- ", "shop", null, null).close();
+
+		verify(bigQuery, never()).query(any(QueryJobConfiguration.class));
+		verify(bigQuery).listTables(any(DatasetId.class));
+	}
+
+	/**
+	 * Makes {@code listDatasetsForProject} yield one dataset, whatever the project.
+	 */
+	private void stubOneDataset() {
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.listDatasets(anyString())).thenReturn(datasetPage);
+		lenient().when(datasetPage.iterateAll()).thenReturn(java.util.List.of(dataset));
+		lenient().when(dataset.getDatasetId()).thenReturn(DatasetId.of("test-project", "shop"));
 	}
 
 	/**
