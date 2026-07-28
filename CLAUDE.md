@@ -98,7 +98,8 @@ any figure you intend to quote.
 
 #### Inheritance Hierarchy
 - **Base Classes:** All JDBC implementations extend abstract bases in `base/` package
-- **Mixins:** `ReadOnlyResultSetMixin` provides shared behavior for read-only operations
+- **Read-only ResultSets:** `BaseReadOnlyResultSet` supplies the refusals for every mutating
+  `ResultSet` method, so `BQResultSet`, `StorageReadResultSet` and `MetadataResultSet` inherit them
 - **Closeable Pattern:** `BaseCloseable` manages lifecycle state consistently
 - **Wrapper Pattern:** `BaseJdbcWrapper` implements JDBC wrapper methods
 
@@ -228,7 +229,6 @@ table per method for mutating classes, `@TestInstance(PER_CLASS)` plus
 ### Naming Conventions
 - Classes: `BQ` prefix for JDBC implementations (e.g., `BQConnection`, `BQStatement`)
 - Base classes: `Abstract` or `Base` prefix
-- Mixins: `Mixin` suffix
 - Exceptions: Standard JDBC exceptions (`SQLException`, `SQLFeatureNotSupportedException`)
 
 ## Important Implementation Details
