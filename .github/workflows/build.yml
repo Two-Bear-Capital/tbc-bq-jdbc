@@ -167,11 +167,31 @@ jobs:
       # by `./mvnw verify` built the shaded JARs and javadoc twice and re-ran the
       # full unit suite that the Build job already covers — about 135s of the
       # job with nothing to show for it. Nothing here needs the packaged JARs.
+      #
+      # TZ pins the JVM default zone to something other than the runner's UTC.
+      #
+      # UTC is the least informative zone to run temporal tests in: every offset is
+      # zero, so a conversion applied backwards, twice, or not at all all produce
+      # the same answer as a correct one. Two bugs reached main green for exactly
+      # that reason — #121, an offset applied with the wrong sign, and #155, an
+      # assertion that only held because local happened to equal UTC.
+      #
+      # Asia/Kolkata rather than any non-UTC zone: +05:30 is not a whole hour, so
+      # it also breaks code that assumes offsets are integral hours, and it has no
+      # DST, so a failure means a real timezone bug rather than a daylight-saving
+      # edge that depends on the day the suite happens to run.
+      #
+      # This replaces the UTC run rather than adding to it, so it costs nothing —
+      # no extra job, no extra runner minutes, no extra BigQuery queries. The
+      # trade is that a bug appearing *only* at offset zero would now be missed,
+      # which needs something like an explicit `offset == 0` branch and is far
+      # rarer than the class this catches.
       - name: Run real BigQuery integration tests
         run: ./mvnw test-compile failsafe:integration-test failsafe:verify -Preal-integration-tests -B
         env:
           BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
           BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
+          TZ: Asia/Kolkata
 
       # Second half of the same guard: the pre-flight check proves the secret is set,
       # this proves tests actually ran. Catches a broken include pattern or an

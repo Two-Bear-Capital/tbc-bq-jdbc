@@ -295,13 +295,31 @@ class RealPreparedStatementAdvancedTest extends AbstractRealBigQueryIntegrationT
 	@Test
 	void testSetObjectStringToTimestamp() throws SQLException {
 		// Emulator tier logged and passed on any SQLException here.
+		//
+		// Read without a Calendar, deliberately. This assertion used to pass a UTC
+		// Calendar to getTimestamp while building the expected value with
+		// Timestamp.valueOf, and the two do not agree unless the JVM default zone is
+		// itself UTC:
+		//
+		// - setObject(String, Types.TIMESTAMP) converts via
+		// ParameterConverter.toTimestamp -> Timestamp.valueOf(s), which parses the
+		// wall clock in the JVM DEFAULT zone, and setTimestamp with no Calendar
+		// sends it on those terms.
+		// - getTimestamp(i, utcCal) reinterprets the returned instant in UTC.
+		//
+		// Setting in local terms and reading in UTC terms is asymmetric, so the test
+		// only held on a UTC machine and failed everywhere else by exactly the local
+		// offset (#155). CI runners are UTC, so it never went red there.
+		//
+		// Local in, local out is symmetric and holds in every zone. It is also what
+		// this test is actually about - the String-to-TIMESTAMP conversion, not
+		// Calendar handling, which RealResultSetAdvancedTest covers separately.
 		try (PreparedStatement pstmt = connection.prepareStatement("SELECT ? AS value")) {
 			pstmt.setObject(1, "2024-01-15 10:30:00", Types.TIMESTAMP);
 
 			try (ResultSet rs = pstmt.executeQuery()) {
 				assertTrue(rs.next(), "Should have a result");
-				Calendar utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-				assertEquals(Timestamp.valueOf("2024-01-15 10:30:00"), rs.getTimestamp(1, utc),
+				assertEquals(Timestamp.valueOf("2024-01-15 10:30:00"), rs.getTimestamp(1),
 						"String should convert to the same TIMESTAMP");
 			}
 		}
