@@ -96,10 +96,17 @@ formatting, and the shape of the result grid are all IDE-side, and no JDBC drive
 change them. Requests for a hierarchical viewer for nested data, or for editing nested
 values in place, fall into that category.
 
-Some BigQuery-specific introspection gaps are genuinely open here too: wildcard and
-sharded tables (`events_*`) are listed as individual tables, external tables are reported
-as ordinary ones, `INFORMATION_SCHEMA` is not surfaced as a browsable schema, and STRUCT
-subfields do not appear in the database tree.
+Some BigQuery-specific introspection gaps are open in this driver too, and are things it
+could do rather than things BigQuery prevents:
+
+- wildcard and sharded tables (`events_*`) are listed one row per shard
+- external tables, snapshots and clones are reported as ordinary tables
+- `INFORMATION_SCHEMA` is not surfaced as a browsable schema
+- STRUCT subfields do not appear in the database tree
+- view and routine source SQL is not exposed
+
+These are tracked on the
+[issue list](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement).
 
 ## See Also
 
