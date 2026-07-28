@@ -402,11 +402,24 @@ an access on every hit, which is a write to shared state on the one path that ha
 stay concurrent. Ordering by expiry costs the read path nothing and is exactly
 insertion order, since every entry in a cache takes the same TTL.
 
-**Not fixed**, recorded so it is not rediscovered:
+**Fixed:** `BQDatabaseMetaData` logged **31 times at INFO**, several on every
+`getTables()` and `getColumns()`. Metadata methods are called constantly — an IDE
+walks them on every tree refresh — so the driver shouted through the host
+application's logs during ordinary operation. All 31 are now `debug`.
 
-- `BQDatabaseMetaData` logs **31 times at INFO**, several per `getTables()` /
-  `getColumns()` miss — including one that builds a sublist-to-string of dataset IDs
-  before the level is checked. Routine library operations should not be INFO.
+Two of them also evaluated their arguments eagerly, which parameterised logging does
+*not* prevent: it defers formatting, not the expressions you hand it. One
+concatenated a sublist into a `String`; the other called `MetadataCache.getStats()`,
+which walks every entry to count expired ones and sum their rows. That one ran on
+schedule whether or not anything was listening. Both now sit behind
+`isDebugEnabled()`.
+
+`MetadataLoggingLevelGuardTest` keeps it that way. The failure mode here is
+copy-paste — every one of those 31 was added by matching the method next to it — and
+nothing else catches it: it is not a bug, and SpotBugs and PMD say nothing. Lifecycle
+and configuration events elsewhere in the driver (registration, session open, custom
+endpoint) are legitimately INFO and out of the guard's scope; the line it draws is
+per-call versus once-per-connection.
 
 [93]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/93
 [98]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/98
