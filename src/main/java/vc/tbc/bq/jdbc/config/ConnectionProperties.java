@@ -94,7 +94,29 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
 
 	/** Default page size. */
-	public static final int DEFAULT_PAGE_SIZE = 10000;
+	/**
+	 * Rows requested per {@code jobs.getQueryResults} page.
+	 *
+	 * <p>
+	 * This is the page size of the REST calls underneath
+	 * {@code TableResult.iterateAll()}, so on a large result it decides how many
+	 * HTTP round trips the client pays for. The previous default of 10,000 was the
+	 * worst value measured: raising it to 50,000 was 1.65x faster on a 1M-row
+	 * narrow result and 1.30x on a 113 MB wide one (#163).
+	 *
+	 * <p>
+	 * 50,000 rather than higher because the gain flattens: on wide rows 100,000 was
+	 * only marginally better and 200,000 was slower, while narrow rows kept
+	 * improving. This is the value that helps both shapes without hurting either.
+	 *
+	 * <p>
+	 * Raising it does not risk unbounded page memory. BigQuery bounds a
+	 * {@code getQueryResults} page by response bytes as well as by row count -- "if
+	 * the result is larger than the byte or field limit, the result is trimmed to
+	 * fit the limit" -- so a larger row count yields more rows per page only while
+	 * the payload stays under that ceiling.
+	 */
+	public static final int DEFAULT_PAGE_SIZE = 50000;
 
 	/** Default connection timeout in seconds. */
 	public static final int DEFAULT_CONNECTION_TIMEOUT = 30;
