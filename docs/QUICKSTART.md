@@ -113,9 +113,10 @@ jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
 
 **Required:**
 - `project` - Google Cloud project ID
-- `authType` - Authentication method (ADC, SERVICE_ACCOUNT, USER_OAUTH, etc.)
 
 **Optional:**
+- `authType` - Authentication method (`ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`,
+  `WORKFORCE`, `WORKLOAD`). Defaults to `ADC`; the value is case-insensitive
 - `dataset` - Default dataset (can be omitted if queries specify dataset)
 - `credentials` - Path to service account JSON key (for SERVICE_ACCOUNT auth)
 - `timeout` - Query timeout in seconds (default: 300)
@@ -149,9 +150,13 @@ String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;Project
 - `0` = Service Account (requires `OAuthPvtKeyPath`)
 - `1` = User OAuth (requires `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken`)
 - `3` = Application Default Credentials (recommended)
-- `4` = External Account → Workload/Workforce Identity (set `credentialConfigFile` via `Properties`)
+- `4` = External Account → Workload/Workforce Identity (set `credentialConfigFile`)
 
-If you're migrating from Simba driver, simply replace the driver JAR - your existing connection strings will work without modification.
+`OAuthType=2` (pre-generated access tokens) is not supported and is rejected with an error.
+
+Migrating from Simba is usually a matter of swapping the JAR and setting the driver class
+to `vc.tbc.bq.jdbc.BQDriver`. Property names Simba defines are translated; anything else
+in the URL is accepted and ignored rather than rejected.
 
 See [Connection Properties - Simba Format](CONNECTION_PROPERTIES.md#simba-bigquery-driver-format) for complete property mapping.
 
@@ -249,10 +254,12 @@ recommended settings.
 Set credentials via environment:
 
 ```bash
-# Application Default Credentials
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
+```
 
-# Then use ADC authentication
+Google's client library reads that variable itself, so the URL just selects ADC:
+
+```java
 String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC";
 ```
 
