@@ -24,6 +24,7 @@ import vc.tbc.bq.jdbc.config.ConnectionProperties;
 
 import java.util.Map;
 
+import static vc.tbc.bq.jdbc.testsupport.TestConnectionProperties.props;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -163,9 +164,7 @@ class ConnectionPropertiesTest {
 	@Test
 	void testGetDatasetIdWithDataset() {
 		// Given: Properties with dataset
-		ConnectionProperties props = new ConnectionProperties("my-project", "my_dataset", null,
-				new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, false, null, null,
-				null, null, null, null, null, null);
+		ConnectionProperties props = props().projectId("my-project").datasetId("my_dataset").build();
 
 		// When: Getting the DatasetId
 		DatasetId datasetId = props.getDatasetId();
@@ -179,9 +178,8 @@ class ConnectionPropertiesTest {
 	@Test
 	void testGetDatasetIdWithDifferentProject() {
 		// Given: Properties with dataset in different project
-		ConnectionProperties props = new ConnectionProperties("my-project", "my_dataset", "other-project",
-				new ApplicationDefaultAuth(), null, null, null, null, false, null, null, null, null, false, null, null,
-				null, null, null, null, null, null);
+		ConnectionProperties props = props().projectId("my-project").datasetId("my_dataset")
+				.datasetProjectId("other-project").build();
 
 		// When: Getting the DatasetId
 		DatasetId datasetId = props.getDatasetId();
@@ -195,9 +193,7 @@ class ConnectionPropertiesTest {
 	@Test
 	void testGetDatasetIdWithoutDataset() {
 		// Given: Properties without dataset
-		ConnectionProperties props = new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(),
-				null, null, null, null, false, null, null, null, null, false, null, null, null, null, null, null, null,
-				null);
+		ConnectionProperties props = props().projectId("my-project").build();
 
 		// When: Getting the DatasetId
 		DatasetId datasetId = props.getDatasetId();

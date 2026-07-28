@@ -30,8 +30,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
+
+import static vc.tbc.bq.jdbc.testsupport.TestConnectionProperties.props;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -74,8 +75,7 @@ class StorageApiFallbackTest {
 	private static final long ROWS_OVER_THRESHOLD = 50_000L;
 
 	private static ConnectionProperties propertiesWith(String useStorageApi) {
-		return new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(), null, null, null, null,
-				false, null, null, null, useStorageApi, false, null, null, null, null, null, null, null, null);
+		return props().projectId("my-project").useStorageApi(useStorageApi).build();
 	}
 
 	/** Exposes the inherited protected factory so the test can call it. */
