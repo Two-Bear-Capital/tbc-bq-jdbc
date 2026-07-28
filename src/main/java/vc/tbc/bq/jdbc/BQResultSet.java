@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.base.BaseReadOnlyResultSet;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
-import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.metadata.BQResultSetMetaData;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.FieldValueConverter;
@@ -285,9 +284,9 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	 * exceptions — {@code IllegalStateException} when the attribute is wrong for
 	 * the accessor, {@code NumberFormatException}/{@code ArithmeticException} when
 	 * the text will not parse. JDBC requires getters to report failure as
-	 * {@code SQLException}, so leaking those meant a caller's
-	 * {@code catch (SQLException)} never fired and a conversion error surfaced as
-	 * an unhandled crash (#129).
+	 * {@code SQLException}, so these are translated: leaking them would mean a
+	 * caller's {@code catch (SQLException)} never fires and a conversion error
+	 * surfaces as an unhandled crash.
 	 *
 	 * @param <T>
 	 *            the converted type
@@ -304,7 +303,11 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	private <T> T convert(int columnIndex, String targetType, Supplier<T> conversion) throws SQLException {
 		try {
 			return conversion.get();
-		} catch (IllegalStateException | NumberFormatException | ArithmeticException e) {
+		} catch (IllegalStateException | IllegalArgumentException | ArithmeticException e) {
+			// IllegalArgumentException is the supertype of NumberFormatException and is
+			// also what FieldValue throws for malformed base64 and unparseable
+			// temporal text. Catching only the subtype let those escape a JDBC getter
+			// as an unchecked exception, which callers written to the spec cannot see.
 			throw new BQSQLException(String.format(ErrorMessages.CANNOT_CONVERT_COLUMN, columnLabelFor(columnIndex),
 					targetType, e.getMessage()), BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE, e);
 		}
@@ -443,8 +446,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return null;
 		}
-		String dateStr = value.getStringValue();
-		return Date.valueOf(dateStr);
+		return convert(columnIndex, "Date", () -> Date.valueOf(value.getStringValue()));
 	}
 
 	@Override
@@ -453,8 +455,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return null;
 		}
-		String timeStr = value.getStringValue();
-		return Time.valueOf(timeStr);
+		return convert(columnIndex, "Time", () -> Time.valueOf(value.getStringValue()));
 	}
 
 	@Override
@@ -463,8 +464,17 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		if (value.isNull()) {
 			return null;
 		}
-		long micros = value.getTimestampValue();
-		return new Timestamp(micros / 1000);
+		// BigQuery TIMESTAMP has microsecond resolution. Constructing from
+		// micros/1000 alone truncates to milliseconds; setNanos carries the rest, so
+		// getTimestamp() no longer loses precision that getString() keeps.
+		return convert(columnIndex, "Timestamp", () -> {
+			long micros = value.getTimestampValue();
+			long millis = Math.floorDiv(micros, 1_000L);
+			int nanos = (int) Math.floorMod(micros, 1_000_000L) * 1_000;
+			Timestamp timestamp = new Timestamp(millis);
+			timestamp.setNanos(nanos);
+			return timestamp;
+		});
 	}
 
 	@Override
@@ -564,10 +574,12 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 
 	@Override
 	public Array getArray(int columnIndex) throws SQLException {
-		if (!nativeComplexTypes) {
-			throw new BQSQLFeatureNotSupportedException(
-					"getArray() requires nativeComplexTypes=true connection property");
-		}
+		// Deliberately not gated on nativeComplexTypes. That property governs what
+		// getObject() hands back, because that is the call a database IDE makes for
+		// every cell and the one that has to stay safe by default. getArray() is an
+		// explicit, typed request, so refusing it would only obstruct callers who
+		// already know they want an Array — and it left the write path asymmetric,
+		// since setArray() and createArrayOf() were never gated.
 		FieldValue value = getFieldValue(columnIndex);
 		if (value.isNull()) {
 			return null;

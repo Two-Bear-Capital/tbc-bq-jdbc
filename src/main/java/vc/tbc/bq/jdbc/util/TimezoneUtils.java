@@ -27,7 +27,7 @@ import java.util.TimeZone;
  * <p>
  * JDBC Calendar parameters allow clients to specify the timezone context for
  * interpreting temporal values. Two <em>inverse</em> conversions are involved,
- * and conflating them is what caused issue #121:
+ * and they must not be conflated:
  *
  * <ul>
  * <li>{@code toCalendarZone} — used by the <strong>setters</strong>. The

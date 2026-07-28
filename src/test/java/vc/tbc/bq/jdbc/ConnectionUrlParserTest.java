@@ -21,7 +21,6 @@ import vc.tbc.bq.jdbc.auth.ServiceAccountAuth;
 import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
-import vc.tbc.bq.jdbc.config.JobCreationMode;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 
 import java.sql.SQLException;
@@ -168,18 +167,6 @@ class ConnectionUrlParserTest {
 	}
 
 	@Test
-	void testParseUrlWithJobCreationMode() throws SQLException {
-		// Given: A URL with jobCreationMode
-		String url = "jdbc:bigquery:my-project?jobCreationMode=OPTIONAL";
-
-		// When: Parsing the URL
-		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
-
-		// Then: Job creation mode should be set
-		assertEquals(JobCreationMode.OPTIONAL, props.jobCreationMode());
-	}
-
-	@Test
 	void testParseUrlWithMultipleParameters() throws SQLException {
 		// Given: A URL with multiple parameters
 		String url = "jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=60&maxResults=5000&useLegacySql=false&location=US";
@@ -269,16 +256,6 @@ class ConnectionUrlParserTest {
 	}
 
 	@Test
-	void testParseInvalidJobCreationMode() {
-		// Given: Invalid job creation mode
-		String url = "jdbc:bigquery:my-project?jobCreationMode=INVALID";
-
-		// Then: Should throw SQLException
-		SQLException ex = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
-		assertTrue(ex.getMessage().contains("jobCreationMode"));
-	}
-
-	@Test
 	void testParseDefaultValues() throws SQLException {
 		// Given: A URL with no optional parameters
 		String url = "jdbc:bigquery:my-project?authType=ADC";
@@ -294,7 +271,6 @@ class ConnectionUrlParserTest {
 		assertFalse(props.useLegacySql());
 		assertFalse(props.enableSessions());
 		assertEquals("false", props.useStorageApi());
-		assertEquals(JobCreationMode.REQUIRED, props.jobCreationMode());
 	}
 
 	@Test
@@ -505,7 +481,7 @@ class ConnectionUrlParserTest {
 		// Given: A URL with every supported property set
 		String url = "jdbc:bigquery:my-project/my_dataset"
 				+ "?authType=ADC&timeout=120&maxResults=2000&useLegacySql=false&location=EU"
-				+ "&labels=env=prod,team=data&jobCreationMode=OPTIONAL&datasetProjectId=other-project"
+				+ "&labels=env=prod,team=data&datasetProjectId=other-project"
 				+ "&pageSize=500&useStorageApi=false&enableSessions=true&connectionTimeout=45"
 				+ "&retryCount=2&maxBillingBytes=5000000&metadataCacheTtl=120&metadataCacheEnabled=false"
 				+ "&metadataLazyLoad=true&enableQueryCostEstimation=true" + "&nativeComplexTypes=true";
@@ -521,7 +497,6 @@ class ConnectionUrlParserTest {
 		assertEquals("EU", props.location());
 		assertEquals(2, props.labels().size());
 		assertEquals("prod", props.labels().get("env"));
-		assertEquals(JobCreationMode.OPTIONAL, props.jobCreationMode());
 		assertEquals("other-project", props.datasetProjectId());
 		assertEquals(500, props.pageSize());
 		assertEquals("false", props.useStorageApi());

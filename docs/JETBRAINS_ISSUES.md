@@ -67,8 +67,9 @@ JVM-wide cache shared by every connection, and delegates refresh to Google's aut
 library, so a token refresh does not surface as a prompt. See the
 [Authentication guide](AUTHENTICATION.md).
 
-Note that the credential cache has no expiry: if you rotate a service account key, restart
-the JVM (or the IDE) to pick it up.
+Cached credentials are reused for an hour, so a rotated service account key is picked up
+without restarting the IDE. Set `-Dtbc.bq.jdbc.credentials.ttl.seconds` to change that
+window, or `0` to cache for the life of the process.
 
 ### DBE-16410 — Temp tables need a session
 

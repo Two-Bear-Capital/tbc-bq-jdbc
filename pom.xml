@@ -49,7 +49,7 @@
         <slf4j.version>2.0.18</slf4j.version>
         <junit.version>6.1.2</junit.version>
         <jmh.version>1.37</jmh.version>
-        <hikaricp.version>7.0.2</hikaricp.version>
+        <hikaricp.version>7.1.0</hikaricp.version>
         <!-- Arrow cannot allocate without this on JDK 16+ (see ArrowSupport). Every
              argLine below must include it: without it the Storage Read API path
              silently falls back, and StorageApiParityTest would compare the REST path
@@ -67,7 +67,7 @@
         <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <git-commit-id-maven-plugin.version>10.0.0</git-commit-id-maven-plugin.version>
-        <spotless-maven-plugin.version>3.8.0</spotless-maven-plugin.version>
+        <spotless-maven-plugin.version>3.9.0</spotless-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
         <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
@@ -159,7 +159,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.6.0</version>
+            <version>1.6.1</version>
             <optional>true</optional>
         </dependency>
 
@@ -663,6 +663,17 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
                                     <addHeader>false</addHeader>
+                                </transformer>
+                                <!--
+                                    logback.xml lives outside src/main/resources so it is packaged
+                                    ONLY here. Its appender class names are the relocated ones below,
+                                    which exist in no other artifact; shipping it in the slim or plain
+                                    shaded JAR would put a config naming unloadable classes on the
+                                    user's classpath, ahead of their own.
+                                -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>logback.xml</resource>
+                                    <file>${project.basedir}/src/main/logback/logback.xml</file>
                                 </transformer>
                             </transformers>
                             <relocations>

@@ -57,6 +57,13 @@ class DriverMetricsTest {
 		@Test
 		@DisplayName("records successes and failures separately but times both")
 		void recordsSuccessesAndFailures() {
+			// Submission is counted at dispatch, separately from the terminal
+			// counters, so that queriesInFlight() can be non-zero. Recording only
+			// completions here would leave queriesSubmitted at 0.
+			DriverMetrics.recordQuerySubmitted();
+			DriverMetrics.recordQuerySubmitted();
+			DriverMetrics.recordQuerySubmitted();
+
 			DriverMetrics.recordQuerySucceeded(10 * ONE_MILLI_IN_NANOS);
 			DriverMetrics.recordQuerySucceeded(30 * ONE_MILLI_IN_NANOS);
 			DriverMetrics.recordQueryFailed(20 * ONE_MILLI_IN_NANOS);

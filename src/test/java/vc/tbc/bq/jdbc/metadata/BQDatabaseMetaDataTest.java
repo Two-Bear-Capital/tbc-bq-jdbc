@@ -193,6 +193,14 @@ class BQDatabaseMetaDataTest {
 	}
 
 	@Test
+	void testSupportsNamedParameters() throws SQLException {
+		// Then: false. PreparedStatement binds positional ? placeholders only and
+		// there is no CallableStatement, so a tool that trusted a true here would
+		// generate SQL the driver cannot execute.
+		assertFalse(metaData.supportsNamedParameters());
+	}
+
+	@Test
 	void testSupportsResultSetTypeForwardOnly() throws SQLException {
 		// When: Checking TYPE_FORWARD_ONLY support
 		boolean supported = metaData.supportsResultSetType(ResultSet.TYPE_FORWARD_ONLY);

@@ -27,10 +27,10 @@ This driver maps BigQuery types to standard JDBC types following the JDBC 4.3 sp
 | `STRUCT` | `STRUCT` | `Map` | `getString()` * | not supported ** |
 | `INTERVAL` | `VARCHAR` | `String` | `getString()` | `setString()` |
 
-\* By default ARRAY and STRUCT come back as JSON strings, from `getString()` or
-`getObject()`. Set `nativeComplexTypes=true` to have `getArray()` return a
-`java.sql.Array` and `getObject()` return a `java.sql.Struct`; with the default,
-`getArray()` throws rather than returning a string. See [Complex Types](#complex-types).
+\* By default `getObject()` returns ARRAY and STRUCT as JSON strings. Set
+`nativeComplexTypes=true` to have it return a `java.sql.Array` or `java.sql.Struct`
+instead. `getArray()` always returns a `java.sql.Array` regardless of the setting.
+See [Complex Types](#complex-types).
 
 The "Java Type" column is what `ResultSetMetaData.getColumnClassName()` reports. The
 object `getObject()` actually returns is a `String` unless `nativeComplexTypes=true`.
@@ -402,13 +402,13 @@ while (rs.next()) {
 }
 ```
 
-**Default vs native:** By default ARRAY columns return a JSON string (parse it with your JSON
-library), and `getArray()` throws. Set `nativeComplexTypes=true` on the connection to get a real
-`java.sql.Array` from `getArray()`. The JSON-string default keeps IDEs such as IntelliJ from
-crashing — see [Connection Properties](CONNECTION_PROPERTIES.md).
+**Default vs native:** `getObject()` returns a JSON string by default (parse it with your JSON
+library). Set `nativeComplexTypes=true` to have it return a `java.sql.Array` instead. The
+JSON-string default keeps IDEs such as IntelliJ from crashing — see
+[Connection Properties](CONNECTION_PROPERTIES.md).
 
-Writing is unaffected by the property: `PreparedStatement.setArray()` and
-`Connection.createArrayOf()` work either way.
+`getArray()`, `PreparedStatement.setArray()` and `Connection.createArrayOf()` are not gated by
+the property and work either way.
 
 ---
 
@@ -588,8 +588,8 @@ String s = rs.getString("string_col");
 ❌ These will throw `SQLException`:
 
 ```java
-// getBytes() on a STRING column base64-decodes it, so this succeeds only when the
-// text is valid base64 — it is not a general STRING-to-binary conversion
+// getBytes() on a STRING column base64-decodes it. Text that is not valid base64
+// raises a SQLException — it is not a general STRING-to-binary conversion
 byte[] b = rs.getBytes("string_col");
 
 // Cannot convert non-numeric STRING to number

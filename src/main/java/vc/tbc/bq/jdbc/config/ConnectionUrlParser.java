@@ -350,7 +350,6 @@ public final class ConnectionUrlParser {
 		boolean useLegacySql = parseBoolean(properties, "useLegacySql", false);
 		String location = properties.get("location");
 		Map<String, String> labels = parseLabels(properties.get("labels"));
-		JobCreationMode jobCreationMode = parseJobCreationMode(properties.get("jobCreationMode"));
 		Integer pageSize = parseInteger(properties, "pageSize");
 		String useStorageApi = properties.get("useStorageApi");
 		boolean enableSessions = parseBoolean(properties, "enableSessions", false);
@@ -366,9 +365,9 @@ public final class ConnectionUrlParser {
 		Integer metadataCacheMaxRows = parseInteger(properties, "metadataCacheMaxRows");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
-				maxResults, useLegacySql, location, labels, jobCreationMode, pageSize, useStorageApi, enableSessions,
-				connectionTimeout, retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled,
-				metadataLazyLoad, enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows);
+				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
+				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
+				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
@@ -463,16 +462,5 @@ public final class ConnectionUrlParser {
 			}
 		}
 		return labels;
-	}
-
-	private static JobCreationMode parseJobCreationMode(String mode) throws SQLException {
-		if (mode == null) {
-			return null; // Use default from ConnectionProperties
-		}
-		try {
-			return JobCreationMode.valueOf(mode.toUpperCase(Locale.ROOT));
-		} catch (IllegalArgumentException e) {
-			throw new SQLException("Invalid jobCreationMode: " + mode, e);
-		}
 	}
 }

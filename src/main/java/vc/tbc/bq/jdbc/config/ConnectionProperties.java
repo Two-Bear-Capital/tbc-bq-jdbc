@@ -52,13 +52,10 @@ import java.util.Objects;
  *            BigQuery location (e.g., US, EU) (optional)
  * @param labels
  *            job labels as key-value pairs (optional, immutable)
- * @param jobCreationMode
- *            job creation mode (default: REQUIRED)
  * @param pageSize
- *            result page size for pagination (default: 10000)
+ *            result page size for pagination (default: 50000)
  * @param useStorageApi
- *            Storage API mode: auto, true, false (default: false — the Storage
- *            Read API path is not implemented yet)
+ *            Storage API mode: auto, true, false (default: false)
  * @param enableSessions
  *            whether to use BigQuery sessions (default: false)
  * @param connectionTimeout
@@ -85,10 +82,10 @@ import java.util.Objects;
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
 		String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
-		Map<String, String> labels, JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi,
-		boolean enableSessions, Integer connectionTimeout, Integer retryCount, Long maxBillingBytes,
-		Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad,
-		Boolean enableQueryCostEstimation, Boolean nativeComplexTypes, Integer metadataCacheMaxRows) {
+		Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
+		Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
+		Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
+		Boolean nativeComplexTypes, Integer metadataCacheMaxRows) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -100,14 +97,12 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	 * <p>
 	 * This is the page size of the REST calls underneath
 	 * {@code TableResult.iterateAll()}, so on a large result it decides how many
-	 * HTTP round trips the client pays for. The previous default of 10,000 was the
-	 * worst value measured: raising it to 50,000 was 1.65x faster on a 1M-row
-	 * narrow result and 1.30x on a 113 MB wide one (#163).
+	 * HTTP round trips the client pays for.
 	 *
 	 * <p>
-	 * 50,000 rather than higher because the gain flattens: on wide rows 100,000 was
-	 * only marginally better and 200,000 was slower, while narrow rows kept
-	 * improving. This is the value that helps both shapes without hurting either.
+	 * 50,000 balances the two result shapes: raising it further helps narrow rows
+	 * only marginally and can hurt wide ones, where each page is capped by response
+	 * bytes rather than row count.
 	 *
 	 * <p>
 	 * Raising it does not risk unbounded page memory. BigQuery bounds a
@@ -121,8 +116,15 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	/** Default connection timeout in seconds. */
 	public static final int DEFAULT_CONNECTION_TIMEOUT = 30;
 
-	/** Default retry count. */
-	public static final int DEFAULT_RETRY_COUNT = 3;
+	/**
+	 * Default number of attempts per BigQuery API call, including the first.
+	 *
+	 * <p>
+	 * Deliberately equal to the Google client library's own default: this value is
+	 * applied to the client, so a smaller number here would quietly reduce
+	 * resilience for every connection that never sets the property.
+	 */
+	public static final int DEFAULT_RETRY_COUNT = 6;
 
 	/** Default metadata cache TTL in seconds (5 minutes). */
 	public static final int DEFAULT_METADATA_CACHE_TTL = 300;
@@ -135,9 +137,6 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Objects.requireNonNull(authType, "authType is required");
 		// Defensive copy: create an immutable map to prevent external modification
 		labels = labels == null ? Map.of() : Map.copyOf(labels);
-		if (jobCreationMode == null) {
-			jobCreationMode = JobCreationMode.REQUIRED;
-		}
 		if (timeoutSeconds == null) {
 			timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
 		}
@@ -213,8 +212,6 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	 *            the dataset location, or null
 	 * @param labels
 	 *            job labels
-	 * @param jobCreationMode
-	 *            the job creation mode
 	 * @param pageSize
 	 *            result page size
 	 * @param useStorageApi
@@ -240,14 +237,14 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	 */
 	public ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
 			String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
-			Map<String, String> labels, JobCreationMode jobCreationMode, Integer pageSize, String useStorageApi,
-			boolean enableSessions, Integer connectionTimeout, Integer retryCount, Long maxBillingBytes,
-			Integer metadataCacheTtl, Boolean metadataCacheEnabled, Boolean metadataLazyLoad,
-			Boolean enableQueryCostEstimation, Boolean nativeComplexTypes) {
+			Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
+			Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
+			Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
+			Boolean nativeComplexTypes) {
 		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
-				location, labels, jobCreationMode, pageSize, useStorageApi, enableSessions, connectionTimeout,
-				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
-				enableQueryCostEstimation, nativeComplexTypes, null);
+				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
+				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
+				nativeComplexTypes, null);
 	}
 
 	/**

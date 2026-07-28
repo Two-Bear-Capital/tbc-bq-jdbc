@@ -44,9 +44,9 @@ the hit rate *during* the workload, not since startup.
 
 | Accessor | Meaning |
 |---|---|
-| `queriesSubmitted()` | Query and DML jobs that have completed. Equals succeeded + failed |
+| `queriesSubmitted()` | Query and DML jobs dispatched to BigQuery |
 | `queriesSucceeded()` / `queriesFailed()` | Terminal outcomes. Failures include cancellations and timeouts |
-| `queriesInFlight()` | Always `0` — counters are incremented at completion, not dispatch |
+| `queriesInFlight()` | Dispatched but not yet finished |
 | `meanQueryMillis()` / `maxQueryMillis()` | Wall-clock job duration, successes and failures alike |
 | `metadataCacheHits()` / `metadataCacheMisses()` / `metadataCacheHitRate()` | Metadata lookups served from the shared cache. An expired entry counts as a miss — it costs a round trip either way |
 | `sessionsCreated()` / `sessionsClosed()` / `sessionsOpen()` | BigQuery sessions, used for transactions, temp tables and multi-statement SQL |
@@ -128,6 +128,10 @@ Gauge.builder("bq.metadata.cache.hit.rate",
         () -> DriverMetrics.snapshot().metadataCacheHitRate())
     .register(registry);
 
+Gauge.builder("bq.queries.inflight",
+        () -> DriverMetrics.snapshot().queriesInFlight())
+    .register(registry);
+
 ```
 
 ```java
@@ -140,9 +144,6 @@ Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(
 ## A note on precision
 
 Counters are read one after another rather than under a lock, so a snapshot taken during
-active traffic may catch related counters an operation apart. Derived counts are clamped
-at zero, so a skewed read never reports a negative.
-
-`queriesSubmitted` is incremented when a query finishes, not when it is dispatched, so it
-always equals `queriesSucceeded + queriesFailed` and `queriesInFlight()` always reports
-zero. Do not use it to measure concurrency.
+active traffic may catch related counters an operation apart: `queriesSubmitted` can
+exceed the sum of succeeded and failed by the number of queries genuinely in flight.
+Derived counts are clamped at zero, so a skewed read never reports a negative.

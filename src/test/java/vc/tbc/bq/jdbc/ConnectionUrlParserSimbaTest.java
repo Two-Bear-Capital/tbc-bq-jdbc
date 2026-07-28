@@ -22,7 +22,6 @@ import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
 import vc.tbc.bq.jdbc.auth.WorkloadIdentityAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
-import vc.tbc.bq.jdbc.config.JobCreationMode;
 
 import java.sql.SQLException;
 import java.util.Properties;
@@ -424,13 +423,6 @@ class ConnectionUrlParserSimbaTest {
 	}
 
 	@Test
-	void testParseSimbaUrlWithJobCreationMode() throws SQLException {
-		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;jobCreationMode=OPTIONAL";
-		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
-		assertEquals(JobCreationMode.OPTIONAL, props.jobCreationMode());
-	}
-
-	@Test
 	void testParseSimbaUrlWithEnableSessions() throws SQLException {
 		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3;enableSessions=true";
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
@@ -507,8 +499,7 @@ class ConnectionUrlParserSimbaTest {
 	void testParseSimbaUrlAllPassThroughProperties() throws SQLException {
 		// Given: A Simba URL with all native pass-through properties set
 		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443" + ";ProjectId=my-project;OAuthType=3"
-				+ ";pageSize=2000;useStorageApi=false;jobCreationMode=OPTIONAL"
-				+ ";enableSessions=true;connectionTimeout=45;retryCount=2"
+				+ ";pageSize=2000;useStorageApi=false" + ";enableSessions=true;connectionTimeout=45;retryCount=2"
 				+ ";maxBillingBytes=5000000;metadataCacheTtl=120;metadataCacheEnabled=false"
 				+ ";metadataLazyLoad=true;enableQueryCostEstimation=true";
 
@@ -517,7 +508,6 @@ class ConnectionUrlParserSimbaTest {
 		assertEquals("my-project", props.projectId());
 		assertEquals(2000, props.pageSize());
 		assertEquals("false", props.useStorageApi());
-		assertEquals(JobCreationMode.OPTIONAL, props.jobCreationMode());
 		assertTrue(props.enableSessions());
 		assertEquals(45, props.connectionTimeout());
 		assertEquals(2, props.retryCount());

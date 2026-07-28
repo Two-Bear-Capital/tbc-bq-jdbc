@@ -139,6 +139,21 @@ public final class DriverMetrics {
 	}
 
 	/**
+	 * Records a query or DML job at the moment it is dispatched to BigQuery.
+	 *
+	 * <p>
+	 * Must be called before the job is created, not after it finishes. Counting
+	 * submissions at completion would make {@code queriesSubmitted} identical to
+	 * {@code queriesSucceeded + queriesFailed} by construction, and
+	 * {@link MetricsSnapshot#queriesInFlight()} permanently zero.
+	 */
+	public static void recordQuerySubmitted() {
+		if (enabled) {
+			QUERIES_SUBMITTED.increment();
+		}
+	}
+
+	/**
 	 * Records a query or DML job that completed successfully.
 	 *
 	 * @param elapsedNanos
@@ -149,7 +164,6 @@ public final class DriverMetrics {
 		if (!enabled) {
 			return;
 		}
-		QUERIES_SUBMITTED.increment();
 		QUERIES_SUCCEEDED.increment();
 		QUERY_NANOS_TOTAL.add(elapsedNanos);
 		QUERY_NANOS_MAX.accumulate(elapsedNanos);
@@ -170,7 +184,6 @@ public final class DriverMetrics {
 		if (!enabled) {
 			return;
 		}
-		QUERIES_SUBMITTED.increment();
 		QUERIES_FAILED.increment();
 		QUERY_NANOS_TOTAL.add(elapsedNanos);
 		QUERY_NANOS_MAX.accumulate(elapsedNanos);

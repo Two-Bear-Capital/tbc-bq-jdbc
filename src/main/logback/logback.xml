@@ -54,7 +54,7 @@
     </logger>
 
     <!-- Logger for Google Cloud BigQuery API (less verbose) -->
-    <logger name="com.google.cloud.bigquery" level="WARN" additivity="false">
+    <logger name="vc.tbc.bq.jdbc.shaded.google" level="WARN" additivity="false">
         <appender-ref ref="FILE"/>
     </logger>
 

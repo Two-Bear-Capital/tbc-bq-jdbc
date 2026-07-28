@@ -2100,7 +2100,10 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	@Override
 	public boolean supportsNamedParameters() throws SQLException {
-		return true;
+		// PreparedStatement binds positional ? placeholders only, and there is no
+		// CallableStatement, so a tool that trusted this would generate SQL the
+		// driver cannot execute.
+		return false;
 	}
 
 	@Override
