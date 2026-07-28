@@ -325,7 +325,7 @@ Covers `labels`, `jobCreationMode`, and `maxBillingBytes` (see the
 
 **Example:**
 ```
-jdbc:bigquery:my-project/my_dataset?authType=ADC&labels=env=prod,team=data
+jdbc:bigquery:my-project/my_dataset?authType=ADC&labels=env=prod,team=data&maxBillingBytes=1000000000
 ```
 
 **Job Labels:**
@@ -334,12 +334,17 @@ Format: `key1=value1,key2=value2`
 - Used for tracking and billing
 - Visible in BigQuery console and billing exports
 
-> **`maxBillingBytes` and `jobCreationMode` are accepted but not yet applied.** The driver
-> parses and validates them, but neither is currently sent to BigQuery. In particular,
-> **`maxBillingBytes` does not cap query cost** — do not rely on it as a spend guardrail.
-> To limit what a query may process, set a
-> [custom cost control](https://cloud.google.com/bigquery/docs/custom-quotas) on the
-> project, or use `enableQueryCostEstimation=true` to see the estimate before you run.
+**Max Billing Bytes:**
+- `maxBillingBytes` caps how many bytes a single statement may be billed for. BigQuery
+  rejects the job up front when its estimate exceeds the limit, so nothing is billed
+- Applies to queries and DML alike, including batch-rewritten `INSERT`s
+- Omit it for no limit; there is no value meaning "unlimited"
+- For a ceiling across a whole project rather than per statement, use a
+  [custom cost control](https://cloud.google.com/bigquery/docs/custom-quotas).
+  To see an estimate before running, set `enableQueryCostEstimation=true`
+
+> **`jobCreationMode` is accepted but not yet applied.** The driver parses it, but it is
+> not currently sent to BigQuery.
 
 ---
 
@@ -388,12 +393,14 @@ jdbc:bigquery:my-project/staging_dataset?\
   credentials=/vault/keys/bigquery.json&\
   enableSessions=true&\
   timeout=7200&\
+  maxBillingBytes=10737418240&\
   labels=pipeline=etl,stage=transform
 ```
 
 **Why:**
 - Sessions for temp tables and transactions
 - Long timeout for complex ETL
+- A 10 GB billing ceiling, so a runaway transform fails instead of scanning the warehouse
 - Labels for pipeline tracking
 
 ---
@@ -512,6 +519,7 @@ driver's `getPropertyInfo()`, so it never goes stale.
 | `pageSize` | Higher = fewer round trips, more memory per page | None |
 | `timeout` | Higher allows longer queries | Indirectly (prevents partial work) |
 | `maxResults` | Lower = faster completion | None — BigQuery still scans the full query |
+| `maxBillingBytes` | None | Caps per-statement spend; over-limit statements fail before billing |
 | `enableSessions` | One extra job at connection open | Minimal |
 | `metadataCacheEnabled=true` | Repeated metadata queries served from memory | Lower (fewer API calls) |
 | `metadataCacheTtl` | Higher = more cache hits, staler schema | Lower |
