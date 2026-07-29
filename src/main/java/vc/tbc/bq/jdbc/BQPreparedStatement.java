@@ -15,13 +15,23 @@
  */
 package vc.tbc.bq.jdbc;
 
+import com.google.cloud.bigquery.FormatOptions;
+import com.google.cloud.bigquery.Job;
+import com.google.cloud.bigquery.JobInfo;
+import com.google.cloud.bigquery.JobStatistics;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.QueryParameterValue;
 import com.google.cloud.bigquery.StandardSQLTypeName;
+import com.google.cloud.bigquery.TableDataWriteChannel;
+import com.google.cloud.bigquery.TableId;
+import com.google.cloud.bigquery.WriteChannelConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.base.AbstractBQPreparedStatement;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.metadata.BQParameterMetaData;
 import vc.tbc.bq.jdbc.util.BatchInsertRewriter;
+import vc.tbc.bq.jdbc.util.BatchLoadEncoder;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.ParameterConverter;
 import vc.tbc.bq.jdbc.util.QueryCostEstimate;
@@ -45,6 +55,8 @@ import java.util.Optional;
  * @since 1.0.0
  */
 public final class BQPreparedStatement extends AbstractBQPreparedStatement {
+
+	private static final Logger logger = LoggerFactory.getLogger(BQPreparedStatement.class);
 
 	private final String sqlTemplate;
 	private final List<QueryParameterValue> parameters = new ArrayList<>();
@@ -1176,6 +1188,10 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 		Optional<BatchInsertRewriter.RewritableInsert> rewritable = BatchInsertRewriter.parse(sqlTemplate);
 		if (rewritable.isPresent() && allSetsMatchTemplate(rewritable.get().parametersPerRow(), parameterSets)) {
+			Optional<BatchLoadEncoder.LoadTarget> loadTarget = loadTargetFor(rewritable.get(), parameterSets);
+			if (loadTarget.isPresent()) {
+				return executeLoadBatch(loadTarget.get(), parameterSets);
+			}
 			return executeCollapsedBatch(rewritable.get(), parameterSets);
 		}
 		return executeSequentialBatch(parameterSets);
@@ -1189,6 +1205,191 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	private static boolean allSetsMatchTemplate(int parametersPerRow, List<List<QueryParameterValue>> parameterSets) {
 		return parameterSets.stream().allMatch(set -> set.size() == parametersPerRow);
+	}
+
+	/**
+	 * Decides whether this batch goes through a load job, and where to.
+	 *
+	 * <p>
+	 * Every condition here is a reason the DML path stays correct where the load
+	 * path would not, so each returns empty rather than throwing:
+	 *
+	 * <ul>
+	 * <li><b>The property is unset, or the batch is smaller than it.</b> A load job
+	 * is a different mechanism, not a faster one of the same kind, so it is never
+	 * chosen without being asked for.
+	 * <li><b>The connection is in a transaction or a session.</b> Load jobs cannot
+	 * participate in a BigQuery transaction — rows would land outside it and
+	 * survive a rollback. This is the distinction the issue asked to be explicit
+	 * rather than accidental, and it is checked on {@code autoCommit} rather than
+	 * on whether a transaction has actually begun, because {@code BEGIN} is
+	 * deferred to the first statement and this batch could be it.
+	 * <li><b>The INSERT has no explicit column list, or a shape this driver cannot
+	 * resolve.</b>
+	 * <li><b>Some parameter has a type the encoder is not sure of.</b>
+	 * </ul>
+	 *
+	 * @param insert
+	 *            the parsed INSERT
+	 * @param parameterSets
+	 *            the accumulated batch
+	 * @return where to load, or empty to use the DML path
+	 * @throws SQLException
+	 *             if the connection's state cannot be read
+	 */
+	private Optional<BatchLoadEncoder.LoadTarget> loadTargetFor(BatchInsertRewriter.RewritableInsert insert,
+			List<List<QueryParameterValue>> parameterSets) throws SQLException {
+		Integer threshold = properties.batchLoadThreshold();
+		if (threshold == null || parameterSets.size() < threshold) {
+			return Optional.empty();
+		}
+		if (!connection.getAutoCommit() || connection.getSessionManager().hasSession()) {
+			logger.debug("Batch of {} rows stays on the DML path: a load job cannot join a transaction or session",
+					parameterSets.size());
+			return Optional.empty();
+		}
+		if (!BatchLoadEncoder.canEncode(parameterSets)) {
+			logger.debug("Batch of {} rows stays on the DML path: a parameter type is not loadable",
+					parameterSets.size());
+			return Optional.empty();
+		}
+		Optional<BatchLoadEncoder.LoadTarget> target = BatchLoadEncoder.parseTarget(insert.insertPrefix(),
+				insert.parametersPerRow());
+		if (target.isEmpty()) {
+			logger.debug("Batch of {} rows stays on the DML path: the INSERT names no explicit column list",
+					parameterSets.size());
+		}
+		return target;
+	}
+
+	/**
+	 * Executes the batch as a single BigQuery load job.
+	 *
+	 * <p>
+	 * The rows are streamed as newline-delimited JSON straight into the job's write
+	 * channel, so nothing is staged in GCS and the whole batch never exists as one
+	 * string in memory.
+	 *
+	 * <p>
+	 * <b>Update counts.</b> A load job reports rows written in aggregate, with no
+	 * per-row breakdown to map back onto parameter sets. When the count matches the
+	 * batch exactly, every entry is 1; otherwise every entry is
+	 * {@link #SUCCESS_NO_INFO}, which JDBC defines for precisely this case. The
+	 * counts are never fabricated from the batch size.
+	 *
+	 * @param target
+	 *            the table and columns to write
+	 * @param parameterSets
+	 *            the rows
+	 * @return per-row update counts
+	 * @throws SQLException
+	 *             if the load fails
+	 */
+	private int[] executeLoadBatch(BatchLoadEncoder.LoadTarget target, List<List<QueryParameterValue>> parameterSets)
+			throws SQLException {
+		TableId tableId = resolveTableId(target.tablePath());
+		WriteChannelConfiguration writeConfig = WriteChannelConfiguration.newBuilder(tableId)
+				.setFormatOptions(FormatOptions.json())
+				// The table exists and owns its schema: this INSERT names columns, and
+				// autodetect would infer types from the JSON text instead, quietly
+				// widening or narrowing them.
+				.setAutodetect(false).setWriteDisposition(JobInfo.WriteDisposition.WRITE_APPEND)
+				.setCreateDisposition(JobInfo.CreateDisposition.CREATE_NEVER).build();
+
+		logger.debug("Loading {} rows into {} via a load job", parameterSets.size(), target.tablePath());
+
+		Job job;
+		TableDataWriteChannel channel = connection.getBigQuery().writer(writeConfig);
+		try {
+			for (List<QueryParameterValue> values : parameterSets) {
+				String line = BatchLoadEncoder.toJsonRow(target, values) + "\n";
+				channel.write(java.nio.ByteBuffer.wrap(line.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+			}
+			// Closed here rather than in a finally, and deliberately not with
+			// try-with-resources: the load job does not exist until the channel is
+			// closed, so getJob() returns null before this line and the ordering is
+			// the point rather than an incidental detail.
+			channel.close();
+			job = channel.getJob();
+		} catch (java.io.IOException e) {
+			closeQuietly(channel);
+			throw new BQSQLException("Failed to stream a batch load of " + parameterSets.size() + " rows into "
+					+ target.tablePath() + ": " + e.getMessage(), BQSQLException.SQLSTATE_GENERAL_ERROR, e);
+		}
+
+		long written = awaitLoad(job, target, parameterSets.size());
+		int[] updateCounts = new int[parameterSets.size()];
+		java.util.Arrays.fill(updateCounts, written == parameterSets.size() ? 1 : SUCCESS_NO_INFO);
+		return updateCounts;
+	}
+
+	/**
+	 * Closes a write channel while an earlier failure is already propagating.
+	 *
+	 * <p>
+	 * A close failure here is swallowed on purpose: the exception on its way out
+	 * says why the load did not happen, and replacing it with a second one about
+	 * the cleanup would hide that.
+	 */
+	private static void closeQuietly(TableDataWriteChannel channel) {
+		try {
+			channel.close();
+		} catch (java.io.IOException | RuntimeException e) {
+			logger.debug("Ignoring failure closing a batch load channel after an earlier error: {}", e.getMessage());
+		}
+	}
+
+	/**
+	 * Waits for a load job and reports how many rows it wrote.
+	 *
+	 * @throws SQLException
+	 *             if the job fails, which for a load job means nothing was written
+	 */
+	private long awaitLoad(Job job, BatchLoadEncoder.LoadTarget target, int rowCount) throws SQLException {
+		try {
+			Job completed = job.waitFor();
+			if (completed == null) {
+				throw new BQSQLException("Batch load job for " + target.tablePath() + " no longer exists",
+						BQSQLException.SQLSTATE_GENERAL_ERROR);
+			}
+			if (completed.getStatus() != null && completed.getStatus().getError() != null) {
+				throw new BatchUpdateException(
+						"Batch load of " + rowCount + " rows into " + target.tablePath() + " failed: "
+								+ completed.getStatus().getError().getMessage(),
+						BQSQLException.SQLSTATE_GENERAL_ERROR, 0, new int[0]);
+			}
+			JobStatistics.LoadStatistics stats = completed.getStatistics();
+			return stats == null || stats.getOutputRows() == null ? -1 : stats.getOutputRows();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new BQSQLException("Interrupted waiting for a batch load job",
+					BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
+		}
+	}
+
+	/**
+	 * Resolves an INSERT's table path against the connection's defaults.
+	 *
+	 * <p>
+	 * A load job needs a fully-qualified {@link TableId}, where the SQL may have
+	 * named the table with one, two or three parts.
+	 */
+	private TableId resolveTableId(String tablePath) throws SQLException {
+		String[] parts = tablePath.split("\\.");
+		return switch (parts.length) {
+			case 3 -> TableId.of(parts[0], parts[1], parts[2]);
+			case 2 -> TableId.of(properties.projectId(), parts[0], parts[1]);
+			case 1 -> {
+				if (properties.datasetId() == null) {
+					throw new BQSQLException("Cannot load into '" + tablePath
+							+ "': the statement names no dataset and the " + "connection has no default one",
+							BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+				}
+				yield TableId.of(properties.projectId(), properties.datasetId(), parts[0]);
+			}
+			default -> throw new BQSQLException("Cannot load into '" + tablePath + "': unrecognised table path",
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		};
 	}
 
 	/**

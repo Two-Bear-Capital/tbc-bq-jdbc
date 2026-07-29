@@ -90,6 +90,10 @@ import java.util.Objects;
  *            whether {@code getTables} reads table descriptions into
  *            {@code REMARKS} (default: true). Costs one
  *            {@code INFORMATION_SCHEMA} query per dataset scanned.
+ * @param batchLoadThreshold
+ *            row count at or above which {@code executeBatch()} submits a
+ *            BigQuery load job instead of chunked INSERT DML (optional; unset
+ *            disables the load path entirely).
  * @param collapseShardedTables
  *            whether date-sharded tables ({@code events_20260101}, …) are
  *            reported as one {@code events_*} entry (default: false). Sharding
@@ -103,7 +107,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
 		Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
 		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
-		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables) {
+		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -208,6 +212,13 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			// <something>_20260101 must not vanish from a listing by default.
 			collapseShardedTables = false;
 		}
+		// No default: a load job is a different mechanism, not a faster one of the
+		// same kind. It is not DML-quota bound, but neither is it transactional nor
+		// atomic with surrounding DML, so switching to it at some row count would
+		// change the failure modes of a batch the caller wrote as an INSERT.
+		if (batchLoadThreshold != null && batchLoadThreshold < 1) {
+			throw new IllegalArgumentException("batchLoadThreshold must be at least 1: " + batchLoadThreshold);
+		}
 		// No default: a rate the driver invented would be wrong for every customer
 		// not on on-demand pricing, and would silently go stale. Unset means
 		// estimates report bytes and no money. Rejected rather than clamped,
@@ -218,9 +229,8 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	}
 
 	/**
-	 * Creates properties without {@code queryPricePerTiB},
-	 * {@code metadataIncludeDescriptions} or {@code collapseShardedTables}, which
-	 * then take their defaults.
+	 * Creates properties without any of the components added in 3.2.0, which then
+	 * take their defaults.
 	 *
 	 * <p>
 	 * This is the canonical shape as of 3.1.0, and the reason both this and the
@@ -286,7 +296,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
 				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
-				nativeComplexTypes, metadataCacheMaxRows, null, null, null);
+				nativeComplexTypes, metadataCacheMaxRows, null, null, null, null);
 	}
 
 	/**
