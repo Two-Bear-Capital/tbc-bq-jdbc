@@ -106,6 +106,16 @@ resource "google_project_iam_member" "ci_read_session_user" {
   depends_on = [google_project_service.bigquery_storage]
 }
 
+# Project-scoped INFORMATION_SCHEMA views (SCHEMATA, JOBS, ...) need a
+# project-level role to read; jobUser and dataset-scoped dataEditor are not
+# enough. Without this, RealInformationSchemaMetadataTest can only assert that
+# describing them degrades gracefully, never that it works (#189, #248).
+resource "google_project_iam_member" "ci_metadata_viewer" {
+  project = google_project.integration.project_id
+  role    = "roles/bigquery.metadataViewer"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+}
+
 # ── Service Account Impersonation Fixture ────────────────────────────────────
 #
 # Two service accounts, existing only so RealImpersonationTest can exercise both
