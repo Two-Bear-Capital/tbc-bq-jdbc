@@ -76,6 +76,14 @@ variable — CI's service account already has the grant. Without it the tests fa
 on the first statement with `Error requesting access token (HTTP 403: Permission
 'iam.serviceAccounts.getAccessToken' denied …)`.
 
+### Table snapshot tests
+
+`RealTableTypeMetadataTest` creates a real table snapshot, which needs
+`bigquery.tables.createSnapshot` and `deleteSnapshot` —
+`roles/bigquery.dataEditor` does not carry them. Set `BQ_TEST_SNAPSHOT_FIXTURES`
+to any non-empty value to enable it. A maintainer running the suite under their
+own credentials on the Terraform-provisioned project already has the access.
+
 ## Running
 
 ```bash

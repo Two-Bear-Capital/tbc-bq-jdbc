@@ -19,6 +19,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -42,9 +43,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * are the whole point of the issue. The fixtures here are real ones, and the
  * test asserts what the driver reports for each.
  *
+ * <p>
+ * <b>Enabling:</b> creating a snapshot needs
+ * {@code bigquery.tables.createSnapshot} and {@code deleteSnapshot}, which
+ * {@code roles/bigquery.dataEditor} does not carry — so this class is gated on
+ * {@code BQ_TEST_SNAPSHOT_FIXTURES} rather than failing CI until Terraform has
+ * upgraded the CI service account to {@code dataOwner} on the test dataset. A
+ * maintainer running the suite under their own credentials already has it. See
+ * #252.
+ *
  * @since 4.0.0
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledIfEnvironmentVariable(named = "BQ_TEST_SNAPSHOT_FIXTURES", matches = ".+", disabledReason = "BQ_TEST_SNAPSHOT_FIXTURES is not set — the caller may not be able to create table snapshots")
 class RealTableTypeMetadataTest extends AbstractRealBigQueryIntegrationTest {
 
 	private static final String BASE = tableName("types_base");
