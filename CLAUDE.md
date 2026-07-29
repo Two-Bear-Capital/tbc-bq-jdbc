@@ -115,6 +115,18 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
 - `DriverMetrics.reset()` is global; tests using it must reset in both `@BeforeEach`
   and `@AfterEach` or they will corrupt unrelated tests in the same JVM
 
+### Parameter binding
+- **Every parameter goes through `BQPreparedStatement.setParameter(int, ParameterFactory)`.**
+  It takes a factory, not a value, because `QueryParameterValue`'s factories validate
+  client-side and throw `IllegalArgumentException` while *building* the value — taking a
+  finished value could not wrap anything (#227)
+- That wrapping is structural on purpose: a new setter cannot forget, because there is no
+  other way to store a parameter. Array and struct elements are built inside the factory
+  for the same reason
+- `ParameterConverter` wraps its *own* conversions already, so a test asserting only
+  `SQLException` proves nothing — the real-tier tests assert on the "Cannot bind parameter"
+  wording, and were verified to fail without the fix
+
 ### Batch Execution
 - `PreparedStatement.addBatch()/executeBatch()` collapses simple parameterized INSERTs into multi-row `INSERT ... VALUES (...), (...)` query jobs (like PostgreSQL's `reWriteBatchedInserts`)
 - Rewrite logic in `util/BatchInsertRewriter.java`; conservative parser — anything not a placeholder-only single-tuple INSERT falls back to sequential execution (one job per parameter set)
