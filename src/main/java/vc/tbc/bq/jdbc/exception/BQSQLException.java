@@ -20,6 +20,14 @@ import java.sql.SQLException;
 /**
  * SQLException specific to BigQuery operations.
  *
+ * <p>
+ * <b>Every constructor taking a cause runs it through
+ * {@link ServiceErrorDetail}</b>, so a message reaching a JDBC caller carries
+ * whatever the service said rather than the client library's summary of it.
+ * That is done here rather than at the throw sites deliberately: there are a
+ * dozen of them across statement execution, session management and connection
+ * setup, and a new one cannot forget a step it does not perform.
+ *
  * @since 1.0.0
  */
 public class BQSQLException extends SQLException {
@@ -71,19 +79,53 @@ public class BQSQLException extends SQLException {
 	/** SQLState for numeric value out of range. */
 	public static final String SQLSTATE_NUMERIC_VALUE_OUT_OF_RANGE = "22003";
 
+	/**
+	 * Creates an exception with no underlying cause.
+	 *
+	 * @param reason
+	 *            the message
+	 */
 	public BQSQLException(String reason) {
 		super(reason);
 	}
 
+	/**
+	 * Creates an exception with no underlying cause.
+	 *
+	 * @param reason
+	 *            the message
+	 * @param sqlState
+	 *            the SQLState
+	 */
 	public BQSQLException(String reason, String sqlState) {
 		super(reason, sqlState);
 	}
 
+	/**
+	 * Creates an exception wrapping a cause, appending the service's own
+	 * explanation to {@code reason} when the cause chain carries one.
+	 *
+	 * @param reason
+	 *            the message
+	 * @param sqlState
+	 *            the SQLState
+	 * @param cause
+	 *            the underlying failure
+	 */
 	public BQSQLException(String reason, String sqlState, Throwable cause) {
-		super(reason, sqlState, cause);
+		super(ServiceErrorDetail.appendTo(reason, cause), sqlState, cause);
 	}
 
+	/**
+	 * Creates an exception wrapping a cause, appending the service's own
+	 * explanation to {@code reason} when the cause chain carries one.
+	 *
+	 * @param reason
+	 *            the message
+	 * @param cause
+	 *            the underlying failure
+	 */
 	public BQSQLException(String reason, Throwable cause) {
-		super(reason, cause);
+		super(ServiceErrorDetail.appendTo(reason, cause), cause);
 	}
 }

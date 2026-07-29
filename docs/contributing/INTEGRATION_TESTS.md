@@ -73,7 +73,8 @@ The two service accounts are created by `terraform/main.tf`. To run these under
 your own ADC you also need `roles/iam.serviceAccountTokenCreator` on both, which
 means naming yourself in the `impersonation_source_principals` Terraform
 variable — CI's service account already has the grant. Without it the tests fail
-on the first statement with `Error requesting access token`.
+on the first statement with `Error requesting access token (HTTP 403: Permission
+'iam.serviceAccounts.getAccessToken' denied …)`.
 
 ## Running
 
