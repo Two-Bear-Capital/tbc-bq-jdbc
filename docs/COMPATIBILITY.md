@@ -25,6 +25,7 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | `Statement` execution | ✅ | executeQuery, executeUpdate, execute |
 | `PreparedStatement` | ✅ | Positional parameters (`?`) |
 | Batch updates (`addBatch()`, `executeBatch()`) | ✅ | See [Batch execution](#batch-execution) |
+| SQLState reporting | ✅ | Mapped from BigQuery's error reason: `42000` syntax, `42S02` not found, `42501` not authorised, `53000` quota, `HY008` cancelled. A rejected credential reports `28000`, distinct from `42501` |
 | Update counts | ✅ | `executeUpdate()` / `getUpdateCount()` return real affected-row counts from BigQuery DML statistics |
 | `ResultSet` iteration | ✅ | Forward-only (`TYPE_FORWARD_ONLY`) |
 | `Statement.setFetchSize()` | ✅ | Page size for that statement, overriding the connection's `pageSize`. `0` restores the connection default; `getFetchSize()` reports the effective value |

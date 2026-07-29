@@ -145,6 +145,18 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
 - Update counts are 1 per row only when the load's aggregate output matches the batch,
   otherwise `SUCCESS_NO_INFO` — never fabricated from the batch size
 
+### Error classification
+- `AbstractBQStatement.sqlStateFor(BigQueryException)` classifies; the `BigQueryError`
+  overload it delegates to handles everything BigQuery gave a reason for
+- **BigQuery's reason always wins.** Only when there is none — the signature of a credential
+  that could not be minted or refreshed, since the request never reached BigQuery — does the
+  cause chain get a say, and a 401/403 there means `28000`
+- That asymmetry is the whole point: a 403 from an auth endpoint is a rejected credential
+  (`28000`, re-authenticate), a 403 from BigQuery is a missing grant (`42501`, surface it).
+  Turning the second into the first sends a pool round a retry loop over a working credential
+- `ServiceErrorDetail` owns the chain walk for both this and the message enrichment (#242),
+  so there is one place that understands the shape the Google client libraries produce
+
 ### Multi-statement script results
 - A script is one job with a **child job per executed statement**; the parent carries only
   the **last** statement's result. `executeQuery()` used to return that, so a script looked

@@ -226,4 +226,21 @@ class ServiceErrorDetailTest {
 		assertEquals("Connection closed",
 				new BQSQLException("Connection closed", BQSQLException.SQLSTATE_CONNECTION_CLOSED).getMessage());
 	}
+
+	@Test
+	void testAuthenticationFailureIsRecognisedFromTheStatus() {
+		// Then: 401 and 403 are the statuses an auth endpoint rejects with
+		assertTrue(ServiceErrorDetail
+				.isAuthenticationFailure(new IOException("x", httpError(403, "Forbidden", IAM_DENIED_BODY))));
+		assertTrue(ServiceErrorDetail.isAuthenticationFailure(httpError(401, "Unauthorized", null)));
+	}
+
+	@Test
+	void testOtherStatusesAreNotAuthenticationFailures() {
+		// Then: A 404 or a 500 says nothing about the credential
+		assertFalse(ServiceErrorDetail.isAuthenticationFailure(httpError(404, "Not Found", null)));
+		assertFalse(ServiceErrorDetail.isAuthenticationFailure(httpError(500, "Server Error", null)));
+		assertFalse(ServiceErrorDetail.isAuthenticationFailure(new IOException("no http here")));
+		assertFalse(ServiceErrorDetail.isAuthenticationFailure(null));
+	}
 }
