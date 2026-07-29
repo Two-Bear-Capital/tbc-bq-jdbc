@@ -50,16 +50,36 @@ import java.util.concurrent.TimeUnit;
  * the nested ones.
  *
  * <p>
+ * <b>What it found</b>, at 1,000,000 rows with 5x60s measured iterations:
+ *
+ * <pre>
+ * shape         Storage            REST               speedup
+ * SCALAR         3418 +/- 622 ms   19134 +/- 1084 ms    5.6x
+ * ARRAY_STRUCT   4639 +/- 457 ms   40189 +/- 5928 ms    8.7x
+ * </pre>
+ *
+ * The speedup is <em>larger</em> for nested data, not smaller. Going from
+ * scalar to nested costs the Storage path 1.36x and the REST path 2.10x, so
+ * Arrow degrades more gracefully than JSON parsing does — re-encoding nested
+ * values into {@code FieldValue}s is cheaper than parsing them out of JSON.
+ * {@code useStorageApi=auto} is choosing correctly for these shapes and needs
+ * no adjustment (#232).
+ *
+ * <p>
  * <b>Read the control before reading anything else.</b> Every op re-executes
  * its query, so each measurement includes BigQuery's job scheduling and
  * compute, which vary by seconds and are paid identically by both paths. On
- * short runs that variance swamps the fetch difference this benchmark is about:
- * a first pass at 1,000 and 50,000 rows produced error bars larger than the
- * scores, and the scalar control came out *slower* on the Storage path — which
- * is the read session's fixed cost, not a regression, and is why {@code auto}
- * has a row threshold at all. Give it long iterations and enough rows that
- * transfer dominates, and treat a run whose control does not reproduce as a run
- * that measured nothing.
+ * short runs that variance swamps the fetch difference: a first pass at 1,000
+ * and 50,000 rows produced error bars larger than the scores, and the scalar
+ * control came out <em>slower</em> on the Storage path — the read session's
+ * fixed cost, which is why {@code auto} has a row threshold at all. Treat a run
+ * whose control does not reproduce as a run that measured nothing.
+ *
+ * <p>
+ * That shared compute is also why the control reads 5.6x here against the 11.7x
+ * of #152 rather than contradicting it: a constant paid by both paths
+ * compresses the ratio toward 1, so the fetch-only figure is higher than what
+ * this measures.
  *
  * @since 3.3.0
  */
