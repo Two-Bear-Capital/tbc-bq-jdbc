@@ -63,10 +63,15 @@ import java.util.Objects;
  * {@value #CLOUD_PLATFORM_SCOPE}. Unlike a service account key, an impersonated
  * credential has no fallback when it carries no scopes — the IAM
  * {@code generateAccessToken} call would be made with an empty scope list and
- * rejected — and {@code FixedCredentialsProvider} in the Storage Read API path
- * never scopes a credential it is handed. Requesting cloud-platform up front is
- * what makes both the REST and Storage paths work, and matches what
- * {@code gcloud --impersonate-service-account} requests.
+ * rejected — so this is requested up front rather than left to whoever consumes
+ * the credential. It matches what {@code gcloud --impersonate-service-account}
+ * requests.
+ *
+ * <p>
+ * The Storage Read API path used to scope nothing, which made this the only
+ * reason that path worked; it now reuses the connection's scoped credential
+ * (#243), so this is no longer load-bearing for it. It stays because the scope
+ * a token is minted with is this type's business, not its consumers'.
  *
  * @param source
  *            the authentication type providing the source identity, typically
