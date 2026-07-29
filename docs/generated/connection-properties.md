@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **27** connection properties.
+There are **28** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -32,7 +32,8 @@ There are **27** connection properties.
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |
-| `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings. Sequential batches are not estimated (one job per entry already) |
+| `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings and readable as typed values via BQStatement.getCostEstimates(). Sequential batches are not estimated (one job per entry already) |
+| `queryPricePerTiB` | _(none)_ | any | Price of one tebibyte of billed query data, used to turn cost estimates into money (blank = report bytes only). Any currency; BigQuery's on-demand rate is 6.25 USD/TiB, but editions and negotiated contracts differ |
 | `maxResults` | _(none)_ | any | Maximum number of query result rows to return (blank = unlimited) |
 | `maxBillingBytes` | _(none)_ | any | Maximum bytes billed per query; queries exceeding this limit are rejected (blank = unlimited) |
 | `labels` | _(none)_ | any | Comma-separated BigQuery job labels in key=value format (e.g., env=prod,team=data) |

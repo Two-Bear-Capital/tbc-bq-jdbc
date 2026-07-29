@@ -128,6 +128,27 @@ class ConnectionPropertiesTest {
 	}
 
 	@Test
+	void testNegativeQueryPricePerTiBThrowsException() {
+		// A negative price is a typo, not an intent, and clamping one to zero would
+		// quietly report every query as free.
+		IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+				() -> new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(), null, null, null,
+						null, false, null, null, null, null, false, null, null, null, null, null, null, null, null,
+						null, new java.math.BigDecimal("-1")));
+		assertTrue(e.getMessage().contains("queryPricePerTiB"), "the message should name the property: " + e);
+	}
+
+	@Test
+	void testQueryPricePerTiBDefaultsToUnset() {
+		// The pre-3.2.0 constructor shape leaves the rate unset, so an existing caller
+		// gets byte-only estimates rather than a price the driver made up.
+		ConnectionProperties props = new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(),
+				null, null, null, null, false, null, null, null, null, false, null, null, null, null, null, null, null,
+				null);
+		assertNull(props.queryPricePerTiB());
+	}
+
+	@Test
 	void testLabelsImmutability() {
 		// Given: A mutable map of labels
 		Map<String, String> mutableLabels = new java.util.HashMap<>();
