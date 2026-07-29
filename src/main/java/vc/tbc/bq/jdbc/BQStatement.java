@@ -233,6 +233,21 @@ public class BQStatement extends AbstractBQStatement {
 		return ResultSet.FETCH_FORWARD;
 	}
 
+	/**
+	 * Sets the page size this statement reads results at, overriding the
+	 * connection's {@code pageSize} for this statement only.
+	 *
+	 * <p>
+	 * Per-statement is the useful granularity: one connection may run both a narrow
+	 * lookup and a million-row scan, which want different page sizes. Zero restores
+	 * the connection default, per the JDBC contract that 0 means the driver
+	 * decides.
+	 *
+	 * @param rows
+	 *            the page size, or 0 for the connection's {@code pageSize}
+	 * @throws SQLException
+	 *             if the statement is closed or {@code rows} is negative
+	 */
 	@Override
 	public void setFetchSize(int rows) throws SQLException {
 		checkClosed();
@@ -245,9 +260,18 @@ public class BQStatement extends AbstractBQStatement {
 	@Override
 	public int getFetchSize() throws SQLException {
 		checkClosed();
-		return fetchSize > 0 ? fetchSize : properties.pageSize();
+		return getEffectiveFetchSize();
 	}
 
+	/**
+	 * The page size results are actually read at: this statement's if one was set,
+	 * otherwise the connection's {@code pageSize}.
+	 *
+	 * <p>
+	 * {@link #getFetchSize()} delegates here rather than repeating the expression —
+	 * a statement has one effective page size, and two copies of the rule is one
+	 * copy to forget when it changes.
+	 */
 	@Override
 	protected int getEffectiveFetchSize() {
 		return fetchSize > 0 ? fetchSize : properties.pageSize();

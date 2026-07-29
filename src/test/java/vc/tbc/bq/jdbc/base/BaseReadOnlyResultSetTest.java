@@ -515,12 +515,25 @@ class BaseReadOnlyResultSetTest {
 	}
 
 	@Test
-	void fetchSizeIsIgnoredAndReportsZero() throws SQLException {
-		// Paging is driven by the pageSize connection property, not per-ResultSet.
-		// Accepting the call keeps pooled tools working; reporting 0 tells a caller
-		// the driver is choosing
+	void fetchSizeIsRecordedAndReportedBack() throws SQLException {
+		// It cannot change how these rows are read — they were paged at the size the
+		// statement asked for when the results opened — but JDBC requires the hint to
+		// be reported back. Returning 0 to a caller that had just set 500 said the
+		// request went nowhere.
 		resultSet.setFetchSize(500);
+		assertEquals(500, resultSet.getFetchSize());
+	}
+
+	@Test
+	void fetchSizeDefaultsToZeroWithoutAStatement() throws SQLException {
+		// Zero means "the driver decides", which is the honest answer for a result
+		// set no statement produced — the metadata results.
 		assertEquals(0, resultSet.getFetchSize());
+	}
+
+	@Test
+	void fetchSizeRejectsANegativeHint() {
+		assertThrows(SQLException.class, () -> resultSet.setFetchSize(-1));
 	}
 
 	@Test

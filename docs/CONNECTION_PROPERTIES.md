@@ -146,6 +146,9 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
 - Lowering `pageSize` reduces peak memory per page but costs more round trips. BigQuery also
   caps a page by response bytes, so a very large `pageSize` stops adding rows per page once
   the payload hits that ceiling
+- `Statement.setFetchSize(n)` overrides `pageSize` for that statement, so one connection can
+  run a narrow lookup and a million-row scan at different page sizes. Set it before executing;
+  `0` restores the connection's `pageSize`
 - `maxResults` limits total rows returned, regardless of pagination
 - `nativeComplexTypes` governs **only what `getObject()` returns** for ARRAY and STRUCT
   columns. With the default `false` it returns a JSON string, which keeps IntelliJ IDEA
