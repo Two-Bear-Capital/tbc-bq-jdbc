@@ -78,6 +78,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.schemaFields = schema != null ? schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
 		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
+		initialiseFetchSize(resolveFetchSize(statement));
 	}
 
 	/**
@@ -132,6 +133,15 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.schemaFields = schema != null ? schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
 		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
+		initialiseFetchSize(resolveFetchSize(statement));
+	}
+
+	/**
+	 * The page size the statement read these rows at, which JDBC makes the result
+	 * set's default fetch size. Zero for a result set no statement produced.
+	 */
+	private static int resolveFetchSize(BQStatement statement) {
+		return statement == null ? 0 : statement.getEffectiveFetchSize();
 	}
 
 	private static int resolveMaxRows(BQStatement statement) {

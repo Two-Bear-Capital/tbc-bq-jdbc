@@ -27,6 +27,7 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | Batch updates (`addBatch()`, `executeBatch()`) | ✅ | See [Batch execution](#batch-execution) |
 | Update counts | ✅ | `executeUpdate()` / `getUpdateCount()` return real affected-row counts from BigQuery DML statistics |
 | `ResultSet` iteration | ✅ | Forward-only (`TYPE_FORWARD_ONLY`) |
+| `Statement.setFetchSize()` | ✅ | Page size for that statement, overriding the connection's `pageSize`. `0` restores the connection default; `getFetchSize()` reports the effective value |
 | `ResultSetMetaData` | ✅ | Column names, types, counts |
 | `DatabaseMetaData` | ⚠️ | See [DatabaseMetaData](#databasemetadata) |
 | `SQLException` hierarchy | ✅ | With SQLState codes |
@@ -141,7 +142,7 @@ itself — the error comes from BigQuery.
 | Updatable result sets (`CONCUR_UPDATABLE`) | ❌ | Use DML statements |
 | `updateRow()`, `deleteRow()`, `insertRow()` | ❌ | Use DML / INSERT statements |
 | `beforeFirst()`, `absolute()`, `relative()` | ❌ | Forward-only iteration |
-| `setFetchSize()` | ⚠️ | Accepted and ignored; `getFetchSize()` returns 0. Use the `pageSize` connection property |
+| `ResultSet.setFetchSize()` | ⚠️ | Recorded and reported by `getFetchSize()`, but the rows have already been paged — set it on the `Statement` before executing to change paging |
 | Holdability | ⚠️ | Always `CLOSE_CURSORS_AT_COMMIT`; any other value throws |
 
 BigQuery results are streaming and forward-only. Cache rows if you need random access:

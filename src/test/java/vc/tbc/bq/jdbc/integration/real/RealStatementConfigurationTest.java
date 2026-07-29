@@ -190,6 +190,24 @@ class RealStatementConfigurationTest extends AbstractRealBigQueryIntegrationTest
 	}
 
 	@Test
+	void testResultSetInheritsTheStatementFetchSize() throws SQLException {
+		// JDBC makes a result set's fetch size default to that of the statement
+		// which created it. It used to report 0 whatever the statement had asked
+		// for, which told a caller its request had gone nowhere.
+		try (Statement stmt = connection.createStatement()) {
+			stmt.setFetchSize(250);
+			try (ResultSet rs = stmt.executeQuery("SELECT * FROM " + TEST_TABLE)) {
+				assertEquals(250, rs.getFetchSize(), "the result set should report the page size it was read at");
+
+				// Setting it on the result set records the hint, but the rows have
+				// already been paged — there is nothing left for it to influence.
+				rs.setFetchSize(10);
+				assertEquals(10, rs.getFetchSize());
+			}
+		}
+	}
+
+	@Test
 	void testFetchSizeDoesNotAffectResults() throws SQLException {
 		try (Statement small = connection.createStatement(); Statement large = connection.createStatement()) {
 			small.setFetchSize(1);
