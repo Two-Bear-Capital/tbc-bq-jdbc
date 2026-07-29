@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-07-29
+
+### ⚡ Features
+
+- **auth:** Support service account impersonation ([#240](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/240)) [**BREAKING**]
+- **metadata:** Make INFORMATION_SCHEMA browsable ([#246](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/246)) [**BREAKING**]
+- **execution:** Reach every statement of a multi-statement script ([#249](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/249)) [**BREAKING**]
+- **metadata:** Discover and switch between projects ([#250](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/250)) [**BREAKING**]
+- **metadata:** Distinguish external tables, snapshots and clones ([#251](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/251)) [**BREAKING**]
+- **metadata:** Report STRUCT subfields in getColumns() ([#253](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/253))
+
+### 🐛 Bug Fixes
+
+- **errors:** Report the service's own explanation, not the client's summary ([#244](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/244))
+- **errors:** Report a rejected credential as SQLState 28000 ([#254](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/254))
+- **storage:** Authenticate the Storage path with the connection's credential ([#255](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/255))
+
+### 🔀 Pull Requests
+
+- Merge pull request #256 from Two-Bear-Capital/release/4.0.0
+
+Release 4.0.0
+
 ## [3.2.1] - 2026-07-29
 
 ### 🐛 Bug Fixes
@@ -2577,6 +2600,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.0.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.1...v4.0.0
 [3.2.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.0.9...v3.1.0
