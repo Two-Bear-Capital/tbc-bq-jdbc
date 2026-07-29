@@ -18,6 +18,10 @@ package vc.tbc.bq.jdbc;
 import org.junit.jupiter.api.Test;
 import vc.tbc.bq.jdbc.auth.*;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -26,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 1.0.0
  */
 class AuthenticationTest {
+
+	private static final String TARGET = "etl@my-project.iam.gserviceaccount.com";
 
 	@Test
 	void testServiceAccountAuthConstruction() {
@@ -184,6 +190,7 @@ class AuthenticationTest {
 		AuthType userOAuth = new UserOAuthAuth("client", "secret", "refresh");
 		AuthType workforce = new WorkforceIdentityAuth("/path/to/config.json");
 		AuthType workload = new WorkloadIdentityAuth("/path/to/config.json");
+		AuthType impersonated = new ImpersonatedAuth(adc, TARGET);
 
 		// Then: All should be instances of AuthType
 		assertInstanceOf(AuthType.class, serviceAccount);
@@ -191,6 +198,7 @@ class AuthenticationTest {
 		assertInstanceOf(AuthType.class, userOAuth);
 		assertInstanceOf(AuthType.class, workforce);
 		assertInstanceOf(AuthType.class, workload);
+		assertInstanceOf(AuthType.class, impersonated);
 	}
 
 	@Test
@@ -214,5 +222,93 @@ class AuthenticationTest {
 
 		// Then: Should contain field names (but not necessarily values for security)
 		assertTrue(str.contains("UserOAuthAuth"));
+	}
+
+	@Test
+	void testImpersonatedAuthConstruction() {
+		// Given: A source auth type and a delegation chain
+		AuthType source = new ApplicationDefaultAuth();
+		List<String> delegates = List.of("mid1@my-project.iam.gserviceaccount.com");
+
+		// When: Creating ImpersonatedAuth
+		ImpersonatedAuth auth = new ImpersonatedAuth(source, TARGET, delegates);
+
+		// Then: Should store all three components
+		assertEquals(source, auth.source());
+		assertEquals(TARGET, auth.targetPrincipal());
+		assertEquals(delegates, auth.delegates());
+	}
+
+	@Test
+	void testImpersonatedAuthDefaultsToNoDelegates() {
+		// When: Creating ImpersonatedAuth without a chain, either way
+		ImpersonatedAuth convenience = new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET);
+		ImpersonatedAuth explicitNull = new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET, null);
+
+		// Then: Both should hold an empty chain, and be equal
+		assertEquals(List.of(), convenience.delegates());
+		assertEquals(List.of(), explicitNull.delegates());
+		assertEquals(convenience, explicitNull);
+	}
+
+	@Test
+	void testImpersonatedAuthDelegatesAreImmutable() {
+		// Given: A mutable list handed to the constructor
+		List<String> delegates = new ArrayList<>(List.of("mid1@my-project.iam.gserviceaccount.com"));
+		ImpersonatedAuth auth = new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET, delegates);
+
+		// When: The caller's list is mutated afterwards
+		delegates.add("mid2@my-project.iam.gserviceaccount.com");
+
+		// Then: The record should be unaffected, and reject mutation of its own copy
+		assertEquals(1, auth.delegates().size());
+		assertThrows(UnsupportedOperationException.class, () -> auth.delegates().add("late@example.com"));
+	}
+
+	@Test
+	void testImpersonatedAuthNullComponentsThrowException() {
+		// Then: Neither the source nor the target may be null
+		assertThrows(NullPointerException.class, () -> new ImpersonatedAuth(null, TARGET));
+		assertThrows(NullPointerException.class, () -> new ImpersonatedAuth(new ApplicationDefaultAuth(), null));
+	}
+
+	@Test
+	void testImpersonatedAuthBlankTargetThrowsException() {
+		// Then: A blank target is a missing target
+		assertThrows(IllegalArgumentException.class, () -> new ImpersonatedAuth(new ApplicationDefaultAuth(), ""));
+		assertThrows(IllegalArgumentException.class, () -> new ImpersonatedAuth(new ApplicationDefaultAuth(), "   "));
+	}
+
+	@Test
+	void testImpersonatedAuthBlankDelegateThrowsException() {
+		// Then: A blank link in the chain is a typo, not an empty chain
+		List<String> delegates = Arrays.asList("mid1@my-project.iam.gserviceaccount.com", "  ");
+		assertThrows(IllegalArgumentException.class,
+				() -> new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET, delegates));
+	}
+
+	@Test
+	void testImpersonatedAuthRejectsNestedImpersonation() {
+		// Given: An already-impersonated source
+		ImpersonatedAuth inner = new ImpersonatedAuth(new ApplicationDefaultAuth(),
+				"mid@my-project.iam.gserviceaccount.com");
+
+		// Then: Wrapping it again should point the caller at delegates instead
+		IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+				() -> new ImpersonatedAuth(inner, TARGET));
+		assertTrue(e.getMessage().contains("delegates"), "Message should name the alternative: " + e.getMessage());
+	}
+
+	@Test
+	void testImpersonatedAuthEqualityIncludesSource() {
+		// Given: The same target reached from two different source identities
+		ImpersonatedAuth fromAdc = new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET);
+		ImpersonatedAuth fromKey = new ImpersonatedAuth(new ServiceAccountAuth("/path/to/key.json"), TARGET);
+
+		// Then: They must not be equal — CredentialsCache keys on AuthType, so
+		// treating these as one entry would hand a caller the wrong credentials
+		assertNotEquals(fromAdc, fromKey);
+		assertEquals(fromAdc, new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET));
+		assertEquals(fromAdc.hashCode(), new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET).hashCode());
 	}
 }

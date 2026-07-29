@@ -125,6 +125,15 @@ guidance, examples, and recommended configurations a flat table can't capture.
 jdbc:bigquery:my-project/my_dataset?authType=SERVICE_ACCOUNT&credentials=/path/to/key.json
 ```
 
+`impersonateServiceAccount` and `impersonateDelegates` are independent of `authType`: they
+run queries as another service account using whichever method above authenticated the
+connection. See [Service account impersonation](AUTHENTICATION.md#service-account-impersonation).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com
+```
+
 ---
 
 ### Query Execution Properties

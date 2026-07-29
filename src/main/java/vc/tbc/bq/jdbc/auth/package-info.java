@@ -32,6 +32,10 @@
  * Federation
  * </ul>
  *
+ * <p>
+ * {@link vc.tbc.bq.jdbc.auth.ImpersonatedAuth} sits alongside these rather than
+ * among them: it layers service account impersonation over any one of them.
+ *
  * @since 1.0.0
  */
 package vc.tbc.bq.jdbc.auth;

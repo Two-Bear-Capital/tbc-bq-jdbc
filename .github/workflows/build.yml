@@ -196,6 +196,15 @@ jobs:
         env:
           BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
           BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
+          # Impersonation fixtures (#197). Unlike BQ_TEST_PROJECT these are not
+          # pre-flight checked: the service accounts are created by terraform/,
+          # which only applies on main, so RealImpersonationTest has to be able to
+          # skip on a release branch that has not reached main yet. Set both
+          # secrets once `terraform apply` has run, from the
+          # impersonation_target_service_account and
+          # impersonation_delegate_service_account outputs.
+          BQ_TEST_IMPERSONATE_SA: ${{ secrets.BQ_TEST_IMPERSONATE_SA }}
+          BQ_TEST_IMPERSONATE_DELEGATE: ${{ secrets.BQ_TEST_IMPERSONATE_DELEGATE }}
           TZ: Asia/Kolkata
 
       # Second half of the same guard: the pre-flight check proves the secret is set,

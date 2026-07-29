@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **31** connection properties.
+There are **33** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -18,6 +18,8 @@ There are **31** connection properties.
 | `clientId` | _(none)_ | any | OAuth 2.0 client ID (required for USER_OAUTH auth) |
 | `clientSecret` | _(none)_ | any | OAuth 2.0 client secret (required for USER_OAUTH auth) |
 | `refreshToken` | _(none)_ | any | OAuth 2.0 refresh token (required for USER_OAUTH auth) |
+| `impersonateServiceAccount` | _(none)_ | any | Email of a service account to impersonate, using the configured authType as the source identity |
+| `impersonateDelegates` | _(none)_ | any | Comma-separated intermediate service account emails, source-first, for a delegated impersonation chain |
 | `host` | _(none)_ | any | Alternative BigQuery endpoint, e.g. a proxy or Private Service Connect address. Defaults to https when no scheme is given; blank uses Google's endpoints |
 | `port` | _(none)_ | any | Port for the alternative endpoint set by 'host' |
 | `location` | _(none)_ | any | BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location. |

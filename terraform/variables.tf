@@ -31,3 +31,14 @@ variable "dataset_id" {
   type        = string
   default     = "tbc_bq_jdbc_integration_tests"
 }
+
+variable "impersonation_source_principals" {
+  description = <<-EOT
+    Extra IAM principals allowed to impersonate the test service accounts, in full
+    member form (e.g. "user:someone@example.com"). CI already has these grants; this
+    is for running the impersonation tests locally under your own ADC. Empty by
+    default so the grant is always named deliberately.
+  EOT
+  type        = list(string)
+  default     = []
+}
