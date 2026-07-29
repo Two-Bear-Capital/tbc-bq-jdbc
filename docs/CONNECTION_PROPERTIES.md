@@ -138,6 +138,15 @@ jdbc:bigquery:my-project/my_dataset?impersonateServiceAccount=etl@my-project.iam
 
 ### Metadata Properties
 
+`includeStructFields` (default `false`) adds a `getColumns()` row per `STRUCT` field, named
+by its dotted path. See [STRUCT subfields](COMPATIBILITY.md#struct-subfields).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?includeStructFields=true
+```
+
+
 `additionalProjects` (default empty) is a comma-separated list of further project IDs to
 report from `getCatalogs()`, so a tool can discover and `setCatalog()` to them. See
 [Browsing more than one project](COMPATIBILITY.md#browsing-more-than-one-project).

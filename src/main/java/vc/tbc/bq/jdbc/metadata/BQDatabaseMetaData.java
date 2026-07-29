@@ -1856,7 +1856,158 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			rows.add(buildColumnRow(projectId, datasetId, tableName, columnName, typeInfo.jdbcType(), dataType,
 					typeInfo.columnSize(), typeInfo.decimalDigits(), nullable, ordinalPosition, null));
 		}
+
+		if (connection.getProperties().includeStructFields()) {
+			rows = spliceStructFields(bigquery, projectId, datasetId, rows, tableNamePattern, columnNamePattern);
+		}
 		return rows;
+	}
+
+	/**
+	 * Separator for the composite map keys below. A tab, because no BigQuery table
+	 * or column name can contain one, so a key cannot be ambiguous.
+	 */
+	private static final String SEP = "\t";
+
+	/** Index of {@code COLUMN_NAME} in a {@link MetadataColumns.Columns} row. */
+	private static final int COLUMN_ROW_COLUMN_NAME = 3;
+
+	/**
+	 * Index of {@code ORDINAL_POSITION} in a {@link MetadataColumns.Columns} row.
+	 */
+	private static final int COLUMN_ROW_ORDINAL = 16;
+
+	/**
+	 * Adds a row per {@code STRUCT} field, immediately after the column it belongs
+	 * to.
+	 *
+	 * <p>
+	 * {@code INFORMATION_SCHEMA.COLUMN_FIELD_PATHS} is BigQuery's own answer to
+	 * "what is inside this record". It lists the top-level column as a path too, so
+	 * only the dotted ones are new here.
+	 *
+	 * <p>
+	 * <b>Paths below an ARRAY are excluded</b>, and that is not tidiness. A struct
+	 * path is a usable column reference — {@code SELECT person.name} works — but an
+	 * array's is not: {@code SELECT items.n} fails with "Cannot access field n on a
+	 * value with type ARRAY&lt;…&gt;", because it needs {@code UNNEST}. Reporting
+	 * one would advertise a column that cannot be selected, which is worse than not
+	 * reporting it.
+	 *
+	 * <p>
+	 * Nullability is reported as nullable: the view carries no {@code is_nullable},
+	 * and a nested field of a nullable record is nullable in practice whatever the
+	 * field itself declares.
+	 *
+	 * @return the rows with field rows spliced in and ordinals renumbered
+	 */
+	private java.util.List<Object[]> spliceStructFields(BigQuery bigquery, String projectId, String datasetId,
+			java.util.List<Object[]> rows, String tableNamePattern, String columnNamePattern)
+			throws InterruptedException {
+
+		String sql = "SELECT table_name, column_name, field_path, data_type" + " FROM `" + projectId + "." + datasetId
+				+ ".INFORMATION_SCHEMA.COLUMN_FIELD_PATHS`" + " ORDER BY table_name, field_path";
+		TableResult results = bigquery.query(QueryJobConfiguration.newBuilder(sql).setUseLegacySql(false).build());
+
+		// Every path's declared type, so a path can be tested for an ARRAY ancestor.
+		java.util.Map<String, String> typesByPath = new java.util.HashMap<>();
+		java.util.List<FieldValueList> paths = new java.util.ArrayList<>();
+		for (FieldValueList row : results.iterateAll()) {
+			String key = row.get("table_name").getStringValue() + SEP + row.get("field_path").getStringValue();
+			typesByPath.put(key, row.get("data_type").getStringValue());
+			paths.add(row);
+		}
+
+		// Field rows, grouped by the table and column they belong under.
+		java.util.Map<String, java.util.List<Object[]>> fieldsByColumn = new java.util.LinkedHashMap<>();
+		for (FieldValueList row : paths) {
+			String tableName = row.get("table_name").getStringValue();
+			String fieldPath = row.get("field_path").getStringValue();
+			if (!fieldPath.contains(".")) {
+				continue;
+			}
+			if (tableNamePattern != null && !matchesTableNameFilter(tableName, tableNamePattern)) {
+				continue;
+			}
+			if (columnNamePattern != null && !matchesPattern(fieldPath, columnNamePattern)) {
+				continue;
+			}
+			if (!isSelectablePath(tableName, fieldPath, typesByPath)) {
+				continue;
+			}
+
+			String dataType = row.get("data_type").getStringValue();
+			TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+			Object[] fieldRow = buildColumnRow(projectId, datasetId, tableName, fieldPath, typeInfo.jdbcType(),
+					dataType, typeInfo.columnSize(), typeInfo.decimalDigits(), DatabaseMetaData.columnNullable, 0,
+					null);
+			fieldsByColumn.computeIfAbsent(tableName + SEP + row.get("column_name").getStringValue(),
+					key -> new java.util.ArrayList<>()).add(fieldRow);
+		}
+
+		if (fieldsByColumn.isEmpty()) {
+			return rows;
+		}
+
+		java.util.List<Object[]> merged = new java.util.ArrayList<>(rows.size());
+		java.util.Set<String> placed = new java.util.HashSet<>();
+		java.util.Map<String, Integer> nextOrdinal = new java.util.HashMap<>();
+
+		for (Object[] row : rows) {
+			String tableName = (String) row[COLUMN_ROW_TABLE_NAME];
+			int ordinal = nextOrdinal.getOrDefault(tableName, 1);
+			row[COLUMN_ROW_ORDINAL] = ordinal++;
+			merged.add(row);
+
+			String key = tableName + SEP + row[COLUMN_ROW_COLUMN_NAME];
+			for (Object[] fieldRow : fieldsByColumn.getOrDefault(key, java.util.List.of())) {
+				fieldRow[COLUMN_ROW_ORDINAL] = ordinal++;
+				merged.add(fieldRow);
+			}
+			placed.add(key);
+			nextOrdinal.put(tableName, ordinal);
+		}
+
+		// Fields whose own column did not survive the caller's filter.
+		// getColumns(…, "person.%") matches person.name but not person, so the
+		// column those fields hang off is absent — and when it is the only column
+		// asked for, `rows` is empty and there is no table context at all. Attaching
+		// fields only to a surviving parent answered that query with nothing, which
+		// is what the first two cuts of this did.
+		for (java.util.Map.Entry<String, java.util.List<Object[]>> entry : fieldsByColumn.entrySet()) {
+			if (placed.contains(entry.getKey())) {
+				continue;
+			}
+			String tableName = entry.getKey().substring(0, entry.getKey().indexOf(SEP));
+			int ordinal = nextOrdinal.getOrDefault(tableName, 1);
+			for (Object[] fieldRow : entry.getValue()) {
+				fieldRow[COLUMN_ROW_ORDINAL] = ordinal++;
+				merged.add(fieldRow);
+			}
+			nextOrdinal.put(tableName, ordinal);
+		}
+		return merged;
+	}
+
+	/**
+	 * Whether a dotted field path can be named directly in a query.
+	 *
+	 * <p>
+	 * True only when every ancestor is a {@code STRUCT}. One ARRAY anywhere above
+	 * it means the path needs {@code UNNEST} and cannot be selected as written.
+	 */
+	private static boolean isSelectablePath(String tableName, String fieldPath,
+			java.util.Map<String, String> typesByPath) {
+		int dot = fieldPath.indexOf('.');
+		while (dot >= 0) {
+			String ancestor = fieldPath.substring(0, dot);
+			String ancestorType = typesByPath.get(tableName + SEP + ancestor);
+			if (ancestorType == null || !ancestorType.startsWith("STRUCT<")) {
+				return false;
+			}
+			dot = fieldPath.indexOf('.', dot + 1);
+		}
+		return true;
 	}
 
 	/**
@@ -3424,6 +3575,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		ConnectionProperties properties = connection.getProperties();
 		return (properties.includeInformationSchema() ? "i" : "-") + (properties.collapseShardedTables() ? "s" : "-")
 				+ (properties.metadataIncludeDescriptions() ? "d" : "-")
+				+ (properties.includeStructFields() ? "f" : "-")
 				// The current catalog belongs here for the same reason: a null
 				// catalog argument resolves against it, so two connections pointed at
 				// different projects build identical call-site keys for different

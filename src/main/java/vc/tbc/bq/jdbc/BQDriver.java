@@ -186,6 +186,10 @@ public final class BQDriver implements Driver {
 				"Comma-separated further project IDs to report from getCatalogs(), so a tool can discover and switch to them with setCatalog(). Not discovered automatically. Cross-project queries work without this; it only makes the projects visible",
 				false, null));
 
+		props.add(prop(info, "includeStructFields", "false",
+				"Add a getColumns() row per STRUCT field, named by its dotted path (person.name). Costs one extra INFORMATION_SCHEMA query per dataset. Fields under an ARRAY are excluded because such a path needs UNNEST and cannot be selected as written. Off by default: it changes the row count of every getColumns() call",
+				false, new String[]{"true", "false"}));
+
 		props.add(prop(info, "includeInformationSchema", "true",
 				"Make INFORMATION_SCHEMA browsable: a synthetic INFORMATION_SCHEMA schema per project holding the project-scoped views (SCHEMATA, JOBS, ...), plus the dataset-scoped views (TABLES, COLUMNS, ...) as tables named INFORMATION_SCHEMA.<view> inside each dataset. Reported as SYSTEM TABLE so a caller can filter them out. Costs no BigQuery query — the view list is static",
 				false, new String[]{"true", "false"}));
