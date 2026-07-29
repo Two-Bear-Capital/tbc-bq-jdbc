@@ -367,12 +367,13 @@ public final class ConnectionUrlParser {
 		BigDecimal queryPricePerTiB = parseBigDecimal(properties, "queryPricePerTiB");
 		Boolean metadataIncludeDescriptions = parseBooleanObject(properties, "metadataIncludeDescriptions");
 		Boolean collapseShardedTables = parseBooleanObject(properties, "collapseShardedTables");
+		Integer batchLoadThreshold = parseInteger(properties, "batchLoadThreshold");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
-				metadataIncludeDescriptions, collapseShardedTables);
+				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {

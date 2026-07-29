@@ -65,6 +65,10 @@ Details:
   UPDATE/DELETE/MERGE, `INSERT ... SELECT`, tuples mixing literals with placeholders,
   and any batch whose parameter sets do not all match the template's placeholder count.
 - `Statement.addBatch(String)` (heterogeneous SQL batches) also executes sequentially.
+- Set `batchLoadThreshold` to have large batches written by a single BigQuery **load job**
+  instead of chunked DML — not bound by DML quotas, and far faster at volume. Off by
+  default; see [Connection properties](CONNECTION_PROPERTIES.md#performance-tuning) for
+  the conditions a batch must meet, including that load jobs cannot join a transaction.
 - Update counts come from BigQuery DML statistics. On the sequential path each entry
   carries that statement's affected-row count. On the collapsed path a chunk reports
   `1` per row only when BigQuery confirms exactly the expected total; otherwise every

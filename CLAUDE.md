@@ -121,6 +121,17 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
 - Chunked to stay under BigQuery limits (10,000 query parameters/query, ~1 MB query text)
 - `Statement.addBatch(String)` heterogeneous batches execute sequentially
 - DML executed via `AbstractBQStatement.executeDmlInternal()`, which returns real affected-row counts from job statistics
+- `batchLoadThreshold` (opt-in) sends large batches through **one load job** instead, streamed
+  as NDJSON into a `TableDataWriteChannel` — no GCS staging. `util/BatchLoadEncoder` owns the
+  target parsing and the JSON
+- **Every gate on that path exists because the DML path stays correct where the load path
+  would not**, so each falls back rather than throwing: below the threshold, in a
+  transaction or session (a load job cannot join one — rows would survive a rollback), no
+  explicit column list, or a parameter type with no settled JSON form
+- The channel's job **does not exist until the channel is closed**; `getJob()` returns null
+  before that
+- Update counts are 1 per row only when the load's aggregate output matches the batch,
+  otherwise `SUCCESS_NO_INFO` — never fabricated from the batch size
 
 ### Unsupported JDBC Features (BigQuery Limitations)
 - Scrollable ResultSets (no `previous()`, `absolute()`)

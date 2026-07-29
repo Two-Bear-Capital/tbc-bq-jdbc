@@ -338,6 +338,38 @@ SELECT * FROM `my-project.my_dataset.events_*` WHERE _TABLE_SUFFIX BETWEEN '2026
 declares, so the only evidence is the name. A table legitimately ending in a date would
 otherwise disappear from listings into a set it does not belong to.
 
+**`batchLoadThreshold`:**
+- blank (default) - `executeBatch()` always uses chunked INSERT DML
+- a row count - batches at or above it are written with a single BigQuery **load job**
+
+Chunked DML means one query job per chunk, so a million rows is hundreds of jobs against
+DML quotas. A load job is not DML-quota bound and is dramatically faster at volume.
+
+```
+jdbc:bigquery:my-project/my_dataset?authType=ADC&batchLoadThreshold=50000
+```
+
+A batch takes the load path only when **all** of these hold; otherwise it silently uses
+the DML path, which is always correct:
+
+- the batch has at least `batchLoadThreshold` rows
+- the connection is in auto-commit and has no session — **load jobs cannot join a
+  BigQuery transaction**, so the rows would land outside it and survive a rollback
+- the statement is a simple `INSERT` with an **explicit column list**. Without one the
+  column order is the table's, which the driver will not guess
+- every parameter is a scalar type: STRING, INT64, FLOAT64, NUMERIC, BIGNUMERIC, BOOL,
+  BYTES, DATE, TIME, DATETIME or TIMESTAMP. ARRAY, STRUCT, JSON, GEOGRAPHY and INTERVAL
+  each need a bespoke JSON form, and a wrong one writes bad data rather than failing
+
+**Update counts.** A load job reports rows written in aggregate, with no per-row
+breakdown. When the count matches the batch exactly, every entry of the returned `int[]`
+is `1`; otherwise every entry is `Statement.SUCCESS_NO_INFO`. The counts are never
+fabricated from the batch size.
+
+**Off by default deliberately.** A load job is a different mechanism, not a faster one of
+the same kind — switching to it at some row count would change the failure modes of a
+batch written as an INSERT.
+
 **Recommended Configurations:**
 
 **Small Projects (< 10 datasets):**
