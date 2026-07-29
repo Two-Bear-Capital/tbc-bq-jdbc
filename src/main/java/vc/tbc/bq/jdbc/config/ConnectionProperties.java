@@ -90,6 +90,11 @@ import java.util.Objects;
  *            whether {@code getTables} reads table descriptions into
  *            {@code REMARKS} (default: true). Costs one
  *            {@code INFORMATION_SCHEMA} query per dataset scanned.
+ * @param collapseShardedTables
+ *            whether date-sharded tables ({@code events_20260101}, …) are
+ *            reported as one {@code events_*} entry (default: false). Sharding
+ *            is a naming convention, not something BigQuery declares, so this
+ *            is opt-in.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
@@ -98,7 +103,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
 		Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
 		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
-		Boolean metadataIncludeDescriptions) {
+		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -196,6 +201,13 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			// project large enough to feel it.
 			metadataIncludeDescriptions = true;
 		}
+		if (collapseShardedTables == null) {
+			// Opt-in, unlike metadataIncludeDescriptions: collapsing removes rows
+			// rather than filling one in, and the evidence for a set is a naming
+			// convention BigQuery never declared. A table legitimately named
+			// <something>_20260101 must not vanish from a listing by default.
+			collapseShardedTables = false;
+		}
 		// No default: a rate the driver invented would be wrong for every customer
 		// not on on-demand pricing, and would silently go stale. Unset means
 		// estimates report bytes and no money. Rejected rather than clamped,
@@ -206,15 +218,16 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	}
 
 	/**
-	 * Creates properties without {@code queryPricePerTiB} or
-	 * {@code metadataIncludeDescriptions}, which then take their defaults.
+	 * Creates properties without {@code queryPricePerTiB},
+	 * {@code metadataIncludeDescriptions} or {@code collapseShardedTables}, which
+	 * then take their defaults.
 	 *
 	 * <p>
 	 * This is the canonical shape as of 3.1.0, and the reason both this and the
 	 * overload below it exist: the canonical constructor of a public record is part
 	 * of its ABI, so growing the component list would break existing callers at
-	 * source and binary level. Two components were added in 3.2.0 and neither has
-	 * shipped on its own, so one overload covers both rather than there being a
+	 * source and binary level. The components added in 3.2.0 have not shipped
+	 * individually, so one overload covers them all rather than there being a
 	 * separate step per component.
 	 *
 	 * @param projectId
@@ -273,7 +286,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
 				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
-				nativeComplexTypes, metadataCacheMaxRows, null, null);
+				nativeComplexTypes, metadataCacheMaxRows, null, null, null);
 	}
 
 	/**

@@ -214,7 +214,8 @@ or scripts before any transaction), or to make the session cost explicit at conn
 ### Performance Tuning
 
 Covers `useStorageApi`, `metadataCacheEnabled`, `metadataCacheTtl`,
-`metadataCacheMaxRows`, `metadataLazyLoad`, and `metadataIncludeDescriptions` (see the
+`metadataCacheMaxRows`, `metadataLazyLoad`, `metadataIncludeDescriptions` and
+`collapseShardedTables` (see the
 [generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
@@ -307,6 +308,35 @@ second per dataset on a cold call, run up to 16 datasets at a time and cached fo
 `metadataCacheTtl`. Datasets containing views pay nothing extra, because the same query
 supplies their definitions. Turn it off on projects with enough datasets for that to be
 felt on every cold refresh.
+
+**`collapseShardedTables`:**
+- `false` (default) - every date-shard is its own `getTables()` row
+- `true` - a set of `events_20260101`, `events_20260102`, … is reported as one
+  `events_*` entry
+
+A year of daily shards is 365 rows in a database tree for what users think of as one
+table, and it fills the metadata cache against `metadataCacheMaxRows` for no benefit.
+Collapsing removes both.
+
+`events_*` is BigQuery's own wildcard syntax, so the reported name is directly
+queryable:
+
+```sql
+SELECT * FROM `my-project.my_dataset.events_*` WHERE _TABLE_SUFFIX BETWEEN '20260101' AND '20260131'
+```
+
+- `getColumns()` answers for the wildcard name using the **newest** shard's schema.
+  Shards drift, and a column added recently is one a wildcard query can select
+- `getPseudoColumns()` reports `_TABLE_SUFFIX` for each collapsed entry
+- Naming a single shard exactly — `getTables(…, "events_20260102", …)` — still returns
+  that shard. Collapsing applies to listings, not to lookups
+- A set needs at least two shards. One `events_20260101` is left alone
+- The eight digits must be a plausible date: `metrics_12345678` and `backup_20261301`
+  are not shards
+
+**Off by default deliberately.** Sharding is a naming convention that BigQuery never
+declares, so the only evidence is the name. A table legitimately ending in a date would
+otherwise disappear from listings into a set it does not belong to.
 
 **Recommended Configurations:**
 
@@ -599,6 +629,7 @@ driver's `getPropertyInfo()`, so it never goes stale.
 | `metadataCacheTtl` | Higher = more cache hits, staler schema | Lower |
 | `metadataLazyLoad=true` | No upfront metadata load | Lower (fewer API calls) |
 | `metadataIncludeDescriptions=true` | One `INFORMATION_SCHEMA` query per dataset on a cold `getTables()` | None — `INFORMATION_SCHEMA` reads are not billed |
+| `collapseShardedTables=true` | Far fewer metadata rows on sharded projects; one extra `INFORMATION_SCHEMA` query per dataset for `getPseudoColumns()` | None |
 
 ---
 

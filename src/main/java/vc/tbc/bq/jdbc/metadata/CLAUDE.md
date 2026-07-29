@@ -22,6 +22,24 @@
   `"hello \"there\""`. `util/SqlStringLiterals.unquote` decodes it
 - `metadataIncludeDescriptions=false` falls back to the narrower view-only read
 
+### Sharded tables (`collapseShardedTables`)
+- Off by default, and must stay that way: sharding is a naming convention BigQuery never
+  declares, so collapsing on by default would make a table legitimately ending in a date
+  vanish from listings
+- `ShardedTables` owns the recognition — greedy prefix, so `events_daily_20260101` groups
+  under `events_daily`; the eight digits are range-checked so `metrics_12345678` is not a
+  shard; a set needs **two** members
+- The collapsed name `events_*` is BigQuery's wildcard syntax, not a display convention —
+  it can be queried as-is
+- **`getColumns` reports the newest shard's schema** under the wildcard name. Shards drift
+  and a wildcard query can select a recently added column, so the oldest would under-report
+- Filtering is via `matchesTableNameFilter`, which additionally lets `events_*` match its
+  shards — `*` is not a JDBC pattern character, so the plain matcher never would. An exact
+  shard name still matches itself, which is what keeps single-shard lookups working
+- `getPseudoColumns` adds `_TABLE_SUFFIX` per collapsed entry via a **separate** dataset
+  read. The ingestion-time query filters `is_system_defined = 'YES'`; a wildcard set need
+  not be partitioned at all, so folding them together would mean loosening that query
+
 ### Key Constraints (PK/FK)
 - BigQuery supports `PRIMARY KEY`/`FOREIGN KEY ... NOT ENFORCED` and never validates
   them; `getPrimaryKeys`/`getImportedKeys`/`getExportedKeys`/`getCrossReference` report
