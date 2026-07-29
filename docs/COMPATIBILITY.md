@@ -229,7 +229,7 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getCatalogs()` | ✅ | The connection's project, plus any named by `additionalProjects`, ordered by `TABLE_CAT`. Cached — [see below](#browsing-more-than-one-project) |
 | `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached. Also reports a synthetic `INFORMATION_SCHEMA` schema unless `includeInformationSchema=false` |
 | `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry. `INFORMATION_SCHEMA` views are included as `SYSTEM TABLE` — see below |
-| `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
+| `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached. With `includeStructFields=true`, adds a row per `STRUCT` field — [see below](#struct-subfields) |
 | `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW, EXTERNAL, SNAPSHOT, CLONE, and SYSTEM TABLE while `includeInformationSchema` is on — [see below](#table-types) |
 | `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |
 | `getTypeInfo()` | ✅ | BigQuery type information |
@@ -243,6 +243,43 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
 | `getUDTs()`, `getSuperTypes()`, `getSuperTables()`, `getAttributes()` | ⚠️ | BigQuery has no user-defined types; returns empty |
 | `getClientInfoProperties()` | ⚠️ | The driver accepts no client info properties; returns empty |
+
+### STRUCT subfields
+
+By default `getColumns()` reports top-level columns only, so a `STRUCT` column is one entry
+and its fields are invisible. `includeStructFields=true` adds a row per field, named by its
+dotted path:
+
+```
+COLUMN_NAME        TYPE_NAME                 ORDINAL_POSITION
+id                 INT64                     1
+person             STRUCT<name STRING, …>    2
+person.addr        STRUCT<zip INT64, …>      3
+person.addr.state  STRING                    4
+person.addr.zip    INT64                     5
+person.name        STRING                    6
+items              ARRAY<STRUCT<n INT64>>    7
+label              STRING                    8
+```
+
+Each field follows the column it belongs to, and `ORDINAL_POSITION` is renumbered so it
+stays contiguous.
+
+**Fields below an `ARRAY` are deliberately excluded.** BigQuery's
+`INFORMATION_SCHEMA.COLUMN_FIELD_PATHS` lists them, but they are not usable column
+references — `SELECT items.n` fails with *Cannot access field n on a value with type
+ARRAY&lt;…&gt;* and needs `UNNEST`. Reporting one would advertise a column no query can
+name. Struct paths are usable: `SELECT person.name` works.
+
+Quote a path by its parts, not as a whole. `` `person`.`name` `` works; `` `person.name` ``
+does not — BigQuery reads it as a single column with a dot in its name.
+
+Off by default, because it changes the row count of every `getColumns()` call — a tool that
+builds an INSERT column list from it would treat a field as a column — and because it costs
+a second `INFORMATION_SCHEMA` query per dataset.
+
+Nested rows report `NULLABLE` as nullable: `COLUMN_FIELD_PATHS` carries no nullability, and
+a field of a nullable record is nullable in practice regardless.
 
 ### Table types
 

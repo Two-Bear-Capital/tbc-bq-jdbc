@@ -22,6 +22,23 @@
   `"hello \"there\""`. `util/SqlStringLiterals.unquote` decodes it
 - `metadataIncludeDescriptions=false` falls back to the narrower view-only read
 
+### STRUCT subfields (`includeStructFields`, #186)
+- Off by default: it changes the row count of every `getColumns()` call — a tool building an
+  INSERT column list would treat a field as a column — and costs a second
+  `INFORMATION_SCHEMA` query (`COLUMN_FIELD_PATHS`) per dataset
+- **Paths below an ARRAY are excluded, and that is correctness not tidiness.** A struct path
+  is a usable reference (`SELECT person.name` works); an array's is not (`SELECT items.n`
+  fails, needs `UNNEST`). `isSelectablePath` requires every ancestor to be a `STRUCT`
+- `RealStructFieldMetadataTest` selects every path the driver reports — the only check that
+  separates a correct path list from a plausible one
+- **Field rows must survive their parent being filtered out.** `getColumns(…, "person.%")`
+  matches `person.name` but not `person`, so `rows` can be empty and there is no parent to
+  attach to. Two cuts of this answered that query with nothing; the final sweep keys off the
+  table name in the map key instead of a parent row
+- Ordinals are renumbered per table as rows are spliced, so `ORDINAL_POSITION` stays
+  contiguous
+- Nullability is reported as nullable — `COLUMN_FIELD_PATHS` has no `is_nullable`
+
 ### Table types (#187)
 - `TABLE`, `VIEW`, `MATERIALIZED VIEW`, `EXTERNAL`, `SNAPSHOT`, `CLONE`. The last three are
   a driver convention — JDBC standardises only the first two — and use BigQuery's own

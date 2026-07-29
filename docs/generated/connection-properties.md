@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **35** connection properties.
+There are **36** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -34,6 +34,7 @@ There are **35** connection properties.
 | `batchLoadThreshold` | _(none)_ | any | Row count at or above which PreparedStatement.executeBatch() submits one BigQuery load job instead of chunked INSERT DML, which is not bound by DML quotas and is far faster at volume (blank = never). Only simple INSERTs with an explicit column list and scalar parameters qualify; anything else, and any batch inside a transaction or session, uses the DML path |
 | `collapseShardedTables` | `false` | `true`, `false` | Report date-sharded tables (events_20260101, events_20260102, ...) as a single events_* entry in getTables(), instead of one row per shard. getColumns() answers for the wildcard name using the newest shard's schema. Off by default: sharding is a naming convention, so a table legitimately ending in a date would otherwise disappear from listings |
 | `additionalProjects` | _(none)_ | any | Comma-separated further project IDs to report from getCatalogs(), so a tool can discover and switch to them with setCatalog(). Not discovered automatically. Cross-project queries work without this; it only makes the projects visible |
+| `includeStructFields` | `false` | `true`, `false` | Add a getColumns() row per STRUCT field, named by its dotted path (person.name). Costs one extra INFORMATION_SCHEMA query per dataset. Fields under an ARRAY are excluded because such a path needs UNNEST and cannot be selected as written. Off by default: it changes the row count of every getColumns() call |
 | `includeInformationSchema` | `true` | `true`, `false` | Make INFORMATION_SCHEMA browsable: a synthetic INFORMATION_SCHEMA schema per project holding the project-scoped views (SCHEMATA, JOBS, ...), plus the dataset-scoped views (TABLES, COLUMNS, ...) as tables named INFORMATION_SCHEMA.<view> inside each dataset. Reported as SYSTEM TABLE so a caller can filter them out. Costs no BigQuery query — the view list is static |
 | `metadataIncludeDescriptions` | `true` | `true`, `false` | Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets |
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |

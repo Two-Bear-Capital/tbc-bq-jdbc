@@ -106,6 +106,11 @@ import java.util.Objects;
  *            automatically — listing every project a credential can see is a
  *            different, much slower call, and most of them are not BigQuery
  *            projects at all.
+ * @param includeStructFields
+ *            whether {@code getColumns()} adds a row per {@code STRUCT} field,
+ *            named by its dotted path (default: false). Opt-in: it changes the
+ *            row count of every {@code getColumns()} call, and a tool that
+ *            builds a column list from it would treat a field as a column.
  * @param includeInformationSchema
  *            whether {@code INFORMATION_SCHEMA} is browsable — a synthetic
  *            schema per project, and its dataset-scoped views as tables of each
@@ -120,7 +125,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
 		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
 		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold,
-		Boolean includeInformationSchema, List<String> additionalProjects) {
+		Boolean includeInformationSchema, List<String> additionalProjects, Boolean includeStructFields) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -231,6 +236,13 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 				? List.of()
 				: additionalProjects.stream().filter(java.util.Objects::nonNull).map(String::trim)
 						.filter(project -> !project.isEmpty() && !project.equals(projectId)).distinct().toList();
+		if (includeStructFields == null) {
+			// Off by default, unlike includeInformationSchema: that one adds entries
+			// a caller can act on unchanged, where this one adds rows that are not
+			// columns in the sense the rest of JDBC means. It also costs a second
+			// INFORMATION_SCHEMA query per dataset, which the default must not.
+			includeStructFields = false;
+		}
 		if (includeInformationSchema == null) {
 			// On by default, like metadataIncludeDescriptions and unlike
 			// collapseShardedTables: it adds entries that are genuinely there and
@@ -333,7 +345,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
 				nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB, metadataIncludeDescriptions,
-				collapseShardedTables, batchLoadThreshold, null, null);
+				collapseShardedTables, batchLoadThreshold, null, null, null);
 	}
 
 	/**
@@ -409,7 +421,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
 				nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB, metadataIncludeDescriptions,
-				collapseShardedTables, batchLoadThreshold, includeInformationSchema, null);
+				collapseShardedTables, batchLoadThreshold, includeInformationSchema, null, null);
 	}
 
 	/**
@@ -480,7 +492,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
 				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
-				nativeComplexTypes, metadataCacheMaxRows, null, null, null, null, null, null);
+				nativeComplexTypes, metadataCacheMaxRows, null, null, null, null, null, null, null);
 	}
 
 	/**
