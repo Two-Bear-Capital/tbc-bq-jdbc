@@ -650,15 +650,12 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return statement;
 	}
 
-	@Override
-	public Object getObject(int columnIndex, Map<String, Class<?>> map) throws SQLException {
-		return getObject(columnIndex);
-	}
-
-	@Override
-	public Object getObject(String columnLabel, Map<String, Class<?>> map) throws SQLException {
-		return getObject(columnLabel);
-	}
+	// The getObject(..., Map) overloads are deliberately not overridden. They used
+	// to be, with the same body as the plain getObject, which is what let a
+	// populated type map be dropped on this path — the one nearly every caller
+	// takes. BaseReadOnlyResultSet now refuses a populated map and delegates the
+	// rest to getObject(int) below, so the answer cannot drift from the refusal
+	// Connection.setTypeMap already gives.
 
 	@Override
 	public Date getDate(int columnIndex, Calendar cal) throws SQLException {

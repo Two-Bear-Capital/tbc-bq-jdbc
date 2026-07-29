@@ -170,7 +170,8 @@ while (rs.next()) {
 | `Struct` | ⚠️ | `getObject()` returns a JSON string by default, or a `java.sql.Struct` with `nativeComplexTypes=true`. `Connection.createStruct()` and passing a `Struct` to `setObject()` are not supported |
 | `Blob`, `Clob`, `NClob` | ❌ | Use `byte[]` and `String` |
 | `SQLXML` | ❌ | Use `String` with JSON |
-| `Ref`, `RowId`, custom type maps, Sharding API | ❌ | Not applicable to BigQuery |
+| `Ref`, `RowId`, Sharding API | ❌ | Not applicable to BigQuery |
+| Custom type maps | ❌ | `Connection.setTypeMap()` and `ResultSet.getObject(col, map)` with a populated map both throw `SQLFeatureNotSupportedException`; `getTypeMap()` returns an empty map. A null or empty map is accepted and returns the default mapping |
 
 ---
 
