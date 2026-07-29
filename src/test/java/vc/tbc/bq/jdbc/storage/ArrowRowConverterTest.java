@@ -40,49 +40,66 @@ class ArrowRowConverterTest {
 
 	@ParameterizedTest
 	@EnumSource(value = StandardSQLTypeName.class, names = {"INT64", "FLOAT64", "NUMERIC", "BIGNUMERIC", "BOOL",
-			"STRING", "BYTES", "DATE", "TIME", "DATETIME", "TIMESTAMP", "GEOGRAPHY", "JSON"})
+			"STRING", "BYTES", "DATE", "TIME", "DATETIME", "TIMESTAMP", "GEOGRAPHY", "JSON", "INTERVAL"})
 	@DisplayName("scalar types are eligible")
 	void scalarTypesAreSupported(StandardSQLTypeName type) {
 		assertTrue(ArrowRowConverter.isSupported(Schema.of(Field.of("c", type))),
 				type + " is a flat scalar and should use the Storage Read API path");
 	}
 
-	@ParameterizedTest
-	@EnumSource(value = StandardSQLTypeName.class, names = {"INTERVAL", "RANGE"})
-	@DisplayName("scalar types the encoder does not cover are rejected")
-	void unsupportedScalarTypesAreRejected(StandardSQLTypeName type) {
-		// INTERVAL is not supported by the Storage Read API at all, and RANGE has no
-		// REST encoding this converter reproduces.
-		assertFalse(ArrowRowConverter.isSupported(Schema.of(Field.of("c", type))),
-				type + " must fall back to the REST path");
+	@Test
+	@DisplayName("RANGE is rejected")
+	void rangeIsRejected() {
+		// The one type left outside: RANGE has no FieldValue encoding the REST path
+		// agrees on. INTERVAL used to be here on the belief that the Storage Read API
+		// could not carry it; it can, as an IntervalMonthDayNanoVector (#193).
+		assertFalse(ArrowRowConverter.isSupported(Schema.of(Field.of("c", StandardSQLTypeName.RANGE))),
+				"RANGE must fall back to the REST path");
 	}
 
-	// STRUCT and ARRAY are not covered here because the BigQuery client refuses to
-	// build a bare Field for them at all — a RECORD demands sub-fields. They are
-	// covered by nestedRecordsAreRejected() and repeatedColumnsAreRejected(), which
-	// construct them the way BigQuery actually reports them.
-
 	@Test
-	@DisplayName("a repeated column is rejected even when its element type is scalar")
-	void repeatedColumnsAreRejected() {
+	@DisplayName("a repeated column is eligible when its element type is")
+	void repeatedColumnsAreSupported() {
 		Field repeated = Field.newBuilder("c", StandardSQLTypeName.INT64).setMode(Field.Mode.REPEATED).build();
-		assertFalse(ArrowRowConverter.isSupported(Schema.of(repeated)),
-				"a REPEATED INT64 is an ARRAY<INT64>, which the converter does not encode");
+		assertTrue(ArrowRowConverter.isSupported(Schema.of(repeated)),
+				"an ARRAY<INT64> is encoded by recursing into the list vector");
 	}
 
 	@Test
-	@DisplayName("a record with subfields is rejected")
-	void nestedRecordsAreRejected() {
-		Field nested = Field.newBuilder("c", StandardSQLTypeName.STRUCT, Field.of("inner", StandardSQLTypeName.INT64))
+	@DisplayName("a repeated column is rejected when its element type is not")
+	void repeatedColumnsOfUnsupportedTypeAreRejected() {
+		Field repeated = Field.newBuilder("c", StandardSQLTypeName.RANGE).setMode(Field.Mode.REPEATED).build();
+		assertFalse(ArrowRowConverter.isSupported(Schema.of(repeated)),
+				"an ARRAY<RANGE<...>> is no more encodable than a bare RANGE");
+	}
+
+	@Test
+	@DisplayName("a record with supported subfields is eligible")
+	void nestedRecordsAreSupported() {
+		Field nested = Field.newBuilder("c", StandardSQLTypeName.STRUCT, Field.of("member", StandardSQLTypeName.INT64))
 				.build();
-		assertFalse(ArrowRowConverter.isSupported(Schema.of(nested)), "nested structs must fall back to the REST path");
+		assertTrue(ArrowRowConverter.isSupported(Schema.of(nested)),
+				"a STRUCT is encoded by recursing into the struct vector's children");
+	}
+
+	@Test
+	@DisplayName("support is decided recursively, however deep the bad type is")
+	void unsupportedTypeNestedDeeplyIsRejected() {
+		// The check has to recurse or a RANGE three levels down reaches the encoder,
+		// where it fails mid-ResultSet — after rows have gone back to the caller.
+		Field deep = Field.newBuilder("inner", StandardSQLTypeName.STRUCT, Field.of("r", StandardSQLTypeName.RANGE))
+				.build();
+		Field outer = Field.newBuilder("c", StandardSQLTypeName.STRUCT, Field.of("n", StandardSQLTypeName.INT64), deep)
+				.setMode(Field.Mode.REPEATED).build();
+
+		assertFalse(ArrowRowConverter.isSupported(Schema.of(outer)),
+				"ARRAY<STRUCT<n INT64, inner STRUCT<r RANGE>>> must fall back to REST");
 	}
 
 	@Test
 	@DisplayName("one bad column disqualifies the whole result")
 	void mixedSchemaIsRejected() {
-		Schema mixed = Schema.of(Field.of("ok", StandardSQLTypeName.INT64),
-				Field.of("bad", StandardSQLTypeName.INTERVAL));
+		Schema mixed = Schema.of(Field.of("ok", StandardSQLTypeName.INT64), Field.of("bad", StandardSQLTypeName.RANGE));
 		assertFalse(ArrowRowConverter.isSupported(mixed),
 				"the path is all-or-nothing per result: one unsupported column sends the whole query to REST");
 	}
