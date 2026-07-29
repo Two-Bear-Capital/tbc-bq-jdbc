@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.util;
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.FieldList;
 import com.google.cloud.bigquery.FieldValue;
+import com.google.cloud.bigquery.Range;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -231,7 +232,50 @@ public final class FieldValueConverter {
 		if (type == StandardSQLTypeName.TIMESTAMP) {
 			return epochSeconds(value.getTimestampValue());
 		}
+		if (value.getValue() instanceof Range range) {
+			return rangeLiteral(range);
+		}
 		return value.getStringValue();
+	}
+
+	/**
+	 * Renders a RANGE as the literal BigQuery would accept back.
+	 *
+	 * <p>
+	 * A RANGE is the one type whose {@code FieldValue} holds something other than a
+	 * string: the client hands back a {@link Range} object, so
+	 * {@code getStringValue()} threw {@code ClassCastException} — an unchecked
+	 * exception out of {@code getString}, which no caller can be relying on because
+	 * it never returned.
+	 *
+	 * <p>
+	 * The form is BigQuery's own — {@code [start, end)}, half-open, with
+	 * {@code UNBOUNDED} for an absent bound — so the text can be pasted back into a
+	 * query rather than being a display convention.
+	 *
+	 * <p>
+	 * Endpoints are rendered through the same canonicalisation the column types get
+	 * on their own: a TIMESTAMP range arrives holding raw epoch seconds
+	 * ({@code 1577836800.000000}), which is not what a TIMESTAMP column reads as,
+	 * and letting the two disagree would be the drift this class exists to prevent.
+	 *
+	 * <p>
+	 * <b>This is deliberately only {@code getString}.</b> {@code getObject} still
+	 * returns the {@link Range}; changing that is a result change, and belongs with
+	 * the rest of the RANGE work in 4.0.0 (#231).
+	 */
+	private static String rangeLiteral(Range range) {
+		return "[" + rangeBound(range.getStart(), range) + ", " + rangeBound(range.getEnd(), range) + ")";
+	}
+
+	/** One endpoint of a range, or {@code UNBOUNDED} when it has none. */
+	private static String rangeBound(FieldValue bound, Range range) {
+		if (bound == null || bound.isNull() || bound.getValue() == null) {
+			return "UNBOUNDED";
+		}
+		boolean isTimestamp = range.getType() != null && range.getType().getType() != null
+				&& "TIMESTAMP".equalsIgnoreCase(range.getType().getType());
+		return isTimestamp ? epochSeconds(bound.getTimestampValue()) : bound.getStringValue();
 	}
 
 	/**
