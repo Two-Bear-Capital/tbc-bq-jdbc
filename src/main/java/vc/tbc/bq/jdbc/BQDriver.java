@@ -166,6 +166,10 @@ public final class BQDriver implements Driver {
 				"Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects)",
 				false, new String[]{"true", "false"}));
 
+		props.add(prop(info, "collapseShardedTables", "false",
+				"Report date-sharded tables (events_20260101, events_20260102, ...) as a single events_* entry in getTables(), instead of one row per shard. getColumns() answers for the wildcard name using the newest shard's schema. Off by default: sharding is a naming convention, so a table legitimately ending in a date would otherwise disappear from listings",
+				false, new String[]{"true", "false"}));
+
 		props.add(prop(info, "metadataIncludeDescriptions", "true",
 				"Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets",
 				false, new String[]{"true", "false"}));

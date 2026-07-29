@@ -432,6 +432,22 @@ class ConnectionUrlParserTest {
 	}
 
 	@Test
+	void testParseUrlWithCollapseShardedTables() throws SQLException {
+		String url = "jdbc:bigquery:my-project?collapseShardedTables=true";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.collapseShardedTables());
+	}
+
+	@Test
+	void testCollapseShardedTablesDefaultsToOff() throws SQLException {
+		// Opt-in: collapsing removes rows on the evidence of a naming convention, so
+		// a table legitimately ending in a date must not vanish by default.
+		String url = "jdbc:bigquery:my-project";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertFalse(props.collapseShardedTables());
+	}
+
+	@Test
 	void testParseUrlWithMetadataCacheDisabled() throws SQLException {
 		String url = "jdbc:bigquery:my-project?metadataCacheEnabled=false";
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
