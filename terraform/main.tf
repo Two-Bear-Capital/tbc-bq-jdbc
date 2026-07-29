@@ -81,10 +81,14 @@ resource "google_service_account" "ci" {
 
 # ── IAM Bindings for CI Service Account ─────────────────────────────────────
 
-resource "google_bigquery_dataset_iam_member" "ci_data_editor" {
+# dataOwner rather than dataEditor: table snapshots need
+# bigquery.tables.createSnapshot and deleteSnapshot, which dataEditor does not
+# carry, so RealTableTypeMetadataTest cannot build its fixtures without it
+# (#187, #252). Scoped to the test dataset, which exists only for this suite.
+resource "google_bigquery_dataset_iam_member" "ci_data_owner" {
   project    = google_project.integration.project_id
   dataset_id = google_bigquery_dataset.integration_tests.dataset_id
-  role       = "roles/bigquery.dataEditor"
+  role       = "roles/bigquery.dataOwner"
   member     = "serviceAccount:${google_service_account.ci.email}"
 }
 

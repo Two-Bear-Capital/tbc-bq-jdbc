@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.metadata;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.Dataset;
 import com.google.cloud.bigquery.DatasetId;
+import com.google.cloud.bigquery.ExternalTableDefinition;
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
@@ -26,6 +27,7 @@ import com.google.cloud.bigquery.JobStatistics;
 import com.google.cloud.bigquery.MaterializedViewDefinition;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.Schema;
+import com.google.cloud.bigquery.SnapshotTableDefinition;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import com.google.cloud.bigquery.Table;
 import com.google.cloud.bigquery.TableDefinition;
@@ -1229,21 +1231,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				continue;
 			}
 
-			// Map BigQuery table type to JDBC type
-			String tableType;
-			TableDefinition def = table.getDefinition();
-			if (def instanceof ViewDefinition) {
-				tableType = "VIEW";
-			} else if (def instanceof MaterializedViewDefinition) {
-				tableType = "MATERIALIZED VIEW";
-			} else {
-				tableType = "TABLE";
-			}
-
-			// Apply type filter
-			if (types != null && !java.util.Arrays.asList(types).contains(tableType)) {
-				continue;
-			}
+			String tableType = tableTypeOf(table.getDefinition());
 
 			// Always empty in practice: tables.list does not return description, so
 			// this is filled in by fillInRemarks below. Kept because a future listing
@@ -1263,8 +1251,82 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			});
 		}
 
+		// Deliberately after fillInRemarks, which is where a row the listing called
+		// an ordinary TABLE becomes a CLONE. Filtering first let a clone through a
+		// types={"TABLE"} request and then relabelled it, so the caller got a CLONE
+		// row it had excluded — and types={"CLONE"} matched nothing at all.
 		fillInRemarks(projectId, datasetId, rows);
-		return collapseShards(rows);
+		return collapseShards(filterByType(rows, types));
+	}
+
+	/**
+	 * Keeps only rows whose {@code TABLE_TYPE} the caller asked for.
+	 *
+	 * @param rows
+	 *            table rows with their final types
+	 * @param types
+	 *            the caller's type filter, or null for all
+	 * @return the rows that match
+	 */
+	private static java.util.List<Object[]> filterByType(java.util.List<Object[]> rows, String[] types) {
+		if (types == null) {
+			return rows;
+		}
+		java.util.List<String> wanted = java.util.Arrays.asList(types);
+		java.util.List<Object[]> kept = new java.util.ArrayList<>(rows.size());
+		for (Object[] row : rows) {
+			if (wanted.contains(row[TABLE_ROW_TYPE])) {
+				kept.add(row);
+			}
+		}
+		return kept;
+	}
+
+	/**
+	 * JDBC {@code TABLE_TYPE} for an external table.
+	 *
+	 * <p>
+	 * These three are a driver convention: JDBC standardises {@code TABLE} and
+	 * {@code VIEW} and says nothing about the rest, so the strings are BigQuery's
+	 * own — the values {@code INFORMATION_SCHEMA.TABLES.table_type} reports — which
+	 * makes what the driver says and what a user sees in BigQuery the same word.
+	 */
+	public static final String TYPE_EXTERNAL = "EXTERNAL";
+
+	/** JDBC {@code TABLE_TYPE} for a table snapshot. */
+	public static final String TYPE_SNAPSHOT = "SNAPSHOT";
+
+	/** JDBC {@code TABLE_TYPE} for a table clone. */
+	public static final String TYPE_CLONE = "CLONE";
+
+	/**
+	 * Maps a table's definition to its JDBC {@code TABLE_TYPE}.
+	 *
+	 * <p>
+	 * Everything here is free — the definition comes with the listing. A
+	 * <b>clone</b> is the one kind this cannot see: BigQuery's own
+	 * {@code tables.list} reports it as an ordinary table, and only
+	 * {@code INFORMATION_SCHEMA} distinguishes it, so it is refined later by
+	 * {@link #fillInRemarks}.
+	 *
+	 * @param definition
+	 *            the table's definition
+	 * @return the JDBC table type
+	 */
+	private static String tableTypeOf(TableDefinition definition) {
+		if (definition instanceof ViewDefinition) {
+			return "VIEW";
+		}
+		if (definition instanceof MaterializedViewDefinition) {
+			return "MATERIALIZED VIEW";
+		}
+		if (definition instanceof ExternalTableDefinition) {
+			return TYPE_EXTERNAL;
+		}
+		if (definition instanceof SnapshotTableDefinition) {
+			return TYPE_SNAPSHOT;
+		}
+		return "TABLE";
 	}
 
 	/**
@@ -1420,6 +1482,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		java.util.Map<String, String> descriptions = new java.util.HashMap<>();
 		java.util.Map<String, String> definitions = new java.util.HashMap<>();
+		java.util.Set<String> clones = new java.util.HashSet<>();
 		String sql = readDescriptions ? remarksSql(projectId, datasetId) : viewDefinitionSql(projectId, datasetId);
 
 		queryInformationSchema(projectId, datasetId, "table remarks", "INFORMATION_SCHEMA.TABLES", sql, row -> {
@@ -1432,10 +1495,24 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				// value arrives quoted and escaped.
 				descriptions.put(tableName, SqlStringLiterals.unquote(row.get("description").getStringValue()));
 			}
+			// The one table kind the listing cannot see. Collected here because this
+			// read already happens for descriptions, so recognising clones costs no
+			// additional query.
+			if (!row.get("table_type").isNull() && "CLONE".equals(row.get("table_type").getStringValue())) {
+				clones.add(tableName);
+			}
 			// Collected into the maps above rather than returned as rows: this read
 			// annotates rows that already exist instead of producing its own.
 			return null;
 		});
+
+		// Only a row the listing called an ordinary TABLE can turn out to be a
+		// clone; a view or a snapshot was already identified from its definition.
+		for (Object[] row : rows) {
+			if ("TABLE".equals(row[TABLE_ROW_TYPE]) && clones.contains((String) row[TABLE_ROW_NAME])) {
+				row[TABLE_ROW_TYPE] = TYPE_CLONE;
+			}
+		}
 
 		// Descriptions first, for every kind of table.
 		for (Object[] row : rows) {
@@ -1473,7 +1550,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private static String remarksSql(String projectId, String datasetId) {
 		return String.format("SELECT t.table_name AS table_name, "
 				+ "IF(t.table_type IN ('VIEW', 'MATERIALIZED VIEW'), t.ddl, NULL) AS ddl, "
-				+ "o.option_value AS description " + "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLES t "
+				+ "o.option_value AS description, t.table_type AS table_type "
+				+ "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLES t "
 				+ "LEFT JOIN `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLE_OPTIONS o "
 				+ "ON o.table_name = t.table_name AND o.option_name = 'description'", projectId, datasetId);
 	}
@@ -1487,7 +1565,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * way.
 	 */
 	private static String viewDefinitionSql(String projectId, String datasetId) {
-		return String.format("SELECT table_name, ddl, CAST(NULL AS STRING) AS description "
+		return String.format("SELECT table_name, ddl, CAST(NULL AS STRING) AS description, table_type "
 				+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES " + "WHERE table_type IN ('VIEW', 'MATERIALIZED VIEW')",
 				projectId, datasetId);
 	}
@@ -1532,6 +1610,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			rows.add(new Object[]{"TABLE"});
 			rows.add(new Object[]{"VIEW"});
 			rows.add(new Object[]{"MATERIALIZED VIEW"});
+			rows.add(new Object[]{TYPE_EXTERNAL});
+			rows.add(new Object[]{TYPE_SNAPSHOT});
+			rows.add(new Object[]{TYPE_CLONE});
 			if (includesInformationSchema()) {
 				// Listed only when it can occur. A type nothing is reported under is a
 				// filter that silently returns nothing, which reads as "no such tables"

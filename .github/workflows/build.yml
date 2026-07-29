@@ -205,6 +205,11 @@ jobs:
           # impersonation_delegate_service_account outputs.
           BQ_TEST_IMPERSONATE_SA: ${{ secrets.BQ_TEST_IMPERSONATE_SA }}
           BQ_TEST_IMPERSONATE_DELEGATE: ${{ secrets.BQ_TEST_IMPERSONATE_DELEGATE }}
+          # Table snapshot fixtures (#187). Same reason as above: the grant that
+          # allows them (dataOwner on the test dataset) is applied by terraform/,
+          # which only runs on main. Set this secret to any non-empty value once
+          # it has. See #252.
+          BQ_TEST_SNAPSHOT_FIXTURES: ${{ secrets.BQ_TEST_SNAPSHOT_FIXTURES }}
           TZ: Asia/Kolkata
 
       # Second half of the same guard: the pre-flight check proves the secret is set,
