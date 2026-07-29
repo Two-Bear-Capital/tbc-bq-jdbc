@@ -383,6 +383,39 @@ class ConnectionUrlParserTest {
 	}
 
 	@Test
+	void testParseUrlWithQueryPricePerTiB() throws SQLException {
+		String url = "jdbc:bigquery:my-project?queryPricePerTiB=6.25";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertEquals(new java.math.BigDecimal("6.25"), props.queryPricePerTiB());
+	}
+
+	@Test
+	void testQueryPricePerTiBIsUnsetByDefault() throws SQLException {
+		// No default rate: one the driver invented would be wrong for every customer
+		// not on on-demand pricing, and would go stale silently. Unset means cost
+		// estimates report bytes and no money.
+		String url = "jdbc:bigquery:my-project";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertNull(props.queryPricePerTiB());
+	}
+
+	@Test
+	void testBlankQueryPricePerTiBIsUnsetRatherThanZero() throws SQLException {
+		// "queryPricePerTiB=" reads as "I did not set this". Parsing it as zero would
+		// price every query at nothing, which looks like a working estimate.
+		String url = "jdbc:bigquery:my-project?queryPricePerTiB=";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertNull(props.queryPricePerTiB());
+	}
+
+	@Test
+	void testInvalidQueryPricePerTiBIsRejected() {
+		String url = "jdbc:bigquery:my-project?queryPricePerTiB=six-dollars";
+		SQLException e = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
+		assertTrue(e.getMessage().contains("queryPricePerTiB"), "the message should name the property: " + e);
+	}
+
+	@Test
 	void testParseUrlWithMetadataCacheDisabled() throws SQLException {
 		String url = "jdbc:bigquery:my-project?metadataCacheEnabled=false";
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);

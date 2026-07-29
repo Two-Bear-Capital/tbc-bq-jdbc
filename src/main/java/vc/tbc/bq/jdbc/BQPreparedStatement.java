@@ -24,6 +24,7 @@ import vc.tbc.bq.jdbc.metadata.BQParameterMetaData;
 import vc.tbc.bq.jdbc.util.BatchInsertRewriter;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.ParameterConverter;
+import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 import vc.tbc.bq.jdbc.util.TimezoneUtils;
 
 import java.math.BigDecimal;
@@ -108,6 +109,27 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	@Override
 	protected String getLogPrefix() {
 		return "Prepared query";
+	}
+
+	/**
+	 * Estimates what this statement would cost with its parameters as currently
+	 * set, without running it.
+	 *
+	 * <p>
+	 * The no-SQL form of
+	 * {@link vc.tbc.bq.jdbc.base.AbstractBQStatement#estimateCost(String)}, since a
+	 * prepared statement already knows its SQL. The dry-run binds the parameters
+	 * set so far, so bind them first — BigQuery prices a query by the partitions
+	 * and columns it touches, and an unbound placeholder can change both.
+	 *
+	 * @return the estimate, with a cost only when {@code queryPricePerTiB} is
+	 *         configured
+	 * @throws SQLException
+	 *             if the statement is closed or BigQuery rejects the dry-run
+	 * @since 3.2.0
+	 */
+	public QueryCostEstimate estimateCost() throws SQLException {
+		return estimateCost(sqlTemplate);
 	}
 
 	@Override
@@ -995,6 +1017,13 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		int[] updateCounts = new int[totalRows];
 		int completedRows = 0;
 
+		// Each chunk is a separate execution and so clears the previous chunk's
+		// warnings and cost estimates. Collecting them here is what makes
+		// getWarnings() a chain and getCostEstimates() one entry per chunk; without
+		// it a caller sees only the final chunk, which for a large batch is the
+		// least interesting one.
+		Diagnostics batchDiagnostics = Diagnostics.NONE;
+
 		while (completedRows < totalRows) {
 			int chunkRows = Math.min(maxRowsPerChunk, totalRows - completedRows);
 			String chunkSql = insert.buildSql(chunkRows);
@@ -1012,12 +1041,14 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 								+ e.getMessage(),
 						e.getSQLState(), e.getErrorCode(), Arrays.copyOf(updateCounts, completedRows), e);
 			}
+			batchDiagnostics = batchDiagnostics.andThen(currentDiagnostics());
 
 			// Only claim per-row success when BigQuery confirms the expected count
 			int perRowCount = affectedRows == chunkRows ? 1 : SUCCESS_NO_INFO;
 			Arrays.fill(updateCounts, completedRows, completedRows + chunkRows, perRowCount);
 			completedRows += chunkRows;
 		}
+		publishDiagnostics(batchDiagnostics);
 		return updateCounts;
 	}
 
