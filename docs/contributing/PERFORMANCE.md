@@ -365,15 +365,46 @@ User-facing documentation is in **[docs/OBSERVABILITY.md](../OBSERVABILITY.md)**
 
 ## Open questions this does not settle
 
-- **Is the Storage Read API path covered?** No. `StorageReadResultSet` (Arrow)
-  received none of the scrutiny the standard path did in #99, and none of these
-  instruments exercise it — the scale tests use the standard path. That gap is
-  unchanged.
+- **Is the Storage Read API path covered?** Partly, now. `NestedTypeReadBenchmark`
+  compares it against the REST path across scalar and nested shapes (#232), and
+  `StorageApiParityTest` covers correctness. What is still uncovered is the rest of
+  #99's scrutiny — allocation profiles, thread scaling — and the scale tests still
+  use the standard path.
 - **Should a regression fail a build?** Currently no, by decision: reported numbers a
   human reads. Revisit if someone starts ignoring the reports.
 - **Why do the metadata benchmarks plateau at 4x on ten cores?** Still unexplained —
   and now known *not* to be allocation pressure, see above. The first real question
   these instruments have raised rather than answered, which is what they are for.
+
+## Storage Read API vs REST, by column shape
+
+Measured with `NestedTypeReadBenchmark` at 1,000,000 rows, 5x60s iterations:
+
+| Shape | Storage Read API | REST | Speedup |
+|---|---|---|---|
+| `SCALAR` (control) | 3,418 ± 622 ms | 19,134 ± 1,084 ms | **5.6x** |
+| `ARRAY_STRUCT` | 4,639 ± 457 ms | 40,189 ± 5,928 ms | **8.7x** |
+
+**The speedup is larger for nested data, not smaller.** Moving from scalar to nested
+costs the Storage path 1.36x and the REST path 2.10x — re-encoding Arrow's nested
+vectors into `FieldValue`s is cheaper than parsing the same structures out of JSON. So
+`useStorageApi=auto` is choosing correctly for these shapes, which is what #232 asked.
+
+Two things to know before re-running it:
+
+- **Read the control first.** Every op re-executes its query, so each measurement
+  includes BigQuery's scheduling and compute — seconds of variance, paid identically by
+  both paths. At 1,000 and 50,000 rows that swamped the fetch difference entirely: error
+  bars exceeded the scores and the control came out *slower* on the Storage path, which
+  is the read session's fixed cost rather than a regression. A run whose control does not
+  reproduce has measured nothing.
+- **The control reads 5.6x here, not #152's 11.7x, and does not contradict it.** A
+  constant paid by both paths compresses the ratio toward 1, so the fetch-only figure is
+  higher than this measures.
+
+The benchmark asserts which result-set implementation each connection produced and fails
+otherwise. The Storage path falls back silently by design, so without that check the
+comparison could be REST against REST with every number looking plausible.
 
 ## What the instruments found on their first run
 
