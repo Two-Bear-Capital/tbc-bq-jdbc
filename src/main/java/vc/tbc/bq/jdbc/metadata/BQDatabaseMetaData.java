@@ -838,13 +838,38 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private static final String ROUTINE_TYPE_TABLE_FUNCTION = "TABLE FUNCTION";
 
+	/**
+	 * The routine read behind {@code getProcedures} and {@code getFunctions}.
+	 *
+	 * <p>
+	 * {@code routine_definition} is the body. It is what an IDE shows when you ask
+	 * to see a procedure — JetBrains
+	 * <a href="https://youtrack.jetbrains.com/issue/DBE-12785">DBE-12785</a> is
+	 * that request — and the driver was discarding it while already reading the row
+	 * it sits on.
+	 */
+	private String routinesQuery(String projectId, String datasetId) {
+		return String.format(
+				"SELECT routine_name, routine_type, routine_definition " + "FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
+				projectId, datasetId);
+	}
+
+	/**
+	 * The routine body, for {@code REMARKS}.
+	 *
+	 * <p>
+	 * {@code ROUTINES} has no description column — a routine's description lives in
+	 * {@code ROUTINE_OPTIONS} under {@code option_name = 'description'} — so
+	 * {@code REMARKS} was always null and the definition displaces nothing.
+	 */
+	private static String routineDefinition(FieldValueList row) {
+		FieldValue definition = row.get("routine_definition");
+		return definition.isNull() ? null : definition.getStringValue();
+	}
+
 	private java.util.List<Object[]> queryProceduresForDataset(String projectId, String datasetId,
 			String procedureNamePattern) {
-		// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
-		// routine's description lives in ROUTINE_OPTIONS under
-		// option_name = 'description', so REMARKS is reported as null
-		String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
-				projectId, datasetId);
+		String sql = routinesQuery(projectId, datasetId);
 		return queryInformationSchema(projectId, datasetId, "procedures", "INFORMATION_SCHEMA.ROUTINES", sql, row -> {
 			if (!isProcedure(row)) {
 				return null;
@@ -853,7 +878,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
 				return null;
 			}
-			return buildProcedureRow(projectId, datasetId, routineName, null);
+			return buildProcedureRow(projectId, datasetId, routineName, routineDefinition(row));
 		});
 	}
 
@@ -1153,7 +1178,73 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			});
 		}
 
+		fillInViewDefinitions(projectId, datasetId, rows);
 		return rows;
+	}
+
+	/** Index of {@code TABLE_TYPE} in a {@link MetadataColumns.Tables} row. */
+	private static final int TABLE_ROW_TYPE = 3;
+
+	/** Index of {@code REMARKS} in a {@link MetadataColumns.Tables} row. */
+	private static final int TABLE_ROW_REMARKS = 4;
+
+	/**
+	 * Fills the {@code REMARKS} of any view in {@code rows} that has no description
+	 * with its defining SQL.
+	 *
+	 * <p>
+	 * An IDE that cannot show a view's SQL sends you to the BigQuery console —
+	 * JetBrains
+	 * <a href="https://youtrack.jetbrains.com/issue/DBE-12630">DBE-12630</a>. The
+	 * definition is not on the {@link Table} objects {@code listTables} returns:
+	 * that response carries {@code view.useLegacySql} and nothing else, so
+	 * {@code ViewDefinition.getQuery()} is null there and a per-table
+	 * {@code getTable()} would be one API call per view. One
+	 * {@code INFORMATION_SCHEMA.TABLES} read per dataset costs a query instead, and
+	 * only when the dataset actually contributed a view — a project of plain tables
+	 * pays nothing, which matters because this is the path IntelliJ walks on every
+	 * refresh.
+	 *
+	 * <p>
+	 * A description, where one exists, wins: it is what the author wrote for this
+	 * column. On this path there is never one to prefer — {@code tables.list} does
+	 * not return {@code description} either, so {@code Table.getDescription()} is
+	 * null for every table listed here and {@code REMARKS} was uniformly empty.
+	 * That is its own gap, not this one; the check stays so filling it later cannot
+	 * silently start overwriting descriptions. Nothing is lost meanwhile, because
+	 * BigQuery emits the description inside the DDL's {@code OPTIONS}.
+	 *
+	 * <p>
+	 * {@code ddl} rather than {@code VIEWS.view_definition} because
+	 * {@code MATERIALIZED_VIEWS} has no definition column at all, so the DDL is the
+	 * only form that answers for both.
+	 */
+	private void fillInViewDefinitions(String projectId, String datasetId, java.util.List<Object[]> rows) {
+		java.util.List<Object[]> undescribedViews = rows.stream()
+				.filter(row -> "VIEW".equals(row[TABLE_ROW_TYPE]) || "MATERIALIZED VIEW".equals(row[TABLE_ROW_TYPE]))
+				.filter(row -> row[TABLE_ROW_REMARKS] == null || ((String) row[TABLE_ROW_REMARKS]).isEmpty()).toList();
+		if (undescribedViews.isEmpty()) {
+			return;
+		}
+
+		String sql = String.format("SELECT table_name, ddl FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES "
+				+ "WHERE table_type IN ('VIEW', 'MATERIALIZED VIEW')", projectId, datasetId);
+		java.util.Map<String, String> definitions = new java.util.HashMap<>();
+		queryInformationSchema(projectId, datasetId, "view definitions", "INFORMATION_SCHEMA.TABLES", sql, row -> {
+			if (!row.get("ddl").isNull()) {
+				definitions.put(row.get("table_name").getStringValue(), row.get("ddl").getStringValue());
+			}
+			// Collected into the map above rather than returned as rows: this read
+			// annotates rows that already exist instead of producing its own.
+			return null;
+		});
+
+		for (Object[] row : undescribedViews) {
+			String definition = definitions.get((String) row[2]);
+			if (definition != null) {
+				row[TABLE_ROW_REMARKS] = definition;
+			}
+		}
 	}
 
 	@Override
@@ -2452,8 +2543,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private java.util.List<Object[]> queryFunctionsForDataset(String projectId, String datasetId,
 			String functionNamePattern) {
-		String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
-				projectId, datasetId);
+		String sql = routinesQuery(projectId, datasetId);
 		return queryInformationSchema(projectId, datasetId, "functions", "INFORMATION_SCHEMA.ROUTINES", sql, row -> {
 			if (isProcedure(row)) {
 				return null;
@@ -2468,7 +2558,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			return new Object[]{projectId, // FUNCTION_CAT
 					datasetId, // FUNCTION_SCHEM
 					routineName, // FUNCTION_NAME
-					null, // REMARKS
+					routineDefinition(row), // REMARKS
 					functionType, // FUNCTION_TYPE
 					routineName // SPECIFIC_NAME
 			};

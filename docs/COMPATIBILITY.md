@@ -188,13 +188,13 @@ projects, but a tool that enumerates everything up front will see nothing.
 |--------|:------:|-------|
 | `getCatalogs()` | ✅ | One row: the connection's project. Cached |
 | `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached |
-| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached |
+| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. For a view or materialized view, `REMARKS` carries its defining SQL |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
 | `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW |
-| `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. Routine bodies are not returned |
+| `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keyword and function lists | ✅ | JDBC version reports 4.3. `getDatabaseProductName()` is `BigQuery (TBC Driver)` and `getDatabaseProductVersion()` is `2.0` |
-| `getFunctions()` / `getFunctionColumns()` | ✅ | Persistent UDFs and table functions from `INFORMATION_SCHEMA.ROUTINES`, cached. A table function reports `functionReturnsTable`; the return value is the `functionReturn` row at ordinal 0 |
+| `getFunctions()` / `getFunctionColumns()` | ✅ | Persistent UDFs and table functions from `INFORMATION_SCHEMA.ROUTINES`, cached. `REMARKS` carries the routine body. A table function reports `functionReturnsTable`; the return value is the `functionReturn` row at ordinal 0 |
 | `getPseudoColumns()` | ✅ | Ingestion-time partitioning columns, cached. `_PARTITIONTIME` on every ingestion-time partitioned table, plus `_PARTITIONDATE` on those partitioned by day — BigQuery exposes that one at daily granularity only |
 | `getPrimaryKeys()` | ✅ | Declared `PRIMARY KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getImportedKeys()`, `getExportedKeys()`, `getCrossReference()` | ✅ | Declared `FOREIGN KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
