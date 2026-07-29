@@ -566,6 +566,44 @@ public final class MetadataColumns {
 	}
 
 	/**
+	 * Column definitions for getPseudoColumns() result set.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class PseudoColumns {
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+				"TABLE_SCHEM", // String => table schema (may be null)
+				"TABLE_NAME", // String => table name
+				"COLUMN_NAME", // String => column name
+				"DATA_TYPE", // int => SQL type from java.sql.Types
+				"COLUMN_SIZE", // int => column size
+				"DECIMAL_DIGITS", // int => fractional digits (null if not applicable)
+				"NUM_PREC_RADIX", // int => radix
+				"COLUMN_USAGE", // String => a java.sql.PseudoColumnUsage name
+				"REMARKS", // String => comment describing the column (may be null)
+				"CHAR_OCTET_LENGTH", // int => max bytes for a char column
+				"IS_NULLABLE" // String => YES, NO or empty when unknown
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+				Types.VARCHAR, // TABLE_SCHEM
+				Types.VARCHAR, // TABLE_NAME
+				Types.VARCHAR, // COLUMN_NAME
+				Types.INTEGER, // DATA_TYPE
+				Types.INTEGER, // COLUMN_SIZE
+				Types.INTEGER, // DECIMAL_DIGITS
+				Types.INTEGER, // NUM_PREC_RADIX
+				Types.VARCHAR, // COLUMN_USAGE
+				Types.VARCHAR, // REMARKS
+				Types.INTEGER, // CHAR_OCTET_LENGTH
+				Types.VARCHAR // IS_NULLABLE
+		};
+
+		private PseudoColumns() {
+		}
+	}
+
+	/**
 	 * Column definitions for getFunctions() result set.
 	 *
 	 * @since 3.1.0
