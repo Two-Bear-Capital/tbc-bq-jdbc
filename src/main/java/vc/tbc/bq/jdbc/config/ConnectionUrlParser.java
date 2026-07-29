@@ -371,12 +371,14 @@ public final class ConnectionUrlParser {
 		Boolean collapseShardedTables = parseBooleanObject(properties, "collapseShardedTables");
 		Integer batchLoadThreshold = parseInteger(properties, "batchLoadThreshold");
 		Boolean includeInformationSchema = parseBooleanObject(properties, "includeInformationSchema");
+		List<String> additionalProjects = parseProjectList(properties.get("additionalProjects"));
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
-				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema);
+				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
+				additionalProjects);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
@@ -523,6 +525,29 @@ public final class ConnectionUrlParser {
 			return null;
 		}
 		return Boolean.parseBoolean(value);
+	}
+
+	/**
+	 * Splits a comma-separated project list, ignoring blank entries.
+	 *
+	 * <p>
+	 * Names are not validated here. A project id the driver would reject is worth
+	 * an error when it is used, not when it is listed alongside working ones —
+	 * {@code getCatalogs()} reporting a name nothing can query is a smaller problem
+	 * than a connection that will not open.
+	 */
+	private static List<String> parseProjectList(String value) {
+		if (value == null || value.isBlank()) {
+			return List.of();
+		}
+		List<String> projects = new ArrayList<>();
+		for (String project : value.split(",")) {
+			String trimmed = project.trim();
+			if (!trimmed.isEmpty()) {
+				projects.add(trimmed);
+			}
+		}
+		return projects;
 	}
 
 	private static Map<String, String> parseLabels(String labelsStr) {

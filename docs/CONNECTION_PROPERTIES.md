@@ -138,6 +138,16 @@ jdbc:bigquery:my-project/my_dataset?impersonateServiceAccount=etl@my-project.iam
 
 ### Metadata Properties
 
+`additionalProjects` (default empty) is a comma-separated list of further project IDs to
+report from `getCatalogs()`, so a tool can discover and `setCatalog()` to them. See
+[Browsing more than one project](COMPATIBILITY.md#browsing-more-than-one-project).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?additionalProjects=other-project,third-project
+```
+
+
 `includeInformationSchema` (default `true`) makes BigQuery's `INFORMATION_SCHEMA` views
 browsable — a synthetic `INFORMATION_SCHEMA` schema per project, and the dataset-scoped
 views as `INFORMATION_SCHEMA.<view>` tables inside each dataset, all typed `SYSTEM TABLE`.

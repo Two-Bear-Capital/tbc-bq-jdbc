@@ -674,4 +674,42 @@ class ConnectionUrlParserTest {
 		ImpersonatedAuth auth = assertInstanceOf(ImpersonatedAuth.class, props.authType());
 		assertEquals("etl@my-project.iam.gserviceaccount.com", auth.targetPrincipal());
 	}
+
+	@Test
+	void testParseAdditionalProjects() throws SQLException {
+		// Given: A URL naming two further projects, with incidental whitespace
+		String url = "jdbc:bigquery:my-project?additionalProjects=other-project,%20third-project";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: Both should be trimmed and kept
+		assertEquals(List.of("other-project", "third-project"), props.additionalProjects());
+	}
+
+	@Test
+	void testAdditionalProjectsDefaultsToEmpty() throws SQLException {
+		// Then: Unset means no extra catalogs, not null
+		assertEquals(List.of(), ConnectionUrlParser.parse("jdbc:bigquery:my-project", null).additionalProjects());
+	}
+
+	@Test
+	void testAdditionalProjectsDropsTheConnectionProjectAndDuplicates() throws SQLException {
+		// Given: A list that repeats itself and names the connection's own project
+		String url = "jdbc:bigquery:my-project?additionalProjects=my-project,other,other,,%20";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: The connection's project is always reported anyway, so listing it
+		// here would duplicate a catalog row
+		assertEquals(List.of("other"), props.additionalProjects());
+	}
+
+	@Test
+	void testAdditionalProjectsAreImmutable() throws SQLException {
+		// Then: The record must not hand out a list a caller can grow
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:p?additionalProjects=q", null);
+		assertThrows(UnsupportedOperationException.class, () -> props.additionalProjects().add("late"));
+	}
 }

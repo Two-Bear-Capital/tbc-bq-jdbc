@@ -84,6 +84,9 @@ class BQDatabaseMetaDataTest {
 	void setUp() throws SQLException {
 		lenient().when(connection.getProperties()).thenReturn(properties);
 		lenient().when(properties.projectId()).thenReturn("test-project");
+		// The connection resolves a null catalog argument through this, so a mock
+		// that does not model it makes every metadata call list a null project.
+		lenient().when(connection.getCurrentCatalog()).thenReturn("test-project");
 		lenient().when(properties.metadataCacheEnabled()).thenReturn(false);
 		metaData = new BQDatabaseMetaData(connection);
 	}
@@ -938,5 +941,39 @@ class BQDatabaseMetaDataTest {
 		lenient().when(connection.isClosed()).thenReturn(true);
 		assertThrows(SQLException.class, () -> metaData.getAttributes(null, null, null, null));
 		assertThrows(SQLException.class, () -> metaData.getClientInfoProperties());
+	}
+
+	// Multi-project catalogs (#190)
+
+	@Test
+	void testGetCatalogsReportsTheConnectionProject() throws SQLException {
+		// Given: No additional projects configured
+		lenient().when(properties.additionalProjects()).thenReturn(java.util.List.of());
+
+		// When: Listing catalogs
+		try (ResultSet rs = metaData.getCatalogs()) {
+			// Then: Just the connection's own project
+			assertTrue(rs.next());
+			assertEquals("test-project", rs.getString("TABLE_CAT"));
+			assertFalse(rs.next());
+		}
+	}
+
+	@Test
+	void testGetCatalogsReportsConfiguredProjectsInOrder() throws SQLException {
+		// Given: Two further projects, named out of order
+		lenient().when(properties.additionalProjects()).thenReturn(java.util.List.of("zeta-project", "alpha-project"));
+
+		// When: Listing catalogs
+		try (ResultSet rs = metaData.getCatalogs()) {
+			java.util.List<String> catalogs = new java.util.ArrayList<>();
+			while (rs.next()) {
+				catalogs.add(rs.getString("TABLE_CAT"));
+			}
+
+			// Then: All three, sorted — JDBC specifies getCatalogs() ordered by
+			// TABLE_CAT, and the configured order is whatever the URL happened to say
+			assertEquals(java.util.List.of("alpha-project", "test-project", "zeta-project"), catalogs);
+		}
 	}
 }

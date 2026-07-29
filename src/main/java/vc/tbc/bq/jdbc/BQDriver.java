@@ -182,6 +182,10 @@ public final class BQDriver implements Driver {
 				"Report date-sharded tables (events_20260101, events_20260102, ...) as a single events_* entry in getTables(), instead of one row per shard. getColumns() answers for the wildcard name using the newest shard's schema. Off by default: sharding is a naming convention, so a table legitimately ending in a date would otherwise disappear from listings",
 				false, new String[]{"true", "false"}));
 
+		props.add(prop(info, "additionalProjects", "",
+				"Comma-separated further project IDs to report from getCatalogs(), so a tool can discover and switch to them with setCatalog(). Not discovered automatically. Cross-project queries work without this; it only makes the projects visible",
+				false, null));
+
 		props.add(prop(info, "includeInformationSchema", "true",
 				"Make INFORMATION_SCHEMA browsable: a synthetic INFORMATION_SCHEMA schema per project holding the project-scoped views (SCHEMATA, JOBS, ...), plus the dataset-scoped views (TABLES, COLUMNS, ...) as tables named INFORMATION_SCHEMA.<view> inside each dataset. Reported as SYSTEM TABLE so a caller can filter them out. Costs no BigQuery query — the view list is static",
 				false, new String[]{"true", "false"}));

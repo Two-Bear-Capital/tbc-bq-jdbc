@@ -26,6 +26,7 @@ import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
+import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.metadata.BQDatabaseMetaData;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
@@ -85,6 +86,16 @@ public final class BQConnection extends AbstractBQConnection {
 
 	private final BigQuery bigquery;
 	private final ConnectionProperties properties;
+
+	/**
+	 * The project a null {@code catalog} argument resolves to, moved by
+	 * {@link #setCatalog(String)}.
+	 *
+	 * <p>
+	 * volatile because a pool may hand the connection to another thread between
+	 * uses; the field is only ever assigned whole.
+	 */
+	private volatile String currentCatalog;
 	private final Set<BQStatement> runningStatements = ConcurrentHashMap.newKeySet();
 	private final SessionManager sessionManager;
 	/**
@@ -116,6 +127,7 @@ public final class BQConnection extends AbstractBQConnection {
 	 */
 	public BQConnection(ConnectionProperties properties) throws SQLException {
 		this.properties = properties;
+		this.currentCatalog = properties.projectId();
 		try {
 			// Shared across connections authenticating the same way: building these
 			// means an ADC probe plus token fetch, or reading and parsing a key file
@@ -612,14 +624,55 @@ public final class BQConnection extends AbstractBQConnection {
 	@Override
 	public void setCatalog(String catalog) throws SQLException {
 		checkClosed();
-		// BigQuery uses project as catalog, but we don't allow changing it
-		logger.debug("setCatalog called with: {} (ignored)", catalog);
+
+		// null is JDBC's "no catalog", which for BigQuery means the project the
+		// connection was opened against. Restoring it is a legitimate request and
+		// the only reading of null that is not a silent no-op.
+		if (catalog == null || catalog.isBlank()) {
+			currentCatalog = properties.projectId();
+			logger.debug("setCatalog(null): back to the connection's project {}", currentCatalog);
+			return;
+		}
+
+		String trimmed = catalog.trim();
+		// Rejected rather than ignored. Ignoring is what this method used to do,
+		// and a caller had no way to tell a switch that did not happen from one
+		// that did — the whole second half of #190. Existence is not checked: that
+		// would cost an API call per call, and a project the driver cannot list is
+		// still one the credential may be able to query.
+		if (!BigQueryIdentifiers.isSafe(trimmed)) {
+			throw new BQSQLException("Not a usable BigQuery project id: " + catalog,
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+
+		currentCatalog = trimmed;
+		logger.debug("setCatalog: metadata and unqualified names now default to project {}", currentCatalog);
 	}
 
 	@Override
 	public String getCatalog() throws SQLException {
 		checkClosed();
-		return properties.projectId();
+		return currentCatalog;
+	}
+
+	/**
+	 * The project metadata calls default to, without the closed check.
+	 *
+	 * <p>
+	 * For {@link vc.tbc.bq.jdbc.metadata.BQDatabaseMetaData}, which resolves a null
+	 * {@code catalog} argument on paths that are already inside a call and must not
+	 * re-check liveness — and in lambdas where a checked exception has nowhere to
+	 * go.
+	 *
+	 * <p>
+	 * This is the <b>metadata</b> default only. The project that owns and is billed
+	 * for jobs is fixed when the connection opens, because it is baked into the
+	 * BigQuery client; {@code setCatalog} does not move billing to another project.
+	 *
+	 * @return the current catalog, never null
+	 */
+	public String getCurrentCatalog() {
+		return currentCatalog;
 	}
 
 	/**
