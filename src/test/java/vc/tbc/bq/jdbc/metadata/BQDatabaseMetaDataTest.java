@@ -652,6 +652,8 @@ class BQDatabaseMetaDataTest {
 
 		metaData.getProcedures(maliciousCatalog, "shop", null).close();
 		metaData.getProcedureColumns(maliciousCatalog, "shop", null, null).close();
+		metaData.getFunctions(maliciousCatalog, "shop", null).close();
+		metaData.getFunctionColumns(maliciousCatalog, "shop", null, null).close();
 
 		verify(bigQuery, never()).query(any(QueryJobConfiguration.class));
 	}
@@ -670,6 +672,28 @@ class BQDatabaseMetaDataTest {
 		metaData.getProcedures("safe-project", "shop", null).close();
 
 		verify(bigQuery).query(any(QueryJobConfiguration.class));
+	}
+
+	/**
+	 * Both used to throw {@code SQLFeatureNotSupportedException}. The rows come
+	 * from real datasets, so a mocked-empty project can only pin the shape — the
+	 * routine split itself is covered against real routines in
+	 * {@code RealMetadataEnhancedTest}.
+	 */
+	@Test
+	void testGetFunctionsReturnsTheJdbcShape() throws Exception {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.listDatasets(anyString())).thenReturn(emptyDatasetPage);
+		lenient().when(emptyDatasetPage.iterateAll()).thenReturn(java.util.List.of());
+
+		try (ResultSet functions = metaData.getFunctions(null, null, null);
+				ResultSet columns = metaData.getFunctionColumns(null, null, null, null)) {
+			assertEquals(6, functions.getMetaData().getColumnCount());
+			assertEquals("FUNCTION_CAT", functions.getMetaData().getColumnName(1));
+			assertEquals(17, columns.getMetaData().getColumnCount());
+			assertEquals("SPECIFIC_NAME", columns.getMetaData().getColumnName(17));
+		}
 	}
 
 	/**

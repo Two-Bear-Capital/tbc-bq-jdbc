@@ -566,6 +566,84 @@ public final class MetadataColumns {
 	}
 
 	/**
+	 * Column definitions for getFunctions() result set.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class Functions {
+		static final String[] COLUMN_NAMES = {"FUNCTION_CAT", // String => function catalog (may be null)
+				"FUNCTION_SCHEM", // String => function schema (may be null)
+				"FUNCTION_NAME", // String => function name
+				"REMARKS", // String => explanatory comment
+				"FUNCTION_TYPE", // short => kind of function
+				"SPECIFIC_NAME" // String => name that uniquely identifies this function
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // FUNCTION_CAT
+				Types.VARCHAR, // FUNCTION_SCHEM
+				Types.VARCHAR, // FUNCTION_NAME
+				Types.VARCHAR, // REMARKS
+				Types.SMALLINT, // FUNCTION_TYPE
+				Types.VARCHAR // SPECIFIC_NAME
+		};
+
+		private Functions() {
+		}
+	}
+
+	/**
+	 * Column definitions for getFunctionColumns() result set.
+	 *
+	 * <p>
+	 * Four columns wider than {@link ProcedureColumns} and not a superset of it:
+	 * JDBC orders them differently, so the two shapes cannot be shared.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class FunctionColumns {
+		static final String[] COLUMN_NAMES = {"FUNCTION_CAT", // String => function catalog (may be null)
+				"FUNCTION_SCHEM", // String => function schema (may be null)
+				"FUNCTION_NAME", // String => function name
+				"COLUMN_NAME", // String => column/parameter name
+				"COLUMN_TYPE", // Short => kind of column/parameter
+				"DATA_TYPE", // int => SQL type from java.sql.Types
+				"TYPE_NAME", // String => SQL type name
+				"PRECISION", // int => precision
+				"LENGTH", // int => length in bytes of data
+				"SCALE", // Short => scale
+				"RADIX", // Short => radix
+				"NULLABLE", // Short => can it contain NULL
+				"REMARKS", // String => comment describing the parameter/column
+				"CHAR_OCTET_LENGTH", // int => max bytes for a char parameter
+				"ORDINAL_POSITION", // int => position, with 0 for the return value
+				"IS_NULLABLE", // String => YES, NO or empty when unknown
+				"SPECIFIC_NAME" // String => name that uniquely identifies this function
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // FUNCTION_CAT
+				Types.VARCHAR, // FUNCTION_SCHEM
+				Types.VARCHAR, // FUNCTION_NAME
+				Types.VARCHAR, // COLUMN_NAME
+				Types.SMALLINT, // COLUMN_TYPE
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR, // TYPE_NAME
+				Types.INTEGER, // PRECISION
+				Types.INTEGER, // LENGTH
+				Types.SMALLINT, // SCALE
+				Types.SMALLINT, // RADIX
+				Types.SMALLINT, // NULLABLE
+				Types.VARCHAR, // REMARKS
+				Types.INTEGER, // CHAR_OCTET_LENGTH
+				Types.INTEGER, // ORDINAL_POSITION
+				Types.VARCHAR, // IS_NULLABLE
+				Types.VARCHAR // SPECIFIC_NAME
+		};
+
+		private FunctionColumns() {
+		}
+	}
+
+	/**
 	 * Column definitions for getImportedKeys() and getExportedKeys() result sets.
 	 */
 	public static final class ForeignKeys {

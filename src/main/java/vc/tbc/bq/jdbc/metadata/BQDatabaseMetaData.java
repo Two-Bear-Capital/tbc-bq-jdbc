@@ -19,6 +19,7 @@ import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.Dataset;
 import com.google.cloud.bigquery.DatasetId;
 import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.MaterializedViewDefinition;
 import com.google.cloud.bigquery.QueryJobConfiguration;
@@ -822,6 +823,21 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return rows;
 	}
 
+	/**
+	 * The {@code routine_type} BigQuery reports for a stored procedure. The others
+	 * it reports are {@code FUNCTION} and {@code TABLE FUNCTION}, both of which are
+	 * functions and belong to {@link #getFunctions} — note these are BigQuery's
+	 * spellings, not the ANSI {@code SCALAR_FUNCTION} /
+	 * {@code TABLE_VALUED_FUNCTION}.
+	 */
+	private static final String ROUTINE_TYPE_PROCEDURE = "PROCEDURE";
+
+	/**
+	 * The {@code routine_type} for a function that returns a table rather than a
+	 * scalar, which JDBC reports as {@code functionReturnsTable}.
+	 */
+	private static final String ROUTINE_TYPE_TABLE_FUNCTION = "TABLE FUNCTION";
+
 	private java.util.List<Object[]> queryProceduresForDataset(String projectId, String datasetId,
 			String procedureNamePattern) {
 		// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
@@ -830,12 +846,25 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
 				projectId, datasetId);
 		return queryInformationSchema(projectId, datasetId, "procedures", "INFORMATION_SCHEMA.ROUTINES", sql, row -> {
+			if (!isProcedure(row)) {
+				return null;
+			}
 			String routineName = row.get("routine_name").getStringValue();
 			if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
 				return null;
 			}
 			return buildProcedureRow(projectId, datasetId, routineName, null);
 		});
+	}
+
+	/**
+	 * Whether a {@code ROUTINES} row describes a stored procedure rather than a
+	 * function. A null {@code routine_type} is treated as a procedure, which keeps
+	 * a routine visible somewhere rather than dropping it from both methods.
+	 */
+	private static boolean isProcedure(FieldValueList row) {
+		FieldValue routineType = row.get("routine_type");
+		return routineType.isNull() || ROUTINE_TYPE_PROCEDURE.equalsIgnoreCase(routineType.getStringValue());
 	}
 
 	private Object[] buildProcedureRow(String projectId, String datasetId, String routineName, String remarks) {
@@ -881,12 +910,35 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				MetadataColumns.ProcedureColumns.COLUMN_TYPES, rows);
 	}
 
+	/**
+	 * The parameter read behind both {@code getProcedureColumns} and
+	 * {@code getFunctionColumns}.
+	 *
+	 * <p>
+	 * {@code PARAMETERS} carries no {@code routine_type}, so it is joined to
+	 * {@code ROUTINES} to tell a procedure's parameters from a function's. Without
+	 * the join each method would report the other's parameters as well as its own.
+	 *
+	 * @param wantProcedures
+	 *            true for the parameters of stored procedures, false for those of
+	 *            functions and table functions
+	 */
+	private String parametersQuery(String projectId, String datasetId, boolean wantProcedures) {
+		// IFNULL mirrors isProcedure(): a routine with no routine_type is treated as
+		// a procedure, so it stays visible under one method rather than neither.
+		String predicate = wantProcedures ? "=" : "!=";
+		return String.format("SELECT p.specific_name AS specific_name, p.ordinal_position AS ordinal_position, "
+				+ "p.parameter_name AS parameter_name, p.parameter_mode AS parameter_mode, "
+				+ "p.is_result AS is_result, p.data_type AS data_type "
+				+ "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.PARAMETERS p "
+				+ "JOIN `%1$s`.`%2$s`.INFORMATION_SCHEMA.ROUTINES r " + "ON r.specific_name = p.specific_name "
+				+ "WHERE IFNULL(r.routine_type, '%3$s') %4$s '%3$s' " + "ORDER BY p.specific_name, p.ordinal_position",
+				projectId, datasetId, ROUTINE_TYPE_PROCEDURE, predicate);
+	}
+
 	private java.util.List<Object[]> queryProcedureColumnsForDataset(String projectId, String datasetId,
 			String procedureNamePattern, String columnNamePattern) {
-		String sql = String.format(
-				"SELECT specific_name, ordinal_position, parameter_name, parameter_mode, data_type "
-						+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.PARAMETERS ORDER BY specific_name, ordinal_position",
-				projectId, datasetId);
+		String sql = parametersQuery(projectId, datasetId, true);
 		return queryInformationSchema(projectId, datasetId, "procedure columns", "INFORMATION_SCHEMA.PARAMETERS", sql,
 				row -> {
 					String routineName = row.get("specific_name").getStringValue();
@@ -2355,16 +2407,166 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				MetadataColumns.ClientInfoProperties.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
 
+	/**
+	 * Retrieves the user-defined functions available in the given catalog.
+	 *
+	 * <p>
+	 * BigQuery reports both persistent SQL UDFs and JavaScript UDFs in
+	 * {@code INFORMATION_SCHEMA.ROUTINES} alongside stored procedures, told apart
+	 * by {@code routine_type}. A {@code TABLE FUNCTION} is reported as
+	 * {@link DatabaseMetaData#functionReturnsTable}, everything else as
+	 * {@link DatabaseMetaData#functionNoTable}.
+	 *
+	 * <p>
+	 * {@code REMARKS} is null: {@code ROUTINES} has no description column, and a
+	 * routine's description lives in {@code ROUTINE_OPTIONS} — the same reason
+	 * {@link #getProcedures} reports null there.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getFunctions(String catalog, String schemaPattern, String functionNamePattern)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getFunctions not yet implemented");
+		checkClosed();
+
+		logger.debug("getFunctions() called - catalog: [{}], schemaPattern: [{}], functionNamePattern: [{}]", catalog,
+				schemaPattern, functionNamePattern);
+
+		String cacheKey = "functions:" + catalog + ":" + schemaPattern + ":" + functionNamePattern;
+		return getCachedOrExecute(cacheKey, () -> executeGetFunctions(catalog, schemaPattern, functionNamePattern));
 	}
 
+	private ResultSet executeGetFunctions(String catalog, String schemaPattern, String functionNamePattern)
+			throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryFunctionsForDataset(projectId, datasetId, functionNamePattern),
+				"Error querying functions in parallel");
+
+		logger.debug("getFunctions() returning {} function(s)", rows.size());
+		return createResultSet(MetadataColumns.Functions.COLUMN_NAMES, MetadataColumns.Functions.COLUMN_TYPES, rows);
+	}
+
+	private java.util.List<Object[]> queryFunctionsForDataset(String projectId, String datasetId,
+			String functionNamePattern) {
+		String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
+				projectId, datasetId);
+		return queryInformationSchema(projectId, datasetId, "functions", "INFORMATION_SCHEMA.ROUTINES", sql, row -> {
+			if (isProcedure(row)) {
+				return null;
+			}
+			String routineName = row.get("routine_name").getStringValue();
+			if (functionNamePattern != null && !matchesPattern(routineName, functionNamePattern)) {
+				return null;
+			}
+			short functionType = ROUTINE_TYPE_TABLE_FUNCTION.equalsIgnoreCase(row.get("routine_type").getStringValue())
+					? (short) DatabaseMetaData.functionReturnsTable
+					: (short) DatabaseMetaData.functionNoTable;
+			return new Object[]{projectId, // FUNCTION_CAT
+					datasetId, // FUNCTION_SCHEM
+					routineName, // FUNCTION_NAME
+					null, // REMARKS
+					functionType, // FUNCTION_TYPE
+					routineName // SPECIFIC_NAME
+			};
+		});
+	}
+
+	/**
+	 * Retrieves the parameters and return value of the given user-defined
+	 * functions.
+	 *
+	 * <p>
+	 * BigQuery reports a function's return value as a {@code PARAMETERS} row with
+	 * {@code is_result = 'YES'} at {@code ordinal_position} 0 and no parameter
+	 * name, which is exactly JDBC's {@link DatabaseMetaData#functionReturn}. Its
+	 * arguments carry no {@code parameter_mode} — that column is only populated for
+	 * procedures — so they are reported as
+	 * {@link DatabaseMetaData#functionColumnIn}.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getFunctionColumns(String catalog, String schemaPattern, String functionNamePattern,
 			String columnNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getFunctionColumns not yet implemented");
+		checkClosed();
+
+		logger.debug(
+				"getFunctionColumns() called - catalog: [{}], schemaPattern: [{}], functionNamePattern: [{}], columnNamePattern: [{}]",
+				catalog, schemaPattern, functionNamePattern, columnNamePattern);
+
+		String cacheKey = "functionColumns:" + catalog + ":" + schemaPattern + ":" + functionNamePattern + ":"
+				+ columnNamePattern;
+		return getCachedOrExecute(cacheKey,
+				() -> executeGetFunctionColumns(catalog, schemaPattern, functionNamePattern, columnNamePattern));
+	}
+
+	private ResultSet executeGetFunctionColumns(String catalog, String schemaPattern, String functionNamePattern,
+			String columnNamePattern) throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryFunctionColumnsForDataset(projectId, datasetId, functionNamePattern,
+						columnNamePattern),
+				"Error querying function columns in parallel");
+
+		logger.debug("getFunctionColumns() returning {} column(s)", rows.size());
+		return createResultSet(MetadataColumns.FunctionColumns.COLUMN_NAMES,
+				MetadataColumns.FunctionColumns.COLUMN_TYPES, rows);
+	}
+
+	private java.util.List<Object[]> queryFunctionColumnsForDataset(String projectId, String datasetId,
+			String functionNamePattern, String columnNamePattern) {
+		String sql = parametersQuery(projectId, datasetId, false);
+		return queryInformationSchema(projectId, datasetId, "function columns", "INFORMATION_SCHEMA.PARAMETERS", sql,
+				row -> {
+					String routineName = row.get("specific_name").getStringValue();
+					if (functionNamePattern != null && !matchesPattern(routineName, functionNamePattern)) {
+						return null;
+					}
+					// The return row has no parameter_name. Reported as "" rather than
+					// null so the column-name pattern has something to match, which is
+					// what getProcedureColumns does with an unnamed parameter.
+					String paramName = row.get("parameter_name").isNull()
+							? ""
+							: row.get("parameter_name").getStringValue();
+					if (columnNamePattern != null && !matchesPattern(paramName, columnNamePattern)) {
+						return null;
+					}
+					String dataType = row.get("data_type").isNull() ? "STRING" : row.get("data_type").getStringValue();
+					TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+					boolean isResult = !row.get("is_result").isNull()
+							&& "YES".equalsIgnoreCase(row.get("is_result").getStringValue());
+					short columnType = isResult
+							? (short) DatabaseMetaData.functionReturn
+							: (short) DatabaseMetaData.functionColumnIn;
+					int ordinal = row.get("ordinal_position").isNull()
+							? 0
+							: (int) row.get("ordinal_position").getLongValue();
+					return new Object[]{projectId, // FUNCTION_CAT
+							datasetId, // FUNCTION_SCHEM
+							routineName, // FUNCTION_NAME
+							paramName, // COLUMN_NAME
+							columnType, // COLUMN_TYPE
+							typeInfo.jdbcType(), // DATA_TYPE
+							dataType, // TYPE_NAME
+							typeInfo.columnSize(), // PRECISION
+							typeInfo.columnSize(), // LENGTH
+							(short) typeInfo.decimalDigits(), // SCALE
+							(short) 10, // RADIX
+							(short) DatabaseMetaData.functionNullable, // NULLABLE
+							null, // REMARKS
+							typeInfo.columnSize(), // CHAR_OCTET_LENGTH
+							ordinal, // ORDINAL_POSITION
+							"YES", // IS_NULLABLE
+							routineName // SPECIFIC_NAME
+					};
+				});
 	}
 
 	@Override

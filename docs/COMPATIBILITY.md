@@ -189,10 +189,11 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
 | `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW |
-| `getProcedures()` / `getProcedureColumns()` | ✅ | From `INFORMATION_SCHEMA`, cached. Routine bodies are not returned |
+| `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. Routine bodies are not returned |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keyword and function lists | ✅ | JDBC version reports 4.3. `getDatabaseProductName()` is `BigQuery (TBC Driver)` and `getDatabaseProductVersion()` is `2.0` |
-| `getFunctions()`, `getFunctionColumns()`, `getPseudoColumns()` | ❌ | Throw `SQLFeatureNotSupportedException` |
+| `getFunctions()` / `getFunctionColumns()` | ✅ | Persistent UDFs and table functions from `INFORMATION_SCHEMA.ROUTINES`, cached. A table function reports `functionReturnsTable`; the return value is the `functionReturn` row at ordinal 0 |
+| `getPseudoColumns()` | ❌ | Throws `SQLFeatureNotSupportedException` |
 | `getPrimaryKeys()` | ✅ | Declared `PRIMARY KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getImportedKeys()`, `getExportedKeys()`, `getCrossReference()` | ✅ | Declared `FOREIGN KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getIndexInfo()` | ⚠️ | BigQuery has no indexes; returns empty |
