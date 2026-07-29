@@ -12,7 +12,7 @@ rather than solving it, that is stated.
 
 | JetBrains issue | Votes | What users hit | What tbc-bq-jdbc does |
 |-----------------|:-----:|----------------|------------------------|
-| [DBE-12808](https://youtrack.jetbrains.com/issue/DBE-12808) | 32 | No way to see how much data a query will process before running it | `enableQueryCostEstimation=true` dry-runs each statement and attaches the estimate as a `SQLWarning` |
+| [DBE-12808](https://youtrack.jetbrains.com/issue/DBE-12808) | 32 | No way to see how much data a query will process before running it | `enableQueryCostEstimation=true` dry-runs each statement and attaches the estimate as a `SQLWarning`; `estimateCost()` prices one statement on demand |
 | [DBE-12749](https://youtrack.jetbrains.com/issue/DBE-12749) | 14 | STRUCT columns arrive as one opaque string with no field names | Renders STRUCT as readable JSON by default, or real `java.sql.Struct` objects with `nativeComplexTypes=true` |
 | [DBE-17806](https://youtrack.jetbrains.com/issue/DBE-17806) | 13 | Nested RECORD values land in the wrong columns when fields are NULL | Never flattens a struct across columns, so the misalignment cannot occur |
 | [DBE-14390](https://youtrack.jetbrains.com/issue/DBE-14390) | 5 | Google user authentication re-prompts for a token constantly | Credentials are cached JVM-wide and refreshed by the Google auth library |
@@ -36,9 +36,24 @@ try (Statement stmt = conn.createStatement();
 }
 ```
 
-Worth knowing before enabling it: each statement costs an extra dry-run job, the estimate
-is priced at BigQuery's standard on-demand rate, and the `SQLWarning` is the only way to
-read it. Dry runs themselves are free.
+Outside the IDE, read the estimate as a value rather than as a sentence:
+
+```java
+var bq = stmt.unwrap(AbstractBQStatement.class);
+
+// after executing with enableQueryCostEstimation=true
+List<QueryCostEstimate> estimates = bq.getCostEstimates();
+
+// or price one statement on demand, without running it and without the property
+QueryCostEstimate estimate = bq.estimateCost("SELECT * FROM events");
+```
+
+Worth knowing before enabling it: each statement costs an extra dry-run job, which is why
+`estimateCost` exists for the statements you actually want priced. Dry runs themselves are
+free. The estimate reports bytes always and money only when `queryPricePerTiB` is set —
+BigQuery's on-demand rate is 6.25 USD/TiB, but editions and negotiated contracts differ,
+so the driver does not assume one. See
+[Connection properties](CONNECTION_PROPERTIES.md#query-cost-estimation).
 
 ### DBE-12749 — STRUCT columns
 

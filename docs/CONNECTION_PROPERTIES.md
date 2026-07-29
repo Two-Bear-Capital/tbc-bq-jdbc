@@ -214,7 +214,7 @@ or scripts before any transaction), or to make the session cost explicit at conn
 ### Performance Tuning
 
 Covers `useStorageApi`, `metadataCacheEnabled`, `metadataCacheTtl`,
-`metadataCacheMaxRows`, and `metadataLazyLoad` (see the
+`metadataCacheMaxRows`, `metadataLazyLoad`, and `metadataIncludeDescriptions` (see the
 [generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
@@ -296,6 +296,18 @@ dominates the cost and every subsequent one within the TTL is served from memory
 Lazy loading removes the upfront load entirely, at the cost of an empty result for
 tools that enumerate everything without a pattern.
 
+**`metadataIncludeDescriptions`:**
+- `true` (default) - `getTables()` reports each table's description in `REMARKS`
+- `false` - skip the read; `REMARKS` is empty for tables, and a view still carries its
+  defining SQL
+
+Descriptions are not in the `tables.list` response BigQuery answers `getTables()` with,
+so reading them costs one `INFORMATION_SCHEMA` query per dataset scanned — about a
+second per dataset on a cold call, run up to 16 datasets at a time and cached for
+`metadataCacheTtl`. Datasets containing views pay nothing extra, because the same query
+supplies their definitions. Turn it off on projects with enough datasets for that to be
+felt on every cold refresh.
+
 **Recommended Configurations:**
 
 **Small Projects (< 10 datasets):**
@@ -350,6 +362,62 @@ Format: `key1=value1,key2=value2`
 
 > **`jobCreationMode` is accepted but not yet applied.** The driver parses it, but it is
 > not currently sent to BigQuery.
+
+---
+
+### Query Cost Estimation
+
+Covers `enableQueryCostEstimation` and `queryPricePerTiB`.
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?authType=ADC&enableQueryCostEstimation=true&queryPricePerTiB=6.25
+```
+
+`enableQueryCostEstimation=true` dry-runs every statement — SELECT and DML alike — before
+running it. Each estimate is attached as a `SQLWarning` and is also readable as a typed
+value:
+
+```java
+var bq = stmt.unwrap(AbstractBQStatement.class);
+for (QueryCostEstimate estimate : bq.getCostEstimates()) {
+    System.out.println(estimate.totalBytesProcessed() + " bytes read, " + estimate.estimatedCost());
+}
+```
+
+To price a single statement without dry-running every one, call `estimateCost` instead.
+It works whether or not `enableQueryCostEstimation` is set, and does not run the statement:
+
+```java
+QueryCostEstimate estimate = stmt.unwrap(AbstractBQStatement.class)
+        .estimateCost("SELECT * FROM events");
+```
+
+On a `BQPreparedStatement`, `estimateCost()` takes no argument and prices the statement
+with its parameters as currently bound.
+
+**Notes:**
+- Every estimated statement costs one extra dry-run job. Dry runs are free, but they are
+  still jobs — `estimateCost` exists so a caller can price the statements that matter
+  rather than all of them
+- Sequential batches are not estimated: that path already runs one job per entry. A
+  collapsed multi-row `INSERT` is estimated once per chunk, and `getCostEstimates()`
+  returns one entry per chunk
+- `estimateCost` throws when BigQuery rejects the dry run; the automatic path logs and
+  carries on, since an estimate must never stop a statement from running
+
+**Pricing:**
+- `queryPricePerTiB` is the price of one tebibyte of billed query data. Without it,
+  estimates report bytes and `estimatedCost()` is `null`
+- The value is a plain decimal in whatever currency you use — the driver does not
+  interpret it. BigQuery's on-demand rate is 6.25 USD/TiB; editions and negotiated
+  contracts differ, and rates change
+- Cost is computed from `billableBytes()`: the bytes the query reads, rounded up to the
+  nearest MiB, with BigQuery's 10 MiB per-query and per-table minimum applied. On a large
+  scan it equals `totalBytesProcessed()`; on a small one it is larger
+- `totalBytesBilled()` is `0` on every estimate. BigQuery bills nothing for a dry run, so
+  the field describes the dry-run job rather than the query it models — use
+  `billableBytes()` instead
 
 ---
 
@@ -525,10 +593,12 @@ driver's `getPropertyInfo()`, so it never goes stale.
 | `timeout` | Higher allows longer queries | Indirectly (prevents partial work) |
 | `maxResults` | Lower = faster completion | None — BigQuery still scans the full query |
 | `maxBillingBytes` | None | Caps per-statement spend; over-limit statements fail before billing |
+| `enableQueryCostEstimation=true` | One extra dry-run job per statement | None directly — dry runs are free, and the estimate is what lets you avoid an expensive query |
 | `enableSessions` | One extra job at connection open | Minimal |
 | `metadataCacheEnabled=true` | Repeated metadata queries served from memory | Lower (fewer API calls) |
 | `metadataCacheTtl` | Higher = more cache hits, staler schema | Lower |
 | `metadataLazyLoad=true` | No upfront metadata load | Lower (fewer API calls) |
+| `metadataIncludeDescriptions=true` | One `INFORMATION_SCHEMA` query per dataset on a cold `getTables()` | None — `INFORMATION_SCHEMA` reads are not billed |
 
 ---
 

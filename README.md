@@ -59,7 +59,7 @@ This driver addresses critical limitations in existing BigQuery JDBC drivers for
 
 ✅ **Readable STRUCT/ARRAY** - JSON by default, keeping the result grid stable ([DBE-12749](https://youtrack.jetbrains.com/issue/DBE-12749), [DBE-17806](https://youtrack.jetbrains.com/issue/DBE-17806)); native `java.sql.Array`/`java.sql.Struct` via `nativeComplexTypes=true`, and both bind as query parameters
 
-✅ **Query Cost Before You Run** - `enableQueryCostEstimation=true` reports bytes processed as a `SQLWarning` ([DBE-12808](https://youtrack.jetbrains.com/issue/DBE-12808))
+✅ **Query Cost Before You Run** - `enableQueryCostEstimation=true` reports bytes processed as a `SQLWarning`, or call `estimateCost()` to price one statement without running it ([DBE-12808](https://youtrack.jetbrains.com/issue/DBE-12808))
 
 ✅ **Stable Authentication** - Credentials cached and refreshed, without repeated prompts ([DBE-14390](https://youtrack.jetbrains.com/issue/DBE-14390))
 

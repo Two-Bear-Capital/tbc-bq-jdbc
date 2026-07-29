@@ -166,6 +166,10 @@ public final class BQDriver implements Driver {
 				"Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects)",
 				false, new String[]{"true", "false"}));
 
+		props.add(prop(info, "metadataIncludeDescriptions", "true",
+				"Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets",
+				false, new String[]{"true", "false"}));
+
 		props.add(prop(info, "useStorageApi", "false",
 				"BigQuery Storage Read API mode for large result sets: much faster on big results, "
 						+ "but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED "
@@ -181,8 +185,12 @@ public final class BQDriver implements Driver {
 				new String[]{"true", "false"}));
 
 		props.add(prop(info, "enableQueryCostEstimation", "false",
-				"Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings. Sequential batches are not estimated (one job per entry already)",
+				"Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings and readable as typed values via BQStatement.getCostEstimates(). Sequential batches are not estimated (one job per entry already)",
 				false, new String[]{"true", "false"}));
+
+		props.add(prop(info, "queryPricePerTiB", "",
+				"Price of one tebibyte of billed query data, used to turn cost estimates into money (blank = report bytes only). Any currency; BigQuery's on-demand rate is 6.25 USD/TiB, but editions and negotiated contracts differ",
+				false, null));
 
 		props.add(prop(info, "maxResults", "", "Maximum number of query result rows to return (blank = unlimited)",
 				false, null));

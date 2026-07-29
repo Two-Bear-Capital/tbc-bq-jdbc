@@ -40,6 +40,7 @@ import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
+import vc.tbc.bq.jdbc.util.SqlStringLiterals;
 
 import java.sql.*;
 import java.util.Locale;
@@ -1163,6 +1164,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				continue;
 			}
 
+			// Always empty in practice: tables.list does not return description, so
+			// this is filled in by fillInRemarks below. Kept because a future listing
+			// that does carry one should win over the INFORMATION_SCHEMA read.
 			String remarks = table.getDescription() != null ? table.getDescription() : "";
 
 			rows.add(new Object[]{projectId, // TABLE_CAT
@@ -1178,7 +1182,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			});
 		}
 
-		fillInViewDefinitions(projectId, datasetId, rows);
+		fillInRemarks(projectId, datasetId, rows);
 		return rows;
 	}
 
@@ -1188,63 +1192,134 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	/** Index of {@code REMARKS} in a {@link MetadataColumns.Tables} row. */
 	private static final int TABLE_ROW_REMARKS = 4;
 
+	/** Index of {@code TABLE_NAME} in a {@link MetadataColumns.Tables} row. */
+	private static final int TABLE_ROW_NAME = 2;
+
 	/**
-	 * Fills the {@code REMARKS} of any view in {@code rows} that has no description
-	 * with its defining SQL.
+	 * Fills the {@code REMARKS} of {@code rows} from {@code INFORMATION_SCHEMA}:
+	 * the author's description where there is one, and for a view the defining SQL
+	 * where there is not.
 	 *
 	 * <p>
-	 * An IDE that cannot show a view's SQL sends you to the BigQuery console —
-	 * JetBrains
-	 * <a href="https://youtrack.jetbrains.com/issue/DBE-12630">DBE-12630</a>. The
-	 * definition is not on the {@link Table} objects {@code listTables} returns:
-	 * that response carries {@code view.useLegacySql} and nothing else, so
-	 * {@code ViewDefinition.getQuery()} is null there and a per-table
-	 * {@code getTable()} would be one API call per view. One
-	 * {@code INFORMATION_SCHEMA.TABLES} read per dataset costs a query instead, and
-	 * only when the dataset actually contributed a view — a project of plain tables
-	 * pays nothing, which matters because this is the path IntelliJ walks on every
-	 * refresh.
+	 * Neither is on the {@link Table} objects {@code listTables} returns. That
+	 * response carries {@code view.useLegacySql} and nothing else of the view, so
+	 * {@code ViewDefinition.getQuery()} is null; and it omits {@code description}
+	 * entirely, so {@code Table.getDescription()} is null for every table and
+	 * {@code REMARKS} was uniformly the empty string. Only {@code tables.get}
+	 * returns either, which would be one API call per table.
 	 *
 	 * <p>
-	 * A description, where one exists, wins: it is what the author wrote for this
-	 * column. On this path there is never one to prefer — {@code tables.list} does
-	 * not return {@code description} either, so {@code Table.getDescription()} is
-	 * null for every table listed here and {@code REMARKS} was uniformly empty.
-	 * That is its own gap, not this one; the check stays so filling it later cannot
-	 * silently start overwriting descriptions. Nothing is lost meanwhile, because
-	 * BigQuery emits the description inside the DDL's {@code OPTIONS}.
+	 * Both answer a JetBrains request: an IDE that cannot show a view's SQL sends
+	 * you to the BigQuery console
+	 * (<a href="https://youtrack.jetbrains.com/issue/DBE-12630">DBE-12630</a>), and
+	 * a table comment that is always blank is indistinguishable from a table that
+	 * has none.
+	 *
+	 * <p>
+	 * <b>One query per dataset serves both.</b> The descriptions live in
+	 * {@code TABLE_OPTIONS} and the DDL in {@code TABLES}, so a join reads them
+	 * together rather than twice. That matters because the two have different
+	 * reach: the definitions are wanted only for datasets that contributed a view,
+	 * while descriptions apply to every table, so folding them into one read is
+	 * what keeps a dataset of plain tables at one query rather than adding a second
+	 * to the datasets that already paid. This is the path IntelliJ walks on every
+	 * refresh — DBE-22088 — which is also why {@code metadataIncludeDescriptions}
+	 * exists to turn the description half off, falling back to the narrower
+	 * view-only read.
+	 *
+	 * <p>
+	 * A description wins over a definition: it is what the author wrote for this
+	 * column, and BigQuery emits it inside the DDL's {@code OPTIONS} anyway, so
+	 * nothing is lost by preferring it.
 	 *
 	 * <p>
 	 * {@code ddl} rather than {@code VIEWS.view_definition} because
 	 * {@code MATERIALIZED_VIEWS} has no definition column at all, so the DDL is the
-	 * only form that answers for both.
+	 * only form that answers for both. The DDL is selected only for views, since
+	 * for a large table it is a long string nothing here reads.
 	 */
-	private void fillInViewDefinitions(String projectId, String datasetId, java.util.List<Object[]> rows) {
+	private void fillInRemarks(String projectId, String datasetId, java.util.List<Object[]> rows) {
 		java.util.List<Object[]> undescribedViews = rows.stream()
 				.filter(row -> "VIEW".equals(row[TABLE_ROW_TYPE]) || "MATERIALIZED VIEW".equals(row[TABLE_ROW_TYPE]))
-				.filter(row -> row[TABLE_ROW_REMARKS] == null || ((String) row[TABLE_ROW_REMARKS]).isEmpty()).toList();
-		if (undescribedViews.isEmpty()) {
+				.filter(BQDatabaseMetaData::isBlankRemarks).toList();
+
+		boolean readDescriptions = connection.getProperties().metadataIncludeDescriptions();
+		if (!readDescriptions && undescribedViews.isEmpty()) {
 			return;
 		}
 
-		String sql = String.format("SELECT table_name, ddl FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES "
-				+ "WHERE table_type IN ('VIEW', 'MATERIALIZED VIEW')", projectId, datasetId);
+		java.util.Map<String, String> descriptions = new java.util.HashMap<>();
 		java.util.Map<String, String> definitions = new java.util.HashMap<>();
-		queryInformationSchema(projectId, datasetId, "view definitions", "INFORMATION_SCHEMA.TABLES", sql, row -> {
+		String sql = readDescriptions ? remarksSql(projectId, datasetId) : viewDefinitionSql(projectId, datasetId);
+
+		queryInformationSchema(projectId, datasetId, "table remarks", "INFORMATION_SCHEMA.TABLES", sql, row -> {
+			String tableName = row.get("table_name").getStringValue();
 			if (!row.get("ddl").isNull()) {
-				definitions.put(row.get("table_name").getStringValue(), row.get("ddl").getStringValue());
+				definitions.put(tableName, row.get("ddl").getStringValue());
 			}
-			// Collected into the map above rather than returned as rows: this read
+			if (readDescriptions && !row.get("description").isNull()) {
+				// TABLE_OPTIONS reports an option as the SQL that would set it, so the
+				// value arrives quoted and escaped.
+				descriptions.put(tableName, SqlStringLiterals.unquote(row.get("description").getStringValue()));
+			}
+			// Collected into the maps above rather than returned as rows: this read
 			// annotates rows that already exist instead of producing its own.
 			return null;
 		});
 
+		// Descriptions first, for every kind of table.
+		for (Object[] row : rows) {
+			String description = descriptions.get((String) row[TABLE_ROW_NAME]);
+			if (description != null && !description.isEmpty()) {
+				row[TABLE_ROW_REMARKS] = description;
+			}
+		}
+		// Then definitions, for the views the pass above left empty. A view with a
+		// description shows the description; a view without one still shows its SQL,
+		// which is what #219 put here and this must not take away.
 		for (Object[] row : undescribedViews) {
-			String definition = definitions.get((String) row[2]);
+			if (!isBlankRemarks(row)) {
+				continue;
+			}
+			String definition = definitions.get((String) row[TABLE_ROW_NAME]);
 			if (definition != null) {
 				row[TABLE_ROW_REMARKS] = definition;
 			}
 		}
+	}
+
+	/** Whether a table row's {@code REMARKS} is still unset. */
+	private static boolean isBlankRemarks(Object[] row) {
+		return row[TABLE_ROW_REMARKS] == null || ((String) row[TABLE_ROW_REMARKS]).isEmpty();
+	}
+
+	/**
+	 * Reads descriptions for every table and DDL for the views, in one query.
+	 *
+	 * <p>
+	 * A {@code LEFT JOIN} rather than an inner one: a table with no description
+	 * still has to appear, because it may be a view whose DDL is wanted.
+	 */
+	private static String remarksSql(String projectId, String datasetId) {
+		return String.format("SELECT t.table_name AS table_name, "
+				+ "IF(t.table_type IN ('VIEW', 'MATERIALIZED VIEW'), t.ddl, NULL) AS ddl, "
+				+ "o.option_value AS description " + "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLES t "
+				+ "LEFT JOIN `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLE_OPTIONS o "
+				+ "ON o.table_name = t.table_name AND o.option_name = 'description'", projectId, datasetId);
+	}
+
+	/**
+	 * The narrower read used when {@code metadataIncludeDescriptions} is off:
+	 * definitions only, and only for the views that need them.
+	 *
+	 * <p>
+	 * Selects a null {@code description} so the row mapper reads one shape either
+	 * way.
+	 */
+	private static String viewDefinitionSql(String projectId, String datasetId) {
+		return String.format("SELECT table_name, ddl, CAST(NULL AS STRING) AS description "
+				+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES " + "WHERE table_type IN ('VIEW', 'MATERIALIZED VIEW')",
+				projectId, datasetId);
 	}
 
 	@Override

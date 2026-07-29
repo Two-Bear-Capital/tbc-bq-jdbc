@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.config;
 import com.google.cloud.bigquery.DatasetId;
 import vc.tbc.bq.jdbc.auth.AuthType;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Objects;
 
@@ -78,6 +79,17 @@ import java.util.Objects;
  *            objects instead of JSON strings (default: false). When false,
  *            complex types are returned as JSON strings for IntelliJ
  *            compatibility.
+ * @param metadataCacheMaxRows
+ *            row ceiling for a single cached metadata result (default:
+ *            {@link MetadataCache#DEFAULT_MAX_ROWS})
+ * @param queryPricePerTiB
+ *            price of one tebibyte of billed query data, in whatever currency
+ *            the caller uses (optional). Unset means cost estimates report
+ *            bytes only, because the driver cannot know a customer's contract.
+ * @param metadataIncludeDescriptions
+ *            whether {@code getTables} reads table descriptions into
+ *            {@code REMARKS} (default: true). Costs one
+ *            {@code INFORMATION_SCHEMA} query per dataset scanned.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
@@ -85,7 +97,8 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
 		Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
 		Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
-		Boolean nativeComplexTypes, Integer metadataCacheMaxRows) {
+		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
+		Boolean metadataIncludeDescriptions) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -175,6 +188,92 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		if (metadataCacheMaxRows == null) {
 			metadataCacheMaxRows = MetadataCache.DEFAULT_MAX_ROWS;
 		}
+		if (metadataIncludeDescriptions == null) {
+			// On by default: without it REMARKS is the empty string for every table in
+			// every project, which reads as "this table has no comment" rather than as
+			// a setting nobody turned on. The cost is one INFORMATION_SCHEMA query per
+			// dataset, cached for the metadata TTL, and this is the opt-out for the
+			// project large enough to feel it.
+			metadataIncludeDescriptions = true;
+		}
+		// No default: a rate the driver invented would be wrong for every customer
+		// not on on-demand pricing, and would silently go stale. Unset means
+		// estimates report bytes and no money. Rejected rather than clamped,
+		// because a negative price is a typo, not an intent.
+		if (queryPricePerTiB != null && queryPricePerTiB.signum() < 0) {
+			throw new IllegalArgumentException("queryPricePerTiB cannot be negative: " + queryPricePerTiB);
+		}
+	}
+
+	/**
+	 * Creates properties without {@code queryPricePerTiB} or
+	 * {@code metadataIncludeDescriptions}, which then take their defaults.
+	 *
+	 * <p>
+	 * This is the canonical shape as of 3.1.0, and the reason both this and the
+	 * overload below it exist: the canonical constructor of a public record is part
+	 * of its ABI, so growing the component list would break existing callers at
+	 * source and binary level. Two components were added in 3.2.0 and neither has
+	 * shipped on its own, so one overload covers both rather than there being a
+	 * separate step per component.
+	 *
+	 * @param projectId
+	 *            the GCP project id
+	 * @param datasetId
+	 *            the default dataset, or null
+	 * @param datasetProjectId
+	 *            the project owning the dataset, or null to use {@code projectId}
+	 * @param authType
+	 *            the authentication type
+	 * @param host
+	 *            the API host override, or null
+	 * @param port
+	 *            the API port override, or null
+	 * @param timeoutSeconds
+	 *            query timeout in seconds
+	 * @param maxResults
+	 *            maximum rows to return, or null
+	 * @param useLegacySql
+	 *            whether to use legacy SQL
+	 * @param location
+	 *            the dataset location, or null
+	 * @param labels
+	 *            job labels
+	 * @param pageSize
+	 *            result page size
+	 * @param useStorageApi
+	 *            Storage Read API setting
+	 * @param enableSessions
+	 *            whether to create a session eagerly
+	 * @param connectionTimeout
+	 *            connection timeout in seconds
+	 * @param retryCount
+	 *            retry count
+	 * @param maxBillingBytes
+	 *            per-query billed-bytes ceiling, or null
+	 * @param metadataCacheTtl
+	 *            metadata cache TTL in seconds
+	 * @param metadataCacheEnabled
+	 *            whether the metadata cache is enabled
+	 * @param metadataLazyLoad
+	 *            whether metadata loads lazily
+	 * @param enableQueryCostEstimation
+	 *            whether to estimate query cost
+	 * @param nativeComplexTypes
+	 *            whether ARRAY/STRUCT map to native JDBC types
+	 * @param metadataCacheMaxRows
+	 *            row ceiling for one cached metadata result
+	 */
+	public ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
+			String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
+			Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
+			Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
+			Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
+			Boolean nativeComplexTypes, Integer metadataCacheMaxRows) {
+		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
+				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
+				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
+				nativeComplexTypes, metadataCacheMaxRows, null, null);
 	}
 
 	/**
