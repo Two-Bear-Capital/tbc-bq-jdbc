@@ -325,6 +325,87 @@ class RealPreparedStatementAdvancedTest extends AbstractRealBigQueryIntegrationT
 		}
 	}
 
+	/**
+	 * #226: the two-argument {@code setObject} with a real temporal object.
+	 *
+	 * <p>
+	 * Every other {@code setObject} test here passes a {@code String} plus an
+	 * explicit {@code Types.} constant, which takes the converting branch. Nothing
+	 * covered the branch that switches on the object's own class, and both temporal
+	 * cases in it built formats {@code QueryParameterValue} rejects client-side —
+	 * an ISO-8601 timestamp and an {@code HH:mm:ss} time — so neither could ever
+	 * bind, while {@code setTimestamp} and {@code setTime} always worked.
+	 */
+	@Test
+	void testSetObjectBindsATimestampObject() throws SQLException {
+		Timestamp value = Timestamp.valueOf("2024-01-15 10:30:00.123");
+
+		try (PreparedStatement pstmt = connection.prepareStatement("SELECT ? AS value")) {
+			pstmt.setObject(1, value);
+
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have a result");
+				assertEquals(value, rs.getTimestamp(1), "setObject should bind a Timestamp as setTimestamp does");
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectBindsATimeObject() throws SQLException {
+		Time value = Time.valueOf("10:30:00");
+
+		try (PreparedStatement pstmt = connection.prepareStatement("SELECT ? AS value")) {
+			pstmt.setObject(1, value);
+
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have a result");
+				assertEquals(value.toString(), rs.getTime(1).toString(),
+						"setObject should bind a Time as setTime does");
+			}
+		}
+	}
+
+	@Test
+	void testSetObjectBindsADateObject() throws SQLException {
+		// The case that already worked; here so the three stay covered together.
+		Date value = Date.valueOf("2024-01-15");
+
+		try (PreparedStatement pstmt = connection.prepareStatement("SELECT ? AS value")) {
+			pstmt.setObject(1, value);
+
+			try (ResultSet rs = pstmt.executeQuery()) {
+				assertTrue(rs.next(), "Should have a result");
+				assertEquals(value, rs.getDate(1));
+			}
+		}
+	}
+
+	/**
+	 * The typed setters and {@code setObject} must produce the same parameter, not
+	 * merely both succeed — they encode independently only if someone rewrites one
+	 * of them again.
+	 */
+	@Test
+	void testSetObjectAgreesWithTheTypedSetters() throws SQLException {
+		Timestamp ts = Timestamp.valueOf("2024-06-30 23:59:59.999");
+		Time time = Time.valueOf("23:59:59");
+
+		try (PreparedStatement viaObject = connection.prepareStatement("SELECT ? AS ts, ? AS t");
+				PreparedStatement viaTyped = connection.prepareStatement("SELECT ? AS ts, ? AS t")) {
+			viaObject.setObject(1, ts);
+			viaObject.setObject(2, time);
+			viaTyped.setTimestamp(1, ts);
+			viaTyped.setTime(2, time);
+
+			try (ResultSet objectRs = viaObject.executeQuery(); ResultSet typedRs = viaTyped.executeQuery()) {
+				assertTrue(objectRs.next());
+				assertTrue(typedRs.next());
+				assertEquals(typedRs.getTimestamp("ts"), objectRs.getTimestamp("ts"));
+				assertEquals(typedRs.getTime("t").toString(), objectRs.getTime("t").toString());
+			}
+		}
+	}
+
 	@Test
 	void testSetObjectIntegerToBoolean() throws SQLException {
 		try (PreparedStatement pstmt = connection.prepareStatement("SELECT ? AS value")) {
