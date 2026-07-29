@@ -431,9 +431,13 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 * Sets the designated parameter to the given {@link java.sql.Timestamp} value.
 	 *
 	 * <p>
-	 * Maps to BigQuery TIMESTAMP type. The timestamp is converted to an Instant in
-	 * UTC and formatted as ISO-8601 (yyyy-MM-dd'T'HH:mm:ss[.SSS]'Z'). If the value
-	 * is null, calls {@link #setNull(int, int)} with {@link Types#TIMESTAMP}.
+	 * Maps to BigQuery TIMESTAMP type, bound as epoch microseconds via
+	 * {@link #timestampParameter}. If the value is null, calls
+	 * {@link #setNull(int, int)} with {@link Types#TIMESTAMP}.
+	 *
+	 * <p>
+	 * Not an ISO-8601 string: {@code QueryParameterValue} rejects the {@code T}
+	 * separator client-side.
 	 *
 	 * @param parameterIndex
 	 *            the first parameter is 1, the second is 2, ...
@@ -569,11 +573,14 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			case Double d -> setParameter(parameterIndex, QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64));
 			case Boolean b -> setParameter(parameterIndex, QueryParameterValue.of(b, StandardSQLTypeName.BOOL));
 			case BigDecimal bd -> setParameter(parameterIndex, QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC));
-			case Timestamp ts -> setParameter(parameterIndex,
-					QueryParameterValue.of(ts.toInstant().toString(), StandardSQLTypeName.TIMESTAMP));
-			case Date dt ->
-				setParameter(parameterIndex, QueryParameterValue.of(dt.toString(), StandardSQLTypeName.DATE));
-			case Time t -> setParameter(parameterIndex, QueryParameterValue.of(t.toString(), StandardSQLTypeName.TIME));
+			// Delegated rather than re-encoded here. Building the parameter a second
+			// time is what let this drift: TIMESTAMP was bound as an ISO-8601 string
+			// and TIME as HH:mm:ss, both of which QueryParameterValue rejects
+			// client-side, so setObject could not bind either while setTimestamp and
+			// setTime — which use the encodings below — always could.
+			case Timestamp ts -> setTimestamp(parameterIndex, ts);
+			case Date dt -> setDate(parameterIndex, dt);
+			case Time t -> setTime(parameterIndex, t);
 			case byte[] bytes -> setParameter(parameterIndex, QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
 			case java.sql.Array a -> setArray(parameterIndex, a);
 			case java.util.List<?> list -> setListParameter(parameterIndex, list);
