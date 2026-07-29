@@ -829,4 +829,68 @@ class BQDatabaseMetaDataTest {
 		assertEquals(4, rs.getMetaData().getColumnCount());
 		assertFalse(rs.next());
 	}
+
+	/**
+	 * BigQuery has no user-defined types, so empty is the correct answer rather
+	 * than a failure. Both of these used to throw, which tools calling them during
+	 * connection setup read as a broken driver.
+	 */
+	@Test
+	void testGetAttributesReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getAttributes(null, null, null, null);
+		assertNotNull(rs);
+		assertEquals(21, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetClientInfoPropertiesReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getClientInfoProperties();
+		assertNotNull(rs);
+		assertEquals(4, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	/**
+	 * The columns are the point: a caller reading an empty result by column name
+	 * still has to find the names JDBC specifies, so getting the shape wrong fails
+	 * differently from finding no rows.
+	 */
+	@Test
+	void testGetAttributesReportsTheJdbcColumnNames() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		try (ResultSet rs = metaData.getAttributes(null, null, null, null)) {
+			java.sql.ResultSetMetaData md = rs.getMetaData();
+			assertEquals("TYPE_CAT", md.getColumnName(1));
+			assertEquals("ATTR_NAME", md.getColumnName(4));
+			assertEquals("DATA_TYPE", md.getColumnName(5));
+			assertEquals("ORDINAL_POSITION", md.getColumnName(16));
+			assertEquals("SOURCE_DATA_TYPE", md.getColumnName(21));
+		}
+	}
+
+	@Test
+	void testGetClientInfoPropertiesReportsTheJdbcColumnNames() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		try (ResultSet rs = metaData.getClientInfoProperties()) {
+			java.sql.ResultSetMetaData md = rs.getMetaData();
+			assertEquals("NAME", md.getColumnName(1));
+			assertEquals("MAX_LEN", md.getColumnName(2));
+			assertEquals("DEFAULT_VALUE", md.getColumnName(3));
+			assertEquals("DESCRIPTION", md.getColumnName(4));
+		}
+	}
+
+	/**
+	 * Both go through {@code checkClosed()} like every other metadata method, so a
+	 * closed connection still fails rather than quietly answering empty.
+	 */
+	@Test
+	void testEmptyMetadataResultsStillRejectAClosedConnection() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(true);
+		assertThrows(SQLException.class, () -> metaData.getAttributes(null, null, null, null));
+		assertThrows(SQLException.class, () -> metaData.getClientInfoProperties());
+	}
 }

@@ -393,6 +393,93 @@ public final class MetadataColumns {
 	}
 
 	/**
+	 * Column definitions for getAttributes() result set.
+	 *
+	 * <p>
+	 * Attributes describe the fields of a user-defined type. BigQuery has no
+	 * user-defined types, so the result is always empty — but the shape still has
+	 * to be right, because a tool reading it by column name fails differently from
+	 * one that finds no rows.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class Attributes {
+		static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
+				"TYPE_SCHEM", // String => type schema (may be null)
+				"TYPE_NAME", // String => type name
+				"ATTR_NAME", // String => attribute name
+				"DATA_TYPE", // int => attribute type from java.sql.Types
+				"ATTR_TYPE_NAME", // String => data source dependent type name
+				"ATTR_SIZE", // int => column size
+				"DECIMAL_DIGITS", // int => fractional digits (null if not applicable)
+				"NUM_PREC_RADIX", // int => radix
+				"NULLABLE", // int => whether NULL is allowed
+				"REMARKS", // String => comment describing the attribute (may be null)
+				"ATTR_DEF", // String => default value (may be null)
+				"SQL_DATA_TYPE", // int => unused
+				"SQL_DATETIME_SUB", // int => unused
+				"CHAR_OCTET_LENGTH", // int => max bytes for a char attribute
+				"ORDINAL_POSITION", // int => index within the type, starting at 1
+				"IS_NULLABLE", // String => YES, NO or empty when unknown
+				"SCOPE_CATALOG", // String => catalog of the referenced table (REF only)
+				"SCOPE_SCHEMA", // String => schema of the referenced table (REF only)
+				"SCOPE_TABLE", // String => name of the referenced table (REF only)
+				"SOURCE_DATA_TYPE" // short => source type of a DISTINCT or REF type
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
+				Types.VARCHAR, // TYPE_SCHEM
+				Types.VARCHAR, // TYPE_NAME
+				Types.VARCHAR, // ATTR_NAME
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR, // ATTR_TYPE_NAME
+				Types.INTEGER, // ATTR_SIZE
+				Types.INTEGER, // DECIMAL_DIGITS
+				Types.INTEGER, // NUM_PREC_RADIX
+				Types.INTEGER, // NULLABLE
+				Types.VARCHAR, // REMARKS
+				Types.VARCHAR, // ATTR_DEF
+				Types.INTEGER, // SQL_DATA_TYPE
+				Types.INTEGER, // SQL_DATETIME_SUB
+				Types.INTEGER, // CHAR_OCTET_LENGTH
+				Types.INTEGER, // ORDINAL_POSITION
+				Types.VARCHAR, // IS_NULLABLE
+				Types.VARCHAR, // SCOPE_CATALOG
+				Types.VARCHAR, // SCOPE_SCHEMA
+				Types.VARCHAR, // SCOPE_TABLE
+				Types.SMALLINT // SOURCE_DATA_TYPE
+		};
+
+		private Attributes() {
+		}
+	}
+
+	/**
+	 * Column definitions for getClientInfoProperties() result set.
+	 *
+	 * <p>
+	 * The driver accepts no client-info properties, so the result is always empty.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class ClientInfoProperties {
+		static final String[] COLUMN_NAMES = {"NAME", // String => the client info property name
+				"MAX_LEN", // int => maximum length of the value
+				"DEFAULT_VALUE", // String => default value
+				"DESCRIPTION" // String => description of the property
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // NAME
+				Types.INTEGER, // MAX_LEN
+				Types.VARCHAR, // DEFAULT_VALUE
+				Types.VARCHAR // DESCRIPTION
+		};
+
+		private ClientInfoProperties() {
+		}
+	}
+
+	/**
 	 * Column definitions for getSuperTables() result set.
 	 */
 	public static final class SuperTables {
