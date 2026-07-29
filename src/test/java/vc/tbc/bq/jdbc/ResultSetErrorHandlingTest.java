@@ -23,6 +23,8 @@ import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.TableResult;
 import org.junit.jupiter.api.Test;
 
+import static vc.tbc.bq.jdbc.testsupport.TestResultSets.singleColumn;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -48,14 +50,9 @@ import static org.mockito.Mockito.when;
  */
 class ResultSetErrorHandlingTest {
 
-	/** Builds a single-row, single-column result set over the given raw value. */
+	/** Builds a single-row, single-column result set positioned on its only row. */
 	private static ResultSet resultSetOf(Field field, String rawValue) throws SQLException {
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, rawValue)), field);
-		TableResult tableResult = mock(TableResult.class);
-		when(tableResult.getSchema()).thenReturn(Schema.of(field));
-		when(tableResult.iterateAll()).thenReturn(List.of(row));
-
-		ResultSet rs = new BQResultSet(null, tableResult);
+		ResultSet rs = singleColumn(field, rawValue);
 		rs.next();
 		return rs;
 	}
