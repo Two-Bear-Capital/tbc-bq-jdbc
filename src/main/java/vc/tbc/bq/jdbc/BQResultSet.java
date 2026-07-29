@@ -78,6 +78,7 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.schemaFields = schema != null ? schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
 		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
+		initialiseFetchSize(resolveFetchSize(statement));
 	}
 
 	/**
@@ -132,6 +133,15 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.schemaFields = schema != null ? schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
 		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
+		initialiseFetchSize(resolveFetchSize(statement));
+	}
+
+	/**
+	 * The page size the statement read these rows at, which JDBC makes the result
+	 * set's default fetch size. Zero for a result set no statement produced.
+	 */
+	private static int resolveFetchSize(BQStatement statement) {
+		return statement == null ? 0 : statement.getEffectiveFetchSize();
 	}
 
 	private static int resolveMaxRows(BQStatement statement) {
@@ -640,15 +650,12 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		return statement;
 	}
 
-	@Override
-	public Object getObject(int columnIndex, Map<String, Class<?>> map) throws SQLException {
-		return getObject(columnIndex);
-	}
-
-	@Override
-	public Object getObject(String columnLabel, Map<String, Class<?>> map) throws SQLException {
-		return getObject(columnLabel);
-	}
+	// The getObject(..., Map) overloads are deliberately not overridden. They used
+	// to be, with the same body as the plain getObject, which is what let a
+	// populated type map be dropped on this path — the one nearly every caller
+	// takes. BaseReadOnlyResultSet now refuses a populated map and delegates the
+	// rest to getObject(int) below, so the answer cannot drift from the refusal
+	// Connection.setTypeMap already gives.
 
 	@Override
 	public Date getDate(int columnIndex, Calendar cal) throws SQLException {

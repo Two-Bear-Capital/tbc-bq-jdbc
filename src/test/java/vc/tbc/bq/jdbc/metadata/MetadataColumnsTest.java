@@ -382,6 +382,114 @@ class MetadataColumnsTest {
 	}
 
 	@Test
+	void testAttributesColumnCount() {
+		assertEquals(21, MetadataColumns.Attributes.COLUMN_NAMES.length);
+		assertEquals(21, MetadataColumns.Attributes.COLUMN_TYPES.length);
+	}
+
+	/**
+	 * The result is always empty, so the columns are the only thing a caller can
+	 * read — spot-checks the two ends and the two that are not VARCHAR.
+	 */
+	@Test
+	void testAttributesColumnNamesAndTypes() {
+		String[] names = MetadataColumns.Attributes.COLUMN_NAMES;
+		int[] types = MetadataColumns.Attributes.COLUMN_TYPES;
+
+		assertEquals("TYPE_CAT", names[0]);
+		assertEquals("DATA_TYPE", names[4]);
+		assertEquals("IS_NULLABLE", names[16]);
+		assertEquals("SOURCE_DATA_TYPE", names[20]);
+		assertEquals(Types.INTEGER, types[4]);
+		assertEquals(Types.SMALLINT, types[20]);
+	}
+
+	@Test
+	void testClientInfoPropertiesColumnCount() {
+		assertEquals(4, MetadataColumns.ClientInfoProperties.COLUMN_NAMES.length);
+		assertEquals(4, MetadataColumns.ClientInfoProperties.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testClientInfoPropertiesColumnNamesAndTypes() {
+		String[] names = MetadataColumns.ClientInfoProperties.COLUMN_NAMES;
+		int[] types = MetadataColumns.ClientInfoProperties.COLUMN_TYPES;
+
+		assertEquals("NAME", names[0]);
+		assertEquals("MAX_LEN", names[1]);
+		assertEquals("DEFAULT_VALUE", names[2]);
+		assertEquals("DESCRIPTION", names[3]);
+		assertEquals(Types.INTEGER, types[1]);
+	}
+
+	@Test
+	void testPseudoColumnsColumnCount() {
+		assertEquals(12, MetadataColumns.PseudoColumns.COLUMN_NAMES.length);
+		assertEquals(12, MetadataColumns.PseudoColumns.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testPseudoColumnsColumnNamesAndTypes() {
+		String[] names = MetadataColumns.PseudoColumns.COLUMN_NAMES;
+		int[] types = MetadataColumns.PseudoColumns.COLUMN_TYPES;
+
+		assertEquals("TABLE_CAT", names[0]);
+		assertEquals("COLUMN_NAME", names[3]);
+		assertEquals("DATA_TYPE", names[4]);
+		assertEquals("COLUMN_USAGE", names[8]);
+		assertEquals("CHAR_OCTET_LENGTH", names[10]);
+		assertEquals("IS_NULLABLE", names[11]);
+		assertEquals(Types.INTEGER, types[4]);
+		assertEquals(Types.VARCHAR, types[8]);
+	}
+
+	@Test
+	void testFunctionsColumnCount() {
+		assertEquals(6, MetadataColumns.Functions.COLUMN_NAMES.length);
+		assertEquals(6, MetadataColumns.Functions.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testFunctionsColumnNamesAndTypes() {
+		String[] names = MetadataColumns.Functions.COLUMN_NAMES;
+		int[] types = MetadataColumns.Functions.COLUMN_TYPES;
+
+		assertEquals("FUNCTION_CAT", names[0]);
+		assertEquals("FUNCTION_SCHEM", names[1]);
+		assertEquals("FUNCTION_NAME", names[2]);
+		assertEquals("REMARKS", names[3]);
+		assertEquals("FUNCTION_TYPE", names[4]);
+		assertEquals("SPECIFIC_NAME", names[5]);
+		assertEquals(Types.SMALLINT, types[4]);
+	}
+
+	@Test
+	void testFunctionColumnsColumnCount() {
+		assertEquals(17, MetadataColumns.FunctionColumns.COLUMN_NAMES.length);
+		assertEquals(17, MetadataColumns.FunctionColumns.COLUMN_TYPES.length);
+	}
+
+	/**
+	 * Four columns wider than {@code ProcedureColumns} and ordered differently, so
+	 * the two shapes cannot be shared — the tail is where they diverge.
+	 */
+	@Test
+	void testFunctionColumnsColumnNamesAndTypes() {
+		String[] names = MetadataColumns.FunctionColumns.COLUMN_NAMES;
+		int[] types = MetadataColumns.FunctionColumns.COLUMN_TYPES;
+
+		assertEquals("FUNCTION_CAT", names[0]);
+		assertEquals("COLUMN_TYPE", names[4]);
+		assertEquals("REMARKS", names[12]);
+		assertEquals("CHAR_OCTET_LENGTH", names[13]);
+		assertEquals("ORDINAL_POSITION", names[14]);
+		assertEquals("IS_NULLABLE", names[15]);
+		assertEquals("SPECIFIC_NAME", names[16]);
+		assertEquals(Types.SMALLINT, types[4]);
+		assertEquals(Types.INTEGER, types[14]);
+	}
+
+	@Test
 	void testProceduresColumnCount() {
 		assertEquals(8, MetadataColumns.Procedures.COLUMN_NAMES.length);
 		assertEquals(8, MetadataColumns.Procedures.COLUMN_TYPES.length);

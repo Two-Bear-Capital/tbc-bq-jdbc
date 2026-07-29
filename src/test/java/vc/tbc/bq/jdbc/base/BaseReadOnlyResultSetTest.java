@@ -507,20 +507,50 @@ class BaseReadOnlyResultSetTest {
 		// type-map forms are legacy but must not blow up
 		assertEquals(null, resultSet.getObject(1, String.class));
 		assertEquals(null, resultSet.getObject("c", String.class));
-		// The type-map forms accept a map and ignore it, delegating to the plain
-		// getObject. Pinned as current behaviour, not endorsed: silently dropping a
-		// populated map contradicts setTypeMap, which refuses one outright. See #206.
+		// An empty map asks for nothing, so there is nothing to refuse — and a
+		// caller handing back getTypeMap(), which is always empty, keeps working.
 		assertEquals(null, resultSet.getObject(1, java.util.Map.of()));
 		assertEquals(null, resultSet.getObject("c", java.util.Map.of()));
+		// Null is the same case: no mapping was asked for.
+		assertEquals(null, resultSet.getObject(1, (java.util.Map<String, Class<?>>) null));
+		assertEquals(null, resultSet.getObject("c", (java.util.Map<String, Class<?>>) null));
+	}
+
+	/**
+	 * A populated map asks for a custom mapping the driver does not do, and used to
+	 * get the default mapping back with no exception and no warning.
+	 * {@code Connection.setTypeMap} refuses one outright, so answering quietly and
+	 * wrongly here made the driver give two different answers to the same question
+	 * (#206).
+	 */
+	@Test
+	void aPopulatedTypeMapIsRefusedRatherThanIgnored() {
+		java.util.Map<String, Class<?>> map = java.util.Map.of("STRUCT", java.util.List.class);
+
+		assertThrows(SQLFeatureNotSupportedException.class, () -> resultSet.getObject(1, map));
+		assertThrows(SQLFeatureNotSupportedException.class, () -> resultSet.getObject("c", map));
 	}
 
 	@Test
-	void fetchSizeIsIgnoredAndReportsZero() throws SQLException {
-		// Paging is driven by the pageSize connection property, not per-ResultSet.
-		// Accepting the call keeps pooled tools working; reporting 0 tells a caller
-		// the driver is choosing
+	void fetchSizeIsRecordedAndReportedBack() throws SQLException {
+		// It cannot change how these rows are read — they were paged at the size the
+		// statement asked for when the results opened — but JDBC requires the hint to
+		// be reported back. Returning 0 to a caller that had just set 500 said the
+		// request went nowhere.
 		resultSet.setFetchSize(500);
+		assertEquals(500, resultSet.getFetchSize());
+	}
+
+	@Test
+	void fetchSizeDefaultsToZeroWithoutAStatement() throws SQLException {
+		// Zero means "the driver decides", which is the honest answer for a result
+		// set no statement produced — the metadata results.
 		assertEquals(0, resultSet.getFetchSize());
+	}
+
+	@Test
+	void fetchSizeRejectsANegativeHint() {
+		assertThrows(SQLException.class, () -> resultSet.setFetchSize(-1));
 	}
 
 	@Test

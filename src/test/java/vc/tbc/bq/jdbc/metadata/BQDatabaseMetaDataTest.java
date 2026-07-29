@@ -19,6 +19,7 @@ import com.google.api.gax.paging.Page;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.Dataset;
 import com.google.cloud.bigquery.DatasetId;
+import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.Table;
 import com.google.cloud.bigquery.TableResult;
@@ -651,6 +652,9 @@ class BQDatabaseMetaDataTest {
 
 		metaData.getProcedures(maliciousCatalog, "shop", null).close();
 		metaData.getProcedureColumns(maliciousCatalog, "shop", null, null).close();
+		metaData.getFunctions(maliciousCatalog, "shop", null).close();
+		metaData.getFunctionColumns(maliciousCatalog, "shop", null, null).close();
+		metaData.getPseudoColumns(maliciousCatalog, "shop", null, null).close();
 
 		verify(bigQuery, never()).query(any(QueryJobConfiguration.class));
 	}
@@ -669,6 +673,114 @@ class BQDatabaseMetaDataTest {
 		metaData.getProcedures("safe-project", "shop", null).close();
 
 		verify(bigQuery).query(any(QueryJobConfiguration.class));
+	}
+
+	/**
+	 * Both used to throw {@code SQLFeatureNotSupportedException}. The rows come
+	 * from real datasets, so a mocked-empty project can only pin the shape — the
+	 * routine split itself is covered against real routines in
+	 * {@code RealMetadataEnhancedTest}.
+	 */
+	@Test
+	void testGetFunctionsReturnsTheJdbcShape() throws Exception {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.listDatasets(anyString())).thenReturn(emptyDatasetPage);
+		lenient().when(emptyDatasetPage.iterateAll()).thenReturn(java.util.List.of());
+
+		try (ResultSet functions = metaData.getFunctions(null, null, null);
+				ResultSet columns = metaData.getFunctionColumns(null, null, null, null)) {
+			assertEquals(6, functions.getMetaData().getColumnCount());
+			assertEquals("FUNCTION_CAT", functions.getMetaData().getColumnName(1));
+			assertEquals(17, columns.getMetaData().getColumnCount());
+			assertEquals("SPECIFIC_NAME", columns.getMetaData().getColumnName(17));
+		}
+	}
+
+	/**
+	 * Which pseudo columns a table has depends on its partitioning, so a mocked
+	 * project can only pin the shape — {@code RealPseudoColumnMetadataTest} covers
+	 * the selection against real partitioned tables.
+	 */
+	@Test
+	void testGetPseudoColumnsReturnsTheJdbcShape() throws Exception {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.listDatasets(anyString())).thenReturn(emptyDatasetPage);
+		lenient().when(emptyDatasetPage.iterateAll()).thenReturn(java.util.List.of());
+
+		try (ResultSet rs = metaData.getPseudoColumns(null, null, null, null)) {
+			assertEquals(12, rs.getMetaData().getColumnCount());
+			assertEquals("TABLE_CAT", rs.getMetaData().getColumnName(1));
+			assertEquals("COLUMN_USAGE", rs.getMetaData().getColumnName(9));
+			assertEquals("IS_NULLABLE", rs.getMetaData().getColumnName(12));
+			assertFalse(rs.next());
+		}
+	}
+
+	/**
+	 * An interrupt reaching a per-dataset read must leave the thread's interrupt
+	 * flag set, or whoever asked for the cancellation never learns it landed.
+	 *
+	 * <p>
+	 * The helper is invoked directly rather than through {@code getProcedures()}
+	 * because in production it only ever runs on the virtual threads of the
+	 * parallel scan: by the time the scan returns, the thread carrying the flag has
+	 * terminated and the flag is gone. Driving it on the test's own thread is the
+	 * only way to observe the thing being fixed.
+	 */
+	@Test
+	void testInterruptedDatasetReadRestoresTheInterruptFlag() throws Exception {
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class)))
+				.thenThrow(new InterruptedException("cancelled"));
+
+		try {
+			Object rows = invokeQueryInformationSchema();
+
+			assertEquals(java.util.List.of(), rows, "an interrupted read contributes no rows");
+			assertTrue(Thread.currentThread().isInterrupted(),
+					"the interrupt flag must outlive the swallowed exception");
+		} finally {
+			// Clear it so the flag cannot leak into unrelated tests on this thread.
+			Thread.interrupted();
+		}
+	}
+
+	/**
+	 * The control for the test above: only an interrupt sets the flag. Without
+	 * this, catching {@code Exception} first and interrupting unconditionally would
+	 * still pass.
+	 */
+	@Test
+	void testFailedDatasetReadLeavesTheInterruptFlagAlone() throws Exception {
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class)))
+				.thenThrow(new IllegalStateException("permission denied"));
+
+		try {
+			Object rows = invokeQueryInformationSchema();
+
+			assertEquals(java.util.List.of(), rows, "an unreadable dataset contributes no rows");
+			assertFalse(Thread.currentThread().isInterrupted(), "a plain failure is not a cancellation");
+		} finally {
+			Thread.interrupted();
+		}
+	}
+
+	/**
+	 * Calls the private per-dataset read helper on the current thread. The
+	 * identifiers are deliberately safe ones so the call reaches the query rather
+	 * than the identifier guard.
+	 */
+	private Object invokeQueryInformationSchema() throws Exception {
+		java.lang.reflect.Method helper = BQDatabaseMetaData.class.getDeclaredMethod("queryInformationSchema",
+				String.class, String.class, String.class, String.class, String.class,
+				java.util.function.Function.class);
+		helper.setAccessible(true);
+		java.util.function.Function<FieldValueList, Object[]> rowMapper = row -> new Object[0];
+		return helper.invoke(metaData, "test-project", "shop", "procedures", "INFORMATION_SCHEMA.ROUTINES",
+				"SELECT routine_name FROM `test-project`.`shop`.INFORMATION_SCHEMA.ROUTINES", rowMapper);
 	}
 
 	/**
@@ -762,5 +874,69 @@ class BQDatabaseMetaDataTest {
 		assertNotNull(rs);
 		assertEquals(4, rs.getMetaData().getColumnCount());
 		assertFalse(rs.next());
+	}
+
+	/**
+	 * BigQuery has no user-defined types, so empty is the correct answer rather
+	 * than a failure. Both of these used to throw, which tools calling them during
+	 * connection setup read as a broken driver.
+	 */
+	@Test
+	void testGetAttributesReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getAttributes(null, null, null, null);
+		assertNotNull(rs);
+		assertEquals(21, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	@Test
+	void testGetClientInfoPropertiesReturnsEmpty() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		ResultSet rs = metaData.getClientInfoProperties();
+		assertNotNull(rs);
+		assertEquals(4, rs.getMetaData().getColumnCount());
+		assertFalse(rs.next());
+	}
+
+	/**
+	 * The columns are the point: a caller reading an empty result by column name
+	 * still has to find the names JDBC specifies, so getting the shape wrong fails
+	 * differently from finding no rows.
+	 */
+	@Test
+	void testGetAttributesReportsTheJdbcColumnNames() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		try (ResultSet rs = metaData.getAttributes(null, null, null, null)) {
+			java.sql.ResultSetMetaData md = rs.getMetaData();
+			assertEquals("TYPE_CAT", md.getColumnName(1));
+			assertEquals("ATTR_NAME", md.getColumnName(4));
+			assertEquals("DATA_TYPE", md.getColumnName(5));
+			assertEquals("ORDINAL_POSITION", md.getColumnName(16));
+			assertEquals("SOURCE_DATA_TYPE", md.getColumnName(21));
+		}
+	}
+
+	@Test
+	void testGetClientInfoPropertiesReportsTheJdbcColumnNames() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		try (ResultSet rs = metaData.getClientInfoProperties()) {
+			java.sql.ResultSetMetaData md = rs.getMetaData();
+			assertEquals("NAME", md.getColumnName(1));
+			assertEquals("MAX_LEN", md.getColumnName(2));
+			assertEquals("DEFAULT_VALUE", md.getColumnName(3));
+			assertEquals("DESCRIPTION", md.getColumnName(4));
+		}
+	}
+
+	/**
+	 * Both go through {@code checkClosed()} like every other metadata method, so a
+	 * closed connection still fails rather than quietly answering empty.
+	 */
+	@Test
+	void testEmptyMetadataResultsStillRejectAClosedConnection() throws SQLException {
+		lenient().when(connection.isClosed()).thenReturn(true);
+		assertThrows(SQLException.class, () -> metaData.getAttributes(null, null, null, null));
+		assertThrows(SQLException.class, () -> metaData.getClientInfoProperties());
 	}
 }

@@ -19,6 +19,7 @@ import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.Dataset;
 import com.google.cloud.bigquery.DatasetId;
 import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.MaterializedViewDefinition;
 import com.google.cloud.bigquery.QueryJobConfiguration;
@@ -806,31 +807,89 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 					rows.add(mapped);
 				}
 			}
+		} catch (InterruptedException e) {
+			// Swallowing this along with everything else would leave the thread's
+			// interrupt flag cleared, and these run on the virtual threads of the
+			// parallel scan — whoever asked for the cancellation would never see it.
+			Thread.currentThread().interrupt();
+			logger.warn("Interrupted reading {} for dataset {}.{}", view, projectId, datasetId);
+			// The interrupt can only come from bigquery.query(), which is before the
+			// first row is read, so there is nothing partial to discard here — the
+			// dataset contributes nothing, like any other dataset that failed to read.
+			return java.util.List.of();
 		} catch (Exception e) {
-			// Preserves the existing swallow-and-log behaviour verbatim, including
-			// that an InterruptedException does not re-set the interrupt flag here.
-			// That is a real gap — queryConstraintsForDataset handles it properly —
-			// but fixing it is a behaviour change and belongs in its own issue.
-			// Having one place to fix rather than two is part of the point.
 			logger.warn("Could not query {} for dataset {}: {}", view, datasetId, e.getMessage());
 		}
 		return rows;
 	}
 
+	/**
+	 * The {@code routine_type} BigQuery reports for a stored procedure. The others
+	 * it reports are {@code FUNCTION} and {@code TABLE FUNCTION}, both of which are
+	 * functions and belong to {@link #getFunctions} — note these are BigQuery's
+	 * spellings, not the ANSI {@code SCALAR_FUNCTION} /
+	 * {@code TABLE_VALUED_FUNCTION}.
+	 */
+	private static final String ROUTINE_TYPE_PROCEDURE = "PROCEDURE";
+
+	/**
+	 * The {@code routine_type} for a function that returns a table rather than a
+	 * scalar, which JDBC reports as {@code functionReturnsTable}.
+	 */
+	private static final String ROUTINE_TYPE_TABLE_FUNCTION = "TABLE FUNCTION";
+
+	/**
+	 * The routine read behind {@code getProcedures} and {@code getFunctions}.
+	 *
+	 * <p>
+	 * {@code routine_definition} is the body. It is what an IDE shows when you ask
+	 * to see a procedure — JetBrains
+	 * <a href="https://youtrack.jetbrains.com/issue/DBE-12785">DBE-12785</a> is
+	 * that request — and the driver was discarding it while already reading the row
+	 * it sits on.
+	 */
+	private String routinesQuery(String projectId, String datasetId) {
+		return String.format(
+				"SELECT routine_name, routine_type, routine_definition " + "FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
+				projectId, datasetId);
+	}
+
+	/**
+	 * The routine body, for {@code REMARKS}.
+	 *
+	 * <p>
+	 * {@code ROUTINES} has no description column — a routine's description lives in
+	 * {@code ROUTINE_OPTIONS} under {@code option_name = 'description'} — so
+	 * {@code REMARKS} was always null and the definition displaces nothing.
+	 */
+	private static String routineDefinition(FieldValueList row) {
+		FieldValue definition = row.get("routine_definition");
+		return definition.isNull() ? null : definition.getStringValue();
+	}
+
 	private java.util.List<Object[]> queryProceduresForDataset(String projectId, String datasetId,
 			String procedureNamePattern) {
-		// INFORMATION_SCHEMA.ROUTINES has no comment/description column — a
-		// routine's description lives in ROUTINE_OPTIONS under
-		// option_name = 'description', so REMARKS is reported as null
-		String sql = String.format("SELECT routine_name, routine_type FROM `%s`.`%s`.INFORMATION_SCHEMA.ROUTINES",
-				projectId, datasetId);
+		String sql = routinesQuery(projectId, datasetId);
 		return queryInformationSchema(projectId, datasetId, "procedures", "INFORMATION_SCHEMA.ROUTINES", sql, row -> {
+			if (!isProcedure(row)) {
+				return null;
+			}
 			String routineName = row.get("routine_name").getStringValue();
 			if (procedureNamePattern != null && !matchesPattern(routineName, procedureNamePattern)) {
 				return null;
 			}
-			return buildProcedureRow(projectId, datasetId, routineName, null);
+			return buildProcedureRow(projectId, datasetId, routineName, routineDefinition(row));
 		});
+	}
+
+	/**
+	 * Whether a {@code ROUTINES} row describes a stored procedure rather than a
+	 * function. A null {@code routine_type} is treated as a procedure, which keeps
+	 * a routine visible somewhere rather than dropping it from both methods.
+	 */
+	private static boolean isProcedure(FieldValueList row) {
+		FieldValue routineType = row.get("routine_type");
+		return routineType.isNull() || ROUTINE_TYPE_PROCEDURE.equalsIgnoreCase(routineType.getStringValue());
 	}
 
 	private Object[] buildProcedureRow(String projectId, String datasetId, String routineName, String remarks) {
@@ -876,12 +935,35 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				MetadataColumns.ProcedureColumns.COLUMN_TYPES, rows);
 	}
 
+	/**
+	 * The parameter read behind both {@code getProcedureColumns} and
+	 * {@code getFunctionColumns}.
+	 *
+	 * <p>
+	 * {@code PARAMETERS} carries no {@code routine_type}, so it is joined to
+	 * {@code ROUTINES} to tell a procedure's parameters from a function's. Without
+	 * the join each method would report the other's parameters as well as its own.
+	 *
+	 * @param wantProcedures
+	 *            true for the parameters of stored procedures, false for those of
+	 *            functions and table functions
+	 */
+	private String parametersQuery(String projectId, String datasetId, boolean wantProcedures) {
+		// IFNULL mirrors isProcedure(): a routine with no routine_type is treated as
+		// a procedure, so it stays visible under one method rather than neither.
+		String predicate = wantProcedures ? "=" : "!=";
+		return String.format("SELECT p.specific_name AS specific_name, p.ordinal_position AS ordinal_position, "
+				+ "p.parameter_name AS parameter_name, p.parameter_mode AS parameter_mode, "
+				+ "p.is_result AS is_result, p.data_type AS data_type "
+				+ "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.PARAMETERS p "
+				+ "JOIN `%1$s`.`%2$s`.INFORMATION_SCHEMA.ROUTINES r " + "ON r.specific_name = p.specific_name "
+				+ "WHERE IFNULL(r.routine_type, '%3$s') %4$s '%3$s' " + "ORDER BY p.specific_name, p.ordinal_position",
+				projectId, datasetId, ROUTINE_TYPE_PROCEDURE, predicate);
+	}
+
 	private java.util.List<Object[]> queryProcedureColumnsForDataset(String projectId, String datasetId,
 			String procedureNamePattern, String columnNamePattern) {
-		String sql = String.format(
-				"SELECT specific_name, ordinal_position, parameter_name, parameter_mode, data_type "
-						+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.PARAMETERS ORDER BY specific_name, ordinal_position",
-				projectId, datasetId);
+		String sql = parametersQuery(projectId, datasetId, true);
 		return queryInformationSchema(projectId, datasetId, "procedure columns", "INFORMATION_SCHEMA.PARAMETERS", sql,
 				row -> {
 					String routineName = row.get("specific_name").getStringValue();
@@ -1096,7 +1178,73 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			});
 		}
 
+		fillInViewDefinitions(projectId, datasetId, rows);
 		return rows;
+	}
+
+	/** Index of {@code TABLE_TYPE} in a {@link MetadataColumns.Tables} row. */
+	private static final int TABLE_ROW_TYPE = 3;
+
+	/** Index of {@code REMARKS} in a {@link MetadataColumns.Tables} row. */
+	private static final int TABLE_ROW_REMARKS = 4;
+
+	/**
+	 * Fills the {@code REMARKS} of any view in {@code rows} that has no description
+	 * with its defining SQL.
+	 *
+	 * <p>
+	 * An IDE that cannot show a view's SQL sends you to the BigQuery console —
+	 * JetBrains
+	 * <a href="https://youtrack.jetbrains.com/issue/DBE-12630">DBE-12630</a>. The
+	 * definition is not on the {@link Table} objects {@code listTables} returns:
+	 * that response carries {@code view.useLegacySql} and nothing else, so
+	 * {@code ViewDefinition.getQuery()} is null there and a per-table
+	 * {@code getTable()} would be one API call per view. One
+	 * {@code INFORMATION_SCHEMA.TABLES} read per dataset costs a query instead, and
+	 * only when the dataset actually contributed a view — a project of plain tables
+	 * pays nothing, which matters because this is the path IntelliJ walks on every
+	 * refresh.
+	 *
+	 * <p>
+	 * A description, where one exists, wins: it is what the author wrote for this
+	 * column. On this path there is never one to prefer — {@code tables.list} does
+	 * not return {@code description} either, so {@code Table.getDescription()} is
+	 * null for every table listed here and {@code REMARKS} was uniformly empty.
+	 * That is its own gap, not this one; the check stays so filling it later cannot
+	 * silently start overwriting descriptions. Nothing is lost meanwhile, because
+	 * BigQuery emits the description inside the DDL's {@code OPTIONS}.
+	 *
+	 * <p>
+	 * {@code ddl} rather than {@code VIEWS.view_definition} because
+	 * {@code MATERIALIZED_VIEWS} has no definition column at all, so the DDL is the
+	 * only form that answers for both.
+	 */
+	private void fillInViewDefinitions(String projectId, String datasetId, java.util.List<Object[]> rows) {
+		java.util.List<Object[]> undescribedViews = rows.stream()
+				.filter(row -> "VIEW".equals(row[TABLE_ROW_TYPE]) || "MATERIALIZED VIEW".equals(row[TABLE_ROW_TYPE]))
+				.filter(row -> row[TABLE_ROW_REMARKS] == null || ((String) row[TABLE_ROW_REMARKS]).isEmpty()).toList();
+		if (undescribedViews.isEmpty()) {
+			return;
+		}
+
+		String sql = String.format("SELECT table_name, ddl FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES "
+				+ "WHERE table_type IN ('VIEW', 'MATERIALIZED VIEW')", projectId, datasetId);
+		java.util.Map<String, String> definitions = new java.util.HashMap<>();
+		queryInformationSchema(projectId, datasetId, "view definitions", "INFORMATION_SCHEMA.TABLES", sql, row -> {
+			if (!row.get("ddl").isNull()) {
+				definitions.put(row.get("table_name").getStringValue(), row.get("ddl").getStringValue());
+			}
+			// Collected into the map above rather than returned as rows: this read
+			// annotates rows that already exist instead of producing its own.
+			return null;
+		});
+
+		for (Object[] row : undescribedViews) {
+			String definition = definitions.get((String) row[2]);
+			if (definition != null) {
+				row[TABLE_ROW_REMARKS] = definition;
+			}
+		}
 	}
 
 	@Override
@@ -2175,10 +2323,24 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				new java.util.ArrayList<>());
 	}
 
+	/**
+	 * Returns an empty result set: BigQuery has no user-defined types, so there are
+	 * no attributes to describe.
+	 *
+	 * <p>
+	 * Empty is the answer JDBC specifies here, not a failure. This used to throw
+	 * {@code SQLFeatureNotSupportedException}, which tools that call it during
+	 * connection setup read as a broken driver rather than an absent feature.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getAttributes(String catalog, String schemaPattern, String typeNamePattern,
 			String attributeNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getAttributes not supported");
+		checkClosed();
+		logger.debug("getAttributes() called - BigQuery has no user-defined types, returning empty result");
+		return createResultSet(MetadataColumns.Attributes.COLUMN_NAMES, MetadataColumns.Attributes.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -2316,27 +2478,298 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return false;
 	}
 
+	/**
+	 * Returns an empty result set: the driver supports no client-info properties.
+	 *
+	 * <p>
+	 * That is an empty result, not an unsupported operation —
+	 * {@code Connection.setClientInfo} accordingly ignores whatever it is handed
+	 * and {@code getClientInfo} reports nothing back. This used to throw
+	 * {@code SQLFeatureNotSupportedException}, and tools call it while opening a
+	 * connection, so the driver looked broken before the first query ran.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getClientInfoProperties() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getClientInfoProperties not supported");
+		checkClosed();
+		logger.debug("getClientInfoProperties() called - no client info properties supported, returning empty result");
+		return createResultSet(MetadataColumns.ClientInfoProperties.COLUMN_NAMES,
+				MetadataColumns.ClientInfoProperties.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
 
+	/**
+	 * Retrieves the user-defined functions available in the given catalog.
+	 *
+	 * <p>
+	 * BigQuery reports both persistent SQL UDFs and JavaScript UDFs in
+	 * {@code INFORMATION_SCHEMA.ROUTINES} alongside stored procedures, told apart
+	 * by {@code routine_type}. A {@code TABLE FUNCTION} is reported as
+	 * {@link DatabaseMetaData#functionReturnsTable}, everything else as
+	 * {@link DatabaseMetaData#functionNoTable}.
+	 *
+	 * <p>
+	 * {@code REMARKS} is null: {@code ROUTINES} has no description column, and a
+	 * routine's description lives in {@code ROUTINE_OPTIONS} — the same reason
+	 * {@link #getProcedures} reports null there.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getFunctions(String catalog, String schemaPattern, String functionNamePattern)
 			throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getFunctions not yet implemented");
+		checkClosed();
+
+		logger.debug("getFunctions() called - catalog: [{}], schemaPattern: [{}], functionNamePattern: [{}]", catalog,
+				schemaPattern, functionNamePattern);
+
+		String cacheKey = "functions:" + catalog + ":" + schemaPattern + ":" + functionNamePattern;
+		return getCachedOrExecute(cacheKey, () -> executeGetFunctions(catalog, schemaPattern, functionNamePattern));
 	}
 
+	private ResultSet executeGetFunctions(String catalog, String schemaPattern, String functionNamePattern)
+			throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryFunctionsForDataset(projectId, datasetId, functionNamePattern),
+				"Error querying functions in parallel");
+
+		logger.debug("getFunctions() returning {} function(s)", rows.size());
+		return createResultSet(MetadataColumns.Functions.COLUMN_NAMES, MetadataColumns.Functions.COLUMN_TYPES, rows);
+	}
+
+	private java.util.List<Object[]> queryFunctionsForDataset(String projectId, String datasetId,
+			String functionNamePattern) {
+		String sql = routinesQuery(projectId, datasetId);
+		return queryInformationSchema(projectId, datasetId, "functions", "INFORMATION_SCHEMA.ROUTINES", sql, row -> {
+			if (isProcedure(row)) {
+				return null;
+			}
+			String routineName = row.get("routine_name").getStringValue();
+			if (functionNamePattern != null && !matchesPattern(routineName, functionNamePattern)) {
+				return null;
+			}
+			short functionType = ROUTINE_TYPE_TABLE_FUNCTION.equalsIgnoreCase(row.get("routine_type").getStringValue())
+					? (short) DatabaseMetaData.functionReturnsTable
+					: (short) DatabaseMetaData.functionNoTable;
+			return new Object[]{projectId, // FUNCTION_CAT
+					datasetId, // FUNCTION_SCHEM
+					routineName, // FUNCTION_NAME
+					routineDefinition(row), // REMARKS
+					functionType, // FUNCTION_TYPE
+					routineName // SPECIFIC_NAME
+			};
+		});
+	}
+
+	/**
+	 * Retrieves the parameters and return value of the given user-defined
+	 * functions.
+	 *
+	 * <p>
+	 * BigQuery reports a function's return value as a {@code PARAMETERS} row with
+	 * {@code is_result = 'YES'} at {@code ordinal_position} 0 and no parameter
+	 * name, which is exactly JDBC's {@link DatabaseMetaData#functionReturn}. Its
+	 * arguments carry no {@code parameter_mode} — that column is only populated for
+	 * procedures — so they are reported as
+	 * {@link DatabaseMetaData#functionColumnIn}.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getFunctionColumns(String catalog, String schemaPattern, String functionNamePattern,
 			String columnNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getFunctionColumns not yet implemented");
+		checkClosed();
+
+		logger.debug(
+				"getFunctionColumns() called - catalog: [{}], schemaPattern: [{}], functionNamePattern: [{}], columnNamePattern: [{}]",
+				catalog, schemaPattern, functionNamePattern, columnNamePattern);
+
+		String cacheKey = "functionColumns:" + catalog + ":" + schemaPattern + ":" + functionNamePattern + ":"
+				+ columnNamePattern;
+		return getCachedOrExecute(cacheKey,
+				() -> executeGetFunctionColumns(catalog, schemaPattern, functionNamePattern, columnNamePattern));
 	}
 
+	private ResultSet executeGetFunctionColumns(String catalog, String schemaPattern, String functionNamePattern,
+			String columnNamePattern) throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryFunctionColumnsForDataset(projectId, datasetId, functionNamePattern,
+						columnNamePattern),
+				"Error querying function columns in parallel");
+
+		logger.debug("getFunctionColumns() returning {} column(s)", rows.size());
+		return createResultSet(MetadataColumns.FunctionColumns.COLUMN_NAMES,
+				MetadataColumns.FunctionColumns.COLUMN_TYPES, rows);
+	}
+
+	private java.util.List<Object[]> queryFunctionColumnsForDataset(String projectId, String datasetId,
+			String functionNamePattern, String columnNamePattern) {
+		String sql = parametersQuery(projectId, datasetId, false);
+		return queryInformationSchema(projectId, datasetId, "function columns", "INFORMATION_SCHEMA.PARAMETERS", sql,
+				row -> {
+					String routineName = row.get("specific_name").getStringValue();
+					if (functionNamePattern != null && !matchesPattern(routineName, functionNamePattern)) {
+						return null;
+					}
+					// The return row has no parameter_name. Reported as "" rather than
+					// null so the column-name pattern has something to match, which is
+					// what getProcedureColumns does with an unnamed parameter.
+					String paramName = row.get("parameter_name").isNull()
+							? ""
+							: row.get("parameter_name").getStringValue();
+					if (columnNamePattern != null && !matchesPattern(paramName, columnNamePattern)) {
+						return null;
+					}
+					String dataType = row.get("data_type").isNull() ? "STRING" : row.get("data_type").getStringValue();
+					TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+					boolean isResult = !row.get("is_result").isNull()
+							&& "YES".equalsIgnoreCase(row.get("is_result").getStringValue());
+					short columnType = isResult
+							? (short) DatabaseMetaData.functionReturn
+							: (short) DatabaseMetaData.functionColumnIn;
+					int ordinal = row.get("ordinal_position").isNull()
+							? 0
+							: (int) row.get("ordinal_position").getLongValue();
+					return new Object[]{projectId, // FUNCTION_CAT
+							datasetId, // FUNCTION_SCHEM
+							routineName, // FUNCTION_NAME
+							paramName, // COLUMN_NAME
+							columnType, // COLUMN_TYPE
+							typeInfo.jdbcType(), // DATA_TYPE
+							dataType, // TYPE_NAME
+							typeInfo.columnSize(), // PRECISION
+							typeInfo.columnSize(), // LENGTH
+							(short) typeInfo.decimalDigits(), // SCALE
+							(short) 10, // RADIX
+							(short) DatabaseMetaData.functionNullable, // NULLABLE
+							null, // REMARKS
+							typeInfo.columnSize(), // CHAR_OCTET_LENGTH
+							ordinal, // ORDINAL_POSITION
+							"YES", // IS_NULLABLE
+							routineName // SPECIFIC_NAME
+					};
+				});
+	}
+
+	/**
+	 * Retrieves the pseudo columns of the matching tables.
+	 *
+	 * <p>
+	 * BigQuery's are the ingestion-time partitioning columns: {@code
+	 * _PARTITIONTIME} on every ingestion-time partitioned table, and {@code
+	 * _PARTITIONDATE} on those partitioned by day. Both are queryable — and are
+	 * what a partition filter is written against — but neither is declared in the
+	 * table's schema, which is the gap this method exists to fill.
+	 *
+	 * <p>
+	 * {@code _PARTITIONDATE} is reported only for daily partitioning because that
+	 * is the only granularity BigQuery exposes it at: on an hourly, monthly or
+	 * yearly table, selecting it fails with "Unrecognized name". Announcing a
+	 * column that cannot be queried would be worse than announcing none, so the
+	 * granularity is read rather than assumed.
+	 *
+	 * <p>
+	 * {@code COLUMN_USAGE} is
+	 * {@link java.sql.PseudoColumnUsage#NO_USAGE_RESTRICTIONS}: these can be used
+	 * in both the select list and predicates, and {@code PseudoColumnUsage.SELECT}
+	 * would deny the second — which is the one that matters, since filtering on
+	 * {@code _PARTITIONTIME} is how partition pruning is expressed. No enum value
+	 * captures the real restriction, that BigQuery will not accept a pseudo column
+	 * as a DML target.
+	 *
+	 * <p>
+	 * Note that {@code _PARTITIONTIME} also appears in {@link #getColumns} today,
+	 * because the {@code INFORMATION_SCHEMA} read there does not filter hidden
+	 * columns. Removing it from there would change an existing result and is left
+	 * alone here.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getPseudoColumns(String catalog, String schemaPattern, String tableNamePattern,
 			String columnNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getPseudoColumns not supported");
+		checkClosed();
+
+		logger.debug(
+				"getPseudoColumns() called - catalog: [{}], schemaPattern: [{}], tableNamePattern: [{}], columnNamePattern: [{}]",
+				catalog, schemaPattern, tableNamePattern, columnNamePattern);
+
+		String cacheKey = "pseudoColumns:" + catalog + ":" + schemaPattern + ":" + tableNamePattern + ":"
+				+ columnNamePattern;
+		return getCachedOrExecute(cacheKey,
+				() -> executeGetPseudoColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern));
+	}
+
+	private ResultSet executeGetPseudoColumns(String catalog, String schemaPattern, String tableNamePattern,
+			String columnNamePattern) throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryPseudoColumnsForDataset(projectId, datasetId, tableNamePattern, columnNamePattern),
+				"Error querying pseudo columns in parallel");
+
+		logger.debug("getPseudoColumns() returning {} pseudo column(s)", rows.size());
+		return createResultSet(MetadataColumns.PseudoColumns.COLUMN_NAMES, MetadataColumns.PseudoColumns.COLUMN_TYPES,
+				rows);
+	}
+
+	private java.util.List<Object[]> queryPseudoColumnsForDataset(String projectId, String datasetId,
+			String tableNamePattern, String columnNamePattern) {
+		// One row per pseudo column rather than per table, so the row mapper stays
+		// one-row-in one-row-out. The UNNEST is what expands a daily-partitioned
+		// table into its two.
+		//
+		// The daily test is on the DDL because INFORMATION_SCHEMA cannot answer it
+		// otherwise: an hourly and a daily ingestion-time table are identical in
+		// COLUMNS, both showing only _PARTITIONTIME as system-defined. BigQuery
+		// normalises the clause, so every daily table reads back as
+		// "PARTITION BY DATE(_PARTITIONTIME)" whichever spelling created it, while
+		// the coarser granularities keep TIMESTAMP_TRUNC(_PARTITIONTIME, <unit>).
+		// REGEXP_CONTAINS runs server-side so the DDL itself never crosses the wire.
+		String sql = String.format("SELECT c.table_name AS table_name, pseudo_column AS column_name, "
+				+ "IF(pseudo_column = '_PARTITIONDATE', 'DATE', 'TIMESTAMP') AS data_type "
+				+ "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.COLUMNS c "
+				+ "JOIN `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLES t ON t.table_name = c.table_name "
+				+ "CROSS JOIN UNNEST(IF(REGEXP_CONTAINS(t.ddl, r'PARTITION BY DATE\\(_PARTITIONTIME\\)'), "
+				+ "['_PARTITIONTIME', '_PARTITIONDATE'], ['_PARTITIONTIME'])) AS pseudo_column "
+				+ "WHERE c.is_system_defined = 'YES' AND c.column_name = '_PARTITIONTIME' "
+				+ "ORDER BY c.table_name, pseudo_column", projectId, datasetId);
+		return queryInformationSchema(projectId, datasetId, "pseudo columns", "INFORMATION_SCHEMA.COLUMNS", sql,
+				row -> {
+					String tableName = row.get("table_name").getStringValue();
+					if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+						return null;
+					}
+					String columnName = row.get("column_name").getStringValue();
+					if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
+						return null;
+					}
+					String dataType = row.get("data_type").getStringValue();
+					TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+					return new Object[]{projectId, // TABLE_CAT
+							datasetId, // TABLE_SCHEM
+							tableName, // TABLE_NAME
+							columnName, // COLUMN_NAME
+							typeInfo.jdbcType(), // DATA_TYPE
+							typeInfo.columnSize(), // COLUMN_SIZE
+							typeInfo.decimalDigits(), // DECIMAL_DIGITS
+							10, // NUM_PREC_RADIX
+							java.sql.PseudoColumnUsage.NO_USAGE_RESTRICTIONS.name(), // COLUMN_USAGE
+							"Ingestion-time partitioning pseudo column", // REMARKS
+							null, // CHAR_OCTET_LENGTH
+							"YES" // IS_NULLABLE
+					};
+				});
 	}
 
 	@Override

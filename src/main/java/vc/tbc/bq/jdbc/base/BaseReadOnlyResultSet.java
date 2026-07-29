@@ -61,6 +61,30 @@ import java.util.Map;
  */
 public abstract class BaseReadOnlyResultSet extends BaseCloseable implements ResultSet {
 
+	/**
+	 * The rows-per-page hint this result set reports, seeded from the statement
+	 * that created it. Zero means the driver decides, which is the answer for a
+	 * result set no statement produced.
+	 */
+	private int fetchSize;
+
+	/**
+	 * Seeds the fetch size a result set inherits from its statement.
+	 *
+	 * <p>
+	 * JDBC specifies that a result set's fetch size defaults to that of the
+	 * statement which created it, so subclasses with a statement call this while
+	 * constructing. Result sets built without one — the metadata results — keep
+	 * zero.
+	 *
+	 * @param rows
+	 *            the statement's effective fetch size
+	 * @since 3.1.0
+	 */
+	protected final void initialiseFetchSize(int rows) {
+		this.fetchSize = Math.max(rows, 0);
+	}
+
 	// =================================================================
 	// Abstract methods that subclasses MUST implement
 	// =================================================================
@@ -338,14 +362,59 @@ public abstract class BaseReadOnlyResultSet extends BaseCloseable implements Res
 		throw new BQSQLFeatureNotSupportedException("URL not supported");
 	}
 
+	/**
+	 * Returns the column value, refusing a populated type map.
+	 *
+	 * <p>
+	 * This used to accept the map and ignore it, handing back the default mapping
+	 * of a caller that had asked for a custom one — no exception, no warning, wrong
+	 * answer. Every other type-map path in the driver refuses:
+	 * {@code Connection.setTypeMap} throws and {@code getTypeMap} returns an empty
+	 * map. This one now agrees with them.
+	 *
+	 * <p>
+	 * A null or empty map still delegates, because there is then nothing to ignore
+	 * — and a tool that passes {@code getTypeMap()} straight back in keeps working.
+	 *
+	 * @param columnIndex
+	 *            the column, 1-based
+	 * @param map
+	 *            the type map; must be null or empty
+	 * @throws SQLFeatureNotSupportedException
+	 *             if the map declares any mapping
+	 * @since 3.1.0
+	 */
 	@Override
 	public Object getObject(int columnIndex, Map<String, Class<?>> map) throws SQLException {
+		rejectPopulatedTypeMap(map);
 		return getObject(columnIndex);
 	}
 
+	/**
+	 * The label form of {@link #getObject(int, Map)}, with the same refusal.
+	 *
+	 * @param columnLabel
+	 *            the column label
+	 * @param map
+	 *            the type map; must be null or empty
+	 * @throws SQLFeatureNotSupportedException
+	 *             if the map declares any mapping
+	 * @since 3.1.0
+	 */
 	@Override
 	public Object getObject(String columnLabel, Map<String, Class<?>> map) throws SQLException {
-		return getObject(findColumn(columnLabel), map);
+		rejectPopulatedTypeMap(map);
+		return getObject(findColumn(columnLabel));
+	}
+
+	/**
+	 * Refuses a type map that asks for something, wording it as
+	 * {@code Connection.setTypeMap} does so the two read as one answer.
+	 */
+	private static void rejectPopulatedTypeMap(Map<String, Class<?>> map) throws SQLException {
+		if (map != null && !map.isEmpty()) {
+			throw new BQSQLFeatureNotSupportedException("Custom type maps not supported");
+		}
 	}
 
 	@Override
@@ -567,16 +636,47 @@ public abstract class BaseReadOnlyResultSet extends BaseCloseable implements Res
 		return FETCH_FORWARD;
 	}
 
+	/**
+	 * Records the fetch size hint. It does not change how this result set is read.
+	 *
+	 * <p>
+	 * The rows already arrived: BigQuery drew the pages at the size the statement
+	 * asked for when the results were opened, so a size set here has nothing left
+	 * to influence. JDBC calls it a hint the driver may ignore, and requires
+	 * {@link #getFetchSize()} to report back what was set — which is what this
+	 * stores it for. To actually change paging, set it on the {@code Statement}
+	 * before executing.
+	 *
+	 * @param rows
+	 *            the hint, or 0 to let the driver decide
+	 * @throws SQLException
+	 *             if the result set is closed or {@code rows} is negative
+	 * @since 3.1.0
+	 */
 	@Override
 	public void setFetchSize(int rows) throws SQLException {
 		checkClosed();
-		// Ignored
+		if (rows < 0) {
+			throw new SQLException("Fetch size must be non-negative");
+		}
+		this.fetchSize = rows;
 	}
 
+	/**
+	 * Returns the fetch size: whatever {@link #setFetchSize(int)} was last given,
+	 * or the creating statement's, or 0 when neither applies.
+	 *
+	 * <p>
+	 * This used to always return 0, which told a caller that had just set 5000 on
+	 * the statement that its request had gone nowhere.
+	 *
+	 * @return the rows-per-page hint, 0 meaning the driver decides
+	 * @since 3.1.0
+	 */
 	@Override
 	public int getFetchSize() throws SQLException {
 		checkClosed();
-		return 0;
+		return fetchSize;
 	}
 
 	@Override

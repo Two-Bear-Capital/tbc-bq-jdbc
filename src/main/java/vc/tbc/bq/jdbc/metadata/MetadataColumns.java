@@ -393,6 +393,93 @@ public final class MetadataColumns {
 	}
 
 	/**
+	 * Column definitions for getAttributes() result set.
+	 *
+	 * <p>
+	 * Attributes describe the fields of a user-defined type. BigQuery has no
+	 * user-defined types, so the result is always empty — but the shape still has
+	 * to be right, because a tool reading it by column name fails differently from
+	 * one that finds no rows.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class Attributes {
+		static final String[] COLUMN_NAMES = {"TYPE_CAT", // String => type catalog (may be null)
+				"TYPE_SCHEM", // String => type schema (may be null)
+				"TYPE_NAME", // String => type name
+				"ATTR_NAME", // String => attribute name
+				"DATA_TYPE", // int => attribute type from java.sql.Types
+				"ATTR_TYPE_NAME", // String => data source dependent type name
+				"ATTR_SIZE", // int => column size
+				"DECIMAL_DIGITS", // int => fractional digits (null if not applicable)
+				"NUM_PREC_RADIX", // int => radix
+				"NULLABLE", // int => whether NULL is allowed
+				"REMARKS", // String => comment describing the attribute (may be null)
+				"ATTR_DEF", // String => default value (may be null)
+				"SQL_DATA_TYPE", // int => unused
+				"SQL_DATETIME_SUB", // int => unused
+				"CHAR_OCTET_LENGTH", // int => max bytes for a char attribute
+				"ORDINAL_POSITION", // int => index within the type, starting at 1
+				"IS_NULLABLE", // String => YES, NO or empty when unknown
+				"SCOPE_CATALOG", // String => catalog of the referenced table (REF only)
+				"SCOPE_SCHEMA", // String => schema of the referenced table (REF only)
+				"SCOPE_TABLE", // String => name of the referenced table (REF only)
+				"SOURCE_DATA_TYPE" // short => source type of a DISTINCT or REF type
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TYPE_CAT
+				Types.VARCHAR, // TYPE_SCHEM
+				Types.VARCHAR, // TYPE_NAME
+				Types.VARCHAR, // ATTR_NAME
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR, // ATTR_TYPE_NAME
+				Types.INTEGER, // ATTR_SIZE
+				Types.INTEGER, // DECIMAL_DIGITS
+				Types.INTEGER, // NUM_PREC_RADIX
+				Types.INTEGER, // NULLABLE
+				Types.VARCHAR, // REMARKS
+				Types.VARCHAR, // ATTR_DEF
+				Types.INTEGER, // SQL_DATA_TYPE
+				Types.INTEGER, // SQL_DATETIME_SUB
+				Types.INTEGER, // CHAR_OCTET_LENGTH
+				Types.INTEGER, // ORDINAL_POSITION
+				Types.VARCHAR, // IS_NULLABLE
+				Types.VARCHAR, // SCOPE_CATALOG
+				Types.VARCHAR, // SCOPE_SCHEMA
+				Types.VARCHAR, // SCOPE_TABLE
+				Types.SMALLINT // SOURCE_DATA_TYPE
+		};
+
+		private Attributes() {
+		}
+	}
+
+	/**
+	 * Column definitions for getClientInfoProperties() result set.
+	 *
+	 * <p>
+	 * The driver accepts no client-info properties, so the result is always empty.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class ClientInfoProperties {
+		static final String[] COLUMN_NAMES = {"NAME", // String => the client info property name
+				"MAX_LEN", // int => maximum length of the value
+				"DEFAULT_VALUE", // String => default value
+				"DESCRIPTION" // String => description of the property
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // NAME
+				Types.INTEGER, // MAX_LEN
+				Types.VARCHAR, // DEFAULT_VALUE
+				Types.VARCHAR // DESCRIPTION
+		};
+
+		private ClientInfoProperties() {
+		}
+	}
+
+	/**
 	 * Column definitions for getSuperTables() result set.
 	 */
 	public static final class SuperTables {
@@ -475,6 +562,122 @@ public final class MetadataColumns {
 		};
 
 		private ProcedureColumns() {
+		}
+	}
+
+	/**
+	 * Column definitions for getPseudoColumns() result set.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class PseudoColumns {
+		static final String[] COLUMN_NAMES = {"TABLE_CAT", // String => table catalog (may be null)
+				"TABLE_SCHEM", // String => table schema (may be null)
+				"TABLE_NAME", // String => table name
+				"COLUMN_NAME", // String => column name
+				"DATA_TYPE", // int => SQL type from java.sql.Types
+				"COLUMN_SIZE", // int => column size
+				"DECIMAL_DIGITS", // int => fractional digits (null if not applicable)
+				"NUM_PREC_RADIX", // int => radix
+				"COLUMN_USAGE", // String => a java.sql.PseudoColumnUsage name
+				"REMARKS", // String => comment describing the column (may be null)
+				"CHAR_OCTET_LENGTH", // int => max bytes for a char column
+				"IS_NULLABLE" // String => YES, NO or empty when unknown
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // TABLE_CAT
+				Types.VARCHAR, // TABLE_SCHEM
+				Types.VARCHAR, // TABLE_NAME
+				Types.VARCHAR, // COLUMN_NAME
+				Types.INTEGER, // DATA_TYPE
+				Types.INTEGER, // COLUMN_SIZE
+				Types.INTEGER, // DECIMAL_DIGITS
+				Types.INTEGER, // NUM_PREC_RADIX
+				Types.VARCHAR, // COLUMN_USAGE
+				Types.VARCHAR, // REMARKS
+				Types.INTEGER, // CHAR_OCTET_LENGTH
+				Types.VARCHAR // IS_NULLABLE
+		};
+
+		private PseudoColumns() {
+		}
+	}
+
+	/**
+	 * Column definitions for getFunctions() result set.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class Functions {
+		static final String[] COLUMN_NAMES = {"FUNCTION_CAT", // String => function catalog (may be null)
+				"FUNCTION_SCHEM", // String => function schema (may be null)
+				"FUNCTION_NAME", // String => function name
+				"REMARKS", // String => explanatory comment
+				"FUNCTION_TYPE", // short => kind of function
+				"SPECIFIC_NAME" // String => name that uniquely identifies this function
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // FUNCTION_CAT
+				Types.VARCHAR, // FUNCTION_SCHEM
+				Types.VARCHAR, // FUNCTION_NAME
+				Types.VARCHAR, // REMARKS
+				Types.SMALLINT, // FUNCTION_TYPE
+				Types.VARCHAR // SPECIFIC_NAME
+		};
+
+		private Functions() {
+		}
+	}
+
+	/**
+	 * Column definitions for getFunctionColumns() result set.
+	 *
+	 * <p>
+	 * Four columns wider than {@link ProcedureColumns} and not a superset of it:
+	 * JDBC orders them differently, so the two shapes cannot be shared.
+	 *
+	 * @since 3.1.0
+	 */
+	public static final class FunctionColumns {
+		static final String[] COLUMN_NAMES = {"FUNCTION_CAT", // String => function catalog (may be null)
+				"FUNCTION_SCHEM", // String => function schema (may be null)
+				"FUNCTION_NAME", // String => function name
+				"COLUMN_NAME", // String => column/parameter name
+				"COLUMN_TYPE", // Short => kind of column/parameter
+				"DATA_TYPE", // int => SQL type from java.sql.Types
+				"TYPE_NAME", // String => SQL type name
+				"PRECISION", // int => precision
+				"LENGTH", // int => length in bytes of data
+				"SCALE", // Short => scale
+				"RADIX", // Short => radix
+				"NULLABLE", // Short => can it contain NULL
+				"REMARKS", // String => comment describing the parameter/column
+				"CHAR_OCTET_LENGTH", // int => max bytes for a char parameter
+				"ORDINAL_POSITION", // int => position, with 0 for the return value
+				"IS_NULLABLE", // String => YES, NO or empty when unknown
+				"SPECIFIC_NAME" // String => name that uniquely identifies this function
+		};
+
+		static final int[] COLUMN_TYPES = {Types.VARCHAR, // FUNCTION_CAT
+				Types.VARCHAR, // FUNCTION_SCHEM
+				Types.VARCHAR, // FUNCTION_NAME
+				Types.VARCHAR, // COLUMN_NAME
+				Types.SMALLINT, // COLUMN_TYPE
+				Types.INTEGER, // DATA_TYPE
+				Types.VARCHAR, // TYPE_NAME
+				Types.INTEGER, // PRECISION
+				Types.INTEGER, // LENGTH
+				Types.SMALLINT, // SCALE
+				Types.SMALLINT, // RADIX
+				Types.SMALLINT, // NULLABLE
+				Types.VARCHAR, // REMARKS
+				Types.INTEGER, // CHAR_OCTET_LENGTH
+				Types.INTEGER, // ORDINAL_POSITION
+				Types.VARCHAR, // IS_NULLABLE
+				Types.VARCHAR // SPECIFIC_NAME
+		};
+
+		private FunctionColumns() {
 		}
 	}
 

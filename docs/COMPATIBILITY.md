@@ -27,6 +27,7 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | Batch updates (`addBatch()`, `executeBatch()`) | ✅ | See [Batch execution](#batch-execution) |
 | Update counts | ✅ | `executeUpdate()` / `getUpdateCount()` return real affected-row counts from BigQuery DML statistics |
 | `ResultSet` iteration | ✅ | Forward-only (`TYPE_FORWARD_ONLY`) |
+| `Statement.setFetchSize()` | ✅ | Page size for that statement, overriding the connection's `pageSize`. `0` restores the connection default; `getFetchSize()` reports the effective value |
 | `ResultSetMetaData` | ✅ | Column names, types, counts |
 | `DatabaseMetaData` | ⚠️ | See [DatabaseMetaData](#databasemetadata) |
 | `SQLException` hierarchy | ✅ | With SQLState codes |
@@ -141,7 +142,7 @@ itself — the error comes from BigQuery.
 | Updatable result sets (`CONCUR_UPDATABLE`) | ❌ | Use DML statements |
 | `updateRow()`, `deleteRow()`, `insertRow()` | ❌ | Use DML / INSERT statements |
 | `beforeFirst()`, `absolute()`, `relative()` | ❌ | Forward-only iteration |
-| `setFetchSize()` | ⚠️ | Accepted and ignored; `getFetchSize()` returns 0. Use the `pageSize` connection property |
+| `ResultSet.setFetchSize()` | ⚠️ | Recorded and reported by `getFetchSize()`, but the rows have already been paged — set it on the `Statement` before executing to change paging |
 | Holdability | ⚠️ | Always `CLOSE_CURSORS_AT_COMMIT`; any other value throws |
 
 BigQuery results are streaming and forward-only. Cache rows if you need random access:
@@ -169,7 +170,8 @@ while (rs.next()) {
 | `Struct` | ⚠️ | `getObject()` returns a JSON string by default, or a `java.sql.Struct` with `nativeComplexTypes=true`. `Connection.createStruct()` and passing a `Struct` to `setObject()` are not supported |
 | `Blob`, `Clob`, `NClob` | ❌ | Use `byte[]` and `String` |
 | `SQLXML` | ❌ | Use `String` with JSON |
-| `Ref`, `RowId`, custom type maps, Sharding API | ❌ | Not applicable to BigQuery |
+| `Ref`, `RowId`, Sharding API | ❌ | Not applicable to BigQuery |
+| Custom type maps | ❌ | `Connection.setTypeMap()` and `ResultSet.getObject(col, map)` with a populated map both throw `SQLFeatureNotSupportedException`; `getTypeMap()` returns an empty map. A null or empty map is accepted and returns the default mapping |
 
 ---
 
@@ -186,19 +188,21 @@ projects, but a tool that enumerates everything up front will see nothing.
 |--------|:------:|-------|
 | `getCatalogs()` | ✅ | One row: the connection's project. Cached |
 | `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached |
-| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached |
+| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. For a view or materialized view, `REMARKS` carries its defining SQL |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
 | `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW |
-| `getProcedures()` / `getProcedureColumns()` | ✅ | From `INFORMATION_SCHEMA`, cached. Routine bodies are not returned |
+| `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keyword and function lists | ✅ | JDBC version reports 4.3. `getDatabaseProductName()` is `BigQuery (TBC Driver)` and `getDatabaseProductVersion()` is `2.0` |
-| `getFunctions()`, `getFunctionColumns()`, `getPseudoColumns()`, `getClientInfoProperties()`, `getAttributes()` | ❌ | Throw `SQLFeatureNotSupportedException` |
+| `getFunctions()` / `getFunctionColumns()` | ✅ | Persistent UDFs and table functions from `INFORMATION_SCHEMA.ROUTINES`, cached. `REMARKS` carries the routine body. A table function reports `functionReturnsTable`; the return value is the `functionReturn` row at ordinal 0 |
+| `getPseudoColumns()` | ✅ | Ingestion-time partitioning columns, cached. `_PARTITIONTIME` on every ingestion-time partitioned table, plus `_PARTITIONDATE` on those partitioned by day — BigQuery exposes that one at daily granularity only |
 | `getPrimaryKeys()` | ✅ | Declared `PRIMARY KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getImportedKeys()`, `getExportedKeys()`, `getCrossReference()` | ✅ | Declared `FOREIGN KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getIndexInfo()` | ⚠️ | BigQuery has no indexes; returns empty |
 | `getColumnPrivileges()`, `getTablePrivileges()` | ⚠️ | BigQuery uses IAM; returns empty |
 | `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
-| `getUDTs()`, `getSuperTypes()`, `getSuperTables()` | ⚠️ | Not applicable; returns empty |
+| `getUDTs()`, `getSuperTypes()`, `getSuperTables()`, `getAttributes()` | ⚠️ | BigQuery has no user-defined types; returns empty |
+| `getClientInfoProperties()` | ⚠️ | The driver accepts no client info properties; returns empty |
 
 ### Unenforced primary and foreign keys
 

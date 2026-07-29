@@ -1055,6 +1055,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		DriverMetrics.recordQuerySubmitted();
 
 		try {
+			// No JobId is supplied, deliberately. BigQuery job ids are location-scoped
+			// and the client builds one that carries the connection's location:
+			// BigQueryImpl.create() generates JobId.of().setLocation(options.location),
+			// and getJob/cancel fall back to that same location for an id without one.
+			// Passing our own id would take this off the library's random-id path,
+			// which is what lets a create RPC that fails after BigQuery accepted the
+			// job recover by fetching it rather than reporting an error for a job that
+			// is running and billing. RealCrossRegionJobTest holds the round-trip.
 			Job job = bigquery.create(JobInfo.of(config));
 
 			// currentJob is volatile: this single reference write is already visible
