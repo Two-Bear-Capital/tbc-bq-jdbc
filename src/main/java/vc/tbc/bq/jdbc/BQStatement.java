@@ -385,13 +385,6 @@ public class BQStatement extends AbstractBQStatement {
 	}
 
 	@Override
-	public boolean getMoreResults(int current) throws SQLException {
-		checkClosed();
-		currentUpdateCount = -1L;
-		return false;
-	}
-
-	@Override
 	public ResultSet getGeneratedKeys() throws SQLException {
 		throw UnsupportedOperations.generatedKeys();
 	}
