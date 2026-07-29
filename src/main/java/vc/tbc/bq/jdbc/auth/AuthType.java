@@ -26,10 +26,16 @@ import java.io.IOException;
  * This sealed interface defines all supported authentication methods for
  * connecting to BigQuery.
  *
+ * <p>
+ * All but one map to an {@code authType} connection property value.
+ * {@link ImpersonatedAuth} is the exception: it wraps another {@code AuthType}
+ * rather than replacing it, so a switch over this hierarchy that means "which
+ * credential source is this" must look through it.
+ *
  * @since 1.0.0
  */
-public sealed interface AuthType
-		permits ServiceAccountAuth, ApplicationDefaultAuth, UserOAuthAuth, WorkforceIdentityAuth, WorkloadIdentityAuth {
+public sealed interface AuthType permits ServiceAccountAuth, ApplicationDefaultAuth, UserOAuthAuth,
+		WorkforceIdentityAuth, WorkloadIdentityAuth, ImpersonatedAuth {
 
 	/**
 	 * Converts this authentication type to Google Cloud credentials.

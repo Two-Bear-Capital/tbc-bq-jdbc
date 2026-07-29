@@ -18,6 +18,16 @@ output "wif_provider" {
   value       = google_iam_workload_identity_pool_provider.github_oidc.name
 }
 
+output "impersonation_target_service_account" {
+  description = "Email of the impersonation target. Set as the BQ_TEST_IMPERSONATE_SA environment variable or GitHub secret."
+  value       = google_service_account.impersonated.email
+}
+
+output "impersonation_delegate_service_account" {
+  description = "Email of the impersonation delegate. Set as the BQ_TEST_IMPERSONATE_DELEGATE environment variable or GitHub secret."
+  value       = google_service_account.impersonation_delegate.email
+}
+
 output "wif_pool" {
   description = "WIF pool resource name (for reference)."
   value       = google_iam_workload_identity_pool.github_actions.name

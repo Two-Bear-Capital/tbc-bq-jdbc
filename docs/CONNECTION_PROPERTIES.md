@@ -125,6 +125,49 @@ guidance, examples, and recommended configurations a flat table can't capture.
 jdbc:bigquery:my-project/my_dataset?authType=SERVICE_ACCOUNT&credentials=/path/to/key.json
 ```
 
+`impersonateServiceAccount` and `impersonateDelegates` are independent of `authType`: they
+run queries as another service account using whichever method above authenticated the
+connection. See [Service account impersonation](AUTHENTICATION.md#service-account-impersonation).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com
+```
+
+---
+
+### Metadata Properties
+
+`includeStructFields` (default `false`) adds a `getColumns()` row per `STRUCT` field, named
+by its dotted path. See [STRUCT subfields](COMPATIBILITY.md#struct-subfields).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?includeStructFields=true
+```
+
+
+`additionalProjects` (default empty) is a comma-separated list of further project IDs to
+report from `getCatalogs()`, so a tool can discover and `setCatalog()` to them. See
+[Browsing more than one project](COMPATIBILITY.md#browsing-more-than-one-project).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?additionalProjects=other-project,third-project
+```
+
+
+`includeInformationSchema` (default `true`) makes BigQuery's `INFORMATION_SCHEMA` views
+browsable — a synthetic `INFORMATION_SCHEMA` schema per project, and the dataset-scoped
+views as `INFORMATION_SCHEMA.<view>` tables inside each dataset, all typed `SYSTEM TABLE`.
+It issues no BigQuery query. See
+[Browsing INFORMATION_SCHEMA](COMPATIBILITY.md#browsing-information_schema).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?includeInformationSchema=false
+```
+
 ---
 
 ### Query Execution Properties

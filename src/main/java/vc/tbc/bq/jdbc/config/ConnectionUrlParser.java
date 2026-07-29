@@ -21,7 +21,9 @@ import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -343,7 +345,7 @@ public final class ConnectionUrlParser {
 			authTypeStr = "ADC";
 		}
 
-		AuthType authType = parseAuthType(authTypeStr, properties);
+		AuthType authType = applyImpersonation(parseAuthType(authTypeStr, properties), properties);
 
 		// Parse optional properties
 		Integer timeoutSeconds = parseInteger(properties, "timeout");
@@ -368,12 +370,16 @@ public final class ConnectionUrlParser {
 		Boolean metadataIncludeDescriptions = parseBooleanObject(properties, "metadataIncludeDescriptions");
 		Boolean collapseShardedTables = parseBooleanObject(properties, "collapseShardedTables");
 		Integer batchLoadThreshold = parseInteger(properties, "batchLoadThreshold");
+		Boolean includeInformationSchema = parseBooleanObject(properties, "includeInformationSchema");
+		List<String> additionalProjects = parseProjectList(properties.get("additionalProjects"));
+		Boolean includeStructFields = parseBooleanObject(properties, "includeStructFields");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
-				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold);
+				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
+				additionalProjects, includeStructFields);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
@@ -412,6 +418,57 @@ public final class ConnectionUrlParser {
 			}
 			default -> throw new SQLException("Unsupported authentication type: " + authTypeStr);
 		};
+	}
+
+	/**
+	 * Wraps the resolved authentication in service account impersonation, when
+	 * {@code impersonateServiceAccount} asks for it.
+	 *
+	 * <p>
+	 * Impersonation is an orthogonal property rather than an {@code authType} value
+	 * because it always needs a source identity: expressing it as a sixth
+	 * {@code authType} would need a second {@code sourceAuthType} dimension to say
+	 * what that identity is. Layering it composes with all five for free, and
+	 * matches {@code gcloud --impersonate-service-account}.
+	 *
+	 * @param authType
+	 *            the authentication providing the source identity
+	 * @param properties
+	 *            the parsed connection properties
+	 * @return {@code authType} wrapped for impersonation, or unchanged when no
+	 *         target was named
+	 * @throws SQLException
+	 *             if the impersonation properties are invalid
+	 */
+	private static AuthType applyImpersonation(AuthType authType, Map<String, String> properties) throws SQLException {
+		String target = properties.get("impersonateServiceAccount");
+		String delegatesStr = properties.get("impersonateDelegates");
+
+		if (target == null || target.isBlank()) {
+			// Rejected rather than ignored: a delegation chain with no target does
+			// nothing, and silently connecting as the source identity is the one
+			// outcome the caller who set this did not want.
+			if (delegatesStr != null && !delegatesStr.isBlank()) {
+				throw new SQLException("impersonateDelegates requires impersonateServiceAccount");
+			}
+			return authType;
+		}
+
+		List<String> delegates = new ArrayList<>();
+		if (delegatesStr != null) {
+			for (String delegate : delegatesStr.split(",")) {
+				String trimmed = delegate.trim();
+				if (!trimmed.isEmpty()) {
+					delegates.add(trimmed);
+				}
+			}
+		}
+
+		try {
+			return new ImpersonatedAuth(authType, target.trim(), delegates);
+		} catch (IllegalArgumentException e) {
+			throw new SQLException("Invalid impersonation configuration: " + e.getMessage(), e);
+		}
 	}
 
 	private static Integer parseInteger(Map<String, String> properties, String key) throws SQLException {
@@ -469,6 +526,29 @@ public final class ConnectionUrlParser {
 			return null;
 		}
 		return Boolean.parseBoolean(value);
+	}
+
+	/**
+	 * Splits a comma-separated project list, ignoring blank entries.
+	 *
+	 * <p>
+	 * Names are not validated here. A project id the driver would reject is worth
+	 * an error when it is used, not when it is listed alongside working ones —
+	 * {@code getCatalogs()} reporting a name nothing can query is a smaller problem
+	 * than a connection that will not open.
+	 */
+	private static List<String> parseProjectList(String value) {
+		if (value == null || value.isBlank()) {
+			return List.of();
+		}
+		List<String> projects = new ArrayList<>();
+		for (String project : value.split(",")) {
+			String trimmed = project.trim();
+			if (!trimmed.isEmpty()) {
+				projects.add(trimmed);
+			}
+		}
+		return projects;
 	}
 
 	private static Map<String, String> parseLabels(String labelsStr) {

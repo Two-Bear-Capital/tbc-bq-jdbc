@@ -25,9 +25,11 @@ import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
+import vc.tbc.bq.jdbc.exception.ServiceErrorDetail;
 import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 import vc.tbc.bq.jdbc.storage.ArrowSupport;
 import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
+import vc.tbc.bq.jdbc.util.ScriptResults;
 import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 
 import java.sql.*;
@@ -514,7 +516,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			return QueryCostEstimate.of(bytesProcessed, estimatedBytes, bytesBilled, properties.queryPricePerTiB());
 
 		} catch (BigQueryException e) {
-			throw new BQSQLException("Dry-run failed: " + e.getMessage(), e);
+			throw new BQSQLException("Dry-run failed: " + e.getMessage(), sqlStateFor(e), e);
 		}
 	}
 
@@ -590,6 +592,22 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		// can report per-spec results when the statement turned out to be DML
 		currentUpdateCount = readDmlAffectedRows(pair.job);
 
+		// A script's parent job carries only its last statement's result, so
+		// returning pair.result would answer the wrong statement and leave the rest
+		// unreachable. Step onto the first one instead; getMoreResults() walks the
+		// remainder.
+		if (ScriptResults.isScript(pair.job)) {
+			ResultSet first = beginScript(pair.job);
+			if (first != null) {
+				return first;
+			}
+			// The script's first statement produced no rows (a DDL or DML opener).
+			// executeQuery must still hand back a ResultSet, so the parent's empty
+			// one stands in and getMoreResults() carries on from statement one.
+			currentResultSet = createResultSet(pair.result, pair.job);
+			return currentResultSet;
+		}
+
 		try {
 			// Store INFORMATION_SCHEMA results in the shared cache and return a
 			// MetadataResultSet so the cached copy can be replayed on future hits.
@@ -617,7 +635,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			return currentResultSet;
 
 		} catch (BigQueryException e) {
-			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
+			throw new BQSQLException("Query execution failed: " + e.getMessage(), sqlStateFor(e), e);
 		}
 	}
 
@@ -673,14 +691,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				throw new BQSQLException(failure.getMessage(), failure.getSQLState(), failure);
 			}
 			if (cause instanceof BigQueryException bqe) {
-				throw new BQSQLException(bqe.getMessage(), sqlStateFor(bqe.getError()), bqe);
+				throw new BQSQLException(bqe.getMessage(), sqlStateFor(bqe), bqe);
 			}
 			if (cause instanceof RuntimeException) {
 				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_GENERAL_ERROR, cause);
 			}
 			throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
 		} catch (BigQueryException e) {
-			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
+			throw new BQSQLException("Query execution failed: " + e.getMessage(), sqlStateFor(e), e);
 		}
 	}
 
@@ -868,13 +886,118 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		return currentUpdateCount < 0 ? -1L : currentUpdateCount;
 	}
 
+	/**
+	 * The statements of the script currently being walked, or null when the last
+	 * execution was a single statement.
+	 */
+	private ScriptResults scriptResults;
+
+	/**
+	 * Positions on a script's first statement.
+	 *
+	 * @param parent
+	 *            the completed script job
+	 * @return the first statement's ResultSet, or null when it produced none
+	 */
+	private ResultSet beginScript(Job parent) throws SQLException {
+		scriptResults = ScriptResults.of(connection.getBigQuery(), parent);
+		logger.debug("{} ran a script of {} statement(s)", getLogPrefix(), scriptResults.size());
+		if (!scriptResults.advance()) {
+			// A SCRIPT whose children could not be listed. Falling back to the
+			// parent's own result keeps the caller no worse off than before.
+			scriptResults = null;
+			return null;
+		}
+		return applyCurrentScriptStatement();
+	}
+
+	/**
+	 * Makes the cursor's statement the statement's current result.
+	 *
+	 * @return its ResultSet, or null when it produced an update count instead
+	 */
+	@SuppressWarnings("PMD.NullAssignment") // getResultSet() must return null for a non-ResultSet step
+	private ResultSet applyCurrentScriptStatement() throws SQLException {
+		Job statement = scriptResults.current();
+		currentUpdateCount = readDmlAffectedRows(statement);
+
+		if (!ScriptResults.producesResultSet(statement)) {
+			currentResultSet = null;
+			// A DDL statement reports neither rows nor affected rows. JDBC has no
+			// third answer, and 0 is the conventional one — -1 is reserved for "no
+			// more results", which would end the walk at the first CREATE.
+			if (currentUpdateCount < 0) {
+				currentUpdateCount = 0L;
+			}
+			// Deliberately no result fetch: a non-SELECT statement has nothing to
+			// read, so this also saves an API call per DDL or DML step.
+			return null;
+		}
+
+		try {
+			int fetchSize = getEffectiveFetchSize();
+			TableResult result = fetchSize > 0
+					? statement.getQueryResults(BigQuery.QueryResultsOption.pageSize(fetchSize))
+					: statement.getQueryResults();
+			currentResultSet = createResultSet(result, statement);
+			return currentResultSet;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new BQSQLException("Interrupted reading script statement results",
+					BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
+		} catch (BigQueryException e) {
+			throw new BQSQLException("Could not read a script statement's results", e);
+		}
+	}
+
 	@Override
 	public boolean getMoreResults() throws SQLException {
+		return getMoreResults(CLOSE_CURRENT_RESULT);
+	}
+
+	/**
+	 * Moves to the next result of a multi-statement script.
+	 *
+	 * <p>
+	 * For a single statement there is never a second result, so this reports none
+	 * and leaves {@code getUpdateCount()} at -1, as the contract requires.
+	 *
+	 * @param current
+	 *            one of {@link java.sql.Statement#CLOSE_CURRENT_RESULT},
+	 *            {@link java.sql.Statement#KEEP_CURRENT_RESULT} or
+	 *            {@link java.sql.Statement#CLOSE_ALL_RESULTS}
+	 * @return true when the next result is a ResultSet
+	 * @throws SQLException
+	 *             if the statement is closed, {@code current} is not one of the
+	 *             three constants, or the next result cannot be read
+	 */
+	@SuppressWarnings("PMD.NullAssignment") // getResultSet() must return null once results are exhausted
+	public boolean getMoreResults(int current) throws SQLException {
 		checkClosed();
-		// No more results: per the JDBC contract, subsequent getUpdateCount()
-		// must return -1
-		currentUpdateCount = -1L;
-		return false;
+
+		if (current != CLOSE_CURRENT_RESULT && current != KEEP_CURRENT_RESULT && current != CLOSE_ALL_RESULTS) {
+			throw new BQSQLException("Invalid argument to getMoreResults: " + current,
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+
+		// KEEP_CURRENT_RESULT is the only one that does not close, and the driver
+		// holds one ResultSet at a time, so CLOSE_ALL_RESULTS and
+		// CLOSE_CURRENT_RESULT do the same thing here rather than differing in a way
+		// that is not observable.
+		if (current != KEEP_CURRENT_RESULT && currentResultSet != null) {
+			currentResultSet.close();
+		}
+		currentResultSet = null;
+
+		if (scriptResults == null || !scriptResults.advance()) {
+			// Per the JDBC contract, once there are no more results
+			// getUpdateCount() must report -1.
+			scriptResults = null;
+			currentUpdateCount = -1L;
+			return false;
+		}
+
+		return applyCurrentScriptStatement() != null;
 	}
 
 	@Override
@@ -1080,6 +1203,37 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *            the BigQuery error, may be null
 	 * @return the mapped SQLState, never null
 	 */
+	/**
+	 * SQLState for a {@link BigQueryException}, including the client-side failures
+	 * that never reached BigQuery.
+	 *
+	 * <p>
+	 * BigQuery's own error reason decides whenever there is one — that is what
+	 * keeps a 403 on a table reported as {@code 42501} rather than as an
+	 * authentication failure. Only when there is no reason at all, which is the
+	 * signature of a credential that could not be minted or refreshed, does the
+	 * cause chain get a say.
+	 *
+	 * <p>
+	 * The distinction is not cosmetic. Connection pools and BI tools branch on the
+	 * SQLState class: {@code 28} means "invalid authorization specification" and
+	 * triggers a re-authenticate, where {@code HY000} says only that something went
+	 * wrong — so an expired or ungranted credential was retried to the ceiling
+	 * instead of being reported.
+	 *
+	 * @param exception
+	 *            the failure to classify
+	 * @return the SQLState to report
+	 */
+	static String sqlStateFor(BigQueryException exception) {
+		String state = sqlStateFor(exception == null ? null : exception.getError());
+		if (BQSQLException.SQLSTATE_GENERAL_ERROR.equals(state)
+				&& ServiceErrorDetail.isAuthenticationFailure(exception)) {
+			return BQSQLException.SQLSTATE_AUTH_FAILED;
+		}
+		return state;
+	}
+
 	static String sqlStateFor(BigQueryError error) {
 		String reason = error == null ? null : error.getReason();
 		if (reason == null) {
@@ -1112,6 +1266,9 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			currentResultSet.close();
 			currentResultSet = null;
 		}
+		// A cursor left over from a previous script would let getMoreResults()
+		// keep walking that script's statements after an unrelated execution.
+		scriptResults = null;
 		queryWarnings = null;
 		costEstimates = List.of();
 		currentUpdateCount = -1L;

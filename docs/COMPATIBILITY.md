@@ -25,6 +25,8 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | `Statement` execution | ✅ | executeQuery, executeUpdate, execute |
 | `PreparedStatement` | ✅ | Positional parameters (`?`) |
 | Batch updates (`addBatch()`, `executeBatch()`) | ✅ | See [Batch execution](#batch-execution) |
+| Storage Read API authentication | ✅ | The Storage path reuses the connection's scoped credential, so `useStorageApi` cannot change how a connection authenticates |
+| SQLState reporting | ✅ | Mapped from BigQuery's error reason: `42000` syntax, `42S02` not found, `42501` not authorised, `53000` quota, `HY008` cancelled. A rejected credential reports `28000`, distinct from `42501` |
 | Update counts | ✅ | `executeUpdate()` / `getUpdateCount()` return real affected-row counts from BigQuery DML statistics |
 | `ResultSet` iteration | ✅ | Forward-only (`TYPE_FORWARD_ONLY`) |
 | `Statement.setFetchSize()` | ✅ | Page size for that statement, overriding the connection's `pageSize`. `0` restores the connection default; `getFetchSize()` reports the effective value |
@@ -84,7 +86,7 @@ Details:
 |---------|:------:|-------|
 | Sessions | ✅ | `enableSessions=true`, or started on demand by `setAutoCommit(false)` |
 | Temp tables | ✅ | Requires sessions to survive across statements |
-| Multi-statement SQL | ✅ | Runs as a single job; a session is needed only for temp entities or transactions spanning statements |
+| Multi-statement SQL | ✅ | Runs as a single job, with every statement's result reachable via `getMoreResults()` — [see below](#multi-statement-script-results). A session is needed only for temp entities or transactions spanning statements |
 | Transactions | ⚠️ | Session-backed; no isolation levels or savepoints |
 | Storage Read API | ⚠️ | Opt-in via `useStorageApi=true` (always) or `auto` (large results); covers scalars, ARRAY, STRUCT and INTERVAL, and needs `--add-opens=java.base/java.nio=ALL-UNNAMED`. A `RANGE` column sends the result to the standard path, as does anything else that makes the Storage API unavailable |
 | Query labels | ✅ | Job labels for tracking |
@@ -165,6 +167,41 @@ while (rs.next()) {
 | `CallableStatement`, stored procedures | ❌ | Use standard queries / scripting |
 | Generated keys (`getGeneratedKeys()`) | ❌ | Query the table after INSERT |
 | Named cursors | ❌ | Forward-only iteration |
+| `getMoreResults()` / `getMoreResults(int)` | ✅ | Walks a multi-statement script's results — [see below](#multi-statement-script-results) |
+
+#### Multi-statement script results
+
+BigQuery runs a multi-statement script as one job with a **child job per executed
+statement**. The parent job carries only the last statement's result, so the JDBC way to
+reach the rest is `getMoreResults()`:
+
+```java
+boolean isResultSet = stmt.execute("SELECT 1 AS a; INSERT INTO t VALUES (2); SELECT 3 AS c;");
+while (true) {
+    if (isResultSet) {
+        try (ResultSet rs = stmt.getResultSet()) { /* … */ }
+    } else if (stmt.getUpdateCount() == -1) {
+        break;                       // no more results
+    }
+    isResultSet = stmt.getMoreResults();
+    if (!isResultSet && stmt.getUpdateCount() == -1) {
+        break;
+    }
+}
+```
+
+- Results come back **in execution order**, and the first result is the first statement's.
+- A `SELECT` step is a `ResultSet`; every other statement type is an update count — DML
+  reports its affected rows, DDL reports 0.
+- Only statements that **actually ran** appear. A `DECLARE` produces none, and neither does
+  an untaken `IF` branch, so the sequence is the execution trace rather than the script text.
+- `getMoreResults(KEEP_CURRENT_RESULT)` leaves the previous `ResultSet` open; the other two
+  constants close it. Any other argument throws.
+- Running anything else on the same `Statement` discards the walk.
+
+> **Changed in 4.0.0.** `executeQuery()` on a script previously returned the parent job's
+> result, which is the **last** statement's rows, and no other statement was reachable. It
+> now returns the first statement's result, as JDBC specifies.
 
 ### Advanced types
 
@@ -191,11 +228,11 @@ projects, but a tool that enumerates everything up front will see nothing.
 
 | Method | Support | Notes |
 |--------|:------:|-------|
-| `getCatalogs()` | ✅ | One row: the connection's project. Cached |
-| `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached |
-| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry |
-| `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
-| `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW |
+| `getCatalogs()` | ✅ | The connection's project, plus any named by `additionalProjects`, ordered by `TABLE_CAT`. Cached — [see below](#browsing-more-than-one-project) |
+| `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached. Also reports a synthetic `INFORMATION_SCHEMA` schema unless `includeInformationSchema=false` |
+| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry. `INFORMATION_SCHEMA` views are included as `SYSTEM TABLE` — see below |
+| `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached. With `includeStructFields=true`, adds a row per `STRUCT` field — [see below](#struct-subfields) |
+| `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW, EXTERNAL, SNAPSHOT, CLONE, and SYSTEM TABLE while `includeInformationSchema` is on — [see below](#table-types) |
 | `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keyword and function lists | ✅ | JDBC version reports 4.3. `getDatabaseProductName()` is `BigQuery (TBC Driver)` and `getDatabaseProductVersion()` is `2.0` |
@@ -208,6 +245,144 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
 | `getUDTs()`, `getSuperTypes()`, `getSuperTables()`, `getAttributes()` | ⚠️ | BigQuery has no user-defined types; returns empty |
 | `getClientInfoProperties()` | ⚠️ | The driver accepts no client info properties; returns empty |
+
+### STRUCT subfields
+
+By default `getColumns()` reports top-level columns only, so a `STRUCT` column is one entry
+and its fields are invisible. `includeStructFields=true` adds a row per field, named by its
+dotted path:
+
+```
+COLUMN_NAME        TYPE_NAME                 ORDINAL_POSITION
+id                 INT64                     1
+person             STRUCT<name STRING, …>    2
+person.addr        STRUCT<zip INT64, …>      3
+person.addr.state  STRING                    4
+person.addr.zip    INT64                     5
+person.name        STRING                    6
+items              ARRAY<STRUCT<n INT64>>    7
+label              STRING                    8
+```
+
+Each field follows the column it belongs to, and `ORDINAL_POSITION` is renumbered so it
+stays contiguous.
+
+**Fields below an `ARRAY` are deliberately excluded.** BigQuery's
+`INFORMATION_SCHEMA.COLUMN_FIELD_PATHS` lists them, but they are not usable column
+references — `SELECT items.n` fails with *Cannot access field n on a value with type
+ARRAY&lt;…&gt;* and needs `UNNEST`. Reporting one would advertise a column no query can
+name. Struct paths are usable: `SELECT person.name` works.
+
+Quote a path by its parts, not as a whole. `` `person`.`name` `` works; `` `person.name` ``
+does not — BigQuery reads it as a single column with a dot in its name.
+
+Off by default, because it changes the row count of every `getColumns()` call — a tool that
+builds an INSERT column list from it would treat a field as a column — and because it costs
+a second `INFORMATION_SCHEMA` query per dataset.
+
+Nested rows report `NULLABLE` as nullable: `COLUMN_FIELD_PATHS` carries no nullability, and
+a field of a nullable record is nullable in practice regardless.
+
+### Table types
+
+`getTables()` distinguishes the kinds of table BigQuery does, because they do not behave
+alike — an external table cannot be the target of DML, and a snapshot is read-only and
+point-in-time.
+
+| `TABLE_TYPE` | BigQuery |
+|---|---|
+| `TABLE` | an ordinary table (`BASE TABLE`) |
+| `VIEW` | a view |
+| `MATERIALIZED VIEW` | a materialized view |
+| `EXTERNAL` | a table over external data (GCS, Sheets, …) |
+| `SNAPSHOT` | a table snapshot — read-only, point-in-time |
+| `CLONE` | a table clone — writable, sharing storage with its base until diverged |
+| `SYSTEM TABLE` | an `INFORMATION_SCHEMA` view, while `includeInformationSchema` is on |
+
+JDBC standardises only `TABLE` and `VIEW`, so the rest are a driver convention. The strings
+are BigQuery's own — the values `INFORMATION_SCHEMA.TABLES.table_type` reports — so what the
+driver says and what you see in BigQuery are the same word.
+
+> **Changed in 4.0.0.** External tables, snapshots and clones were previously reported as
+> `TABLE`. A caller filtering `getTables(…, new String[]{"TABLE"})` no longer receives them.
+
+**One caveat.** BigQuery's `tables.list` reports a clone as an ordinary table; only
+`INFORMATION_SCHEMA` distinguishes it. The driver reads that view anyway for table
+descriptions, so recognising clones costs no extra query — but with
+`metadataIncludeDescriptions=false` there is no such read, and a clone is reported as
+`TABLE`. Every other type comes from the listing itself and is unaffected.
+
+### Browsing more than one project
+
+Catalogs are projects. BigQuery queries across projects natively, and the metadata methods
+have always honoured an explicit `catalog` argument — what was missing was **discovery**
+and **switching**.
+
+`additionalProjects` names further projects to report from `getCatalogs()`:
+
+```
+jdbc:bigquery:my-project/my_dataset?additionalProjects=other-project,third-project
+```
+
+They are not discovered automatically. Listing every project a credential can see is a
+Resource Manager call, slow on a large organisation, and returns mostly projects with no
+BigQuery data.
+
+`setCatalog()` moves the project that a **null** `catalog` argument resolves to:
+
+```java
+conn.setCatalog("other-project");
+conn.getMetaData().getSchemas();              // other-project's datasets
+conn.getMetaData().getSchemas("my-project", null);  // an explicit argument still wins
+conn.setCatalog(null);                        // back to the connection's own project
+```
+
+- An unusable project id is **rejected**, not ignored. `setCatalog()` used to be a silent
+  no-op, so a caller had no way to tell a switch that did not happen from one that did.
+- A project need not be in `additionalProjects` to be switched to — that property controls
+  what is *listed*, not what is reachable.
+- **Billing does not move.** The project that owns and is billed for jobs is fixed when the
+  connection opens; `setCatalog()` changes only which project metadata and unqualified
+  names default to. Querying another project's data bills the connection's project, which
+  is how BigQuery cross-project access already works.
+- `datasetProjectId` is unaffected and still points the *default dataset* at another
+  project.
+
+### Browsing INFORMATION_SCHEMA
+
+BigQuery's `INFORMATION_SCHEMA` views are ordinary queryable views, but the datasets API
+does not list them and neither does BigQuery's own `INFORMATION_SCHEMA.SCHEMATA`. The
+driver reports them so they can be browsed and autocompleted. This costs no BigQuery
+query — the view list is static.
+
+BigQuery scopes the views in two places, and the two sets are disjoint:
+
+| Scope | Queried as | Reported as | Views |
+|-------|-----------|-------------|-------|
+| Project | `` `project`.INFORMATION_SCHEMA.SCHEMATA `` | a schema named `INFORMATION_SCHEMA`, holding tables named `SCHEMATA`, `JOBS`, … | `SCHEMATA`, `SCHEMATA_OPTIONS`, `SCHEMATA_LINKS`, `JOBS`, `JOBS_BY_PROJECT`, `JOBS_BY_USER`, `JOBS_TIMELINE`, `JOBS_TIMELINE_BY_USER`, `SESSIONS_BY_PROJECT`, `SESSIONS_BY_USER`, `TABLE_STORAGE`, `TABLE_STORAGE_TIMELINE`, `OBJECT_PRIVILEGES`, `STREAMING_TIMELINE_BY_PROJECT`, `WRITE_API_TIMELINE_BY_PROJECT`, `SHARED_DATASET_USAGE`, `RECOMMENDATIONS`, `INSIGHTS` |
+| Dataset | `` `project`.`dataset`.INFORMATION_SCHEMA.TABLES `` | tables of the dataset, named `INFORMATION_SCHEMA.TABLES`, … | `TABLES`, `TABLE_OPTIONS`, `TABLE_CONSTRAINTS`, `TABLE_SNAPSHOTS`, `COLUMNS`, `COLUMN_FIELD_PATHS`, `VIEWS`, `MATERIALIZED_VIEWS`, `ROUTINES`, `ROUTINE_OPTIONS`, `PARAMETERS`, `KEY_COLUMN_USAGE`, `CONSTRAINT_COLUMN_USAGE`, `PARTITIONS`, `SEARCH_INDEXES`, `SEARCH_INDEX_COLUMNS`, `VECTOR_INDEXES` |
+
+A dataset-scoped view needs four name parts and JDBC has three, which is why the last two
+are carried together in the table name. BigQuery accepts that name however a tool quotes
+it:
+
+```sql
+SELECT table_name FROM `my-project`.`sales`.`INFORMATION_SCHEMA.TABLES`
+SELECT table_name FROM `my-project`.`sales`.INFORMATION_SCHEMA.TABLES
+```
+
+All of them are reported with `TABLE_TYPE` of `SYSTEM TABLE`, so
+`getTables(..., new String[]{"TABLE", "VIEW"})` excludes them.
+
+`getColumns()` describes these views from the live service, so the column lists never go
+stale. Resolving one costs a dry run — no job, no bytes billed — and each is resolved at
+most once per connection.
+
+Region-qualified views (`` `project`.`region-us`.INFORMATION_SCHEMA.JOBS ``) are not
+reported. They need a region the connection does not necessarily know, and the ones unique
+to that scope scan the whole organisation's job history.
+
+Set `includeInformationSchema=false` to turn all of this off.
 
 ### Unenforced primary and foreign keys
 

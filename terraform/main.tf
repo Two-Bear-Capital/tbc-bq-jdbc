@@ -81,10 +81,14 @@ resource "google_service_account" "ci" {
 
 # ── IAM Bindings for CI Service Account ─────────────────────────────────────
 
-resource "google_bigquery_dataset_iam_member" "ci_data_editor" {
+# dataOwner rather than dataEditor: table snapshots need
+# bigquery.tables.createSnapshot and deleteSnapshot, which dataEditor does not
+# carry, so RealTableTypeMetadataTest cannot build its fixtures without it
+# (#187, #252). Scoped to the test dataset, which exists only for this suite.
+resource "google_bigquery_dataset_iam_member" "ci_data_owner" {
   project    = google_project.integration.project_id
   dataset_id = google_bigquery_dataset.integration_tests.dataset_id
-  role       = "roles/bigquery.dataEditor"
+  role       = "roles/bigquery.dataOwner"
   member     = "serviceAccount:${google_service_account.ci.email}"
 }
 
@@ -104,6 +108,113 @@ resource "google_project_iam_member" "ci_read_session_user" {
   member  = "serviceAccount:${google_service_account.ci.email}"
 
   depends_on = [google_project_service.bigquery_storage]
+}
+
+# Project-scoped INFORMATION_SCHEMA views (SCHEMATA, JOBS, ...) need a
+# project-level role to read; jobUser and dataset-scoped dataEditor are not
+# enough. Without this, RealInformationSchemaMetadataTest can only assert that
+# describing them degrades gracefully, never that it works (#189, #248).
+resource "google_project_iam_member" "ci_metadata_viewer" {
+  project = google_project.integration.project_id
+  role    = "roles/bigquery.metadataViewer"
+  member  = "serviceAccount:${google_service_account.ci.email}"
+}
+
+# ── Service Account Impersonation Fixture ────────────────────────────────────
+#
+# Two service accounts, existing only so RealImpersonationTest can exercise both
+# shapes the driver supports (#197):
+#
+#   direct  : caller ──────────────────────────────► impersonated
+#   delegated: caller ── delegate ──────────────────► impersonated
+#
+# Only "impersonated" holds BigQuery roles. "delegate" deliberately holds none,
+# so the delegated test proves the token really was minted for the target — a
+# chain that silently resolved to the delegate could not run a query at all.
+
+resource "google_service_account" "impersonated" {
+  project      = google_project.integration.project_id
+  account_id   = "tbc-bq-jdbc-impersonated"
+  display_name = "TBC BQ JDBC Impersonation Target"
+  description  = "Target identity for the driver's service account impersonation tests"
+
+  depends_on = [google_project_service.iam]
+}
+
+resource "google_service_account" "impersonation_delegate" {
+  project      = google_project.integration.project_id
+  account_id   = "tbc-bq-jdbc-delegate"
+  display_name = "TBC BQ JDBC Impersonation Delegate"
+  description  = "Intermediate identity for the driver's delegated impersonation test; holds no BigQuery access"
+
+  depends_on = [google_project_service.iam]
+}
+
+# The impersonated identity must be able to run the same queries the tests run
+# as themselves, or a passing connection would prove nothing about the token.
+
+resource "google_bigquery_dataset_iam_member" "impersonated_data_viewer" {
+  project    = google_project.integration.project_id
+  dataset_id = google_bigquery_dataset.integration_tests.dataset_id
+  role       = "roles/bigquery.dataViewer"
+  member     = "serviceAccount:${google_service_account.impersonated.email}"
+}
+
+resource "google_project_iam_member" "impersonated_job_user" {
+  project = google_project.integration.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.impersonated.email}"
+}
+
+# Direct hop: CI mints tokens for the target itself.
+resource "google_service_account_iam_member" "ci_impersonates_target" {
+  service_account_id = google_service_account.impersonated.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.ci.email}"
+
+  depends_on = [google_project_service.iam_credentials]
+}
+
+# Delegated hop: CI mints for the delegate, and the delegate mints for the
+# target. Both links are required — IAM checks the chain pairwise.
+resource "google_service_account_iam_member" "ci_impersonates_delegate" {
+  service_account_id = google_service_account.impersonation_delegate.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.ci.email}"
+
+  depends_on = [google_project_service.iam_credentials]
+}
+
+resource "google_service_account_iam_member" "delegate_impersonates_target" {
+  service_account_id = google_service_account.impersonated.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.impersonation_delegate.email}"
+
+  depends_on = [google_project_service.iam_credentials]
+}
+
+# Local development: the same two grants for whoever runs the suite from a
+# workstation under their own ADC. Empty by default, because a principal that
+# can mint tokens for an identity with BigQuery access is a real grant and
+# should be named deliberately rather than inherited from a default.
+resource "google_service_account_iam_member" "local_impersonates_target" {
+  for_each = toset(var.impersonation_source_principals)
+
+  service_account_id = google_service_account.impersonated.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value
+
+  depends_on = [google_project_service.iam_credentials]
+}
+
+resource "google_service_account_iam_member" "local_impersonates_delegate" {
+  for_each = toset(var.impersonation_source_principals)
+
+  service_account_id = google_service_account.impersonation_delegate.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.value
+
+  depends_on = [google_project_service.iam_credentials]
 }
 
 # ── Workload Identity Federation ─────────────────────────────────────────────

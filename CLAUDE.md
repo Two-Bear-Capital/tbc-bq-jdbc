@@ -92,6 +92,12 @@ CI runs `./mvnw spotless:check` and it must pass.
   number of milliseconds — 700000µs is `.700`, 10µs is `.000010`
 - `isSupported` recurses: a `RANGE` nested inside `ARRAY<STRUCT<...>>` must disqualify the
   whole result, or it fails mid-ResultSet after rows have reached the caller
+- **Authenticates with the connection's scoped credential, not a freshly built one.**
+  `BigQueryOptions` scopes anything whose `createScopedRequired()` is true, but
+  `FixedCredentialsProvider` scopes nothing, so the two paths used different credentials for
+  the same connection and `useStorageApi` could decide whether a connection authenticated
+  (#243). Reading it off `getBigQuery().getOptions().getScopedCredentials()` means there is
+  no second scope list to keep in step
 - **Needs `--add-opens=java.base/java.nio=ALL-UNNAMED`** or Arrow cannot allocate.
   `ArrowSupport` probes for this once per JVM (it must actually *allocate* — merely
   constructing a `RootAllocator` succeeds without the flag) and the driver falls
@@ -144,6 +150,36 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
   before that
 - Update counts are 1 per row only when the load's aggregate output matches the batch,
   otherwise `SUCCESS_NO_INFO` — never fabricated from the batch size
+
+### Error classification
+- `AbstractBQStatement.sqlStateFor(BigQueryException)` classifies; the `BigQueryError`
+  overload it delegates to handles everything BigQuery gave a reason for
+- **BigQuery's reason always wins.** Only when there is none — the signature of a credential
+  that could not be minted or refreshed, since the request never reached BigQuery — does the
+  cause chain get a say, and a 401/403 there means `28000`
+- That asymmetry is the whole point: a 403 from an auth endpoint is a rejected credential
+  (`28000`, re-authenticate), a 403 from BigQuery is a missing grant (`42501`, surface it).
+  Turning the second into the first sends a pool round a retry loop over a working credential
+- `ServiceErrorDetail` owns the chain walk for both this and the message enrichment (#242),
+  so there is one place that understands the shape the Google client libraries produce
+
+### Multi-statement script results
+- A script is one job with a **child job per executed statement**; the parent carries only
+  the **last** statement's result. `executeQuery()` used to return that, so a script looked
+  like it had answered the first statement while answering the last (#191)
+- `util/ScriptResults` enumerates the children and is the cursor `getMoreResults()` walks
+- **Ordering is by creation time.** The jobs API lists children newest-first, and the `_N`
+  suffix on a child job id is undocumented
+- **A statement produces a ResultSet iff its type is `SELECT`.** Both obvious alternatives
+  are wrong and were tried against the service: a *listed* child carries no result schema
+  at all, so "has columns" makes every SELECT an update count; and a *fetched* DDL/DML
+  result carries the **destination table's** schema, so `CREATE TEMP TABLE t(id INT64)` and
+  `INSERT INTO t` both look like one-column ResultSets
+- Non-SELECT steps are not fetched at all, which also saves an API call each
+- A DDL step reports update count **0**, never -1 — -1 means "no more results" and would
+  end the walk at the first `CREATE`
+- The cursor is cleared by `discardPreviousResult()`, so a new execution cannot resume a
+  half-walked script
 
 ### Unsupported JDBC Features (BigQuery Limitations)
 - Scrollable ResultSets (no `previous()`, `absolute()`)

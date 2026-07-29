@@ -240,6 +240,9 @@ jdbc:bigquery:[project]/[dataset]?property1=value1&property2=value2
 // Service Account
 "jdbc:bigquery:my-project/my_dataset?authType=SERVICE_ACCOUNT&credentials=/path/to/key.json"
 
+// Impersonating a service account, authenticating as yourself
+"jdbc:bigquery:my-project/my_dataset?impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com"
+
 // With sessions and location
 "jdbc:bigquery:my-project/my_dataset?authType=ADC&enableSessions=true&location=EU"
 

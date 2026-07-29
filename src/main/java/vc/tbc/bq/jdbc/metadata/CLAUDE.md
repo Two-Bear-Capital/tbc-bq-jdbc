@@ -22,6 +22,36 @@
   `"hello \"there\""`. `util/SqlStringLiterals.unquote` decodes it
 - `metadataIncludeDescriptions=false` falls back to the narrower view-only read
 
+### STRUCT subfields (`includeStructFields`, #186)
+- Off by default: it changes the row count of every `getColumns()` call — a tool building an
+  INSERT column list would treat a field as a column — and costs a second
+  `INFORMATION_SCHEMA` query (`COLUMN_FIELD_PATHS`) per dataset
+- **Paths below an ARRAY are excluded, and that is correctness not tidiness.** A struct path
+  is a usable reference (`SELECT person.name` works); an array's is not (`SELECT items.n`
+  fails, needs `UNNEST`). `isSelectablePath` requires every ancestor to be a `STRUCT`
+- `RealStructFieldMetadataTest` selects every path the driver reports — the only check that
+  separates a correct path list from a plausible one
+- **Field rows must survive their parent being filtered out.** `getColumns(…, "person.%")`
+  matches `person.name` but not `person`, so `rows` can be empty and there is no parent to
+  attach to. Two cuts of this answered that query with nothing; the final sweep keys off the
+  table name in the map key instead of a parent row
+- Ordinals are renumbered per table as rows are spliced, so `ORDINAL_POSITION` stays
+  contiguous
+- Nullability is reported as nullable — `COLUMN_FIELD_PATHS` has no `is_nullable`
+
+### Table types (#187)
+- `TABLE`, `VIEW`, `MATERIALIZED VIEW`, `EXTERNAL`, `SNAPSHOT`, `CLONE`. The last three are
+  a driver convention — JDBC standardises only the first two — and use BigQuery's own
+  `INFORMATION_SCHEMA.TABLES.table_type` vocabulary
+- All but `CLONE` come free from `TableDefinition` on the listing. **BigQuery's `tables.list`
+  reports a clone as an ordinary table**; only `INFORMATION_SCHEMA` tells them apart, so the
+  refinement rides on the description read `fillInRemarks` already does. With
+  `metadataIncludeDescriptions=false` a clone is reported as `TABLE`, which is documented
+- **The type filter must run after that refinement**, not in the listing loop. Filtering
+  first let a clone through a `types={"TABLE"}` request and *then* relabelled it — the
+  caller got a `CLONE` row it had excluded — while `types={"CLONE"}` matched nothing at all.
+  `filterByType` runs between `fillInRemarks` and `collapseShards`
+
 ### Sharded tables (`collapseShardedTables`)
 - Off by default, and must stay that way: sharding is a naming convention BigQuery never
   declares, so collapsing on by default would make a table legitimately ending in a date
@@ -58,3 +88,33 @@
   encourages
 - `getExportedKeys` must scan every dataset — a FK is recorded only in the dataset of
   the referencing table. Cross-*project* FKs are not discoverable
+
+### INFORMATION_SCHEMA browsing (`includeInformationSchema`)
+- On by default, unlike `collapseShardedTables`: these views are real and queryable, so
+  this fills in entries rather than removing or renaming them. It also costs no query —
+  `InformationSchemaViews` is a static list
+- **The two scopes are disjoint and that is the whole design.** BigQuery resolves each
+  view at exactly one of them; a view listed at the wrong scope produces a well-formed
+  `getTables` row that fails when clicked. `InformationSchemaViewsTest` holds disjointness,
+  and `RealInformationSchemaMetadataTest` queries every advertised name — the only check
+  that can tell a correct entry from a plausible one
+- Project scope is a 3-part name and maps straight onto catalog/schema/table. Dataset
+  scope is **4 parts**, one more than JDBC has, so the last two ride together in the table
+  name (`INFORMATION_SCHEMA.TABLES`). BigQuery accepts that however a tool quotes it
+- Reported as `SYSTEM TABLE`, and `getTableTypes()` advertises that type **only while the
+  property is on** — a type nothing is reported under reads as "no such tables"
+- **`getColumns` resolves each view with a dry run**, not a hard-coded column list: these
+  views have ~25 columns each and Google adds to them. A dry run creates no job and bills
+  nothing. Memoised per view name, *not* per dataset — every dataset's `TABLES` has the
+  same columns, so keying by dataset would multiply the cost for one answer
+- Region-qualified views are deliberately absent: they need a region the connection may
+  not know, and the ones unique to that scope scan the org's whole job history
+
+### Metadata cache keys carry the connection's result-shaping settings
+- The cache is shared **statically** across connections to a project, but the call-site
+  keys describe only the arguments. Two connections disagreeing about
+  `includeInformationSchema`, `collapseShardedTables` or `metadataIncludeDescriptions`
+  were served each other's rows — whichever connected first decided for the whole TTL
+- Fixed by prefixing every key in `getCachedOrExecute`, the one seam all of them pass
+  through. **A new result-shaping property must be added to `metadataShapeKey()`**
+- Only built when a cache exists; with caching off the string is never read

@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **31** connection properties.
+There are **36** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -18,6 +18,8 @@ There are **31** connection properties.
 | `clientId` | _(none)_ | any | OAuth 2.0 client ID (required for USER_OAUTH auth) |
 | `clientSecret` | _(none)_ | any | OAuth 2.0 client secret (required for USER_OAUTH auth) |
 | `refreshToken` | _(none)_ | any | OAuth 2.0 refresh token (required for USER_OAUTH auth) |
+| `impersonateServiceAccount` | _(none)_ | any | Email of a service account to impersonate, using the configured authType as the source identity |
+| `impersonateDelegates` | _(none)_ | any | Comma-separated intermediate service account emails, source-first, for a delegated impersonation chain |
 | `host` | _(none)_ | any | Alternative BigQuery endpoint, e.g. a proxy or Private Service Connect address. Defaults to https when no scheme is given; blank uses Google's endpoints |
 | `port` | _(none)_ | any | Port for the alternative endpoint set by 'host' |
 | `location` | _(none)_ | any | BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location. |
@@ -31,6 +33,9 @@ There are **31** connection properties.
 | `metadataLazyLoad` | `false` | `true`, `false` | Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects) |
 | `batchLoadThreshold` | _(none)_ | any | Row count at or above which PreparedStatement.executeBatch() submits one BigQuery load job instead of chunked INSERT DML, which is not bound by DML quotas and is far faster at volume (blank = never). Only simple INSERTs with an explicit column list and scalar parameters qualify; anything else, and any batch inside a transaction or session, uses the DML path |
 | `collapseShardedTables` | `false` | `true`, `false` | Report date-sharded tables (events_20260101, events_20260102, ...) as a single events_* entry in getTables(), instead of one row per shard. getColumns() answers for the wildcard name using the newest shard's schema. Off by default: sharding is a naming convention, so a table legitimately ending in a date would otherwise disappear from listings |
+| `additionalProjects` | _(none)_ | any | Comma-separated further project IDs to report from getCatalogs(), so a tool can discover and switch to them with setCatalog(). Not discovered automatically. Cross-project queries work without this; it only makes the projects visible |
+| `includeStructFields` | `false` | `true`, `false` | Add a getColumns() row per STRUCT field, named by its dotted path (person.name). Costs one extra INFORMATION_SCHEMA query per dataset. Fields under an ARRAY are excluded because such a path needs UNNEST and cannot be selected as written. Off by default: it changes the row count of every getColumns() call |
+| `includeInformationSchema` | `true` | `true`, `false` | Make INFORMATION_SCHEMA browsable: a synthetic INFORMATION_SCHEMA schema per project holding the project-scoped views (SCHEMATA, JOBS, ...), plus the dataset-scoped views (TABLES, COLUMNS, ...) as tables named INFORMATION_SCHEMA.<view> inside each dataset. Reported as SYSTEM TABLE so a caller can filter them out. Costs no BigQuery query — the view list is static |
 | `metadataIncludeDescriptions` | `true` | `true`, `false` | Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets |
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |

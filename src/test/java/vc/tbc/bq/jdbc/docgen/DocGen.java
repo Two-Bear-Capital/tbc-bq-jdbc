@@ -178,7 +178,7 @@ public final class DocGen {
 		}
 		impls.sort(String::compareTo);
 		for (String impl : impls) {
-			sb.append("| `").append(impl).append("` |  |\n");
+			sb.append("| `").append(impl).append("` | ").append(escape(implNote(impl))).append(" |\n");
 		}
 
 		return new GeneratedDoc("authentication.md", sb.toString());
@@ -207,6 +207,19 @@ public final class DocGen {
 			case "USER_OAUTH" -> "User OAuth flow (client id/secret/refresh token).";
 			case "WORKFORCE" -> "Workforce identity federation (set via `credentialConfigFile`).";
 			case "WORKLOAD" -> "Workload identity federation (set via `credentialConfigFile`).";
+			default -> "";
+		};
+	}
+
+	/**
+	 * Notes for a permitted implementation. Only implementations that do not
+	 * correspond one-to-one with an {@code authType} value need one; the rest are
+	 * described by the table above.
+	 */
+	private static String implNote(String impl) {
+		return switch (impl) {
+			case "ImpersonatedAuth" -> "Not an `authType` value. Wraps whichever of the others is configured, "
+					+ "when `impersonateServiceAccount` is set.";
 			default -> "";
 		};
 	}
