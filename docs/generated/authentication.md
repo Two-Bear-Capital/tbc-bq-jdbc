@@ -25,6 +25,7 @@ Authentication is selected with the `authType` connection property. The accepted
 | Implementation | Notes |
 | --- | --- |
 | `ApplicationDefaultAuth` |  |
+| `ImpersonatedAuth` | Not an `authType` value. Wraps whichever of the others is configured, when `impersonateServiceAccount` is set. |
 | `ServiceAccountAuth` |  |
 | `UserOAuthAuth` |  |
 | `WorkforceIdentityAuth` |  |

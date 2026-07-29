@@ -57,6 +57,24 @@ scans a large table fails instead of billing for it.
 
 No Docker, and no container image.
 
+### Impersonation tests
+
+`RealImpersonationTest` needs two more variables, and skips without them:
+
+| Variable | From |
+| --- | --- |
+| `BQ_TEST_IMPERSONATE_SA` | Terraform output `impersonation_target_service_account` |
+| `BQ_TEST_IMPERSONATE_DELEGATE` | Terraform output `impersonation_delegate_service_account` |
+
+They gate independently — set only the first and the direct case runs while the
+delegation-chain test skips.
+
+The two service accounts are created by `terraform/main.tf`. To run these under
+your own ADC you also need `roles/iam.serviceAccountTokenCreator` on both, which
+means naming yourself in the `impersonation_source_principals` Terraform
+variable — CI's service account already has the grant. Without it the tests fail
+on the first statement with `Error requesting access token`.
+
 ## Running
 
 ```bash
@@ -132,6 +150,8 @@ real-integration-tests:
       env:
         BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
         BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
+        BQ_TEST_IMPERSONATE_SA: ${{ secrets.BQ_TEST_IMPERSONATE_SA }}
+        BQ_TEST_IMPERSONATE_DELEGATE: ${{ secrets.BQ_TEST_IMPERSONATE_DELEGATE }}
 ```
 
 Same-repo PRs — including Dependabot's — run the suite, so the gate is on the PR

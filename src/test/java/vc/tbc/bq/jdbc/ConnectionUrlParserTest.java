@@ -17,6 +17,7 @@ package vc.tbc.bq.jdbc;
 
 import org.junit.jupiter.api.Test;
 import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
+import vc.tbc.bq.jdbc.auth.ImpersonatedAuth;
 import vc.tbc.bq.jdbc.auth.ServiceAccountAuth;
 import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
@@ -24,6 +25,7 @@ import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -574,5 +576,102 @@ class ConnectionUrlParserTest {
 		assertTrue(props.metadataLazyLoad());
 		assertTrue(props.enableQueryCostEstimation());
 		assertTrue(props.nativeComplexTypes());
+	}
+
+	@Test
+	void testParseUrlWithImpersonationOverDefaultAuth() throws SQLException {
+		// Given: A URL naming only a target, with no authType
+		String url = "jdbc:bigquery:my-project/my_dataset"
+				+ "?impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: The default ADC auth should be wrapped, not replaced
+		assertInstanceOf(ImpersonatedAuth.class, props.authType());
+		ImpersonatedAuth auth = (ImpersonatedAuth) props.authType();
+		assertInstanceOf(ApplicationDefaultAuth.class, auth.source());
+		assertEquals("etl@my-project.iam.gserviceaccount.com", auth.targetPrincipal());
+		assertEquals(List.of(), auth.delegates());
+	}
+
+	@Test
+	void testParseUrlWithImpersonationOverServiceAccountAuth() throws SQLException {
+		// Given: A URL pairing impersonation with an explicit source auth type
+		String url = "jdbc:bigquery:my-project/my_dataset"
+				+ "?authType=SERVICE_ACCOUNT&credentials=/keys/bootstrap.json"
+				+ "&impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: The key file should be the source identity
+		ImpersonatedAuth auth = assertInstanceOf(ImpersonatedAuth.class, props.authType());
+		ServiceAccountAuth source = assertInstanceOf(ServiceAccountAuth.class, auth.source());
+		assertEquals("/keys/bootstrap.json", source.jsonKeyPath());
+	}
+
+	@Test
+	void testParseUrlWithImpersonationDelegates() throws SQLException {
+		// Given: A URL with a two-hop delegation chain, with incidental whitespace
+		String url = "jdbc:bigquery:my-project" + "?impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com"
+				+ "&impersonateDelegates=mid1@my-project.iam.gserviceaccount.com,"
+				+ "%20mid2@my-project.iam.gserviceaccount.com";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: The chain should be trimmed and kept in source-first order
+		ImpersonatedAuth auth = assertInstanceOf(ImpersonatedAuth.class, props.authType());
+		assertEquals(List.of("mid1@my-project.iam.gserviceaccount.com", "mid2@my-project.iam.gserviceaccount.com"),
+				auth.delegates());
+	}
+
+	@Test
+	void testParseUrlWithoutImpersonationLeavesAuthTypeAlone() throws SQLException {
+		// Given: A URL with no impersonation properties at all
+		String url = "jdbc:bigquery:my-project?authType=ADC";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: The auth type should not be wrapped
+		assertInstanceOf(ApplicationDefaultAuth.class, props.authType());
+	}
+
+	@Test
+	void testParseUrlWithBlankImpersonationTargetIsNotImpersonation() throws SQLException {
+		// Given: A URL where the target is present but empty
+		String url = "jdbc:bigquery:my-project?impersonateServiceAccount=";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: It should read as "not set", like any other empty property
+		assertInstanceOf(ApplicationDefaultAuth.class, props.authType());
+	}
+
+	@Test
+	void testParseUrlWithDelegatesButNoTargetThrowsException() {
+		// Given: A URL with a chain but nothing to reach
+		String url = "jdbc:bigquery:my-project" + "?impersonateDelegates=mid1@my-project.iam.gserviceaccount.com";
+
+		// Then: Parsing should fail rather than silently connect as the source
+		SQLException e = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
+		assertTrue(e.getMessage().contains("impersonateServiceAccount"), e.getMessage());
+	}
+
+	@Test
+	void testParseUrlWithImpersonationInProperties() throws SQLException {
+		// Given: Impersonation supplied through the Properties object instead
+		Properties info = new Properties();
+		info.setProperty("impersonateServiceAccount", "etl@my-project.iam.gserviceaccount.com");
+
+		// When: Parsing a URL that does not mention it
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project", info);
+
+		// Then: It should apply the same way
+		ImpersonatedAuth auth = assertInstanceOf(ImpersonatedAuth.class, props.authType());
+		assertEquals("etl@my-project.iam.gserviceaccount.com", auth.targetPrincipal());
 	}
 }

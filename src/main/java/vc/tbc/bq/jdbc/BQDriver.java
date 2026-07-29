@@ -127,6 +127,14 @@ public final class BQDriver implements Driver {
 		props.add(
 				prop(info, "refreshToken", "", "OAuth 2.0 refresh token (required for USER_OAUTH auth)", false, null));
 
+		props.add(prop(info, "impersonateServiceAccount", "",
+				"Email of a service account to impersonate, using the configured authType as the source identity",
+				false, null));
+
+		props.add(prop(info, "impersonateDelegates", "",
+				"Comma-separated intermediate service account emails, source-first, for a delegated impersonation chain",
+				false, null));
+
 		props.add(
 				prop(info, "host", "",
 						"Alternative BigQuery endpoint, e.g. a proxy or Private Service Connect address. "

@@ -17,6 +17,10 @@ tbc-bq-jdbc supports all Google Cloud authentication methods:
 `authType` defaults to `ADC` when omitted, and its value is case-insensitive. Omitting a
 required property fails at connection time with a message naming the property.
 
+[Service account impersonation](#service-account-impersonation) is not an `authType` value.
+It layers on top of whichever method above you choose, through the
+`impersonateServiceAccount` property.
+
 The accepted `authType` values and their underlying implementations are generated from the driver —
 see [the generated reference](generated/authentication.md). The sections below cover setup,
 credentials, and examples for each method.
@@ -341,6 +345,93 @@ try (Connection conn = DriverManager.getConnection(url)) {
 
 ---
 
+## Service Account Impersonation
+
+Impersonation lets you authenticate as yourself and run queries as a service account. The
+driver exchanges your credentials for a short-lived token belonging to the target service
+account, so nothing long-lived has to be distributed.
+
+This is not an `authType` value. It wraps whichever authentication method the connection
+already uses, named by the `impersonateServiceAccount` property.
+
+### Setup
+
+Grant the caller — your own user, or the service account the connection authenticates as —
+`roles/iam.serviceAccountTokenCreator` on the target:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+  etl@my-project.iam.gserviceaccount.com \
+  --member="user:me@example.com" \
+  --role="roles/iam.serviceAccountTokenCreator"
+```
+
+The target service account needs whatever BigQuery roles the queries require
+(`roles/bigquery.jobUser`, plus dataset access). The caller does not.
+
+The `iamcredentials.googleapis.com` API must be enabled on the project holding the target.
+
+### Usage
+
+With Application Default Credentials as the source:
+
+```java
+String url = "jdbc:bigquery:my-project/my_dataset?" +
+             "impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com";
+
+try (Connection conn = DriverManager.getConnection(url)) {
+    // Queries run as etl@my-project.iam.gserviceaccount.com
+}
+```
+
+With a service account key file as the source:
+
+```java
+String url = "jdbc:bigquery:my-project/my_dataset?" +
+             "authType=SERVICE_ACCOUNT&" +
+             "credentials=/keys/bootstrap.json&" +
+             "impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com";
+```
+
+### Delegation chains
+
+When the caller cannot mint a token for the target directly but can reach it through
+intermediates, list them in `impersonateDelegates`, source-first:
+
+```java
+String url = "jdbc:bigquery:my-project/my_dataset?" +
+             "impersonateServiceAccount=etl@my-project.iam.gserviceaccount.com&" +
+             "impersonateDelegates=mid1@my-project.iam.gserviceaccount.com," +
+             "mid2@my-project.iam.gserviceaccount.com";
+```
+
+Each link needs its own grant: the caller must hold `serviceAccountTokenCreator` on `mid1`,
+`mid1` on `mid2`, and `mid2` on the target. Most deployments need no delegates at all.
+
+### Configuration Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `impersonateServiceAccount` | No | Email of the service account to impersonate. Setting it enables impersonation |
+| `impersonateDelegates` | No | Comma-separated intermediate service account emails, source-first |
+
+`impersonateDelegates` without `impersonateServiceAccount` is rejected at connection time.
+
+### Verifying
+
+`SESSION_USER()` reports the identity BigQuery sees, which is the target when impersonation
+is in effect:
+
+```java
+try (Statement stmt = conn.createStatement();
+     ResultSet rs = stmt.executeQuery("SELECT SESSION_USER()")) {
+    rs.next();
+    System.out.println(rs.getString(1));
+}
+```
+
+---
+
 ## Authentication Comparison
 
 ### Security
@@ -352,6 +443,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 | User OAuth | Refresh token | ✅ | User specific |
 | Workforce | Config file | ✅ | User specific |
 | Workload | Config file | ✅ | Workload specific |
+| Impersonation | None — layered over one of the above | ✅ | Target service account |
 
 ### Use Case Matrix
 
@@ -365,6 +457,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 | Enterprise SSO | Workforce Identity |
 | Cloud Function | ADC (automatic) |
 | Lambda/external cloud | Workload Identity |
+| Running as a service account without distributing its key | ADC + `impersonateServiceAccount` |
 
 ---
 
@@ -396,9 +489,16 @@ fails fast with a message naming it:
 | `credentialConfigFile required for WORKFORCE authentication` | `authType=WORKFORCE` without the config file | Add `credentialConfigFile=/path/to/config.json` |
 | `credentialConfigFile required for WORKLOAD authentication` | `authType=WORKLOAD` without the config file | Add `credentialConfigFile=/path/to/config.json` |
 | `Unsupported authentication type` | `authType` is not one of the five values | Use `ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`, `WORKFORCE` or `WORKLOAD` |
+| `impersonateDelegates requires impersonateServiceAccount` | A delegation chain with no target | Add `impersonateServiceAccount=sa@project.iam.gserviceaccount.com` |
 
 Errors raised by Google Cloud rather than the driver — expired credentials, insufficient
 IAM permissions, a project that does not exist — surface with the service's own message.
+
+Impersonation is validated by Google Cloud, not the driver, and the token is minted on the
+first query rather than at connection time. A missing
+`roles/iam.serviceAccountTokenCreator` grant therefore fails on that first statement with
+`Error requesting access token`; the `PERMISSION_DENIED` naming
+`iam.serviceAccounts.getAccessToken` is in the exception's cause chain.
 
 ---
 
