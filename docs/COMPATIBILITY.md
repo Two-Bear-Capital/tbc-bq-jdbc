@@ -188,7 +188,7 @@ projects, but a tool that enumerates everything up front will see nothing.
 |--------|:------:|-------|
 | `getCatalogs()` | ✅ | One row: the connection's project. Cached |
 | `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached |
-| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. For a view or materialized view, `REMARKS` carries its defining SQL |
+| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
 | `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW |
 | `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |

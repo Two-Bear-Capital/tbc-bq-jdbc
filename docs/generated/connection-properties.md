@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **28** connection properties.
+There are **29** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -29,6 +29,7 @@ There are **28** connection properties.
 | `metadataCacheTtl` | `300` | any | How long (seconds) to keep metadata in the cache before re-fetching |
 | `metadataCacheMaxRows` | `50000` | any | Ceiling on total rows held in the metadata cache; oldest entries are evicted above it. Set to 0 for no limit |
 | `metadataLazyLoad` | `false` | `true`, `false` | Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects) |
+| `metadataIncludeDescriptions` | `true` | `true`, `false` | Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets |
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |

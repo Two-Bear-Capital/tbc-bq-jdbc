@@ -134,7 +134,7 @@ class ConnectionPropertiesTest {
 		IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
 				() -> new ConnectionProperties("my-project", null, null, new ApplicationDefaultAuth(), null, null, null,
 						null, false, null, null, null, null, false, null, null, null, null, null, null, null, null,
-						null, new java.math.BigDecimal("-1")));
+						null, new java.math.BigDecimal("-1"), null));
 		assertTrue(e.getMessage().contains("queryPricePerTiB"), "the message should name the property: " + e);
 	}
 
