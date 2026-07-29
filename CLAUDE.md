@@ -40,6 +40,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 ### Running Tests
+**Read Maven's own `Tests run:` summary line, and use `clean`.** Summing
+`target/surefire-reports/*.txt` counts stale files from previous runs and will report a
+green total while CI fails — the reports accumulate unless `clean` removes them.
+
 ```bash
 # Unit tests only (fast, no Docker needed)
 ./mvnw test
@@ -393,6 +397,22 @@ version number, from the same `cliff.toml` parsers.
 | `feat(scope)!:` or a `BREAKING CHANGE:` footer | Breaking change | **major** (1.x → 2.0.0) |
 
 Example: `feat(auth): add workforce identity federation support` → a minor release.
+
+**`@since` names the version a thing ships in, not the version in `pom.xml`.** The pom
+holds the *last released* version and the bump happens after merge, so a `feat` added
+while the pom says 3.0.5 is `@since 3.1.0` and a `fix` is `@since 3.0.6`. Copying the pom
+is the easy mistake. Recent additions follow this — `ArrowSupport` is `@since 2.4.0` with
+the pom at 2.3.0, `KeyConstraints` 2.2.0 at 2.1.3 — though a few older files were tagged
+with whatever the pom said at the time.
+
+The next version is only a *prediction* while other PRs are in flight: anything that
+merges first bumps past you. Take the best guess from your own commit prefix, and do not
+hold up a PR over it — `git tag --contains <sha>` gives the real answer afterwards if it
+turns out to matter.
+
+**Milestones track the release a change lands in, not a theme.** `3.1.0` is additive work,
+`4.0.0` is breaking or result-changing. They are organisational only — `git-cliff` derives
+the version from commit prefixes and never reads them.
 
 The bump is computed by `git-cliff --bumped-version` in `version-and-release.yml`. If
 every commit since the last tag is one `cliff.toml` skips, the release falls back to a

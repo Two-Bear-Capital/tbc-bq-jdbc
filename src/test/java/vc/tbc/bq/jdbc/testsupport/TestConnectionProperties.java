@@ -46,7 +46,7 @@ import java.util.Map;
  * directly. Those tests are supposed to notice when the record changes, and
  * routing them through a builder would test the builder instead.
  *
- * @since 3.0.2
+ * @since 3.0.4
  */
 public final class TestConnectionProperties {
 
