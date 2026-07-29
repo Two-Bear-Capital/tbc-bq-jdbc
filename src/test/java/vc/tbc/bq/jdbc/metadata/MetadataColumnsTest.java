@@ -382,6 +382,47 @@ class MetadataColumnsTest {
 	}
 
 	@Test
+	void testAttributesColumnCount() {
+		assertEquals(21, MetadataColumns.Attributes.COLUMN_NAMES.length);
+		assertEquals(21, MetadataColumns.Attributes.COLUMN_TYPES.length);
+	}
+
+	/**
+	 * The result is always empty, so the columns are the only thing a caller can
+	 * read — spot-checks the two ends and the two that are not VARCHAR.
+	 */
+	@Test
+	void testAttributesColumnNamesAndTypes() {
+		String[] names = MetadataColumns.Attributes.COLUMN_NAMES;
+		int[] types = MetadataColumns.Attributes.COLUMN_TYPES;
+
+		assertEquals("TYPE_CAT", names[0]);
+		assertEquals("DATA_TYPE", names[4]);
+		assertEquals("IS_NULLABLE", names[16]);
+		assertEquals("SOURCE_DATA_TYPE", names[20]);
+		assertEquals(Types.INTEGER, types[4]);
+		assertEquals(Types.SMALLINT, types[20]);
+	}
+
+	@Test
+	void testClientInfoPropertiesColumnCount() {
+		assertEquals(4, MetadataColumns.ClientInfoProperties.COLUMN_NAMES.length);
+		assertEquals(4, MetadataColumns.ClientInfoProperties.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testClientInfoPropertiesColumnNamesAndTypes() {
+		String[] names = MetadataColumns.ClientInfoProperties.COLUMN_NAMES;
+		int[] types = MetadataColumns.ClientInfoProperties.COLUMN_TYPES;
+
+		assertEquals("NAME", names[0]);
+		assertEquals("MAX_LEN", names[1]);
+		assertEquals("DEFAULT_VALUE", names[2]);
+		assertEquals("DESCRIPTION", names[3]);
+		assertEquals(Types.INTEGER, types[1]);
+	}
+
+	@Test
 	void testProceduresColumnCount() {
 		assertEquals(8, MetadataColumns.Procedures.COLUMN_NAMES.length);
 		assertEquals(8, MetadataColumns.Procedures.COLUMN_TYPES.length);

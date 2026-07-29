@@ -192,13 +192,14 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getProcedures()` / `getProcedureColumns()` | ✅ | From `INFORMATION_SCHEMA`, cached. Routine bodies are not returned |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keyword and function lists | ✅ | JDBC version reports 4.3. `getDatabaseProductName()` is `BigQuery (TBC Driver)` and `getDatabaseProductVersion()` is `2.0` |
-| `getFunctions()`, `getFunctionColumns()`, `getPseudoColumns()`, `getClientInfoProperties()`, `getAttributes()` | ❌ | Throw `SQLFeatureNotSupportedException` |
+| `getFunctions()`, `getFunctionColumns()`, `getPseudoColumns()` | ❌ | Throw `SQLFeatureNotSupportedException` |
 | `getPrimaryKeys()` | ✅ | Declared `PRIMARY KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getImportedKeys()`, `getExportedKeys()`, `getCrossReference()` | ✅ | Declared `FOREIGN KEY ... NOT ENFORCED` constraints, cached — [see below](#unenforced-primary-and-foreign-keys) |
 | `getIndexInfo()` | ⚠️ | BigQuery has no indexes; returns empty |
 | `getColumnPrivileges()`, `getTablePrivileges()` | ⚠️ | BigQuery uses IAM; returns empty |
 | `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
-| `getUDTs()`, `getSuperTypes()`, `getSuperTables()` | ⚠️ | Not applicable; returns empty |
+| `getUDTs()`, `getSuperTypes()`, `getSuperTables()`, `getAttributes()` | ⚠️ | BigQuery has no user-defined types; returns empty |
+| `getClientInfoProperties()` | ⚠️ | The driver accepts no client info properties; returns empty |
 
 ### Unenforced primary and foreign keys
 

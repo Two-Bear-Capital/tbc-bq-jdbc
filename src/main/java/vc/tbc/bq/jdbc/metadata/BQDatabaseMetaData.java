@@ -2175,10 +2175,24 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				new java.util.ArrayList<>());
 	}
 
+	/**
+	 * Returns an empty result set: BigQuery has no user-defined types, so there are
+	 * no attributes to describe.
+	 *
+	 * <p>
+	 * Empty is the answer JDBC specifies here, not a failure. This used to throw
+	 * {@code SQLFeatureNotSupportedException}, which tools that call it during
+	 * connection setup read as a broken driver rather than an absent feature.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getAttributes(String catalog, String schemaPattern, String typeNamePattern,
 			String attributeNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getAttributes not supported");
+		checkClosed();
+		logger.debug("getAttributes() called - BigQuery has no user-defined types, returning empty result");
+		return createResultSet(MetadataColumns.Attributes.COLUMN_NAMES, MetadataColumns.Attributes.COLUMN_TYPES,
+				new java.util.ArrayList<>());
 	}
 
 	@Override
@@ -2316,9 +2330,24 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		return false;
 	}
 
+	/**
+	 * Returns an empty result set: the driver supports no client-info properties.
+	 *
+	 * <p>
+	 * That is an empty result, not an unsupported operation —
+	 * {@code Connection.setClientInfo} accordingly ignores whatever it is handed
+	 * and {@code getClientInfo} reports nothing back. This used to throw
+	 * {@code SQLFeatureNotSupportedException}, and tools call it while opening a
+	 * connection, so the driver looked broken before the first query ran.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getClientInfoProperties() throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getClientInfoProperties not supported");
+		checkClosed();
+		logger.debug("getClientInfoProperties() called - no client info properties supported, returning empty result");
+		return createResultSet(MetadataColumns.ClientInfoProperties.COLUMN_NAMES,
+				MetadataColumns.ClientInfoProperties.COLUMN_TYPES, new java.util.ArrayList<>());
 	}
 
 	@Override
