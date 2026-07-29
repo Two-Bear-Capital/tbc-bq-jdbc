@@ -25,6 +25,7 @@ import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
+import vc.tbc.bq.jdbc.exception.ServiceErrorDetail;
 import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 import vc.tbc.bq.jdbc.storage.ArrowSupport;
 import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
@@ -515,7 +516,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			return QueryCostEstimate.of(bytesProcessed, estimatedBytes, bytesBilled, properties.queryPricePerTiB());
 
 		} catch (BigQueryException e) {
-			throw new BQSQLException("Dry-run failed: " + e.getMessage(), e);
+			throw new BQSQLException("Dry-run failed: " + e.getMessage(), sqlStateFor(e), e);
 		}
 	}
 
@@ -634,7 +635,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			return currentResultSet;
 
 		} catch (BigQueryException e) {
-			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
+			throw new BQSQLException("Query execution failed: " + e.getMessage(), sqlStateFor(e), e);
 		}
 	}
 
@@ -690,14 +691,14 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				throw new BQSQLException(failure.getMessage(), failure.getSQLState(), failure);
 			}
 			if (cause instanceof BigQueryException bqe) {
-				throw new BQSQLException(bqe.getMessage(), sqlStateFor(bqe.getError()), bqe);
+				throw new BQSQLException(bqe.getMessage(), sqlStateFor(bqe), bqe);
 			}
 			if (cause instanceof RuntimeException) {
 				throw new BQSQLException(cause.getMessage(), BQSQLException.SQLSTATE_GENERAL_ERROR, cause);
 			}
 			throw new BQSQLException("Query execution failed: " + cause.getMessage(), cause);
 		} catch (BigQueryException e) {
-			throw new BQSQLException("Query execution failed: " + e.getMessage(), e);
+			throw new BQSQLException("Query execution failed: " + e.getMessage(), sqlStateFor(e), e);
 		}
 	}
 
@@ -1202,6 +1203,37 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *            the BigQuery error, may be null
 	 * @return the mapped SQLState, never null
 	 */
+	/**
+	 * SQLState for a {@link BigQueryException}, including the client-side failures
+	 * that never reached BigQuery.
+	 *
+	 * <p>
+	 * BigQuery's own error reason decides whenever there is one — that is what
+	 * keeps a 403 on a table reported as {@code 42501} rather than as an
+	 * authentication failure. Only when there is no reason at all, which is the
+	 * signature of a credential that could not be minted or refreshed, does the
+	 * cause chain get a say.
+	 *
+	 * <p>
+	 * The distinction is not cosmetic. Connection pools and BI tools branch on the
+	 * SQLState class: {@code 28} means "invalid authorization specification" and
+	 * triggers a re-authenticate, where {@code HY000} says only that something went
+	 * wrong — so an expired or ungranted credential was retried to the ceiling
+	 * instead of being reported.
+	 *
+	 * @param exception
+	 *            the failure to classify
+	 * @return the SQLState to report
+	 */
+	static String sqlStateFor(BigQueryException exception) {
+		String state = sqlStateFor(exception == null ? null : exception.getError());
+		if (BQSQLException.SQLSTATE_GENERAL_ERROR.equals(state)
+				&& ServiceErrorDetail.isAuthenticationFailure(exception)) {
+			return BQSQLException.SQLSTATE_AUTH_FAILED;
+		}
+		return state;
+	}
+
 	static String sqlStateFor(BigQueryError error) {
 		String reason = error == null ? null : error.getReason();
 		if (reason == null) {

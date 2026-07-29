@@ -98,6 +98,34 @@ public final class ServiceErrorDetail {
 	}
 
 	/**
+	 * Whether a failure was the credential being rejected, rather than the request.
+	 *
+	 * <p>
+	 * True when the cause chain carries an HTTP 401 or 403. That is deliberately
+	 * only half the test — the caller must already have established that BigQuery
+	 * reported no error reason of its own, because a 403 means two different things
+	 * depending on who sent it:
+	 *
+	 * <ul>
+	 * <li>From an <b>auth endpoint</b> it means the credential could not be minted
+	 * or refreshed. There is no {@code BigQueryError}, because the request never
+	 * reached BigQuery.
+	 * <li>From <b>BigQuery</b> it means the caller is authenticated but not
+	 * authorised for a table. That arrives with reason {@code accessDenied}, which
+	 * already maps to {@code 42501}, and must not be turned into an authentication
+	 * failure — a pool would re-authenticate instead of surfacing a missing grant.
+	 * </ul>
+	 *
+	 * @param cause
+	 *            the failure being wrapped, or null
+	 * @return true when the chain shows a rejected credential
+	 */
+	public static boolean isAuthenticationFailure(Throwable cause) {
+		HttpResponseException http = findHttpResponse(cause);
+		return http != null && (http.getStatusCode() == 401 || http.getStatusCode() == 403);
+	}
+
+	/**
 	 * Walks to the deepest {@link HttpResponseException} in the chain.
 	 *
 	 * <p>

@@ -496,6 +496,11 @@ IAM permissions, a project that does not exist — surface with the service's ow
 When the service returns an explanation the client library's summary leaves out, the driver
 appends it to `SQLException.getMessage()`, so it is visible without walking the cause chain.
 
+A rejected credential reports SQLState `28000` (invalid authorization specification), so a
+connection pool can re-authenticate rather than retry. A `403` from BigQuery itself — you are
+authenticated but not authorised for a table — stays `42501`, because those need different
+responses.
+
 Impersonation is validated by Google Cloud, not the driver, and the token is minted on the
 first query rather than at connection time. A missing
 `roles/iam.serviceAccountTokenCreator` grant therefore fails on that first statement:

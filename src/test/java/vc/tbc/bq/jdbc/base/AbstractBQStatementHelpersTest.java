@@ -15,7 +15,10 @@
  */
 package vc.tbc.bq.jdbc.base;
 
+import com.google.api.client.http.HttpHeaders;
+import com.google.api.client.http.HttpResponseException;
 import com.google.cloud.bigquery.BigQueryError;
+import com.google.cloud.bigquery.BigQueryException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -163,7 +166,57 @@ class AbstractBQStatementHelpersTest {
 		void mapsUnknownAndMissingReasonsToGeneralError() {
 			assertEquals(BQSQLException.SQLSTATE_GENERAL_ERROR, AbstractBQStatement.sqlStateFor(error("backendError")));
 			assertEquals(BQSQLException.SQLSTATE_GENERAL_ERROR, AbstractBQStatement.sqlStateFor(error(null)));
-			assertEquals(BQSQLException.SQLSTATE_GENERAL_ERROR, AbstractBQStatement.sqlStateFor(null));
+			assertEquals(BQSQLException.SQLSTATE_GENERAL_ERROR, AbstractBQStatement.sqlStateFor((BigQueryError) null));
+		}
+
+		/** An HTTP failure of the given status, as a cause chain. */
+		private static HttpResponseException httpError(int status) {
+			return new HttpResponseException.Builder(status, "denied", new HttpHeaders())
+					.setContent("{\"error\":{\"message\":\"nope\"}}").build();
+		}
+
+		@Test
+		@DisplayName("a rejected credential reports 28000, not a general error")
+		void mapsCredentialRejectionToAuthenticationFailure() {
+			// Given: The shape a credential failure takes — no BigQuery error
+			// reason, because the request never reached BigQuery
+			BigQueryException failure = new BigQueryException(0, "Error requesting access token",
+					new java.io.IOException("Error requesting access token", httpError(403)));
+
+			// Then: A pool branching on the SQLState class can re-authenticate
+			assertEquals(BQSQLException.SQLSTATE_AUTH_FAILED, AbstractBQStatement.sqlStateFor(failure));
+		}
+
+		@Test
+		void mapsAnExpiredCredentialTo28000() {
+			BigQueryException failure = new BigQueryException(0, "Unauthorized",
+					new java.io.IOException("token expired", httpError(401)));
+			assertEquals(BQSQLException.SQLSTATE_AUTH_FAILED, AbstractBQStatement.sqlStateFor(failure));
+		}
+
+		@Test
+		@DisplayName("BigQuery's own 403 stays 42501 — it is authorisation, not authentication")
+		void doesNotTurnATablePermissionFailureIntoAnAuthenticationFailure() {
+			// Given: A 403 that BigQuery itself sent, so it carries a reason
+			BigQueryException failure = new BigQueryException(403, "Access Denied: Table …", error("accessDenied"));
+
+			// Then: The reason wins. Reporting 28000 would send a pool off to
+			// re-authenticate a credential that is working, instead of surfacing a
+			// missing grant
+			assertEquals(BQSQLException.SQLSTATE_INSUFFICIENT_PRIVILEGE, AbstractBQStatement.sqlStateFor(failure));
+		}
+
+		@Test
+		void leavesFailuresWithNoHttpStatusAsGeneralErrors() {
+			// Given: A client-side failure with nothing in the chain to classify
+			BigQueryException failure = new BigQueryException(0, "connection reset",
+					new java.io.IOException("connection reset"));
+
+			// Then: Unchanged — guessing 28000 from "something failed" would be
+			// worse than admitting the driver does not know
+			assertEquals(BQSQLException.SQLSTATE_GENERAL_ERROR, AbstractBQStatement.sqlStateFor(failure));
+			assertEquals(BQSQLException.SQLSTATE_GENERAL_ERROR,
+					AbstractBQStatement.sqlStateFor((BigQueryException) null));
 		}
 	}
 }
