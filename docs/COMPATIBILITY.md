@@ -226,7 +226,7 @@ projects, but a tool that enumerates everything up front will see nothing.
 
 | Method | Support | Notes |
 |--------|:------:|-------|
-| `getCatalogs()` | ✅ | One row: the connection's project. Cached |
+| `getCatalogs()` | ✅ | The connection's project, plus any named by `additionalProjects`, ordered by `TABLE_CAT`. Cached — [see below](#browsing-more-than-one-project) |
 | `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached. Also reports a synthetic `INFORMATION_SCHEMA` schema unless `includeInformationSchema=false` |
 | `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry. `INFORMATION_SCHEMA` views are included as `SYSTEM TABLE` — see below |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
@@ -243,6 +243,42 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
 | `getUDTs()`, `getSuperTypes()`, `getSuperTables()`, `getAttributes()` | ⚠️ | BigQuery has no user-defined types; returns empty |
 | `getClientInfoProperties()` | ⚠️ | The driver accepts no client info properties; returns empty |
+
+### Browsing more than one project
+
+Catalogs are projects. BigQuery queries across projects natively, and the metadata methods
+have always honoured an explicit `catalog` argument — what was missing was **discovery**
+and **switching**.
+
+`additionalProjects` names further projects to report from `getCatalogs()`:
+
+```
+jdbc:bigquery:my-project/my_dataset?additionalProjects=other-project,third-project
+```
+
+They are not discovered automatically. Listing every project a credential can see is a
+Resource Manager call, slow on a large organisation, and returns mostly projects with no
+BigQuery data.
+
+`setCatalog()` moves the project that a **null** `catalog` argument resolves to:
+
+```java
+conn.setCatalog("other-project");
+conn.getMetaData().getSchemas();              // other-project's datasets
+conn.getMetaData().getSchemas("my-project", null);  // an explicit argument still wins
+conn.setCatalog(null);                        // back to the connection's own project
+```
+
+- An unusable project id is **rejected**, not ignored. `setCatalog()` used to be a silent
+  no-op, so a caller had no way to tell a switch that did not happen from one that did.
+- A project need not be in `additionalProjects` to be switched to — that property controls
+  what is *listed*, not what is reachable.
+- **Billing does not move.** The project that owns and is billed for jobs is fixed when the
+  connection opens; `setCatalog()` changes only which project metadata and unqualified
+  names default to. Querying another project's data bills the connection's project, which
+  is how BigQuery cross-project access already works.
+- `datasetProjectId` is unaffected and still points the *default dataset* at another
+  project.
 
 ### Browsing INFORMATION_SCHEMA
 

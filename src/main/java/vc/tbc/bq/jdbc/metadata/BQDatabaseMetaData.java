@@ -747,7 +747,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private ResultSet executeGetProcedures(String catalog, String schemaPattern, String procedureNamePattern)
 			throws SQLException {
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		BigQuery bigquery = connection.getBigQuery();
 
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
@@ -924,7 +924,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private ResultSet executeGetProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern,
 			String columnNamePattern) throws SQLException {
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		BigQuery bigquery = connection.getBigQuery();
 
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
@@ -1077,7 +1077,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private ResultSet executeGetTables(String catalog, String schemaPattern, String tableNamePattern, String[] types)
 			throws SQLException {
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 
 		BigQuery bigquery = connection.getBigQuery();
 		boolean lazyLoad = connection.getProperties().metadataLazyLoad();
@@ -1502,12 +1502,22 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		checkClosed();
 
 		return getCachedOrExecute("catalogs", () -> {
-			// BigQuery: Catalogs = Projects
-			// Return the current project
-			String projectId = connection.getProperties().projectId();
+			// Catalogs are projects. The connection's own is always reported; the
+			// rest are the ones the caller named, because there is no cheap way to
+			// discover them — listing every project a credential can see is a
+			// Resource Manager call, is slow on a large organisation, and returns
+			// mostly projects that have no BigQuery data at all.
+			java.util.List<String> projects = new java.util.ArrayList<>();
+			projects.add(connection.getProperties().projectId());
+			projects.addAll(connection.getProperties().additionalProjects());
+			// Sorted because JDBC specifies getCatalogs() ordered by TABLE_CAT, and
+			// the configured order is whatever the URL happened to say.
+			projects.sort(String::compareTo);
 
-			java.util.List<Object[]> rows = new java.util.ArrayList<>();
-			rows.add(new Object[]{projectId});
+			java.util.List<Object[]> rows = new java.util.ArrayList<>(projects.size());
+			for (String project : projects) {
+				rows.add(new Object[]{project});
+			}
 
 			return createResultSet(MetadataColumns.Catalogs.COLUMN_NAMES, MetadataColumns.Catalogs.COLUMN_TYPES, rows);
 		});
@@ -1890,7 +1900,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private ResultSet executeGetColumns(String catalog, String schemaPattern, String tableNamePattern,
 			String columnNamePattern) throws SQLException {
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 
 		BigQuery bigquery = connection.getBigQuery();
 		boolean lazyLoad = connection.getProperties().metadataLazyLoad();
@@ -2132,7 +2142,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		logger.debug("getPrimaryKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId,
 				datasetsToScan(projectId, schema));
 
@@ -2175,7 +2185,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		logger.debug("getImportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId,
 				datasetsToScan(projectId, schema));
 
@@ -2218,7 +2228,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		logger.debug("getExportedKeys() called - catalog: [{}], schema: [{}], table: [{}]", catalog, schema, table);
 
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId, allDatasets(projectId));
 
 		java.util.List<KeyConstraints.Constraint> foreignKeys = constraints.stream().filter(c -> !c.primaryKey()
@@ -2261,7 +2271,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		logger.debug("getCrossReference() called - parent: [{}].[{}].[{}], foreign: [{}].[{}].[{}]", parentCatalog,
 				parentSchema, parentTable, foreignCatalog, foreignSchema, foreignTable);
 
-		String projectId = foreignCatalog != null ? foreignCatalog : connection.getProperties().projectId();
+		String projectId = foreignCatalog != null ? foreignCatalog : connection.getCurrentCatalog();
 		java.util.List<KeyConstraints.Constraint> constraints = loadConstraints(projectId,
 				datasetsToScan(projectId, foreignSchema));
 
@@ -2326,7 +2336,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			}
 			String parentProject = fk.referencedCatalog() != null
 					? fk.referencedCatalog()
-					: connection.getProperties().projectId();
+					: connection.getCurrentCatalog();
 			missing.computeIfAbsent(parentProject, ignored -> new java.util.LinkedHashSet<>())
 					.add(fk.referencedSchema());
 		}
@@ -2889,7 +2899,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		String cacheKey = "schemas:" + catalog + ":" + schemaPattern;
 
 		return getCachedOrExecute(cacheKey, () -> {
-			String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+			String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 			BigQuery bigquery = connection.getBigQuery();
 
 			java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
@@ -2980,7 +2990,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private ResultSet executeGetFunctions(String catalog, String schemaPattern, String functionNamePattern)
 			throws SQLException {
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		BigQuery bigquery = connection.getBigQuery();
 
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
@@ -3047,7 +3057,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private ResultSet executeGetFunctionColumns(String catalog, String schemaPattern, String functionNamePattern,
 			String columnNamePattern) throws SQLException {
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		BigQuery bigquery = connection.getBigQuery();
 
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
@@ -3161,7 +3171,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 	private ResultSet executeGetPseudoColumns(String catalog, String schemaPattern, String tableNamePattern,
 			String columnNamePattern) throws SQLException {
-		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		String projectId = catalog != null ? catalog : connection.getCurrentCatalog();
 		BigQuery bigquery = connection.getBigQuery();
 
 		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
@@ -3332,7 +3342,16 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	private String metadataShapeKey() {
 		ConnectionProperties properties = connection.getProperties();
 		return (properties.includeInformationSchema() ? "i" : "-") + (properties.collapseShardedTables() ? "s" : "-")
-				+ (properties.metadataIncludeDescriptions() ? "d" : "-") + "|";
+				+ (properties.metadataIncludeDescriptions() ? "d" : "-")
+				// The current catalog belongs here for the same reason: a null
+				// catalog argument resolves against it, so two connections pointed at
+				// different projects build identical call-site keys for different
+				// answers. setCatalog moving it mid-connection has the same effect.
+				+ "@" + connection.getCurrentCatalog()
+				// And the configured projects, because getCatalogs() is built from
+				// them and its call-site key is the constant "catalogs" — without
+				// this, the first connection to ask decides what every later one sees.
+				+ "+" + properties.additionalProjects() + "|";
 	}
 
 	private ResultSet getCachedOrExecute(String rawKey, SqlSupplier<ResultSet> supplier) throws SQLException {
