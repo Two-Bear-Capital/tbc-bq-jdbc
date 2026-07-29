@@ -362,14 +362,59 @@ public abstract class BaseReadOnlyResultSet extends BaseCloseable implements Res
 		throw new BQSQLFeatureNotSupportedException("URL not supported");
 	}
 
+	/**
+	 * Returns the column value, refusing a populated type map.
+	 *
+	 * <p>
+	 * This used to accept the map and ignore it, handing back the default mapping
+	 * of a caller that had asked for a custom one — no exception, no warning, wrong
+	 * answer. Every other type-map path in the driver refuses:
+	 * {@code Connection.setTypeMap} throws and {@code getTypeMap} returns an empty
+	 * map. This one now agrees with them.
+	 *
+	 * <p>
+	 * A null or empty map still delegates, because there is then nothing to ignore
+	 * — and a tool that passes {@code getTypeMap()} straight back in keeps working.
+	 *
+	 * @param columnIndex
+	 *            the column, 1-based
+	 * @param map
+	 *            the type map; must be null or empty
+	 * @throws SQLFeatureNotSupportedException
+	 *             if the map declares any mapping
+	 * @since 3.1.0
+	 */
 	@Override
 	public Object getObject(int columnIndex, Map<String, Class<?>> map) throws SQLException {
+		rejectPopulatedTypeMap(map);
 		return getObject(columnIndex);
 	}
 
+	/**
+	 * The label form of {@link #getObject(int, Map)}, with the same refusal.
+	 *
+	 * @param columnLabel
+	 *            the column label
+	 * @param map
+	 *            the type map; must be null or empty
+	 * @throws SQLFeatureNotSupportedException
+	 *             if the map declares any mapping
+	 * @since 3.1.0
+	 */
 	@Override
 	public Object getObject(String columnLabel, Map<String, Class<?>> map) throws SQLException {
-		return getObject(findColumn(columnLabel), map);
+		rejectPopulatedTypeMap(map);
+		return getObject(findColumn(columnLabel));
+	}
+
+	/**
+	 * Refuses a type map that asks for something, wording it as
+	 * {@code Connection.setTypeMap} does so the two read as one answer.
+	 */
+	private static void rejectPopulatedTypeMap(Map<String, Class<?>> map) throws SQLException {
+		if (map != null && !map.isEmpty()) {
+			throw new BQSQLFeatureNotSupportedException("Custom type maps not supported");
+		}
 	}
 
 	@Override
