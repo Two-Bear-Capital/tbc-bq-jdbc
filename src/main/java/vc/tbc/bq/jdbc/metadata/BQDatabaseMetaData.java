@@ -806,12 +806,17 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 					rows.add(mapped);
 				}
 			}
+		} catch (InterruptedException e) {
+			// Swallowing this along with everything else would leave the thread's
+			// interrupt flag cleared, and these run on the virtual threads of the
+			// parallel scan — whoever asked for the cancellation would never see it.
+			Thread.currentThread().interrupt();
+			logger.warn("Interrupted reading {} for dataset {}.{}", view, projectId, datasetId);
+			// The interrupt can only come from bigquery.query(), which is before the
+			// first row is read, so there is nothing partial to discard here — the
+			// dataset contributes nothing, like any other dataset that failed to read.
+			return java.util.List.of();
 		} catch (Exception e) {
-			// Preserves the existing swallow-and-log behaviour verbatim, including
-			// that an InterruptedException does not re-set the interrupt flag here.
-			// That is a real gap — queryConstraintsForDataset handles it properly —
-			// but fixing it is a behaviour change and belongs in its own issue.
-			// Having one place to fix rather than two is part of the point.
 			logger.warn("Could not query {} for dataset {}: {}", view, datasetId, e.getMessage());
 		}
 		return rows;
