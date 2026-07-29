@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.sql.SQLException;
 import java.util.List;
 
+import static vc.tbc.bq.jdbc.testsupport.TestResultSets.singleColumn;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
@@ -50,25 +51,12 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class BQResultSetTest {
 
-	@Mock
-	private TableResult mockTableResult;
-
-	private BQResultSet createResultSet(Schema schema, FieldValueList row) throws SQLException {
-		when(mockTableResult.getSchema()).thenReturn(schema);
-		when(mockTableResult.iterateAll()).thenReturn(List.of(row));
-		return new BQResultSet(null, mockTableResult);
-	}
-
 	// ── getInt ────────────────────────────────────────────────────────────────
 
 	@Test
 	void testGetIntByLabelOnFloat64WholeValueReturnsInt() throws SQLException {
 		// Given: FLOAT64 column returning "25.0" (e.g. SELECT 100/4 in BigQuery)
-		Schema schema = Schema.of(Field.of("quotient", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "25.0")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("quotient", StandardSQLTypeName.FLOAT64, "25.0");
 		assertTrue(rs.next());
 
 		// When / Then: should not throw NumberFormatException
@@ -77,11 +65,7 @@ class BQResultSetTest {
 
 	@Test
 	void testGetIntByIndexOnFloat64WholeValueReturnsInt() throws SQLException {
-		Schema schema = Schema.of(Field.of("quotient", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "25.0")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("quotient", StandardSQLTypeName.FLOAT64, "25.0");
 		assertTrue(rs.next());
 
 		assertEquals(25, rs.getInt(1));
@@ -90,11 +74,7 @@ class BQResultSetTest {
 	@Test
 	void testGetIntByLabelOnFloat64DecimalTruncatesPerJdbcSpec() throws SQLException {
 		// JDBC spec: getInt() on a fractional value truncates toward zero
-		Schema schema = Schema.of(Field.of("val", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "25.7")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("val", StandardSQLTypeName.FLOAT64, "25.7");
 		assertTrue(rs.next());
 
 		assertEquals(25, rs.getInt("val"));
@@ -103,11 +83,7 @@ class BQResultSetTest {
 	@Test
 	void testGetIntByLabelOnInt64ReturnsCorrectValue() throws SQLException {
 		// Regression: INT64 columns must still work correctly
-		Schema schema = Schema.of(Field.of("age", StandardSQLTypeName.INT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "30")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("age", StandardSQLTypeName.INT64, "30");
 		assertTrue(rs.next());
 
 		assertEquals(30, rs.getInt("age"));
@@ -115,11 +91,7 @@ class BQResultSetTest {
 
 	@Test
 	void testGetIntByLabelOnFloat64NullReturnsZero() throws SQLException {
-		Schema schema = Schema.of(Field.of("val", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, null)),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("val", StandardSQLTypeName.FLOAT64, null);
 		assertTrue(rs.next());
 
 		assertEquals(0, rs.getInt("val"));
@@ -130,11 +102,7 @@ class BQResultSetTest {
 
 	@Test
 	void testGetLongByLabelOnFloat64WholeValueReturnsLong() throws SQLException {
-		Schema schema = Schema.of(Field.of("quotient", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "25.0")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("quotient", StandardSQLTypeName.FLOAT64, "25.0");
 		assertTrue(rs.next());
 
 		assertEquals(25L, rs.getLong("quotient"));
@@ -142,11 +110,7 @@ class BQResultSetTest {
 
 	@Test
 	void testGetLongByIndexOnFloat64WholeValueReturnsLong() throws SQLException {
-		Schema schema = Schema.of(Field.of("quotient", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "25.0")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("quotient", StandardSQLTypeName.FLOAT64, "25.0");
 		assertTrue(rs.next());
 
 		assertEquals(25L, rs.getLong(1));
@@ -156,11 +120,7 @@ class BQResultSetTest {
 
 	@Test
 	void testGetShortByLabelOnFloat64WholeValueReturnsShort() throws SQLException {
-		Schema schema = Schema.of(Field.of("val", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "10.0")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("val", StandardSQLTypeName.FLOAT64, "10.0");
 		assertTrue(rs.next());
 
 		assertEquals((short) 10, rs.getShort("val"));
@@ -170,11 +130,7 @@ class BQResultSetTest {
 
 	@Test
 	void testGetByteByLabelOnFloat64WholeValueReturnsByte() throws SQLException {
-		Schema schema = Schema.of(Field.of("val", StandardSQLTypeName.FLOAT64));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, "10.0")),
-				schema.getFields());
-
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("val", StandardSQLTypeName.FLOAT64, "10.0");
 		assertTrue(rs.next());
 
 		assertEquals((byte) 10, rs.getByte("val"));
@@ -213,10 +169,7 @@ class BQResultSetTest {
 	// name, which is how it stayed hidden.
 
 	private BQResultSet stringColumnContaining(String raw) throws SQLException {
-		Schema schema = Schema.of(Field.of("val", StandardSQLTypeName.STRING));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, raw)),
-				schema.getFields());
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("val", StandardSQLTypeName.STRING, raw);
 		assertTrue(rs.next());
 		return rs;
 	}
@@ -255,10 +208,7 @@ class BQResultSetTest {
 	// ── getBoolean coercion per the JDBC conversion table ─────────────────────
 
 	private BQResultSet singleValue(StandardSQLTypeName type, String raw) throws SQLException {
-		Schema schema = Schema.of(Field.of("flag", type));
-		FieldValueList row = FieldValueList.of(List.of(FieldValue.of(FieldValue.Attribute.PRIMITIVE, raw)),
-				schema.getFields());
-		BQResultSet rs = createResultSet(schema, row);
+		BQResultSet rs = singleColumn("flag", type, raw);
 		assertTrue(rs.next());
 		return rs;
 	}
