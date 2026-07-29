@@ -40,6 +40,7 @@ import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
+import vc.tbc.bq.jdbc.util.SqlStringLiterals;
 
 import java.sql.*;
 import java.util.Locale;
@@ -1143,7 +1144,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			String tableName = table.getTableId().getTable();
 
 			// Apply table name pattern filter
-			if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+			if (tableNamePattern != null && !matchesTableNameFilter(tableName, tableNamePattern)) {
 				continue;
 			}
 
@@ -1163,6 +1164,9 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				continue;
 			}
 
+			// Always empty in practice: tables.list does not return description, so
+			// this is filled in by fillInRemarks below. Kept because a future listing
+			// that does carry one should win over the INFORMATION_SCHEMA read.
 			String remarks = table.getDescription() != null ? table.getDescription() : "";
 
 			rows.add(new Object[]{projectId, // TABLE_CAT
@@ -1178,8 +1182,97 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			});
 		}
 
-		fillInViewDefinitions(projectId, datasetId, rows);
-		return rows;
+		fillInRemarks(projectId, datasetId, rows);
+		return collapseShards(rows);
+	}
+
+	/**
+	 * Applies the caller's table-name filter, additionally letting a wildcard name
+	 * stand for the shards it collapses.
+	 *
+	 * <p>
+	 * {@code getTables(…, "events_*")} would otherwise match nothing: {@code *} is
+	 * not a JDBC pattern character, and the {@code _} in it is a single-character
+	 * wildcard, so the pattern reads as "events, any character, a literal
+	 * asterisk". Asking for the name the driver just reported has to work.
+	 *
+	 * <p>
+	 * A shard's own name still matches itself, so an exact lookup of
+	 * {@code events_20260101} keeps returning that one table even with collapsing
+	 * on. Only the unfiltered listing loses the individual rows, which is where the
+	 * 365-rows-per-year problem actually lives.
+	 */
+	private boolean matchesTableNameFilter(String tableName, String tableNamePattern) {
+		if (matchesPattern(tableName, tableNamePattern)) {
+			return true;
+		}
+		if (!collapsesShards()) {
+			return false;
+		}
+		String prefix = ShardedTables.prefixOf(tableNamePattern);
+		return prefix != null && prefix.equals(ShardedTables.shardPrefix(tableName));
+	}
+
+	/** Whether this connection asked for date-sharded tables to be collapsed. */
+	private boolean collapsesShards() {
+		return connection.getProperties().collapseShardedTables();
+	}
+
+	/**
+	 * Replaces each date-sharded set in {@code rows} with one {@code prefix_*} row.
+	 *
+	 * <p>
+	 * A year of daily shards is 365 rows in a database tree for what its users
+	 * think of as one table, and it fills the metadata cache against
+	 * {@code metadataCacheMaxRows} for no benefit — JetBrains
+	 * <a href="https://youtrack.jetbrains.com/issue/DBE-10947">DBE-10947</a> and
+	 * <a href="https://youtrack.jetbrains.com/issue/DBE-12807">DBE-12807</a>.
+	 *
+	 * <p>
+	 * The collapsed row takes the first shard's position, so a set does not jump to
+	 * the end of the listing, and its {@code REMARKS} says what it stands for —
+	 * otherwise a wildcard name is the only clue that rows were removed. Any
+	 * description the shards carried is dropped with them: it belonged to one
+	 * shard, and the summary is the more useful thing to say about a set.
+	 *
+	 * <p>
+	 * Views and materialized views are grouped too if they are named this way.
+	 * Nothing about the convention is specific to tables, and a set of sharded
+	 * views has the same problem.
+	 *
+	 * @param rows
+	 *            the dataset's table rows
+	 * @return the rows with each shard set replaced by a single entry
+	 */
+	private java.util.List<Object[]> collapseShards(java.util.List<Object[]> rows) {
+		if (!collapsesShards()) {
+			return rows;
+		}
+
+		java.util.List<String> names = rows.stream().map(row -> (String) row[TABLE_ROW_NAME]).toList();
+		java.util.Map<String, java.util.List<String>> sets = ShardedTables.shardSets(names);
+		if (sets.isEmpty()) {
+			return rows;
+		}
+
+		java.util.Set<String> collapsed = new java.util.HashSet<>();
+		java.util.List<Object[]> result = new java.util.ArrayList<>(rows.size());
+		for (Object[] row : rows) {
+			String name = (String) row[TABLE_ROW_NAME];
+			String prefix = ShardedTables.shardPrefix(name);
+			if (prefix == null || !sets.containsKey(prefix)) {
+				result.add(row);
+				continue;
+			}
+			if (collapsed.add(prefix)) {
+				Object[] wildcard = row.clone();
+				wildcard[TABLE_ROW_NAME] = ShardedTables.wildcardName(prefix);
+				wildcard[TABLE_ROW_REMARKS] = ShardedTables.describe(sets.get(prefix));
+				result.add(wildcard);
+			}
+		}
+		logger.debug("Collapsed {} sharded set(s) into wildcard entries", sets.size());
+		return result;
 	}
 
 	/** Index of {@code TABLE_TYPE} in a {@link MetadataColumns.Tables} row. */
@@ -1188,63 +1281,134 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	/** Index of {@code REMARKS} in a {@link MetadataColumns.Tables} row. */
 	private static final int TABLE_ROW_REMARKS = 4;
 
+	/** Index of {@code TABLE_NAME} in a {@link MetadataColumns.Tables} row. */
+	private static final int TABLE_ROW_NAME = 2;
+
 	/**
-	 * Fills the {@code REMARKS} of any view in {@code rows} that has no description
-	 * with its defining SQL.
+	 * Fills the {@code REMARKS} of {@code rows} from {@code INFORMATION_SCHEMA}:
+	 * the author's description where there is one, and for a view the defining SQL
+	 * where there is not.
 	 *
 	 * <p>
-	 * An IDE that cannot show a view's SQL sends you to the BigQuery console —
-	 * JetBrains
-	 * <a href="https://youtrack.jetbrains.com/issue/DBE-12630">DBE-12630</a>. The
-	 * definition is not on the {@link Table} objects {@code listTables} returns:
-	 * that response carries {@code view.useLegacySql} and nothing else, so
-	 * {@code ViewDefinition.getQuery()} is null there and a per-table
-	 * {@code getTable()} would be one API call per view. One
-	 * {@code INFORMATION_SCHEMA.TABLES} read per dataset costs a query instead, and
-	 * only when the dataset actually contributed a view — a project of plain tables
-	 * pays nothing, which matters because this is the path IntelliJ walks on every
-	 * refresh.
+	 * Neither is on the {@link Table} objects {@code listTables} returns. That
+	 * response carries {@code view.useLegacySql} and nothing else of the view, so
+	 * {@code ViewDefinition.getQuery()} is null; and it omits {@code description}
+	 * entirely, so {@code Table.getDescription()} is null for every table and
+	 * {@code REMARKS} was uniformly the empty string. Only {@code tables.get}
+	 * returns either, which would be one API call per table.
 	 *
 	 * <p>
-	 * A description, where one exists, wins: it is what the author wrote for this
-	 * column. On this path there is never one to prefer — {@code tables.list} does
-	 * not return {@code description} either, so {@code Table.getDescription()} is
-	 * null for every table listed here and {@code REMARKS} was uniformly empty.
-	 * That is its own gap, not this one; the check stays so filling it later cannot
-	 * silently start overwriting descriptions. Nothing is lost meanwhile, because
-	 * BigQuery emits the description inside the DDL's {@code OPTIONS}.
+	 * Both answer a JetBrains request: an IDE that cannot show a view's SQL sends
+	 * you to the BigQuery console
+	 * (<a href="https://youtrack.jetbrains.com/issue/DBE-12630">DBE-12630</a>), and
+	 * a table comment that is always blank is indistinguishable from a table that
+	 * has none.
+	 *
+	 * <p>
+	 * <b>One query per dataset serves both.</b> The descriptions live in
+	 * {@code TABLE_OPTIONS} and the DDL in {@code TABLES}, so a join reads them
+	 * together rather than twice. That matters because the two have different
+	 * reach: the definitions are wanted only for datasets that contributed a view,
+	 * while descriptions apply to every table, so folding them into one read is
+	 * what keeps a dataset of plain tables at one query rather than adding a second
+	 * to the datasets that already paid. This is the path IntelliJ walks on every
+	 * refresh — DBE-22088 — which is also why {@code metadataIncludeDescriptions}
+	 * exists to turn the description half off, falling back to the narrower
+	 * view-only read.
+	 *
+	 * <p>
+	 * A description wins over a definition: it is what the author wrote for this
+	 * column, and BigQuery emits it inside the DDL's {@code OPTIONS} anyway, so
+	 * nothing is lost by preferring it.
 	 *
 	 * <p>
 	 * {@code ddl} rather than {@code VIEWS.view_definition} because
 	 * {@code MATERIALIZED_VIEWS} has no definition column at all, so the DDL is the
-	 * only form that answers for both.
+	 * only form that answers for both. The DDL is selected only for views, since
+	 * for a large table it is a long string nothing here reads.
 	 */
-	private void fillInViewDefinitions(String projectId, String datasetId, java.util.List<Object[]> rows) {
+	private void fillInRemarks(String projectId, String datasetId, java.util.List<Object[]> rows) {
 		java.util.List<Object[]> undescribedViews = rows.stream()
 				.filter(row -> "VIEW".equals(row[TABLE_ROW_TYPE]) || "MATERIALIZED VIEW".equals(row[TABLE_ROW_TYPE]))
-				.filter(row -> row[TABLE_ROW_REMARKS] == null || ((String) row[TABLE_ROW_REMARKS]).isEmpty()).toList();
-		if (undescribedViews.isEmpty()) {
+				.filter(BQDatabaseMetaData::isBlankRemarks).toList();
+
+		boolean readDescriptions = connection.getProperties().metadataIncludeDescriptions();
+		if (!readDescriptions && undescribedViews.isEmpty()) {
 			return;
 		}
 
-		String sql = String.format("SELECT table_name, ddl FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES "
-				+ "WHERE table_type IN ('VIEW', 'MATERIALIZED VIEW')", projectId, datasetId);
+		java.util.Map<String, String> descriptions = new java.util.HashMap<>();
 		java.util.Map<String, String> definitions = new java.util.HashMap<>();
-		queryInformationSchema(projectId, datasetId, "view definitions", "INFORMATION_SCHEMA.TABLES", sql, row -> {
+		String sql = readDescriptions ? remarksSql(projectId, datasetId) : viewDefinitionSql(projectId, datasetId);
+
+		queryInformationSchema(projectId, datasetId, "table remarks", "INFORMATION_SCHEMA.TABLES", sql, row -> {
+			String tableName = row.get("table_name").getStringValue();
 			if (!row.get("ddl").isNull()) {
-				definitions.put(row.get("table_name").getStringValue(), row.get("ddl").getStringValue());
+				definitions.put(tableName, row.get("ddl").getStringValue());
 			}
-			// Collected into the map above rather than returned as rows: this read
+			if (readDescriptions && !row.get("description").isNull()) {
+				// TABLE_OPTIONS reports an option as the SQL that would set it, so the
+				// value arrives quoted and escaped.
+				descriptions.put(tableName, SqlStringLiterals.unquote(row.get("description").getStringValue()));
+			}
+			// Collected into the maps above rather than returned as rows: this read
 			// annotates rows that already exist instead of producing its own.
 			return null;
 		});
 
+		// Descriptions first, for every kind of table.
+		for (Object[] row : rows) {
+			String description = descriptions.get((String) row[TABLE_ROW_NAME]);
+			if (description != null && !description.isEmpty()) {
+				row[TABLE_ROW_REMARKS] = description;
+			}
+		}
+		// Then definitions, for the views the pass above left empty. A view with a
+		// description shows the description; a view without one still shows its SQL,
+		// which is what #219 put here and this must not take away.
 		for (Object[] row : undescribedViews) {
-			String definition = definitions.get((String) row[2]);
+			if (!isBlankRemarks(row)) {
+				continue;
+			}
+			String definition = definitions.get((String) row[TABLE_ROW_NAME]);
 			if (definition != null) {
 				row[TABLE_ROW_REMARKS] = definition;
 			}
 		}
+	}
+
+	/** Whether a table row's {@code REMARKS} is still unset. */
+	private static boolean isBlankRemarks(Object[] row) {
+		return row[TABLE_ROW_REMARKS] == null || ((String) row[TABLE_ROW_REMARKS]).isEmpty();
+	}
+
+	/**
+	 * Reads descriptions for every table and DDL for the views, in one query.
+	 *
+	 * <p>
+	 * A {@code LEFT JOIN} rather than an inner one: a table with no description
+	 * still has to appear, because it may be a view whose DDL is wanted.
+	 */
+	private static String remarksSql(String projectId, String datasetId) {
+		return String.format("SELECT t.table_name AS table_name, "
+				+ "IF(t.table_type IN ('VIEW', 'MATERIALIZED VIEW'), t.ddl, NULL) AS ddl, "
+				+ "o.option_value AS description " + "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLES t "
+				+ "LEFT JOIN `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLE_OPTIONS o "
+				+ "ON o.table_name = t.table_name AND o.option_name = 'description'", projectId, datasetId);
+	}
+
+	/**
+	 * The narrower read used when {@code metadataIncludeDescriptions} is off:
+	 * definitions only, and only for the views that need them.
+	 *
+	 * <p>
+	 * Selects a null {@code description} so the row mapper reads one shape either
+	 * way.
+	 */
+	private static String viewDefinitionSql(String projectId, String datasetId) {
+		return String.format("SELECT table_name, ddl, CAST(NULL AS STRING) AS description "
+				+ "FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES " + "WHERE table_type IN ('VIEW', 'MATERIALIZED VIEW')",
+				projectId, datasetId);
 	}
 
 	@Override
@@ -1399,8 +1563,8 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		}
 
 		try {
-			return queryColumnsViaInformationSchema(bigquery, projectId, datasetId, tableNamePattern,
-					columnNamePattern);
+			return collapseShardColumns(queryColumnsViaInformationSchema(bigquery, projectId, datasetId,
+					tableNamePattern, columnNamePattern));
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new BQSQLException("INFORMATION_SCHEMA query interrupted for dataset: " + datasetId, e);
@@ -1410,9 +1574,70 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			// endpoint limitation
 			logger.warn("INFORMATION_SCHEMA.COLUMNS query failed for {}.{}, falling back to the getTable() API: {}",
 					projectId, datasetId, e.getMessage());
-			return queryColumnsViaGetTable(bigquery, projectId, datasetId, tableNamePattern, columnNamePattern);
+			return collapseShardColumns(
+					queryColumnsViaGetTable(bigquery, projectId, datasetId, tableNamePattern, columnNamePattern));
 		}
 	}
+
+	/**
+	 * Reports one set of columns per shard set, taken from its newest shard and
+	 * reported under the wildcard name.
+	 *
+	 * <p>
+	 * Without this a collapsed {@code events_*} node has no columns at all — the
+	 * name matches no table — so an IDE renders the entry and then cannot expand
+	 * it. It also removes the other half of the row explosion: a year of daily
+	 * shards is 365 × N column rows, which is what actually fills the metadata
+	 * cache.
+	 *
+	 * <p>
+	 * The newest shard because shards drift. A column added last month exists in
+	 * recent shards and not in the first, and a query through {@code events_*} can
+	 * select it, so reporting the oldest schema would hide columns that work.
+	 *
+	 * <p>
+	 * A set of one is not a set, so an exact lookup of {@code events_20260101}
+	 * still reports that shard under its own name — the same rule
+	 * {@link #collapseShards} applies to the listing.
+	 *
+	 * @param rows
+	 *            column rows for one dataset
+	 * @return the rows with each shard set reduced to its newest member, renamed
+	 */
+	private java.util.List<Object[]> collapseShardColumns(java.util.List<Object[]> rows) {
+		if (!collapsesShards()) {
+			return rows;
+		}
+
+		java.util.List<String> names = rows.stream().map(row -> (String) row[COLUMN_ROW_TABLE_NAME]).distinct()
+				.toList();
+		java.util.Map<String, java.util.List<String>> sets = ShardedTables.shardSets(names);
+		if (sets.isEmpty()) {
+			return rows;
+		}
+
+		java.util.Map<String, String> newestByPrefix = new java.util.HashMap<>();
+		sets.forEach((prefix, shards) -> newestByPrefix.put(prefix, ShardedTables.newestShard(shards)));
+
+		java.util.List<Object[]> result = new java.util.ArrayList<>(rows.size());
+		for (Object[] row : rows) {
+			String tableName = (String) row[COLUMN_ROW_TABLE_NAME];
+			String prefix = ShardedTables.shardPrefix(tableName);
+			if (prefix == null || !sets.containsKey(prefix)) {
+				result.add(row);
+				continue;
+			}
+			if (tableName.equals(newestByPrefix.get(prefix))) {
+				Object[] renamed = row.clone();
+				renamed[COLUMN_ROW_TABLE_NAME] = ShardedTables.wildcardName(prefix);
+				result.add(renamed);
+			}
+		}
+		return result;
+	}
+
+	/** Index of {@code TABLE_NAME} in a {@link MetadataColumns.Columns} row. */
+	private static final int COLUMN_ROW_TABLE_NAME = 2;
 
 	/**
 	 * Query columns via a single {@code INFORMATION_SCHEMA.COLUMNS} query per
@@ -1434,7 +1659,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		for (FieldValueList row : results.iterateAll()) {
 			String tableName = row.get("table_name").getStringValue();
-			if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+			if (tableNamePattern != null && !matchesTableNameFilter(tableName, tableNamePattern)) {
 				continue;
 			}
 			String columnName = row.get("column_name").getStringValue();
@@ -1469,7 +1694,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Table> tablesToQuery = new java.util.ArrayList<>();
 		for (Table table : tables.iterateAll()) {
 			String tableName = table.getTableId().getTable();
-			if (tableNamePattern == null || matchesPattern(tableName, tableNamePattern)) {
+			if (tableNamePattern == null || matchesTableNameFilter(tableName, tableNamePattern)) {
 				tablesToQuery.add(table);
 			}
 		}
@@ -2717,10 +2942,74 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Object[]> rows = executeInParallel(datasetIds,
 				datasetId -> queryPseudoColumnsForDataset(projectId, datasetId, tableNamePattern, columnNamePattern),
 				"Error querying pseudo columns in parallel");
+		rows = new java.util.ArrayList<>(rows);
+		rows.addAll(executeInParallel(datasetIds,
+				datasetId -> tableSuffixPseudoColumns(projectId, datasetId, tableNamePattern, columnNamePattern),
+				"Error querying wildcard pseudo columns in parallel"));
 
 		logger.debug("getPseudoColumns() returning {} pseudo column(s)", rows.size());
 		return createResultSet(MetadataColumns.PseudoColumns.COLUMN_NAMES, MetadataColumns.PseudoColumns.COLUMN_TYPES,
 				rows);
+	}
+
+	/**
+	 * Reports {@code _TABLE_SUFFIX} for each collapsed wildcard entry in a dataset.
+	 *
+	 * <p>
+	 * {@code _TABLE_SUFFIX} is the pseudo column that makes a wildcard table usable
+	 * — it holds the part of each row's table name that {@code *} matched, and is
+	 * how you restrict a scan to a date range instead of reading every shard. An
+	 * {@code events_*} entry whose only distinguishing column is undiscoverable is
+	 * a listing improvement and nothing more, which is why #184 named this as the
+	 * pairing.
+	 *
+	 * <p>
+	 * A separate read from the ingestion-time pseudo columns above rather than a
+	 * clause added to that query. That one is deliberately narrow —
+	 * {@code is_system_defined = 'YES'} — and a wildcard set is not required to be
+	 * partitioned at all, so the two select disjoint things. Folding them together
+	 * would mean loosening a query whose shape is load-bearing.
+	 *
+	 * <p>
+	 * Costs nothing unless {@code collapseShardedTables} is on, since without it
+	 * there are no wildcard entries to describe.
+	 */
+	private java.util.List<Object[]> tableSuffixPseudoColumns(String projectId, String datasetId,
+			String tableNamePattern, String columnNamePattern) {
+		if (!collapsesShards()) {
+			return java.util.List.of();
+		}
+		if (columnNamePattern != null && !matchesPattern("_TABLE_SUFFIX", columnNamePattern)) {
+			return java.util.List.of();
+		}
+
+		String sql = String.format("SELECT table_name FROM `%s`.`%s`.INFORMATION_SCHEMA.TABLES", projectId, datasetId);
+		java.util.List<Object[]> names = queryInformationSchema(projectId, datasetId, "wildcard pseudo columns",
+				"INFORMATION_SCHEMA.TABLES", sql, row -> new Object[]{row.get("table_name").getStringValue()});
+
+		java.util.List<String> tableNames = names.stream().map(row -> (String) row[0]).sorted().toList();
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+		ShardedTables.shardSets(tableNames).forEach((prefix, shards) -> {
+			String wildcard = ShardedTables.wildcardName(prefix);
+			if (tableNamePattern != null && !matchesTableNameFilter(wildcard, tableNamePattern)
+					&& !matchesPattern(wildcard, tableNamePattern)) {
+				return;
+			}
+			rows.add(new Object[]{projectId, // TABLE_CAT
+					datasetId, // TABLE_SCHEM
+					wildcard, // TABLE_NAME
+					"_TABLE_SUFFIX", // COLUMN_NAME
+					java.sql.Types.VARCHAR, // DATA_TYPE
+					Integer.MAX_VALUE, // COLUMN_SIZE
+					null, // DECIMAL_DIGITS
+					10, // NUM_PREC_RADIX
+					java.sql.PseudoColumnUsage.NO_USAGE_RESTRICTIONS.name(), // COLUMN_USAGE
+					"Wildcard table suffix, e.g. " + ShardedTables.newestShard(shards).substring(prefix.length() + 1), // REMARKS
+					null, // CHAR_OCTET_LENGTH
+					"NO" // IS_NULLABLE
+			});
+		});
+		return rows;
 	}
 
 	private java.util.List<Object[]> queryPseudoColumnsForDataset(String projectId, String datasetId,

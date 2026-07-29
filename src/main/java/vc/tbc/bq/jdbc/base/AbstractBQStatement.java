@@ -33,6 +33,8 @@ import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 import java.sql.*;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -136,6 +138,17 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * Query warnings (e.g., cost estimates from dry-run).
 	 */
 	protected SQLWarning queryWarnings = null;
+
+	/**
+	 * Cost estimates produced for the current execution, one per dry-run.
+	 *
+	 * <p>
+	 * The typed counterpart to the estimate warnings in {@link #queryWarnings}, and
+	 * populated alongside them. A caller that wants the byte counts should read
+	 * this rather than parse the warning text; the two carry the same estimates in
+	 * the same order.
+	 */
+	private List<QueryCostEstimate> costEstimates = List.of();
 
 	protected AbstractBQStatement(BQConnection connection) {
 		this.connection = connection;
@@ -269,19 +282,71 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	protected abstract String getLogPrefix();
 
 	/**
-	 * Runs a dry-run query to estimate cost without executing.
-	 *
-	 * @param sql
-	 *            the SQL query to estimate
-	 * @return the cost estimate
-	 * @throws SQLException
-	 *             if dry-run fails
-	 */
-	/**
-	 * Attaches a cost estimate as a {@link SQLWarning} when
-	 * {@code enableQueryCostEstimation} is on, for any statement — SELECT or DML.
+	 * Estimates what a statement would cost, without running it and without
+	 * {@code enableQueryCostEstimation} being on.
 	 *
 	 * <p>
+	 * This is the way to price a statement in production. The connection property
+	 * dry-runs <em>every</em> statement, doubling the job count, which is why it is
+	 * not something to leave enabled — and cost surprises happen in production.
+	 * Here the caller decides which statement is worth an extra job.
+	 *
+	 * <p>
+	 * Driver-specific, so reach it through {@link Statement#unwrap}:
+	 *
+	 * <pre>{@code
+	 * var bq = statement.unwrap(AbstractBQStatement.class);
+	 * QueryCostEstimate estimate = bq.estimateCost("SELECT * FROM huge_table");
+	 * if (estimate.totalBytesBilled() > BUDGET) {
+	 * 	throw new IllegalStateException(estimate.formatSummary());
+	 * }
+	 * }</pre>
+	 *
+	 * <p>
+	 * Unlike the automatic path this throws rather than swallowing: the caller
+	 * asked for the estimate, so a failure to produce one is an answer they need.
+	 *
+	 * @param sql
+	 *            the statement to price. Not executed
+	 * @return the estimate, with a cost only when {@code queryPricePerTiB} is
+	 *         configured
+	 * @throws SQLException
+	 *             if the statement is closed, or BigQuery rejects the dry-run —
+	 *             invalid SQL and missing tables both surface here
+	 * @since 3.2.0
+	 */
+	public QueryCostEstimate estimateCost(String sql) throws SQLException {
+		checkClosed();
+		return runDryRun(sql);
+	}
+
+	/**
+	 * The cost estimates produced for the most recent execution, oldest first.
+	 *
+	 * <p>
+	 * Empty unless {@code enableQueryCostEstimation} is on. Usually one entry; a
+	 * collapsed batch insert contributes one per chunk, because each chunk is its
+	 * own job with its own cost. Cleared when the statement next executes, so read
+	 * it before reusing the statement.
+	 *
+	 * <p>
+	 * The typed answer to "what will this cost" — the same estimates are also
+	 * available as {@link Statement#getWarnings()} text, which a caller would
+	 * otherwise have to parse. Driver-specific, so reach it through
+	 * {@link Statement#unwrap}.
+	 *
+	 * @return the estimates, or an empty list when none were taken
+	 * @since 3.2.0
+	 */
+	public List<QueryCostEstimate> getCostEstimates() {
+		return costEstimates;
+	}
+
+	/**
+	 * Attaches a cost estimate as a {@link SQLWarning}, and records it as a typed
+	 * value, when {@code enableQueryCostEstimation} is on — for any statement,
+	 * SELECT or DML.
+	 *
 	 * <p>
 	 * A failed dry-run is logged and swallowed. An estimate is advisory, so it must
 	 * never be the reason a statement does not run.
@@ -294,7 +359,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *            chunk's parameters explicitly, because the instance parameters
 	 *            belong to a single row and would not match the chunk's SQL.
 	 */
-	protected void estimateCostIfEnabled(String sql, java.util.List<QueryParameterValue> positionalParameters) {
+	protected void estimateCostIfEnabled(String sql, List<QueryParameterValue> positionalParameters) {
 		if (!properties.enableQueryCostEstimation()) {
 			return;
 		}
@@ -313,6 +378,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				queryWarnings.setNextWarning(warning);
 			}
 
+			List<QueryCostEstimate> updated = new ArrayList<>(costEstimates);
+			updated.add(estimate);
+			costEstimates = List.copyOf(updated);
+
 			logger.debug("Dry-run estimate: {}", message);
 		} catch (Exception e) {
 			// Logged with the throwable, not just its message: an NPE here used to
@@ -320,6 +389,70 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			// where it came from.
 			logger.warn("Dry-run estimation failed", e);
 		}
+	}
+
+	/**
+	 * The warnings and cost estimates a single execution produced.
+	 *
+	 * <p>
+	 * Exists so a JDBC call that runs several jobs can accumulate diagnostics
+	 * across them. {@code executeBatch} is the only such call: it runs one job per
+	 * chunk, and each job clears the previous one's diagnostics, so without
+	 * capturing them a caller would see only the last chunk's estimate.
+	 *
+	 * @param warnings
+	 *            the head of the warning chain, or null
+	 * @param estimates
+	 *            the cost estimates, oldest first
+	 */
+	protected record Diagnostics(SQLWarning warnings, List<QueryCostEstimate> estimates) {
+
+		/** Diagnostics from a run that produced none. */
+		public static final Diagnostics NONE = new Diagnostics(null, List.of());
+
+		/**
+		 * Appends another run's diagnostics to these.
+		 *
+		 * @param next
+		 *            the later run's diagnostics
+		 * @return the combined diagnostics
+		 */
+		public Diagnostics andThen(Diagnostics next) {
+			SQLWarning combined = warnings;
+			if (combined == null) {
+				combined = next.warnings;
+			} else if (next.warnings != null) {
+				SQLWarning tail = combined;
+				while (tail.getNextWarning() != null) {
+					tail = tail.getNextWarning();
+				}
+				tail.setNextWarning(next.warnings);
+			}
+			List<QueryCostEstimate> merged = new ArrayList<>(estimates);
+			merged.addAll(next.estimates);
+			return new Diagnostics(combined, List.copyOf(merged));
+		}
+	}
+
+	/**
+	 * Reads off the diagnostics of the execution that just finished.
+	 *
+	 * @return the current warnings and cost estimates
+	 */
+	protected Diagnostics currentDiagnostics() {
+		return new Diagnostics(queryWarnings, costEstimates);
+	}
+
+	/**
+	 * Replaces the statement's diagnostics with an accumulated set, so a multi-job
+	 * JDBC call reports every job's estimate rather than the last one's.
+	 *
+	 * @param diagnostics
+	 *            the diagnostics to publish
+	 */
+	protected void publishDiagnostics(Diagnostics diagnostics) {
+		queryWarnings = diagnostics.warnings();
+		costEstimates = diagnostics.estimates();
 	}
 
 	/**
@@ -334,7 +467,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if the dry-run fails
 	 */
-	protected QueryCostEstimate runDryRun(String sql, java.util.List<QueryParameterValue> positionalParameters)
+	protected QueryCostEstimate runDryRun(String sql, List<QueryParameterValue> positionalParameters)
 			throws SQLException {
 		QueryJobConfiguration.Builder builder = QueryJobConfiguration.newBuilder(sql)
 				.setUseLegacySql(properties.useLegacySql()).setDryRun(true).setUseQueryCache(false);
@@ -375,8 +508,10 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			Long bytesBilled = stats.getTotalBytesBilled();
 			Long estimatedBytes = stats.getEstimatedBytesProcessed();
 
-			return new QueryCostEstimate(bytesProcessed, estimatedBytes, bytesBilled,
-					QueryCostEstimate.calculateCost(bytesBilled));
+			// The rate is the connection's, not the driver's: unset means the estimate
+			// carries bytes and no money, which is the honest answer for a customer
+			// whose contract the driver cannot see.
+			return QueryCostEstimate.of(bytesProcessed, estimatedBytes, bytesBilled, properties.queryPricePerTiB());
 
 		} catch (BigQueryException e) {
 			throw new BQSQLException("Dry-run failed: " + e.getMessage(), e);
@@ -569,14 +704,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if the statement is closed or execution fails
 	 */
-	protected long executeDmlInternal(String sql, java.util.List<QueryParameterValue> positionalParameters)
-			throws SQLException {
+	protected long executeDmlInternal(String sql, List<QueryParameterValue> positionalParameters) throws SQLException {
 		return executeDmlInternal(sql, positionalParameters, true);
 	}
 
 	/**
-	 * As {@link #executeDmlInternal(String, java.util.List)}, with control over
-	 * cost estimation.
+	 * As {@link #executeDmlInternal(String, List)}, with control over cost
+	 * estimation.
 	 *
 	 * <p>
 	 * Sequential batch paths pass {@code false}. They already run one job per
@@ -597,8 +731,8 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 * @throws SQLException
 	 *             if execution fails
 	 */
-	protected long executeDmlInternal(String sql, java.util.List<QueryParameterValue> positionalParameters,
-			boolean estimateCost) throws SQLException {
+	protected long executeDmlInternal(String sql, List<QueryParameterValue> positionalParameters, boolean estimateCost)
+			throws SQLException {
 		checkClosed();
 		logger.debug("Executing {} DML: {}", getLogPrefix(), sql);
 
@@ -979,6 +1113,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			currentResultSet = null;
 		}
 		queryWarnings = null;
+		costEstimates = List.of();
 		currentUpdateCount = -1L;
 	}
 

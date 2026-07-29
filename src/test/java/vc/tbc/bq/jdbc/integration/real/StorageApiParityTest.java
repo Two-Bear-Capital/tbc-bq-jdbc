@@ -115,6 +115,32 @@ class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 			ORDER BY idx
 			""";
 
+	/**
+	 * ARRAY, STRUCT and INTERVAL, including the shapes most likely to expose a
+	 * difference: empty arrays, null structs, nulls inside arrays and structs,
+	 * arrays of structs, structs containing arrays, nesting two deep, and intervals
+	 * with each part signed independently.
+	 */
+	private static final String COMPLEX_TYPES_SQL = """
+			SELECT
+			  i AS idx,
+			  [i, i + 1, i + 2] AS c_arr_int,
+			  [CONCAT('s', CAST(i AS STRING)), 'x'] AS c_arr_string,
+			  IF(MOD(i, 4) = 0, CAST([] AS ARRAY<INT64>), [i]) AS c_arr_maybe_empty,
+			  [CAST(i AS NUMERIC) / 7, CAST(i AS NUMERIC)] AS c_arr_numeric,
+			  [TIMESTAMP_ADD(TIMESTAMP '2020-02-28 23:59:59.999999+00', INTERVAL i MICROSECOND)] AS c_arr_timestamp,
+			  STRUCT(i AS n, CONCAT('s', CAST(i AS STRING)) AS s) AS c_struct,
+			  IF(MOD(i, 5) = 0, NULL, STRUCT(i AS n)) AS c_struct_nullable,
+			  STRUCT(i AS n, IF(MOD(i, 3) = 0, NULL, CAST(i AS STRING)) AS maybe) AS c_struct_with_null,
+			  STRUCT(i AS n, STRUCT(CONCAT('d', CAST(i AS STRING)) AS deep, i * 2 AS n2) AS nested) AS c_struct_nested,
+			  [STRUCT(i AS n, CONCAT('a', CAST(i AS STRING)) AS s)] AS c_arr_struct,
+			  STRUCT([i, i + 1] AS nums, CAST(i AS STRING) AS label) AS c_struct_arr,
+			  MAKE_INTERVAL(i, MOD(i, 12), MOD(i, 28), i, MOD(i, 60), MOD(i, 60)) AS c_interval,
+			  INTERVAL i MICROSECOND AS c_interval_micros
+			FROM UNNEST(GENERATE_ARRAY(-10, 10)) AS i
+			ORDER BY idx
+			""";
+
 	private Connection storageConnection() throws SQLException {
 		// useStorageApi=true rather than auto: these results are deliberately small,
 		// and auto would decline them.
@@ -163,6 +189,76 @@ class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 			}
 		}
 		logger.info("compared {} rows x {} columns across both paths", viaRest.size(), viaRest.get(0).size());
+	}
+
+	@Test
+	@DisplayName("the Storage path engages for complex types too, so the parity check is not vacuous")
+	void storagePathEngagesForComplexTypes() throws SQLException {
+		// The scalar guard above cannot catch this: before #193 a result containing
+		// an ARRAY, STRUCT or INTERVAL fell back to REST, and every complex parity
+		// assertion would then have compared REST with itself and passed.
+		try (Connection conn = storageConnection();
+				Statement stmt = conn.createStatement();
+				ResultSet rs = stmt.executeQuery(
+						"SELECT [1, 2] AS a, STRUCT(1 AS n) AS s, INTERVAL 1 DAY AS i FROM UNNEST([1]) AS x")) {
+
+			assertEquals("vc.tbc.bq.jdbc.storage.StorageReadResultSet", rs.getClass().getName(),
+					"a result with ARRAY, STRUCT and INTERVAL columns should use the Storage path");
+			assertTrue(rs.next());
+		}
+	}
+
+	@Test
+	@DisplayName("arrays, structs and intervals read identically on both paths")
+	void complexTypesMatchTheRestPath() throws SQLException {
+		List<List<String>> viaRest = readAllAsStrings(restConnection(), COMPLEX_TYPES_SQL);
+		List<List<String>> viaStorage = readAllAsStrings(storageConnection(), COMPLEX_TYPES_SQL);
+
+		assertEquals(viaRest.size(), viaStorage.size(), "row count differs between the two paths");
+		assertFalse(viaRest.isEmpty(), "fixture produced no rows");
+
+		for (int row = 0; row < viaRest.size(); row++) {
+			for (int col = 0; col < viaRest.get(row).size(); col++) {
+				assertCellsMatch(viaRest.get(row).get(col), viaStorage.get(row).get(col),
+						"row " + row + ", column " + (col + 1));
+			}
+		}
+		logger.info("compared {} rows x {} complex columns across both paths", viaRest.size(), viaRest.get(0).size());
+	}
+
+	@Test
+	@DisplayName("getObject on a complex column agrees between the two paths")
+	void nativeComplexObjectsMatchTheRestPath() throws SQLException {
+		// getString compares the JSON rendering; this compares the structure the
+		// nativeComplexTypes path builds from the same FieldValues, which is what
+		// would break if member order or nesting were taken from Arrow rather than
+		// from the BigQuery schema.
+		String sql = "SELECT STRUCT(1 AS n, STRUCT('x' AS deep) AS nested) AS s, [1, 2, 3] AS a FROM UNNEST([1]) AS i";
+		String storageUrl = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=true&nativeComplexTypes=true",
+				TEST_PROJECT_ID, TEST_DATASET);
+		String restUrl = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=false&nativeComplexTypes=true",
+				TEST_PROJECT_ID, TEST_DATASET);
+
+		Object[] storageStruct;
+		Object[] restStruct;
+		try (Connection conn = DriverManager.getConnection(storageUrl);
+				Statement stmt = conn.createStatement();
+				ResultSet rs = stmt.executeQuery(sql)) {
+			assertTrue(rs.next());
+			storageStruct = ((java.sql.Struct) rs.getObject("s")).getAttributes();
+		}
+		try (Connection conn = DriverManager.getConnection(restUrl);
+				Statement stmt = conn.createStatement();
+				ResultSet rs = stmt.executeQuery(sql)) {
+			assertTrue(rs.next());
+			restStruct = ((java.sql.Struct) rs.getObject("s")).getAttributes();
+		}
+
+		assertEquals(restStruct.length, storageStruct.length, "struct member count differs between the paths");
+		for (int i = 0; i < restStruct.length; i++) {
+			assertEquals(Objects.toString(restStruct[i]), Objects.toString(storageStruct[i]),
+					"struct member " + i + " differs between the paths");
+		}
 	}
 
 	/**
@@ -303,16 +399,37 @@ class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 	@Test
 	@DisplayName("a query with unsupported types falls back and still returns rows")
 	void unsupportedTypesFallBackToRest() throws SQLException {
+		// RANGE, not ARRAY or STRUCT: those two moved onto the Storage path in #193,
+		// and this test asserted their fallback until then. The fallback itself still
+		// has to work, so the assertion moves to a type that is still outside the
+		// converter's remit rather than being deleted with the limitation.
 		try (Connection conn = storageConnection();
 				Statement stmt = conn.createStatement();
-				ResultSet rs = stmt.executeQuery("SELECT [1, 2, 3] AS arr, STRUCT(1 AS a, 'x' AS b) AS s")) {
+				ResultSet rs = stmt.executeQuery(
+						"SELECT RANGE(DATE '2020-01-01', DATE '2020-12-31') AS r FROM UNNEST([1]) AS i")) {
 
-			// ARRAY and STRUCT are outside the converter's remit; the query must still
-			// work, served by the standard path.
 			assertEquals("vc.tbc.bq.jdbc.BQResultSet", rs.getClass().getName(),
 					"unsupported column types must fall back to the REST path");
 			assertTrue(rs.next());
-			assertNotNull(rs.getString("arr"));
+			// getObject, not getString: the REST path hands a RANGE back as a Range
+			// object, which is the point -- it has no string encoding to compare.
+			assertNotNull(rs.getObject("r"));
+		}
+	}
+
+	@Test
+	@DisplayName("one unsupported column sends the whole result to REST, complex columns included")
+	void oneUnsupportedColumnDisqualifiesTheWholeResult() throws SQLException {
+		// The path is all-or-nothing per result, and a struct now hides the reason
+		// three levels down: this checks the recursive support test actually recurses.
+		try (Connection conn = storageConnection();
+				Statement stmt = conn.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT [STRUCT(1 AS n, "
+						+ "RANGE(DATE '2020-01-01', DATE '2020-12-31') AS r)] AS a FROM UNNEST([1]) AS i")) {
+
+			assertEquals("vc.tbc.bq.jdbc.BQResultSet", rs.getClass().getName(),
+					"a RANGE nested inside an ARRAY<STRUCT<...>> must still disqualify the result");
+			assertTrue(rs.next());
 		}
 	}
 

@@ -136,33 +136,26 @@ class RealSourceSqlMetadataTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	/**
-	 * A described view still gets its DDL — and loses nothing by it.
+	 * A described view reports the description, not the DDL.
 	 *
 	 * <p>
-	 * The driver prefers a description over the definition, but on this path there
-	 * is never one to prefer: {@code tables.list} does not return {@code
-	 * description} at all (only {@code tables.get} does), so {@code
-	 * Table.getDescription()} is null for every table {@code getTables()} sees and
-	 * {@code REMARKS} was uniformly empty before this change. That is a separate
-	 * gap from the one this test covers, and is left alone here.
-	 *
-	 * <p>
-	 * Nothing is lost regardless, because BigQuery emits the description inside the
-	 * DDL's {@code OPTIONS} — which is what the second assertion holds.
+	 * The precedence was written when this landed but could not fire: {@code
+	 * tables.list} omits {@code description}, so every table looked undescribed and
+	 * views uniformly got their DDL. Now that descriptions are read from {@code
+	 * INFORMATION_SCHEMA}, the rule takes effect — what the author wrote for this
+	 * column beats what the driver can reconstruct.
 	 */
 	@Test
-	void aDescribedViewGetsItsDdlAndTheDescriptionSurvivesInside() throws SQLException {
+	void aDescribedViewPrefersItsDescriptionOverItsDdl() throws SQLException {
 		String remarks = tableRemarks().get(DESCRIBED_VIEW);
 
 		assertNotNull(remarks, "the described view should have been listed");
-		assertTrue(remarks.startsWith("CREATE VIEW"), "expected the CREATE statement, got: " + remarks);
-		assertTrue(remarks.contains(DESCRIPTION),
-				"the DDL should carry the description in its OPTIONS, got: " + remarks);
+		assertEquals(DESCRIPTION, remarks);
 	}
 
 	/**
-	 * The control: plain tables are untouched, so the extra read has not leaked
-	 * into rows it does not concern.
+	 * The control: a table with no description still reports empty REMARKS, so the
+	 * description read has not started inventing values for rows that have none.
 	 */
 	@Test
 	void plainTablesKeepEmptyRemarks() throws SQLException {

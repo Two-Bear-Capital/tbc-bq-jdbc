@@ -15,15 +15,27 @@
  */
 package vc.tbc.bq.jdbc;
 
+import com.google.cloud.bigquery.FormatOptions;
+import com.google.cloud.bigquery.Job;
+import com.google.cloud.bigquery.JobInfo;
+import com.google.cloud.bigquery.JobStatistics;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.QueryParameterValue;
 import com.google.cloud.bigquery.StandardSQLTypeName;
+import com.google.cloud.bigquery.TableDataWriteChannel;
+import com.google.cloud.bigquery.TableId;
+import com.google.cloud.bigquery.WriteChannelConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.base.AbstractBQPreparedStatement;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.metadata.BQParameterMetaData;
 import vc.tbc.bq.jdbc.util.BatchInsertRewriter;
+import vc.tbc.bq.jdbc.util.BatchLoadEncoder;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.ParameterConverter;
+import vc.tbc.bq.jdbc.util.QueryCostEstimate;
+import vc.tbc.bq.jdbc.util.StructTypeNames;
 import vc.tbc.bq.jdbc.util.TimezoneUtils;
 
 import java.math.BigDecimal;
@@ -32,7 +44,9 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -41,6 +55,8 @@ import java.util.Optional;
  * @since 1.0.0
  */
 public final class BQPreparedStatement extends AbstractBQPreparedStatement {
+
+	private static final Logger logger = LoggerFactory.getLogger(BQPreparedStatement.class);
 
 	private final String sqlTemplate;
 	private final List<QueryParameterValue> parameters = new ArrayList<>();
@@ -92,9 +108,60 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
-	private void setParameter(int parameterIndex, QueryParameterValue value) throws SQLException {
+	/**
+	 * Builds a parameter value, which may reject its input.
+	 *
+	 * <p>
+	 * A supplier rather than a value so that construction happens <em>inside</em>
+	 * {@link #setParameter}: {@code QueryParameterValue}'s factories validate
+	 * client-side and throw {@link IllegalArgumentException}, and that happens
+	 * while building the value, before any method of this class would otherwise see
+	 * it. Taking the finished value could not wrap anything.
+	 */
+	@FunctionalInterface
+	private interface ParameterFactory {
+		QueryParameterValue create() throws SQLException;
+	}
+
+	/**
+	 * Builds and stores one parameter, turning a rejected value into a
+	 * {@link SQLException}.
+	 *
+	 * <p>
+	 * <b>Every parameter this statement binds goes through here.</b>
+	 * {@code QueryParameterValue}'s factories validate client-side and signal a bad
+	 * value with {@link IllegalArgumentException} — an unchecked exception escaping
+	 * a JDBC method that declares {@code throws SQLException}, which a caller's
+	 * {@code catch (SQLException)} does not catch and whose message names neither
+	 * the parameter nor the driver.
+	 *
+	 * <p>
+	 * Wrapping here rather than at each construction site is what makes the
+	 * guarantee structural: a new setter cannot forget, because there is no other
+	 * way to store a parameter. That also covers the values built inside struct and
+	 * array binding, which are constructed within the factory rather than before
+	 * it.
+	 *
+	 * @param parameterIndex
+	 *            the 1-based parameter index
+	 * @param factory
+	 *            builds the value
+	 * @throws SQLException
+	 *             if the statement is closed, the index is invalid, or the value is
+	 *             rejected
+	 */
+	private void setParameter(int parameterIndex, ParameterFactory factory) throws SQLException {
 		checkClosed();
 		validateParameterIndex(parameterIndex);
+		QueryParameterValue value;
+		try {
+			value = factory.create();
+		} catch (IllegalArgumentException e) {
+			throw new BQSQLException(
+					"Cannot bind parameter " + parameterIndex + ": " + e.getMessage()
+							+ ". BigQuery rejected the value before the statement was sent",
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE, e);
+		}
 		ensureCapacity(parameterIndex);
 		parameters.set(parameterIndex - 1, value);
 	}
@@ -108,6 +175,27 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	@Override
 	protected String getLogPrefix() {
 		return "Prepared query";
+	}
+
+	/**
+	 * Estimates what this statement would cost with its parameters as currently
+	 * set, without running it.
+	 *
+	 * <p>
+	 * The no-SQL form of
+	 * {@link vc.tbc.bq.jdbc.base.AbstractBQStatement#estimateCost(String)}, since a
+	 * prepared statement already knows its SQL. The dry-run binds the parameters
+	 * set so far, so bind them first — BigQuery prices a query by the partitions
+	 * and columns it touches, and an unbound placeholder can change both.
+	 *
+	 * @return the estimate, with a cost only when {@code queryPricePerTiB} is
+	 *         configured
+	 * @throws SQLException
+	 *             if the statement is closed or BigQuery rejects the dry-run
+	 * @since 3.2.0
+	 */
+	public QueryCostEstimate estimateCost() throws SQLException {
+		return estimateCost(sqlTemplate);
 	}
 
 	@Override
@@ -147,7 +235,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		// Use explicit type information for NULL values
 		// This is critical because BigQuery cannot infer type from a NULL value
 		StandardSQLTypeName bqType = TypeMapper.toStandardSQLTypeName(sqlType);
-		setParameter(parameterIndex, QueryParameterValue.of(null, bqType));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(null, bqType));
 	}
 
 	/**
@@ -166,7 +254,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setBoolean(int parameterIndex, boolean x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.BOOL));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.BOOL));
 	}
 
 	/**
@@ -185,7 +273,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setByte(int parameterIndex, byte x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -204,7 +292,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setShort(int parameterIndex, short x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -223,7 +311,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setInt(int parameterIndex, int x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -241,7 +329,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setLong(int parameterIndex, long x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -261,7 +349,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
 		// Bind an explicit BigQuery type rather than letting the service infer one
-		setParameter(parameterIndex, QueryParameterValue.of((double) x, StandardSQLTypeName.FLOAT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((double) x, StandardSQLTypeName.FLOAT64));
 	}
 
 	/**
@@ -279,7 +367,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setDouble(int parameterIndex, double x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.FLOAT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.FLOAT64));
 	}
 
 	/**
@@ -302,7 +390,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.NUMERIC);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.NUMERIC));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.NUMERIC));
 		}
 	}
 
@@ -326,7 +414,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.VARCHAR);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.STRING));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.STRING));
 		}
 	}
 
@@ -350,7 +438,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.VARBINARY);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.BYTES));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.BYTES));
 		}
 	}
 
@@ -374,7 +462,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.DATE);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x.toString(), StandardSQLTypeName.DATE));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x.toString(), StandardSQLTypeName.DATE));
 		}
 	}
 
@@ -398,7 +486,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIME);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.time(TIME_FORMATTER.format(x.toLocalTime())));
+			setParameter(parameterIndex, () -> QueryParameterValue.time(TIME_FORMATTER.format(x.toLocalTime())));
 		}
 	}
 
@@ -406,9 +494,13 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 * Sets the designated parameter to the given {@link java.sql.Timestamp} value.
 	 *
 	 * <p>
-	 * Maps to BigQuery TIMESTAMP type. The timestamp is converted to an Instant in
-	 * UTC and formatted as ISO-8601 (yyyy-MM-dd'T'HH:mm:ss[.SSS]'Z'). If the value
-	 * is null, calls {@link #setNull(int, int)} with {@link Types#TIMESTAMP}.
+	 * Maps to BigQuery TIMESTAMP type, bound as epoch microseconds via
+	 * {@link #timestampParameter}. If the value is null, calls
+	 * {@link #setNull(int, int)} with {@link Types#TIMESTAMP}.
+	 *
+	 * <p>
+	 * Not an ISO-8601 string: {@code QueryParameterValue} rejects the {@code T}
+	 * separator client-side.
 	 *
 	 * @param parameterIndex
 	 *            the first parameter is 1, the second is 2, ...
@@ -422,7 +514,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIMESTAMP);
 		} else {
-			setParameter(parameterIndex, timestampParameter(x));
+			setParameter(parameterIndex, () -> timestampParameter(x));
 		}
 	}
 
@@ -535,25 +627,204 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		// Bind an explicit BigQuery type per Java type rather than letting the
 		// service infer one
 		switch (x) {
-			case String s -> setParameter(parameterIndex, QueryParameterValue.of(s, StandardSQLTypeName.STRING));
+			case String s -> setParameter(parameterIndex, () -> QueryParameterValue.of(s, StandardSQLTypeName.STRING));
 			case Integer i ->
-				setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(i), StandardSQLTypeName.INT64));
-			case Long l -> setParameter(parameterIndex, QueryParameterValue.of(l, StandardSQLTypeName.INT64));
-			case Float f ->
-				setParameter(parameterIndex, QueryParameterValue.of(Double.valueOf(f), StandardSQLTypeName.FLOAT64));
-			case Double d -> setParameter(parameterIndex, QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64));
-			case Boolean b -> setParameter(parameterIndex, QueryParameterValue.of(b, StandardSQLTypeName.BOOL));
-			case BigDecimal bd -> setParameter(parameterIndex, QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC));
-			case Timestamp ts -> setParameter(parameterIndex,
-					QueryParameterValue.of(ts.toInstant().toString(), StandardSQLTypeName.TIMESTAMP));
-			case Date dt ->
-				setParameter(parameterIndex, QueryParameterValue.of(dt.toString(), StandardSQLTypeName.DATE));
-			case Time t -> setParameter(parameterIndex, QueryParameterValue.of(t.toString(), StandardSQLTypeName.TIME));
-			case byte[] bytes -> setParameter(parameterIndex, QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
+				setParameter(parameterIndex, () -> QueryParameterValue.of(Long.valueOf(i), StandardSQLTypeName.INT64));
+			case Long l -> setParameter(parameterIndex, () -> QueryParameterValue.of(l, StandardSQLTypeName.INT64));
+			case Float f -> setParameter(parameterIndex,
+					() -> QueryParameterValue.of(Double.valueOf(f), StandardSQLTypeName.FLOAT64));
+			case Double d -> setParameter(parameterIndex, () -> QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64));
+			case Boolean b -> setParameter(parameterIndex, () -> QueryParameterValue.of(b, StandardSQLTypeName.BOOL));
+			case BigDecimal bd ->
+				setParameter(parameterIndex, () -> QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC));
+			// Delegated rather than re-encoded here. Building the parameter a second
+			// time is what let this drift: TIMESTAMP was bound as an ISO-8601 string
+			// and TIME as HH:mm:ss, both of which QueryParameterValue rejects
+			// client-side, so setObject could not bind either while setTimestamp and
+			// setTime — which use the encodings below — always could.
+			case Timestamp ts -> setTimestamp(parameterIndex, ts);
+			case Date dt -> setDate(parameterIndex, dt);
+			case Time t -> setTime(parameterIndex, t);
+			case byte[] bytes ->
+				setParameter(parameterIndex, () -> QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
 			case java.sql.Array a -> setArray(parameterIndex, a);
 			case java.util.List<?> list -> setListParameter(parameterIndex, list);
+			case java.sql.Struct s -> setParameter(parameterIndex, () -> toStructParameter(s, parameterIndex));
+			case java.util.Map<?, ?> m -> setParameter(parameterIndex, () -> toStructParameter(m, parameterIndex));
 			default -> throw new SQLException("Unsupported parameter type: " + x.getClass().getName());
 		}
+	}
+
+	/**
+	 * Binds a {@link java.sql.Struct} as a BigQuery struct parameter, taking the
+	 * field names from its {@code STRUCT<...>} type name.
+	 *
+	 * <p>
+	 * The type name is the only place the names can come from: {@code Struct}
+	 * carries its attributes positionally. A struct this driver returned from
+	 * {@link java.sql.ResultSet#getObject} always has them, which is what lets a
+	 * struct that was read be bound straight back.
+	 *
+	 * @param struct
+	 *            the struct to bind
+	 * @param parameterIndex
+	 *            the parameter index, for error messages
+	 * @return the BigQuery parameter
+	 * @throws SQLException
+	 *             if the type name declares no usable field names, or the attribute
+	 *             count disagrees with it
+	 */
+	private QueryParameterValue toStructParameter(java.sql.Struct struct, int parameterIndex) throws SQLException {
+		Object[] attributes = struct.getAttributes();
+		List<StructTypeNames.StructField> fields = StructTypeNames.parse(struct.getSQLTypeName());
+		if (fields.isEmpty()) {
+			throw new BQSQLException("Cannot bind the struct at parameter " + parameterIndex + ": its type name ("
+					+ struct.getSQLTypeName() + ") does not name its fields, and BigQuery struct parameters "
+					+ "are named. Use Connection.createStruct(\"STRUCT<a INT64, b STRING>\", ...), or pass a "
+					+ "Map<String, Object> to setObject", BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+		if (attributes.length != fields.size()) {
+			throw new BQSQLException(
+					"The struct at parameter " + parameterIndex + " has " + attributes.length + " attribute(s) but its "
+							+ "type name declares " + fields.size() + ": " + struct.getSQLTypeName(),
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+
+		Map<String, QueryParameterValue> values = new LinkedHashMap<>();
+		for (int i = 0; i < fields.size(); i++) {
+			StructTypeNames.StructField field = fields.get(i);
+			values.put(field.name(), toFieldParameter(attributes[i], field.type(), parameterIndex));
+		}
+		return QueryParameterValue.struct(values);
+	}
+
+	/**
+	 * Binds a {@code Map} as a BigQuery struct parameter, which is the shape
+	 * BigQuery itself uses — {@code QueryParameterValue.struct} takes named fields.
+	 *
+	 * <p>
+	 * Iteration order is preserved, so a {@code LinkedHashMap} binds its fields in
+	 * the order they were added. Names are what BigQuery matches on, so the order
+	 * only affects the struct's declared shape.
+	 *
+	 * <p>
+	 * Field types are inferred from the values, so a {@code null} value has nothing
+	 * to infer from and binds as a {@code STRING} null. Where that is not the right
+	 * type, name the fields with {@code createStruct} instead — a declared type
+	 * answers what a null value cannot.
+	 *
+	 * @param map
+	 *            the field names and values
+	 * @param parameterIndex
+	 *            the parameter index, for error messages
+	 * @return the BigQuery parameter
+	 * @throws SQLException
+	 *             if a key is not a string, or a value has no BigQuery mapping
+	 */
+	private QueryParameterValue toStructParameter(Map<?, ?> map, int parameterIndex) throws SQLException {
+		Map<String, QueryParameterValue> values = new LinkedHashMap<>();
+		for (Map.Entry<?, ?> entry : map.entrySet()) {
+			if (!(entry.getKey() instanceof String name)) {
+				throw new BQSQLException(
+						"The map at parameter " + parameterIndex + " has a non-String key ("
+								+ (entry.getKey() == null ? "null" : entry.getKey().getClass().getName())
+								+ "); BigQuery struct field names are strings",
+						BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+			}
+			values.put(name, toFieldParameter(entry.getValue(), null, parameterIndex));
+		}
+		return QueryParameterValue.struct(values);
+	}
+
+	/**
+	 * Converts one struct field value to a parameter.
+	 *
+	 * <p>
+	 * Mirrors the scalar cases of {@link #setObject(int, Object)} so a value binds
+	 * the same way inside a struct as it does on its own, and recurses for the
+	 * nested shapes: a map or struct becomes a nested struct, a list or array
+	 * becomes an array.
+	 *
+	 * @param value
+	 *            the field value, possibly null
+	 * @param declaredType
+	 *            the type from the struct's type name, or null when the field was
+	 *            not declared. Used only to type a null
+	 * @param parameterIndex
+	 *            the parameter index, for error messages
+	 * @return the BigQuery parameter
+	 * @throws SQLException
+	 *             if the value has no BigQuery mapping
+	 */
+	private QueryParameterValue toFieldParameter(Object value, StandardSQLTypeName declaredType, int parameterIndex)
+			throws SQLException {
+		if (value == null) {
+			// BigQuery rejects an untyped null, so one is needed either way. The
+			// declared type is the honest answer where there is one; STRING is the
+			// fallback, which is why createStruct beats a map for nullable fields.
+			return QueryParameterValue.of(null, declaredType != null ? declaredType : StandardSQLTypeName.STRING);
+		}
+
+		return switch (value) {
+			case String s -> QueryParameterValue.of(s, StandardSQLTypeName.STRING);
+			case Integer i -> QueryParameterValue.of(Long.valueOf(i), StandardSQLTypeName.INT64);
+			case Long l -> QueryParameterValue.of(l, StandardSQLTypeName.INT64);
+			case Short sh -> QueryParameterValue.of(Long.valueOf(sh), StandardSQLTypeName.INT64);
+			case Byte b -> QueryParameterValue.of(Long.valueOf(b), StandardSQLTypeName.INT64);
+			case Float f -> QueryParameterValue.of(Double.valueOf(f), StandardSQLTypeName.FLOAT64);
+			case Double d -> QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64);
+			case Boolean b -> QueryParameterValue.of(b, StandardSQLTypeName.BOOL);
+			case BigDecimal bd -> QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC);
+			// Through the same typed factories setTimestamp and setTime use, not the
+			// string forms setObject reaches for. QueryParameterValue rejects an
+			// ISO-8601 timestamp string client-side, and wants exactly six fractional
+			// digits on a TIME — see timestampParameter and TIME_FORMATTER.
+			case Timestamp ts -> timestampParameter(ts);
+			case Time t -> QueryParameterValue.time(TIME_FORMATTER.format(t.toLocalTime()));
+			case Date dt -> QueryParameterValue.of(dt.toString(), StandardSQLTypeName.DATE);
+			case byte[] bytes -> QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES);
+			case java.sql.Struct nested -> toStructParameter(nested, parameterIndex);
+			case Map<?, ?> nested -> toStructParameter(nested, parameterIndex);
+			case List<?> list -> toArrayFieldParameter(list, parameterIndex);
+			case Object[] array -> toArrayFieldParameter(Arrays.asList(array), parameterIndex);
+			case java.sql.Array array -> toArrayFieldParameter(arrayElements(array), parameterIndex);
+			default -> throw new BQSQLException(
+					"Unsupported struct field type at parameter " + parameterIndex + ": " + value.getClass().getName(),
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		};
+	}
+
+	/** The elements of a {@link java.sql.Array}, as a list. */
+	private static List<?> arrayElements(java.sql.Array array) throws SQLException {
+		Object elements = array.getArray();
+		return elements instanceof Object[] objects ? Arrays.asList(objects) : List.of();
+	}
+
+	/**
+	 * Binds a struct field that is itself an array.
+	 *
+	 * <p>
+	 * BigQuery arrays are homogeneous, so the element type is taken from the first
+	 * non-null element and every element is bound with it. An array of all nulls
+	 * has nothing to infer from and is rejected rather than guessed at, because a
+	 * wrong element type surfaces as a query error far from its cause.
+	 */
+	private QueryParameterValue toArrayFieldParameter(List<?> elements, int parameterIndex) throws SQLException {
+		if (elements.isEmpty()) {
+			return QueryParameterValue.array(new QueryParameterValue[0], StandardSQLTypeName.STRING);
+		}
+		Object first = elements.stream().filter(java.util.Objects::nonNull).findFirst().orElse(null);
+		if (first == null) {
+			throw new BQSQLException("The array struct field at parameter " + parameterIndex
+					+ " contains only nulls, so its element " + "type cannot be inferred",
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+		StandardSQLTypeName elementType = inferSqlType(first);
+		QueryParameterValue[] values = new QueryParameterValue[elements.size()];
+		for (int i = 0; i < elements.size(); i++) {
+			values[i] = toFieldParameter(elements.get(i), elementType, parameterIndex);
+		}
+		return QueryParameterValue.array(values, elementType);
 	}
 
 	@Override
@@ -565,37 +836,33 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 		Object[] arr = (Object[]) x.getArray();
 		StandardSQLTypeName elemType = TypeMapper.toStandardSQLTypeName(x.getBaseType());
-		QueryParameterValue[] paramValues = new QueryParameterValue[arr.length];
-		for (int i = 0; i < arr.length; i++) {
-			Object elem = arr[i];
-			if (elem == null) {
-				paramValues[i] = QueryParameterValue.of(null, elemType);
-			} else {
-				paramValues[i] = QueryParameterValue.of(elem.toString(), elemType);
-			}
+		// Built inside the factory, not before it: an element BigQuery rejects must
+		// surface as a SQLException like any other bad parameter.
+		setParameter(parameterIndex, () -> arrayOf(java.util.Arrays.asList(arr), elemType));
+	}
+
+	/** Builds an array parameter, binding every element with the same type. */
+	private static QueryParameterValue arrayOf(java.util.List<?> elements, StandardSQLTypeName elementType) {
+		QueryParameterValue[] values = new QueryParameterValue[elements.size()];
+		for (int i = 0; i < elements.size(); i++) {
+			Object element = elements.get(i);
+			values[i] = element == null
+					? QueryParameterValue.of(null, elementType)
+					: QueryParameterValue.of(element.toString(), elementType);
 		}
-		setParameter(parameterIndex, QueryParameterValue.array(paramValues, elemType));
+		return QueryParameterValue.array(values, elementType);
 	}
 
 	private void setListParameter(int parameterIndex, java.util.List<?> list) throws SQLException {
 		if (list.isEmpty()) {
 			setParameter(parameterIndex,
-					QueryParameterValue.array(new QueryParameterValue[0], StandardSQLTypeName.STRING));
+					() -> QueryParameterValue.array(new QueryParameterValue[0], StandardSQLTypeName.STRING));
 			return;
 		}
 		// Infer element type from first non-null element
 		Object first = list.stream().filter(e -> e != null).findFirst().orElse(null);
 		StandardSQLTypeName elemType = inferSqlType(first);
-		QueryParameterValue[] paramValues = new QueryParameterValue[list.size()];
-		for (int i = 0; i < list.size(); i++) {
-			Object elem = list.get(i);
-			if (elem == null) {
-				paramValues[i] = QueryParameterValue.of(null, elemType);
-			} else {
-				paramValues[i] = QueryParameterValue.of(elem.toString(), elemType);
-			}
-		}
-		setParameter(parameterIndex, QueryParameterValue.array(paramValues, elemType));
+		setParameter(parameterIndex, () -> arrayOf(list, elemType));
 	}
 
 	private static StandardSQLTypeName inferSqlType(Object obj) {
@@ -747,7 +1014,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 		// Reinterpret the wall clock as belonging to the Calendar's zone (#121)
 		Timestamp adjusted = TimezoneUtils.timestampToCalendarZone(x, cal);
-		setParameter(parameterIndex, timestampParameter(adjusted));
+		setParameter(parameterIndex, () -> timestampParameter(adjusted));
 	}
 
 	/**
@@ -970,6 +1237,10 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 		Optional<BatchInsertRewriter.RewritableInsert> rewritable = BatchInsertRewriter.parse(sqlTemplate);
 		if (rewritable.isPresent() && allSetsMatchTemplate(rewritable.get().parametersPerRow(), parameterSets)) {
+			Optional<BatchLoadEncoder.LoadTarget> loadTarget = loadTargetFor(rewritable.get(), parameterSets);
+			if (loadTarget.isPresent()) {
+				return executeLoadBatch(loadTarget.get(), parameterSets);
+			}
 			return executeCollapsedBatch(rewritable.get(), parameterSets);
 		}
 		return executeSequentialBatch(parameterSets);
@@ -986,6 +1257,191 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	}
 
 	/**
+	 * Decides whether this batch goes through a load job, and where to.
+	 *
+	 * <p>
+	 * Every condition here is a reason the DML path stays correct where the load
+	 * path would not, so each returns empty rather than throwing:
+	 *
+	 * <ul>
+	 * <li><b>The property is unset, or the batch is smaller than it.</b> A load job
+	 * is a different mechanism, not a faster one of the same kind, so it is never
+	 * chosen without being asked for.
+	 * <li><b>The connection is in a transaction or a session.</b> Load jobs cannot
+	 * participate in a BigQuery transaction — rows would land outside it and
+	 * survive a rollback. This is the distinction the issue asked to be explicit
+	 * rather than accidental, and it is checked on {@code autoCommit} rather than
+	 * on whether a transaction has actually begun, because {@code BEGIN} is
+	 * deferred to the first statement and this batch could be it.
+	 * <li><b>The INSERT has no explicit column list, or a shape this driver cannot
+	 * resolve.</b>
+	 * <li><b>Some parameter has a type the encoder is not sure of.</b>
+	 * </ul>
+	 *
+	 * @param insert
+	 *            the parsed INSERT
+	 * @param parameterSets
+	 *            the accumulated batch
+	 * @return where to load, or empty to use the DML path
+	 * @throws SQLException
+	 *             if the connection's state cannot be read
+	 */
+	private Optional<BatchLoadEncoder.LoadTarget> loadTargetFor(BatchInsertRewriter.RewritableInsert insert,
+			List<List<QueryParameterValue>> parameterSets) throws SQLException {
+		Integer threshold = properties.batchLoadThreshold();
+		if (threshold == null || parameterSets.size() < threshold) {
+			return Optional.empty();
+		}
+		if (!connection.getAutoCommit() || connection.getSessionManager().hasSession()) {
+			logger.debug("Batch of {} rows stays on the DML path: a load job cannot join a transaction or session",
+					parameterSets.size());
+			return Optional.empty();
+		}
+		if (!BatchLoadEncoder.canEncode(parameterSets)) {
+			logger.debug("Batch of {} rows stays on the DML path: a parameter type is not loadable",
+					parameterSets.size());
+			return Optional.empty();
+		}
+		Optional<BatchLoadEncoder.LoadTarget> target = BatchLoadEncoder.parseTarget(insert.insertPrefix(),
+				insert.parametersPerRow());
+		if (target.isEmpty()) {
+			logger.debug("Batch of {} rows stays on the DML path: the INSERT names no explicit column list",
+					parameterSets.size());
+		}
+		return target;
+	}
+
+	/**
+	 * Executes the batch as a single BigQuery load job.
+	 *
+	 * <p>
+	 * The rows are streamed as newline-delimited JSON straight into the job's write
+	 * channel, so nothing is staged in GCS and the whole batch never exists as one
+	 * string in memory.
+	 *
+	 * <p>
+	 * <b>Update counts.</b> A load job reports rows written in aggregate, with no
+	 * per-row breakdown to map back onto parameter sets. When the count matches the
+	 * batch exactly, every entry is 1; otherwise every entry is
+	 * {@link #SUCCESS_NO_INFO}, which JDBC defines for precisely this case. The
+	 * counts are never fabricated from the batch size.
+	 *
+	 * @param target
+	 *            the table and columns to write
+	 * @param parameterSets
+	 *            the rows
+	 * @return per-row update counts
+	 * @throws SQLException
+	 *             if the load fails
+	 */
+	private int[] executeLoadBatch(BatchLoadEncoder.LoadTarget target, List<List<QueryParameterValue>> parameterSets)
+			throws SQLException {
+		TableId tableId = resolveTableId(target.tablePath());
+		WriteChannelConfiguration writeConfig = WriteChannelConfiguration.newBuilder(tableId)
+				.setFormatOptions(FormatOptions.json())
+				// The table exists and owns its schema: this INSERT names columns, and
+				// autodetect would infer types from the JSON text instead, quietly
+				// widening or narrowing them.
+				.setAutodetect(false).setWriteDisposition(JobInfo.WriteDisposition.WRITE_APPEND)
+				.setCreateDisposition(JobInfo.CreateDisposition.CREATE_NEVER).build();
+
+		logger.debug("Loading {} rows into {} via a load job", parameterSets.size(), target.tablePath());
+
+		Job job;
+		TableDataWriteChannel channel = connection.getBigQuery().writer(writeConfig);
+		try {
+			for (List<QueryParameterValue> values : parameterSets) {
+				String line = BatchLoadEncoder.toJsonRow(target, values) + "\n";
+				channel.write(java.nio.ByteBuffer.wrap(line.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+			}
+			// Closed here rather than in a finally, and deliberately not with
+			// try-with-resources: the load job does not exist until the channel is
+			// closed, so getJob() returns null before this line and the ordering is
+			// the point rather than an incidental detail.
+			channel.close();
+			job = channel.getJob();
+		} catch (java.io.IOException e) {
+			closeQuietly(channel);
+			throw new BQSQLException("Failed to stream a batch load of " + parameterSets.size() + " rows into "
+					+ target.tablePath() + ": " + e.getMessage(), BQSQLException.SQLSTATE_GENERAL_ERROR, e);
+		}
+
+		long written = awaitLoad(job, target, parameterSets.size());
+		int[] updateCounts = new int[parameterSets.size()];
+		java.util.Arrays.fill(updateCounts, written == parameterSets.size() ? 1 : SUCCESS_NO_INFO);
+		return updateCounts;
+	}
+
+	/**
+	 * Closes a write channel while an earlier failure is already propagating.
+	 *
+	 * <p>
+	 * A close failure here is swallowed on purpose: the exception on its way out
+	 * says why the load did not happen, and replacing it with a second one about
+	 * the cleanup would hide that.
+	 */
+	private static void closeQuietly(TableDataWriteChannel channel) {
+		try {
+			channel.close();
+		} catch (java.io.IOException | RuntimeException e) {
+			logger.debug("Ignoring failure closing a batch load channel after an earlier error: {}", e.getMessage());
+		}
+	}
+
+	/**
+	 * Waits for a load job and reports how many rows it wrote.
+	 *
+	 * @throws SQLException
+	 *             if the job fails, which for a load job means nothing was written
+	 */
+	private long awaitLoad(Job job, BatchLoadEncoder.LoadTarget target, int rowCount) throws SQLException {
+		try {
+			Job completed = job.waitFor();
+			if (completed == null) {
+				throw new BQSQLException("Batch load job for " + target.tablePath() + " no longer exists",
+						BQSQLException.SQLSTATE_GENERAL_ERROR);
+			}
+			if (completed.getStatus() != null && completed.getStatus().getError() != null) {
+				throw new BatchUpdateException(
+						"Batch load of " + rowCount + " rows into " + target.tablePath() + " failed: "
+								+ completed.getStatus().getError().getMessage(),
+						BQSQLException.SQLSTATE_GENERAL_ERROR, 0, new int[0]);
+			}
+			JobStatistics.LoadStatistics stats = completed.getStatistics();
+			return stats == null || stats.getOutputRows() == null ? -1 : stats.getOutputRows();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new BQSQLException("Interrupted waiting for a batch load job",
+					BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
+		}
+	}
+
+	/**
+	 * Resolves an INSERT's table path against the connection's defaults.
+	 *
+	 * <p>
+	 * A load job needs a fully-qualified {@link TableId}, where the SQL may have
+	 * named the table with one, two or three parts.
+	 */
+	private TableId resolveTableId(String tablePath) throws SQLException {
+		String[] parts = tablePath.split("\\.");
+		return switch (parts.length) {
+			case 3 -> TableId.of(parts[0], parts[1], parts[2]);
+			case 2 -> TableId.of(properties.projectId(), parts[0], parts[1]);
+			case 1 -> {
+				if (properties.datasetId() == null) {
+					throw new BQSQLException("Cannot load into '" + tablePath
+							+ "': the statement names no dataset and the " + "connection has no default one",
+							BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+				}
+				yield TableId.of(properties.projectId(), properties.datasetId(), parts[0]);
+			}
+			default -> throw new BQSQLException("Cannot load into '" + tablePath + "': unrecognised table path",
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		};
+	}
+
+	/**
 	 * Executes the batch as chunked multi-row INSERT query jobs.
 	 */
 	private int[] executeCollapsedBatch(BatchInsertRewriter.RewritableInsert insert,
@@ -994,6 +1450,13 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		int maxRowsPerChunk = insert.maxRowsPerChunk();
 		int[] updateCounts = new int[totalRows];
 		int completedRows = 0;
+
+		// Each chunk is a separate execution and so clears the previous chunk's
+		// warnings and cost estimates. Collecting them here is what makes
+		// getWarnings() a chain and getCostEstimates() one entry per chunk; without
+		// it a caller sees only the final chunk, which for a large batch is the
+		// least interesting one.
+		Diagnostics batchDiagnostics = Diagnostics.NONE;
 
 		while (completedRows < totalRows) {
 			int chunkRows = Math.min(maxRowsPerChunk, totalRows - completedRows);
@@ -1012,12 +1475,14 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 								+ e.getMessage(),
 						e.getSQLState(), e.getErrorCode(), Arrays.copyOf(updateCounts, completedRows), e);
 			}
+			batchDiagnostics = batchDiagnostics.andThen(currentDiagnostics());
 
 			// Only claim per-row success when BigQuery confirms the expected count
 			int perRowCount = affectedRows == chunkRows ? 1 : SUCCESS_NO_INFO;
 			Arrays.fill(updateCounts, completedRows, completedRows + chunkRows, perRowCount);
 			completedRows += chunkRows;
 		}
+		publishDiagnostics(batchDiagnostics);
 		return updateCounts;
 	}
 

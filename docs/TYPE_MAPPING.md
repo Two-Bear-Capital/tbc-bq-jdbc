@@ -35,10 +35,10 @@ See [Complex Types](#complex-types).
 The "Java Type" column is what `ResultSetMetaData.getColumnClassName()` reports. The
 object `getObject()` actually returns is a `String` unless `nativeComplexTypes=true`.
 
-\*\* `PreparedStatement.setArray()` and `Connection.createArrayOf()` work regardless of
-`nativeComplexTypes`. There is no equivalent for STRUCT: `Connection.createStruct()` is
-not supported, and passing a `java.sql.Struct` to `setObject()` throws. Pass struct
-values as SQL literals or build them in the query.
+\*\* `PreparedStatement.setArray()`, `Connection.createArrayOf()`,
+`Connection.createStruct()` and passing a `Map`/`java.sql.Struct` to `setObject()` all
+work regardless of `nativeComplexTypes`. That property governs only what `getObject()`
+returns.
 
 ## Primitive Types
 
@@ -436,8 +436,40 @@ while (rs.next()) {
 **Default vs native:** By default STRUCT columns return a JSON object string. Set
 `nativeComplexTypes=true` to have `getObject()` return a `java.sql.Struct`.
 
-There is no write path for STRUCT parameters: `Connection.createStruct()` is not supported and
-passing a `java.sql.Struct` to `setObject()` throws. Build struct values in SQL instead.
+**Binding a STRUCT parameter.** BigQuery struct parameters are *named*, so the field
+names have to come from somewhere. Two ways to supply them:
+
+```java
+// A Map is the shape BigQuery itself uses. Iteration order is preserved,
+// so a LinkedHashMap fixes the field order.
+Map<String, Object> person = new LinkedHashMap<>();
+person.put("id", 1L);
+person.put("name", "Alice");
+stmt.setObject(1, person);
+
+// createStruct takes the names in its type name, the same form getObject()
+// reports for a struct column.
+Struct s = conn.createStruct("STRUCT<id INT64, name STRING>", new Object[]{1L, "Alice"});
+stmt.setObject(1, s);
+```
+
+Reference the fields as `?.name` in the query:
+
+```sql
+SELECT ?.id, ?.name
+```
+
+**Prefer `createStruct` when a field can be null.** BigQuery rejects an untyped null
+parameter. A map infers each field's type from its value, and a null value has nothing
+to infer from — it binds as a `STRING` null. A declared type answers that.
+
+Fields may themselves be structs (`Map`, `Struct`) or arrays (`List`, `Object[]`,
+`java.sql.Array`); those nest to any depth. An array field's element type is inferred
+from its first non-null element, so an array of only nulls is rejected rather than
+guessed at.
+
+A `java.sql.Struct` whose type name does not name its fields — `STRUCT<INT64, STRING>`
+is legal BigQuery but names nothing — cannot be bound, and says so.
 
 You can also project fields directly in SQL when you only need a few:
 

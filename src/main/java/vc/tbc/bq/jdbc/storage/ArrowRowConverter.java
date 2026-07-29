@@ -22,7 +22,10 @@ import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.PeriodDuration;
 import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.complex.ListVector;
+import org.apache.arrow.vector.complex.StructVector;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
 
 import java.math.BigDecimal;
@@ -62,14 +65,27 @@ import java.util.Set;
  * by running the same query down both paths and comparing every cell.
  *
  * <p>
- * Two encodings are easy to get wrong, and both were caught by that parity test
- * rather than by reading documentation:
+ * Three encodings are easy to get wrong, and all three were caught by that
+ * parity test rather than by reading documentation:
  *
  * <ul>
  * <li><b>NUMERIC</b> arrives from Arrow at its full declared scale
  * ({@code -2.000000000}) where REST strips trailing zeros ({@code -2}).
  * <li><b>TIMESTAMP</b> is fractional epoch seconds, not microseconds.
+ * <li><b>INTERVAL</b> fractional seconds are padded to a whole number of
+ * milliseconds: 700000µs is {@code .700} and 10µs is {@code .000010}, never
+ * {@code .7} or {@code .00001}.
  * </ul>
+ * 
+ * <p>
+ * <b>ARRAY and STRUCT are built by recursion, not from Arrow's own
+ * rendering.</b> A list or struct vector will hand back a
+ * {@code JsonStringArrayList} or {@code JsonStringHashMap} whose
+ * {@code toString()} already resembles JSON, and reaching for it would bypass
+ * every encoding above — the scalars inside would be rendered by Arrow rather
+ * than by this class, which is precisely the drift the design exists to
+ * prevent. Nesting is walked against the BigQuery schema instead, which also
+ * fixes member order rather than trusting a map's.
  *
  * <p>
  * FLOAT64 and TIMESTAMP used to be a documented exception to byte parity,
@@ -89,17 +105,17 @@ final class ArrowRowConverter {
 	 * down the REST path instead — see {@link #isSupported(Schema)}.
 	 *
 	 * <p>
-	 * Deliberately scalars only. ARRAY and STRUCT arrive as nested Arrow vectors
-	 * whose JSON encoding would have to match the REST path's exactly, and INTERVAL
-	 * is not supported by the Storage Read API at all. None of them are what the
-	 * feature exists for — large scans of flat data — so they are excluded rather
-	 * than half-supported.
+	 * ARRAY and STRUCT are handled by recursion rather than by a type of their own:
+	 * a repeated field's mode and a struct's subfields say what to do, and the
+	 * element type still has to appear here. {@code RANGE} is the one composite
+	 * type left out, having no {@code FieldValue} shape the REST path agrees on.
 	 */
 	private static final Set<StandardSQLTypeName> SUPPORTED = EnumSet.of(StandardSQLTypeName.INT64,
 			StandardSQLTypeName.FLOAT64, StandardSQLTypeName.NUMERIC, StandardSQLTypeName.BIGNUMERIC,
 			StandardSQLTypeName.BOOL, StandardSQLTypeName.STRING, StandardSQLTypeName.BYTES, StandardSQLTypeName.DATE,
 			StandardSQLTypeName.TIME, StandardSQLTypeName.DATETIME, StandardSQLTypeName.TIMESTAMP,
-			StandardSQLTypeName.GEOGRAPHY, StandardSQLTypeName.JSON);
+			StandardSQLTypeName.GEOGRAPHY, StandardSQLTypeName.JSON, StandardSQLTypeName.INTERVAL,
+			StandardSQLTypeName.STRUCT);
 
 	private final FieldList fields;
 
@@ -119,20 +135,43 @@ final class ArrowRowConverter {
 			return false;
 		}
 		for (Field field : schema.getFields()) {
-			if (field.getMode() == Field.Mode.REPEATED) {
-				return false;
-			}
-			StandardSQLTypeName type = field.getType() == null ? null : field.getType().getStandardType();
-			if (type == null || !SUPPORTED.contains(type)) {
-				return false;
-			}
-			// A RECORD/STRUCT reports a supported-looking type only if it has no
-			// subfields, which should not happen; treat any nesting as unsupported.
-			if (field.getSubFields() != null && !field.getSubFields().isEmpty()) {
+			if (!isSupported(field)) {
 				return false;
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Whether one field, and everything nested inside it, can be encoded.
+	 *
+	 * <p>
+	 * Recursive because a struct's support is its members' support: an
+	 * {@code ARRAY<STRUCT<a INT64, b RANGE<DATE>>>} is unencodable for a reason
+	 * three levels down, and the path is all-or-nothing per result.
+	 */
+	private static boolean isSupported(Field field) {
+		StandardSQLTypeName type = field.getType() == null ? null : field.getType().getStandardType();
+		if (type == null || !SUPPORTED.contains(type)) {
+			return false;
+		}
+		FieldList subFields = field.getSubFields();
+		if (type == StandardSQLTypeName.STRUCT) {
+			// A struct with no members is not something BigQuery produces, and an
+			// empty FieldValueList would be indistinguishable from a null.
+			if (subFields == null || subFields.isEmpty()) {
+				return false;
+			}
+			for (Field subField : subFields) {
+				if (!isSupported(subField)) {
+					return false;
+				}
+			}
+			return true;
+		}
+		// A non-struct carrying subfields is a shape this converter does not know;
+		// refusing it is cheaper than discovering it row by row.
+		return subFields == null || subFields.isEmpty();
 	}
 
 	/**
@@ -159,13 +198,98 @@ final class ArrowRowConverter {
 		return FieldValueList.of(values, fields);
 	}
 
+	/**
+	 * Encodes one value, recursing into arrays and structs.
+	 *
+	 * <p>
+	 * <b>Nested values are built from the BigQuery schema, not from
+	 * {@code vector.getObject()}.</b> Arrow will happily hand back a
+	 * {@code JsonStringArrayList} or {@code JsonStringHashMap} whose
+	 * {@code toString()} already looks like JSON, and using it would be a trap
+	 * twice over: the map gives no guarantee about member order, where the REST
+	 * path's order is the schema's; and its rendering is Arrow's, not BigQuery's,
+	 * so every scalar inside would bypass the encodings above that exist precisely
+	 * because the two differ. Walking the child vectors keeps every leaf going
+	 * through {@link #encode}.
+	 */
 	private static FieldValue toFieldValue(FieldVector vector, int rowIndex, Field field) throws SQLException {
+		if (field.getMode() == Field.Mode.REPEATED) {
+			// An array is never null in BigQuery, only empty, and that is what the
+			// REST path reports — so this returns a REPEATED value either way.
+			return FieldValue.of(FieldValue.Attribute.REPEATED, arrayElements(vector, rowIndex, field));
+		}
 		if (vector.isNull(rowIndex)) {
 			return FieldValue.of(FieldValue.Attribute.PRIMITIVE, null);
+		}
+		if (field.getType().getStandardType() == StandardSQLTypeName.STRUCT) {
+			return FieldValue.of(FieldValue.Attribute.RECORD, structMembers(vector, rowIndex, field));
 		}
 		Object raw = vector.getObject(rowIndex);
 		StandardSQLTypeName type = field.getType().getStandardType();
 		return FieldValue.of(FieldValue.Attribute.PRIMITIVE, encode(raw, type, field));
+	}
+
+	/**
+	 * The elements of a repeated field, read out of the list vector's data vector.
+	 *
+	 * <p>
+	 * Each element is encoded as the same field with its repetition dropped, so an
+	 * {@code ARRAY<STRUCT<…>>} recurses into the struct case and an
+	 * {@code ARRAY<INT64>} into the scalar one.
+	 */
+	private static FieldValueList arrayElements(FieldVector vector, int rowIndex, Field field) throws SQLException {
+		if (!(vector instanceof ListVector list)) {
+			throw unexpected(field, vector, "a list vector");
+		}
+		Field element = elementField(field);
+		FieldVector data = list.getDataVector();
+		int start = list.getElementStartIndex(rowIndex);
+		int end = list.getElementEndIndex(rowIndex);
+
+		List<FieldValue> values = new ArrayList<>(end - start);
+		for (int i = start; i < end; i++) {
+			values.add(toFieldValue(data, i, element));
+		}
+		// Elements are positional and unnamed, which is what FieldValueList.of with
+		// no schema produces — the same shape the REST path builds for an array.
+		return FieldValueList.of(values);
+	}
+
+	/**
+	 * The members of a struct, in the schema's order, read from the struct vector's
+	 * children by name.
+	 */
+	private static FieldValueList structMembers(FieldVector vector, int rowIndex, Field field) throws SQLException {
+		if (!(vector instanceof StructVector struct)) {
+			throw unexpected(field, vector, "a struct vector");
+		}
+		FieldList subFields = field.getSubFields();
+		List<FieldValue> values = new ArrayList<>(subFields.size());
+		for (Field subField : subFields) {
+			FieldVector child = struct.getChild(subField.getName());
+			if (child == null) {
+				throw new BQSQLException("Storage Read API returned no member named '" + subField.getName()
+						+ "' inside struct column '" + field.getName() + "'");
+			}
+			values.add(toFieldValue(child, rowIndex, subField));
+		}
+		// With the schema attached, getRecordValue() can be indexed by name, which
+		// is what FieldValueConverter does when rendering a struct.
+		return FieldValueList.of(values, subFields);
+	}
+
+	/**
+	 * A repeated field seen as its element type.
+	 *
+	 * <p>
+	 * BigQuery models {@code ARRAY<T>} as a field of type {@code T} in
+	 * {@code REPEATED} mode rather than as a distinct array type, so the element
+	 * field is this field with its mode cleared. Rebuilt rather than mutated
+	 * because {@link Field} is immutable.
+	 */
+	private static Field elementField(Field field) {
+		Field.Builder builder = field.toBuilder().setMode(Field.Mode.NULLABLE);
+		return builder.build();
 	}
 
 	/** Encodes a value the way {@code tabledata.list} would have returned it. */
@@ -181,6 +305,7 @@ final class ArrowRowConverter {
 			case TIME -> formatTime(asLocalTime(raw, field));
 			case DATETIME -> formatDateTime(asLocalDateTime(raw, field));
 			case TIMESTAMP -> formatTimestamp(toEpochMicros(raw, field));
+			case INTERVAL -> formatInterval(asPeriodDuration(raw, field));
 			default -> throw unsupported(field, type);
 		};
 	}
@@ -218,6 +343,81 @@ final class ArrowRowConverter {
 	/** BigQuery renders DATETIME as {@code yyyy-MM-ddTHH:MM:SS[.ffffff]}. */
 	private static String formatDateTime(LocalDateTime dateTime) {
 		return dateTime.toLocalDate() + "T" + formatTime(dateTime.toLocalTime());
+	}
+
+	/**
+	 * Renders an INTERVAL the way BigQuery does: {@code Y-M D H:M:S[.ffffff]}.
+	 *
+	 * <p>
+	 * Three independently signed parts, not one signed quantity —
+	 * {@code -1-2 3 -4:5:6} is a legal value, and normalising it into a single sign
+	 * would change what it means. Arrow's {@link PeriodDuration} keeps the same
+	 * split, so each part is rendered from its own source: months from the period,
+	 * days from the period, and the rest from the duration.
+	 *
+	 * <p>
+	 * No zero padding, which is BigQuery's rendering and not an oversight —
+	 * {@code INTERVAL 1 YEAR} reads back as {@code 1-0 0 0:0:0}.
+	 */
+	private static String formatInterval(PeriodDuration value) {
+		java.time.Period period = value.getPeriod();
+		java.time.Duration duration = value.getDuration();
+
+		long totalMonths = period.toTotalMonths();
+		long yearMonthSign = totalMonths < 0 ? -1 : 1;
+		long absMonths = Math.abs(totalMonths);
+
+		long nanos = duration.toNanos();
+		boolean timeNegative = nanos < 0;
+		long absNanos = Math.abs(nanos);
+		long hours = absNanos / 3_600_000_000_000L;
+		long minutes = absNanos / 60_000_000_000L % 60;
+		long seconds = absNanos / 1_000_000_000L % 60;
+		long micros = absNanos / 1_000L % 1_000_000L;
+
+		StringBuilder text = new StringBuilder();
+		if (yearMonthSign < 0) {
+			text.append('-');
+		}
+		text.append(absMonths / 12).append('-').append(absMonths % 12);
+		text.append(' ').append(period.getDays());
+		text.append(' ');
+		if (timeNegative) {
+			text.append('-');
+		}
+		text.append(hours).append(':').append(minutes).append(':').append(seconds);
+		if (micros != 0) {
+			text.append(trimFraction(micros));
+		}
+		return text.toString();
+	}
+
+	/**
+	 * The fractional-seconds part of an INTERVAL, in the form BigQuery's REST
+	 * encoding uses: trailing zeros dropped, then padded back out to a whole number
+	 * of milliseconds.
+	 *
+	 * <p>
+	 * So 700000µs is {@code .700} and 10µs is {@code .000010} — three digits or
+	 * six, never one, four or five. Both examples are measured against REST, not
+	 * inferred: the parity test rejected {@code .00001} for the second, which is
+	 * what {@code stripTrailingZeros} alone would have produced.
+	 */
+	private static String trimFraction(long micros) {
+		String digits = String.format("%06d", micros);
+		int significant = digits.length();
+		while (significant > 1 && digits.charAt(significant - 1) == '0') {
+			significant--;
+		}
+		int padded = (significant + 2) / 3 * 3;
+		return "." + digits.substring(0, padded);
+	}
+
+	private static PeriodDuration asPeriodDuration(Object raw, Field field) throws SQLException {
+		if (raw instanceof PeriodDuration periodDuration) {
+			return periodDuration;
+		}
+		throw unexpected(field, raw, "an interval");
 	}
 
 	private static long toEpochMicros(Object raw, Field field) throws SQLException {

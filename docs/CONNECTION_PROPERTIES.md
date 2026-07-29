@@ -156,8 +156,9 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
   `java.sql.Struct`
 - `rs.getArray()`, `PreparedStatement.setArray()` and `Connection.createArrayOf()` work
   regardless of the setting — an explicit typed call is never gated
-- There is no write path for STRUCT: `Connection.createStruct()` is unsupported and
-  passing a `java.sql.Struct` to `setObject()` throws. Build struct values in SQL
+- `Connection.createStruct()`, `setArray()` and `createArrayOf()` work regardless of the
+  setting — an explicit typed call is never gated. `setObject()` also accepts a
+  `Map<String, Object>` as a STRUCT; see [Type Mapping](TYPE_MAPPING.md#complex-types)
 
 ---
 
@@ -213,7 +214,8 @@ or scripts before any transaction), or to make the session cost explicit at conn
 ### Performance Tuning
 
 Covers `useStorageApi`, `metadataCacheEnabled`, `metadataCacheTtl`,
-`metadataCacheMaxRows`, and `metadataLazyLoad` (see the
+`metadataCacheMaxRows`, `metadataLazyLoad`, `metadataIncludeDescriptions` and
+`collapseShardedTables` (see the
 [generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
@@ -295,6 +297,79 @@ dominates the cost and every subsequent one within the TTL is served from memory
 Lazy loading removes the upfront load entirely, at the cost of an empty result for
 tools that enumerate everything without a pattern.
 
+**`metadataIncludeDescriptions`:**
+- `true` (default) - `getTables()` reports each table's description in `REMARKS`
+- `false` - skip the read; `REMARKS` is empty for tables, and a view still carries its
+  defining SQL
+
+Descriptions are not in the `tables.list` response BigQuery answers `getTables()` with,
+so reading them costs one `INFORMATION_SCHEMA` query per dataset scanned — about a
+second per dataset on a cold call, run up to 16 datasets at a time and cached for
+`metadataCacheTtl`. Datasets containing views pay nothing extra, because the same query
+supplies their definitions. Turn it off on projects with enough datasets for that to be
+felt on every cold refresh.
+
+**`collapseShardedTables`:**
+- `false` (default) - every date-shard is its own `getTables()` row
+- `true` - a set of `events_20260101`, `events_20260102`, … is reported as one
+  `events_*` entry
+
+A year of daily shards is 365 rows in a database tree for what users think of as one
+table, and it fills the metadata cache against `metadataCacheMaxRows` for no benefit.
+Collapsing removes both.
+
+`events_*` is BigQuery's own wildcard syntax, so the reported name is directly
+queryable:
+
+```sql
+SELECT * FROM `my-project.my_dataset.events_*` WHERE _TABLE_SUFFIX BETWEEN '20260101' AND '20260131'
+```
+
+- `getColumns()` answers for the wildcard name using the **newest** shard's schema.
+  Shards drift, and a column added recently is one a wildcard query can select
+- `getPseudoColumns()` reports `_TABLE_SUFFIX` for each collapsed entry
+- Naming a single shard exactly — `getTables(…, "events_20260102", …)` — still returns
+  that shard. Collapsing applies to listings, not to lookups
+- A set needs at least two shards. One `events_20260101` is left alone
+- The eight digits must be a plausible date: `metrics_12345678` and `backup_20261301`
+  are not shards
+
+**Off by default deliberately.** Sharding is a naming convention that BigQuery never
+declares, so the only evidence is the name. A table legitimately ending in a date would
+otherwise disappear from listings into a set it does not belong to.
+
+**`batchLoadThreshold`:**
+- blank (default) - `executeBatch()` always uses chunked INSERT DML
+- a row count - batches at or above it are written with a single BigQuery **load job**
+
+Chunked DML means one query job per chunk, so a million rows is hundreds of jobs against
+DML quotas. A load job is not DML-quota bound and is dramatically faster at volume.
+
+```
+jdbc:bigquery:my-project/my_dataset?authType=ADC&batchLoadThreshold=50000
+```
+
+A batch takes the load path only when **all** of these hold; otherwise it silently uses
+the DML path, which is always correct:
+
+- the batch has at least `batchLoadThreshold` rows
+- the connection is in auto-commit and has no session — **load jobs cannot join a
+  BigQuery transaction**, so the rows would land outside it and survive a rollback
+- the statement is a simple `INSERT` with an **explicit column list**. Without one the
+  column order is the table's, which the driver will not guess
+- every parameter is a scalar type: STRING, INT64, FLOAT64, NUMERIC, BIGNUMERIC, BOOL,
+  BYTES, DATE, TIME, DATETIME or TIMESTAMP. ARRAY, STRUCT, JSON, GEOGRAPHY and INTERVAL
+  each need a bespoke JSON form, and a wrong one writes bad data rather than failing
+
+**Update counts.** A load job reports rows written in aggregate, with no per-row
+breakdown. When the count matches the batch exactly, every entry of the returned `int[]`
+is `1`; otherwise every entry is `Statement.SUCCESS_NO_INFO`. The counts are never
+fabricated from the batch size.
+
+**Off by default deliberately.** A load job is a different mechanism, not a faster one of
+the same kind — switching to it at some row count would change the failure modes of a
+batch written as an INSERT.
+
 **Recommended Configurations:**
 
 **Small Projects (< 10 datasets):**
@@ -349,6 +424,62 @@ Format: `key1=value1,key2=value2`
 
 > **`jobCreationMode` is accepted but not yet applied.** The driver parses it, but it is
 > not currently sent to BigQuery.
+
+---
+
+### Query Cost Estimation
+
+Covers `enableQueryCostEstimation` and `queryPricePerTiB`.
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?authType=ADC&enableQueryCostEstimation=true&queryPricePerTiB=6.25
+```
+
+`enableQueryCostEstimation=true` dry-runs every statement — SELECT and DML alike — before
+running it. Each estimate is attached as a `SQLWarning` and is also readable as a typed
+value:
+
+```java
+var bq = stmt.unwrap(AbstractBQStatement.class);
+for (QueryCostEstimate estimate : bq.getCostEstimates()) {
+    System.out.println(estimate.totalBytesProcessed() + " bytes read, " + estimate.estimatedCost());
+}
+```
+
+To price a single statement without dry-running every one, call `estimateCost` instead.
+It works whether or not `enableQueryCostEstimation` is set, and does not run the statement:
+
+```java
+QueryCostEstimate estimate = stmt.unwrap(AbstractBQStatement.class)
+        .estimateCost("SELECT * FROM events");
+```
+
+On a `BQPreparedStatement`, `estimateCost()` takes no argument and prices the statement
+with its parameters as currently bound.
+
+**Notes:**
+- Every estimated statement costs one extra dry-run job. Dry runs are free, but they are
+  still jobs — `estimateCost` exists so a caller can price the statements that matter
+  rather than all of them
+- Sequential batches are not estimated: that path already runs one job per entry. A
+  collapsed multi-row `INSERT` is estimated once per chunk, and `getCostEstimates()`
+  returns one entry per chunk
+- `estimateCost` throws when BigQuery rejects the dry run; the automatic path logs and
+  carries on, since an estimate must never stop a statement from running
+
+**Pricing:**
+- `queryPricePerTiB` is the price of one tebibyte of billed query data. Without it,
+  estimates report bytes and `estimatedCost()` is `null`
+- The value is a plain decimal in whatever currency you use — the driver does not
+  interpret it. BigQuery's on-demand rate is 6.25 USD/TiB; editions and negotiated
+  contracts differ, and rates change
+- Cost is computed from `billableBytes()`: the bytes the query reads, rounded up to the
+  nearest MiB, with BigQuery's 10 MiB per-query and per-table minimum applied. On a large
+  scan it equals `totalBytesProcessed()`; on a small one it is larger
+- `totalBytesBilled()` is `0` on every estimate. BigQuery bills nothing for a dry run, so
+  the field describes the dry-run job rather than the query it models — use
+  `billableBytes()` instead
 
 ---
 
@@ -524,10 +655,13 @@ driver's `getPropertyInfo()`, so it never goes stale.
 | `timeout` | Higher allows longer queries | Indirectly (prevents partial work) |
 | `maxResults` | Lower = faster completion | None — BigQuery still scans the full query |
 | `maxBillingBytes` | None | Caps per-statement spend; over-limit statements fail before billing |
+| `enableQueryCostEstimation=true` | One extra dry-run job per statement | None directly — dry runs are free, and the estimate is what lets you avoid an expensive query |
 | `enableSessions` | One extra job at connection open | Minimal |
 | `metadataCacheEnabled=true` | Repeated metadata queries served from memory | Lower (fewer API calls) |
 | `metadataCacheTtl` | Higher = more cache hits, staler schema | Lower |
 | `metadataLazyLoad=true` | No upfront metadata load | Lower (fewer API calls) |
+| `metadataIncludeDescriptions=true` | One `INFORMATION_SCHEMA` query per dataset on a cold `getTables()` | None — `INFORMATION_SCHEMA` reads are not billed |
+| `collapseShardedTables=true` | Far fewer metadata rows on sharded projects; one extra `INFORMATION_SCHEMA` query per dataset for `getPseudoColumns()` | None |
 
 ---
 

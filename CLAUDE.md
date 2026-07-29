@@ -82,7 +82,16 @@ CI runs `./mvnw spotless:check` and it must pass.
   (`-0.66666666666666663`, and a TIMESTAMP 0.1us short of the stored value) while
   Arrow carries the exact value. This is why `StorageApiParityTest` can assert byte
   equality with no exemptions — do not reintroduce one, fix the encoding instead
-- Scalar columns only. Arrays, structs and INTERVAL fall back to REST
+- Covers scalars, ARRAY, STRUCT and INTERVAL. Only `RANGE` still falls back to REST
+- **ARRAY/STRUCT recurse against the BigQuery schema, never `vector.getObject()`.** Arrow
+  hands back a `JsonStringArrayList`/`JsonStringHashMap` whose `toString()` looks like
+  JSON; using it would render every nested scalar Arrow's way instead of this class's,
+  and would take struct member order from a map rather than the schema
+- INTERVAL arrives as an `IntervalMonthDayNanoVector` → `PeriodDuration`. Its three parts
+  are signed independently (`-1-2 3 -4:5:6`), and REST pads fractional seconds to a whole
+  number of milliseconds — 700000µs is `.700`, 10µs is `.000010`
+- `isSupported` recurses: a `RANGE` nested inside `ARRAY<STRUCT<...>>` must disqualify the
+  whole result, or it fails mid-ResultSet after rows have reached the caller
 - **Needs `--add-opens=java.base/java.nio=ALL-UNNAMED`** or Arrow cannot allocate.
   `ArrowSupport` probes for this once per JVM (it must actually *allocate* — merely
   constructing a `RootAllocator` succeeds without the flag) and the driver falls
@@ -106,19 +115,47 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
 - `DriverMetrics.reset()` is global; tests using it must reset in both `@BeforeEach`
   and `@AfterEach` or they will corrupt unrelated tests in the same JVM
 
+### Parameter binding
+- **Every parameter goes through `BQPreparedStatement.setParameter(int, ParameterFactory)`.**
+  It takes a factory, not a value, because `QueryParameterValue`'s factories validate
+  client-side and throw `IllegalArgumentException` while *building* the value — taking a
+  finished value could not wrap anything (#227)
+- That wrapping is structural on purpose: a new setter cannot forget, because there is no
+  other way to store a parameter. Array and struct elements are built inside the factory
+  for the same reason
+- `ParameterConverter` wraps its *own* conversions already, so a test asserting only
+  `SQLException` proves nothing — the real-tier tests assert on the "Cannot bind parameter"
+  wording, and were verified to fail without the fix
+
 ### Batch Execution
 - `PreparedStatement.addBatch()/executeBatch()` collapses simple parameterized INSERTs into multi-row `INSERT ... VALUES (...), (...)` query jobs (like PostgreSQL's `reWriteBatchedInserts`)
 - Rewrite logic in `util/BatchInsertRewriter.java`; conservative parser — anything not a placeholder-only single-tuple INSERT falls back to sequential execution (one job per parameter set)
 - Chunked to stay under BigQuery limits (10,000 query parameters/query, ~1 MB query text)
 - `Statement.addBatch(String)` heterogeneous batches execute sequentially
 - DML executed via `AbstractBQStatement.executeDmlInternal()`, which returns real affected-row counts from job statistics
+- `batchLoadThreshold` (opt-in) sends large batches through **one load job** instead, streamed
+  as NDJSON into a `TableDataWriteChannel` — no GCS staging. `util/BatchLoadEncoder` owns the
+  target parsing and the JSON
+- **Every gate on that path exists because the DML path stays correct where the load path
+  would not**, so each falls back rather than throwing: below the threshold, in a
+  transaction or session (a load job cannot join one — rows would survive a rollback), no
+  explicit column list, or a parameter type with no settled JSON form
+- The channel's job **does not exist until the channel is closed**; `getJob()` returns null
+  before that
+- Update counts are 1 per row only when the load's aggregate output matches the batch,
+  otherwise `SUCCESS_NO_INFO` — never fabricated from the batch size
 
 ### Unsupported JDBC Features (BigQuery Limitations)
 - Scrollable ResultSets (no `previous()`, `absolute()`)
 - Updatable ResultSets (no `updateRow()`, `insertRow()`)
 - Savepoints and transaction isolation levels (transactions themselves work via sessions)
 - CallableStatement (limited UDF support)
-- Full Array/Struct JDBC support (returned as JSON)
+- Array/Struct are returned as JSON by default (`nativeComplexTypes=true` for the JDBC
+  types). Both are fully writable: `setArray`/`createArrayOf`, and `createStruct` or a
+  `Map<String, Object>` through `setObject`. **BigQuery struct parameters are named**,
+  so `createStruct` needs a type name that names its fields —
+  `STRUCT<id INT64, name STRING>`, the same form `getObject()` reports — which is what
+  lets a struct that was read be bound straight back (`util/StructTypeNames`)
 
 ## Adding New Features
 
@@ -164,6 +201,19 @@ The bump is computed by `git-cliff --bumped-version` in `version-and-release.yml
 every commit since the last tag is one `cliff.toml` skips, the release falls back to a
 patch bump so the tag still advances. Mislabelling a feature as `fix` silently
 understates the release, so pick the prefix deliberately.
+
+### Milestone work goes on a release branch
+
+**A release fires on every merge to `main`, so a milestone's PRs target
+`release/<version>` and that branch merges to `main` once.** Eight PRs straight to
+`main` would cut eight releases. Base feature PRs on the release branch, squash-merge
+them into it, then open one PR to `main` — and merge **that** one with a merge commit,
+never a squash, or `git-cliff` sees a single commit and the changelog and version bump
+both collapse. Established for 3.1.0 (PRs #212–#219, merged as #221).
+
+Read `docs/contributing/RELEASE_BRANCHES.md` before starting a milestone; it covers the
+rest, including why `build.yml` must keep its `release/**` triggers and why `Closes #NNN`
+does nothing until the work reaches `main`.
 
 ## Documentation
 **Doc scoping convention:** top-level `docs/*.md` is end-user content (how to *use* the driver) and is synced to the website; anything about building, testing, or releasing belongs in `docs/contributing/`.

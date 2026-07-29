@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **27** connection properties.
+There are **31** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -29,10 +29,14 @@ There are **27** connection properties.
 | `metadataCacheTtl` | `300` | any | How long (seconds) to keep metadata in the cache before re-fetching |
 | `metadataCacheMaxRows` | `50000` | any | Ceiling on total rows held in the metadata cache; oldest entries are evicted above it. Set to 0 for no limit |
 | `metadataLazyLoad` | `false` | `true`, `false` | Skip loading all columns on connect; IntelliJ loads them on-demand as you expand tables (faster initial connect for large projects) |
+| `batchLoadThreshold` | _(none)_ | any | Row count at or above which PreparedStatement.executeBatch() submits one BigQuery load job instead of chunked INSERT DML, which is not bound by DML quotas and is far faster at volume (blank = never). Only simple INSERTs with an explicit column list and scalar parameters qualify; anything else, and any batch inside a transaction or session, uses the DML path |
+| `collapseShardedTables` | `false` | `true`, `false` | Report date-sharded tables (events_20260101, events_20260102, ...) as a single events_* entry in getTables(), instead of one row per shard. getColumns() answers for the wildcard name using the newest shard's schema. Off by default: sharding is a naming convention, so a table legitimately ending in a date would otherwise disappear from listings |
+| `metadataIncludeDescriptions` | `true` | `true`, `false` | Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets |
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |
-| `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings. Sequential batches are not estimated (one job per entry already) |
+| `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings and readable as typed values via BQStatement.getCostEstimates(). Sequential batches are not estimated (one job per entry already) |
+| `queryPricePerTiB` | _(none)_ | any | Price of one tebibyte of billed query data, used to turn cost estimates into money (blank = report bytes only). Any currency; BigQuery's on-demand rate is 6.25 USD/TiB, but editions and negotiated contracts differ |
 | `maxResults` | _(none)_ | any | Maximum number of query result rows to return (blank = unlimited) |
 | `maxBillingBytes` | _(none)_ | any | Maximum bytes billed per query; queries exceeding this limit are rejected (blank = unlimited) |
 | `labels` | _(none)_ | any | Comma-separated BigQuery job labels in key=value format (e.g., env=prod,team=data) |

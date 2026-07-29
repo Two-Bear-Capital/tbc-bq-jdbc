@@ -18,6 +18,10 @@ green total while CI fails — the reports accumulate unless `clean` removes the
 # Integration tests (requires ADC credentials)
 ./mvnw verify -Preal-integration-tests
 
+# One integration test class, without re-running the whole unit suite first
+./mvnw verify -Preal-integration-tests -Dit.test=RealMetadataTest \
+  -Dtest=NoSuchUnitTest -Dsurefire.failIfNoSpecifiedTests=false
+
 # Skip tests during build
 ./mvnw clean install -DskipTests
 
@@ -34,6 +38,17 @@ export BENCHMARK_JDBC_URL="jdbc:bigquery:my-project/my_dataset?authType=ADC"
 export BQ_TEST_PROJECT=bigquery-jdbc-driver-test BQ_SCALE_TESTS=true
 ./mvnw verify -Pscale-tests
 ```
+
+**`-Dit.test=` alone does not skip the unit tests.** Failsafe runs after surefire in
+the same lifecycle, so a targeted integration run still pays for the full unit suite —
+and if a unit test is red, the build stops before failsafe ever starts, which reads as
+"my integration test did not run" rather than as a unit failure. Filtering surefire to a
+name that matches nothing is what skips it; `-Dsurefire.failIfNoSpecifiedTests=false`
+stops that filter from being an error in itself.
+
+**There is no `-DskipUTs`.** It is not a property this build defines, so it is accepted
+and silently ignored, and the unit suite runs anyway. `-DskipTests` skips *both* suites,
+which is not what you want when the point is to run one integration test.
 
 **Benchmarks use `exec:exec`, not `exec:java`.** JMH's `@Fork` rebuilds the forked
 JVM's classpath from `java.class.path`; `exec:java` runs in-process behind its own

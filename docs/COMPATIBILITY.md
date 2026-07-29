@@ -30,7 +30,7 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | `Statement.setFetchSize()` | ✅ | Page size for that statement, overriding the connection's `pageSize`. `0` restores the connection default; `getFetchSize()` reports the effective value |
 | `ResultSetMetaData` | ✅ | Column names, types, counts |
 | `DatabaseMetaData` | ⚠️ | See [DatabaseMetaData](#databasemetadata) |
-| `SQLException` hierarchy | ✅ | With SQLState codes |
+| `SQLException` hierarchy | ✅ | With SQLState codes. A parameter value BigQuery's client rejects arrives as a `SQLException` with SQLState `22023`, naming the parameter, rather than as an unchecked exception |
 | Type conversions | ✅ | All BigQuery types; see [Advanced types](#advanced-types) for the JDBC types that do not apply |
 | `NULL` handling | ✅ | `wasNull()` |
 | `beginRequest()` / `endRequest()` (4.3) | ✅ | Connection-pooling hints |
@@ -65,6 +65,10 @@ Details:
   UPDATE/DELETE/MERGE, `INSERT ... SELECT`, tuples mixing literals with placeholders,
   and any batch whose parameter sets do not all match the template's placeholder count.
 - `Statement.addBatch(String)` (heterogeneous SQL batches) also executes sequentially.
+- Set `batchLoadThreshold` to have large batches written by a single BigQuery **load job**
+  instead of chunked DML — not bound by DML quotas, and far faster at volume. Off by
+  default; see [Connection properties](CONNECTION_PROPERTIES.md#performance-tuning) for
+  the conditions a batch must meet, including that load jobs cannot join a transaction.
 - Update counts come from BigQuery DML statistics. On the sequential path each entry
   carries that statement's affected-row count. On the collapsed path a chunk reports
   `1` per row only when BigQuery confirms exactly the expected total; otherwise every
@@ -82,7 +86,7 @@ Details:
 | Temp tables | ✅ | Requires sessions to survive across statements |
 | Multi-statement SQL | ✅ | Runs as a single job; a session is needed only for temp entities or transactions spanning statements |
 | Transactions | ⚠️ | Session-backed; no isolation levels or savepoints |
-| Storage Read API | ⚠️ | Opt-in via `useStorageApi=true` (always) or `auto` (large results); scalar columns only, and needs `--add-opens=java.base/java.nio=ALL-UNNAMED`. Falls back to the standard path when unavailable |
+| Storage Read API | ⚠️ | Opt-in via `useStorageApi=true` (always) or `auto` (large results); covers scalars, ARRAY, STRUCT and INTERVAL, and needs `--add-opens=java.base/java.nio=ALL-UNNAMED`. A `RANGE` column sends the result to the standard path, as does anything else that makes the Storage API unavailable |
 | Query labels | ✅ | Job labels for tracking |
 | Location routing | ✅ | Multi-region support |
 | Query timeout | ✅ | Hard timeout enforcement |
@@ -167,7 +171,7 @@ while (rs.next()) {
 | Feature | Support | Notes |
 |---------|:------:|-------|
 | `Array` | ✅ | `getObject()` returns a JSON string by default, or a `java.sql.Array` with `nativeComplexTypes=true`. `getArray()`, `setArray()` and `Connection.createArrayOf()` always work |
-| `Struct` | ⚠️ | `getObject()` returns a JSON string by default, or a `java.sql.Struct` with `nativeComplexTypes=true`. `Connection.createStruct()` and passing a `Struct` to `setObject()` are not supported |
+| `Struct` | ⚠️ | `getObject()` returns a JSON string by default, or a `java.sql.Struct` with `nativeComplexTypes=true`. Writable: `Connection.createStruct("STRUCT<a INT64, b STRING>", …)`, or pass a `Map<String, Object>` or `Struct` to `setObject()`. A `Struct` whose type name does not name its fields cannot be bound |
 | `Blob`, `Clob`, `NClob` | ❌ | Use `byte[]` and `String` |
 | `SQLXML` | ❌ | Use `String` with JSON |
 | `Ref`, `RowId`, Sharding API | ❌ | Not applicable to BigQuery |
@@ -188,7 +192,7 @@ projects, but a tool that enumerates everything up front will see nothing.
 |--------|:------:|-------|
 | `getCatalogs()` | ✅ | One row: the connection's project. Cached |
 | `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached |
-| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. For a view or materialized view, `REMARKS` carries its defining SQL |
+| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
 | `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW |
 | `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |

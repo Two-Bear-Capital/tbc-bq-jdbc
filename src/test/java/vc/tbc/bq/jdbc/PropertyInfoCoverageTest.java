@@ -65,8 +65,11 @@ class PropertyInfoCoverageTest {
 	/** Extracts the literal keys the parser reads out of the properties map. */
 	private static Set<String> propertiesReadByParser() throws IOException {
 		String source = Files.readString(PARSER_SOURCE, StandardCharsets.UTF_8);
+		// Every parseXxx(properties, "name") helper must be listed: one the regex does
+		// not know about is a property the scan cannot see, and this guard would pass
+		// while the property never reached the generated docs.
 		Pattern lookup = Pattern.compile("(?:properties\\.(?:get|remove)\\(\"([A-Za-z][A-Za-z0-9]*)\"\\)"
-				+ "|parse(?:Integer|Long|BooleanObject|Boolean)\\(properties, \"([A-Za-z][A-Za-z0-9]*)\"\\))");
+				+ "|parse(?:Integer|Long|BooleanObject|Boolean|BigDecimal)\\(properties, \"([A-Za-z][A-Za-z0-9]*)\"\\))");
 		Matcher m = lookup.matcher(source);
 		Set<String> found = new TreeSet<>();
 		while (m.find()) {

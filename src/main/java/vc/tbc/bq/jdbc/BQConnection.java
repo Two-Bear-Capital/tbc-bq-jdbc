@@ -29,6 +29,7 @@ import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.metadata.BQDatabaseMetaData;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
+import vc.tbc.bq.jdbc.util.StructTypeNames;
 import vc.tbc.bq.jdbc.util.UnsupportedOperations;
 
 import java.io.IOException;
@@ -854,6 +855,53 @@ public final class BQConnection extends AbstractBQConnection {
 		int jdbcType = TypeMapper.toJdbcType(sqlType);
 		java.util.List<Object> elementList = elements != null ? java.util.Arrays.asList(elements) : java.util.List.of();
 		return new BQArray(elementList, jdbcType, typeName.toUpperCase(Locale.ROOT));
+	}
+
+	/**
+	 * Creates a STRUCT value that {@code PreparedStatement.setObject} can bind.
+	 *
+	 * <p>
+	 * <b>{@code typeName} must declare the field names</b>, as
+	 * {@code STRUCT<id INT64, name STRING>}. JDBC's {@link java.sql.Struct} is
+	 * positional and BigQuery's struct parameters are named, so the names have to
+	 * come from somewhere and this is the only argument that can carry them. It is
+	 * the same form {@link java.sql.ResultSet#getObject} reports for a struct
+	 * column, so a struct that was read can be rebuilt or bound back unchanged.
+	 *
+	 * <p>
+	 * The declared types are used to type a {@code null} attribute, which BigQuery
+	 * will not accept untyped. That is the reason to prefer this over passing a
+	 * {@code Map<String, Object>} to {@code setObject}: a map has nothing to infer
+	 * a null field's type from.
+	 *
+	 * @param typeName
+	 *            the struct type, e.g. {@code STRUCT<id INT64, name STRING>}
+	 * @param attributes
+	 *            the field values, in the order the type declares them
+	 * @return the struct
+	 * @throws SQLException
+	 *             if the type name does not name its fields, or declares a
+	 *             different number of them than there are attributes
+	 * @since 3.2.0
+	 */
+	@Override
+	public java.sql.Struct createStruct(String typeName, Object[] attributes) throws SQLException {
+		checkClosed();
+		java.util.List<StructTypeNames.StructField> fields = StructTypeNames.parse(typeName);
+		if (fields.isEmpty()) {
+			throw new BQSQLException(
+					"createStruct needs a type name that names its fields, e.g. "
+							+ "STRUCT<id INT64, name STRING>; got: " + typeName,
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+		int attributeCount = attributes != null ? attributes.length : 0;
+		if (attributeCount != fields.size()) {
+			// Caught here rather than at bind time, where the mismatch would be one
+			// statement removed from the call that created it.
+			throw new BQSQLException("createStruct got " + attributeCount + " attribute(s) for a type declaring "
+					+ fields.size() + ": " + typeName, BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+		return new BQStruct(typeName, attributes);
 	}
 
 	// JDBC 4.3 methods
