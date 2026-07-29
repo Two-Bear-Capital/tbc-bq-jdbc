@@ -99,6 +99,11 @@ import java.util.Objects;
  *            reported as one {@code events_*} entry (default: false). Sharding
  *            is a naming convention, not something BigQuery declares, so this
  *            is opt-in.
+ * @param includeInformationSchema
+ *            whether {@code INFORMATION_SCHEMA} is browsable — a synthetic
+ *            schema per project, and its dataset-scoped views as tables of each
+ *            dataset (default: true). Costs no BigQuery query; the view list is
+ *            static.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
@@ -107,7 +112,8 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
 		Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
 		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
-		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold) {
+		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold,
+		Boolean includeInformationSchema) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -212,6 +218,16 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			// <something>_20260101 must not vanish from a listing by default.
 			collapseShardedTables = false;
 		}
+		if (includeInformationSchema == null) {
+			// On by default, like metadataIncludeDescriptions and unlike
+			// collapseShardedTables: it adds entries that are genuinely there and
+			// queryable, rather than removing or renaming rows. It also costs nothing
+			// — the view list is static, so no BigQuery query is issued to produce it.
+			// The opt-out exists because BigQuery's own INFORMATION_SCHEMA.SCHEMATA
+			// does not report this schema, so a tool that diffs schema lists against
+			// the service will see one the service does not admit to.
+			includeInformationSchema = true;
+		}
 		// No default: a load job is a different mechanism, not a faster one of the
 		// same kind. It is not DML-quota bound, but neither is it transactional nor
 		// atomic with surrounding DML, so switching to it at some row count would
@@ -226,6 +242,85 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		if (queryPricePerTiB != null && queryPricePerTiB.signum() < 0) {
 			throw new IllegalArgumentException("queryPricePerTiB cannot be negative: " + queryPricePerTiB);
 		}
+	}
+
+	/**
+	 * Creates properties without {@code includeInformationSchema}, which then takes
+	 * its default.
+	 *
+	 * <p>
+	 * Same reason as the overloads below it: a record's canonical constructor is
+	 * part of its ABI, so declaring the previous signature explicitly keeps
+	 * existing source compiling and existing bytecode linking. 4.0.0 breaks the
+	 * {@link AuthType} hierarchy deliberately; it need not also break this.
+	 *
+	 * @param projectId
+	 *            the GCP project id
+	 * @param datasetId
+	 *            the default dataset, or null
+	 * @param datasetProjectId
+	 *            the project owning the dataset, or null to use {@code projectId}
+	 * @param authType
+	 *            the authentication type
+	 * @param host
+	 *            the API host override, or null
+	 * @param port
+	 *            the API port override, or null
+	 * @param timeoutSeconds
+	 *            query timeout in seconds
+	 * @param maxResults
+	 *            maximum rows to return, or null
+	 * @param useLegacySql
+	 *            whether to use legacy SQL
+	 * @param location
+	 *            the dataset location, or null
+	 * @param labels
+	 *            job labels
+	 * @param pageSize
+	 *            result page size
+	 * @param useStorageApi
+	 *            Storage Read API setting
+	 * @param enableSessions
+	 *            whether to create a session eagerly
+	 * @param connectionTimeout
+	 *            connection timeout in seconds
+	 * @param retryCount
+	 *            retry count
+	 * @param maxBillingBytes
+	 *            per-query billed-bytes ceiling, or null
+	 * @param metadataCacheTtl
+	 *            metadata cache TTL in seconds
+	 * @param metadataCacheEnabled
+	 *            whether the metadata cache is enabled
+	 * @param metadataLazyLoad
+	 *            whether metadata loads lazily
+	 * @param enableQueryCostEstimation
+	 *            whether to estimate query cost
+	 * @param nativeComplexTypes
+	 *            whether ARRAY/STRUCT map to native JDBC types
+	 * @param metadataCacheMaxRows
+	 *            row ceiling for one cached metadata result
+	 * @param queryPricePerTiB
+	 *            price per tebibyte billed, or null
+	 * @param metadataIncludeDescriptions
+	 *            whether table descriptions are read into REMARKS
+	 * @param collapseShardedTables
+	 *            whether date-sharded tables collapse to one wildcard entry
+	 * @param batchLoadThreshold
+	 *            row count at which executeBatch uses a load job, or null
+	 */
+	public ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
+			String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
+			Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
+			Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
+			Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
+			Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
+			Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold) {
+		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
+				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
+				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
+				nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB, metadataIncludeDescriptions,
+				collapseShardedTables, batchLoadThreshold, null);
 	}
 
 	/**
@@ -296,7 +391,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
 				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
-				nativeComplexTypes, metadataCacheMaxRows, null, null, null, null);
+				nativeComplexTypes, metadataCacheMaxRows, null, null, null, null, null);
 	}
 
 	/**
