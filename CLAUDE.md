@@ -165,5 +165,18 @@ every commit since the last tag is one `cliff.toml` skips, the release falls bac
 patch bump so the tag still advances. Mislabelling a feature as `fix` silently
 understates the release, so pick the prefix deliberately.
 
+### Milestone work goes on a release branch
+
+**A release fires on every merge to `main`, so a milestone's PRs target
+`release/<version>` and that branch merges to `main` once.** Eight PRs straight to
+`main` would cut eight releases. Base feature PRs on the release branch, squash-merge
+them into it, then open one PR to `main` — and merge **that** one with a merge commit,
+never a squash, or `git-cliff` sees a single commit and the changelog and version bump
+both collapse. Established for 3.1.0 (PRs #212–#219, merged as #221).
+
+Read `docs/contributing/RELEASE_BRANCHES.md` before starting a milestone; it covers the
+rest, including why `build.yml` must keep its `release/**` triggers and why `Closes #NNN`
+does nothing until the work reaches `main`.
+
 ## Documentation
 **Doc scoping convention:** top-level `docs/*.md` is end-user content (how to *use* the driver) and is synced to the website; anything about building, testing, or releasing belongs in `docs/contributing/`.
