@@ -30,7 +30,7 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | `Statement.setFetchSize()` | ✅ | Page size for that statement, overriding the connection's `pageSize`. `0` restores the connection default; `getFetchSize()` reports the effective value |
 | `ResultSetMetaData` | ✅ | Column names, types, counts |
 | `DatabaseMetaData` | ⚠️ | See [DatabaseMetaData](#databasemetadata) |
-| `SQLException` hierarchy | ✅ | With SQLState codes |
+| `SQLException` hierarchy | ✅ | With SQLState codes. A parameter value BigQuery's client rejects arrives as a `SQLException` with SQLState `22023`, naming the parameter, rather than as an unchecked exception |
 | Type conversions | ✅ | All BigQuery types; see [Advanced types](#advanced-types) for the JDBC types that do not apply |
 | `NULL` handling | ✅ | `wasNull()` |
 | `beginRequest()` / `endRequest()` (4.3) | ✅ | Connection-pooling hints |

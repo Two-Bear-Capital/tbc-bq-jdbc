@@ -108,9 +108,60 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 	}
 
-	private void setParameter(int parameterIndex, QueryParameterValue value) throws SQLException {
+	/**
+	 * Builds a parameter value, which may reject its input.
+	 *
+	 * <p>
+	 * A supplier rather than a value so that construction happens <em>inside</em>
+	 * {@link #setParameter}: {@code QueryParameterValue}'s factories validate
+	 * client-side and throw {@link IllegalArgumentException}, and that happens
+	 * while building the value, before any method of this class would otherwise see
+	 * it. Taking the finished value could not wrap anything.
+	 */
+	@FunctionalInterface
+	private interface ParameterFactory {
+		QueryParameterValue create() throws SQLException;
+	}
+
+	/**
+	 * Builds and stores one parameter, turning a rejected value into a
+	 * {@link SQLException}.
+	 *
+	 * <p>
+	 * <b>Every parameter this statement binds goes through here.</b>
+	 * {@code QueryParameterValue}'s factories validate client-side and signal a bad
+	 * value with {@link IllegalArgumentException} — an unchecked exception escaping
+	 * a JDBC method that declares {@code throws SQLException}, which a caller's
+	 * {@code catch (SQLException)} does not catch and whose message names neither
+	 * the parameter nor the driver.
+	 *
+	 * <p>
+	 * Wrapping here rather than at each construction site is what makes the
+	 * guarantee structural: a new setter cannot forget, because there is no other
+	 * way to store a parameter. That also covers the values built inside struct and
+	 * array binding, which are constructed within the factory rather than before
+	 * it.
+	 *
+	 * @param parameterIndex
+	 *            the 1-based parameter index
+	 * @param factory
+	 *            builds the value
+	 * @throws SQLException
+	 *             if the statement is closed, the index is invalid, or the value is
+	 *             rejected
+	 */
+	private void setParameter(int parameterIndex, ParameterFactory factory) throws SQLException {
 		checkClosed();
 		validateParameterIndex(parameterIndex);
+		QueryParameterValue value;
+		try {
+			value = factory.create();
+		} catch (IllegalArgumentException e) {
+			throw new BQSQLException(
+					"Cannot bind parameter " + parameterIndex + ": " + e.getMessage()
+							+ ". BigQuery rejected the value before the statement was sent",
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE, e);
+		}
 		ensureCapacity(parameterIndex);
 		parameters.set(parameterIndex - 1, value);
 	}
@@ -184,7 +235,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		// Use explicit type information for NULL values
 		// This is critical because BigQuery cannot infer type from a NULL value
 		StandardSQLTypeName bqType = TypeMapper.toStandardSQLTypeName(sqlType);
-		setParameter(parameterIndex, QueryParameterValue.of(null, bqType));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(null, bqType));
 	}
 
 	/**
@@ -203,7 +254,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setBoolean(int parameterIndex, boolean x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.BOOL));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.BOOL));
 	}
 
 	/**
@@ -222,7 +273,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setByte(int parameterIndex, byte x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -241,7 +292,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setShort(int parameterIndex, short x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -260,7 +311,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setInt(int parameterIndex, int x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((long) x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -278,7 +329,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setLong(int parameterIndex, long x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.INT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.INT64));
 	}
 
 	/**
@@ -298,7 +349,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	@Override
 	public void setFloat(int parameterIndex, float x) throws SQLException {
 		// Bind an explicit BigQuery type rather than letting the service infer one
-		setParameter(parameterIndex, QueryParameterValue.of((double) x, StandardSQLTypeName.FLOAT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of((double) x, StandardSQLTypeName.FLOAT64));
 	}
 
 	/**
@@ -316,7 +367,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 	 */
 	@Override
 	public void setDouble(int parameterIndex, double x) throws SQLException {
-		setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.FLOAT64));
+		setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.FLOAT64));
 	}
 
 	/**
@@ -339,7 +390,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.NUMERIC);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.NUMERIC));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.NUMERIC));
 		}
 	}
 
@@ -363,7 +414,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.VARCHAR);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.STRING));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.STRING));
 		}
 	}
 
@@ -387,7 +438,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.VARBINARY);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x, StandardSQLTypeName.BYTES));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x, StandardSQLTypeName.BYTES));
 		}
 	}
 
@@ -411,7 +462,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.DATE);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.of(x.toString(), StandardSQLTypeName.DATE));
+			setParameter(parameterIndex, () -> QueryParameterValue.of(x.toString(), StandardSQLTypeName.DATE));
 		}
 	}
 
@@ -435,7 +486,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIME);
 		} else {
-			setParameter(parameterIndex, QueryParameterValue.time(TIME_FORMATTER.format(x.toLocalTime())));
+			setParameter(parameterIndex, () -> QueryParameterValue.time(TIME_FORMATTER.format(x.toLocalTime())));
 		}
 	}
 
@@ -463,7 +514,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		if (x == null) {
 			setNull(parameterIndex, Types.TIMESTAMP);
 		} else {
-			setParameter(parameterIndex, timestampParameter(x));
+			setParameter(parameterIndex, () -> timestampParameter(x));
 		}
 	}
 
@@ -576,15 +627,16 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		// Bind an explicit BigQuery type per Java type rather than letting the
 		// service infer one
 		switch (x) {
-			case String s -> setParameter(parameterIndex, QueryParameterValue.of(s, StandardSQLTypeName.STRING));
+			case String s -> setParameter(parameterIndex, () -> QueryParameterValue.of(s, StandardSQLTypeName.STRING));
 			case Integer i ->
-				setParameter(parameterIndex, QueryParameterValue.of(Long.valueOf(i), StandardSQLTypeName.INT64));
-			case Long l -> setParameter(parameterIndex, QueryParameterValue.of(l, StandardSQLTypeName.INT64));
-			case Float f ->
-				setParameter(parameterIndex, QueryParameterValue.of(Double.valueOf(f), StandardSQLTypeName.FLOAT64));
-			case Double d -> setParameter(parameterIndex, QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64));
-			case Boolean b -> setParameter(parameterIndex, QueryParameterValue.of(b, StandardSQLTypeName.BOOL));
-			case BigDecimal bd -> setParameter(parameterIndex, QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC));
+				setParameter(parameterIndex, () -> QueryParameterValue.of(Long.valueOf(i), StandardSQLTypeName.INT64));
+			case Long l -> setParameter(parameterIndex, () -> QueryParameterValue.of(l, StandardSQLTypeName.INT64));
+			case Float f -> setParameter(parameterIndex,
+					() -> QueryParameterValue.of(Double.valueOf(f), StandardSQLTypeName.FLOAT64));
+			case Double d -> setParameter(parameterIndex, () -> QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64));
+			case Boolean b -> setParameter(parameterIndex, () -> QueryParameterValue.of(b, StandardSQLTypeName.BOOL));
+			case BigDecimal bd ->
+				setParameter(parameterIndex, () -> QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC));
 			// Delegated rather than re-encoded here. Building the parameter a second
 			// time is what let this drift: TIMESTAMP was bound as an ISO-8601 string
 			// and TIME as HH:mm:ss, both of which QueryParameterValue rejects
@@ -593,11 +645,12 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			case Timestamp ts -> setTimestamp(parameterIndex, ts);
 			case Date dt -> setDate(parameterIndex, dt);
 			case Time t -> setTime(parameterIndex, t);
-			case byte[] bytes -> setParameter(parameterIndex, QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
+			case byte[] bytes ->
+				setParameter(parameterIndex, () -> QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
 			case java.sql.Array a -> setArray(parameterIndex, a);
 			case java.util.List<?> list -> setListParameter(parameterIndex, list);
-			case java.sql.Struct s -> setParameter(parameterIndex, toStructParameter(s, parameterIndex));
-			case java.util.Map<?, ?> m -> setParameter(parameterIndex, toStructParameter(m, parameterIndex));
+			case java.sql.Struct s -> setParameter(parameterIndex, () -> toStructParameter(s, parameterIndex));
+			case java.util.Map<?, ?> m -> setParameter(parameterIndex, () -> toStructParameter(m, parameterIndex));
 			default -> throw new SQLException("Unsupported parameter type: " + x.getClass().getName());
 		}
 	}
@@ -783,37 +836,33 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 		}
 		Object[] arr = (Object[]) x.getArray();
 		StandardSQLTypeName elemType = TypeMapper.toStandardSQLTypeName(x.getBaseType());
-		QueryParameterValue[] paramValues = new QueryParameterValue[arr.length];
-		for (int i = 0; i < arr.length; i++) {
-			Object elem = arr[i];
-			if (elem == null) {
-				paramValues[i] = QueryParameterValue.of(null, elemType);
-			} else {
-				paramValues[i] = QueryParameterValue.of(elem.toString(), elemType);
-			}
+		// Built inside the factory, not before it: an element BigQuery rejects must
+		// surface as a SQLException like any other bad parameter.
+		setParameter(parameterIndex, () -> arrayOf(java.util.Arrays.asList(arr), elemType));
+	}
+
+	/** Builds an array parameter, binding every element with the same type. */
+	private static QueryParameterValue arrayOf(java.util.List<?> elements, StandardSQLTypeName elementType) {
+		QueryParameterValue[] values = new QueryParameterValue[elements.size()];
+		for (int i = 0; i < elements.size(); i++) {
+			Object element = elements.get(i);
+			values[i] = element == null
+					? QueryParameterValue.of(null, elementType)
+					: QueryParameterValue.of(element.toString(), elementType);
 		}
-		setParameter(parameterIndex, QueryParameterValue.array(paramValues, elemType));
+		return QueryParameterValue.array(values, elementType);
 	}
 
 	private void setListParameter(int parameterIndex, java.util.List<?> list) throws SQLException {
 		if (list.isEmpty()) {
 			setParameter(parameterIndex,
-					QueryParameterValue.array(new QueryParameterValue[0], StandardSQLTypeName.STRING));
+					() -> QueryParameterValue.array(new QueryParameterValue[0], StandardSQLTypeName.STRING));
 			return;
 		}
 		// Infer element type from first non-null element
 		Object first = list.stream().filter(e -> e != null).findFirst().orElse(null);
 		StandardSQLTypeName elemType = inferSqlType(first);
-		QueryParameterValue[] paramValues = new QueryParameterValue[list.size()];
-		for (int i = 0; i < list.size(); i++) {
-			Object elem = list.get(i);
-			if (elem == null) {
-				paramValues[i] = QueryParameterValue.of(null, elemType);
-			} else {
-				paramValues[i] = QueryParameterValue.of(elem.toString(), elemType);
-			}
-		}
-		setParameter(parameterIndex, QueryParameterValue.array(paramValues, elemType));
+		setParameter(parameterIndex, () -> arrayOf(list, elemType));
 	}
 
 	private static StandardSQLTypeName inferSqlType(Object obj) {
@@ -965,7 +1014,7 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 
 		// Reinterpret the wall clock as belonging to the Calendar's zone (#121)
 		Timestamp adjusted = TimezoneUtils.timestampToCalendarZone(x, cal);
-		setParameter(parameterIndex, timestampParameter(adjusted));
+		setParameter(parameterIndex, () -> timestampParameter(adjusted));
 	}
 
 	/**
