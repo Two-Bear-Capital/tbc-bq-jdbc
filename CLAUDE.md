@@ -145,6 +145,24 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
 - Update counts are 1 per row only when the load's aggregate output matches the batch,
   otherwise `SUCCESS_NO_INFO` — never fabricated from the batch size
 
+### Multi-statement script results
+- A script is one job with a **child job per executed statement**; the parent carries only
+  the **last** statement's result. `executeQuery()` used to return that, so a script looked
+  like it had answered the first statement while answering the last (#191)
+- `util/ScriptResults` enumerates the children and is the cursor `getMoreResults()` walks
+- **Ordering is by creation time.** The jobs API lists children newest-first, and the `_N`
+  suffix on a child job id is undocumented
+- **A statement produces a ResultSet iff its type is `SELECT`.** Both obvious alternatives
+  are wrong and were tried against the service: a *listed* child carries no result schema
+  at all, so "has columns" makes every SELECT an update count; and a *fetched* DDL/DML
+  result carries the **destination table's** schema, so `CREATE TEMP TABLE t(id INT64)` and
+  `INSERT INTO t` both look like one-column ResultSets
+- Non-SELECT steps are not fetched at all, which also saves an API call each
+- A DDL step reports update count **0**, never -1 — -1 means "no more results" and would
+  end the walk at the first `CREATE`
+- The cursor is cleared by `discardPreviousResult()`, so a new execution cannot resume a
+  half-walked script
+
 ### Unsupported JDBC Features (BigQuery Limitations)
 - Scrollable ResultSets (no `previous()`, `absolute()`)
 - Updatable ResultSets (no `updateRow()`, `insertRow()`)

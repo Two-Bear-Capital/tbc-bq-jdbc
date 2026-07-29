@@ -84,7 +84,7 @@ Details:
 |---------|:------:|-------|
 | Sessions | ✅ | `enableSessions=true`, or started on demand by `setAutoCommit(false)` |
 | Temp tables | ✅ | Requires sessions to survive across statements |
-| Multi-statement SQL | ✅ | Runs as a single job; a session is needed only for temp entities or transactions spanning statements |
+| Multi-statement SQL | ✅ | Runs as a single job, with every statement's result reachable via `getMoreResults()` — [see below](#multi-statement-script-results). A session is needed only for temp entities or transactions spanning statements |
 | Transactions | ⚠️ | Session-backed; no isolation levels or savepoints |
 | Storage Read API | ⚠️ | Opt-in via `useStorageApi=true` (always) or `auto` (large results); covers scalars, ARRAY, STRUCT and INTERVAL, and needs `--add-opens=java.base/java.nio=ALL-UNNAMED`. A `RANGE` column sends the result to the standard path, as does anything else that makes the Storage API unavailable |
 | Query labels | ✅ | Job labels for tracking |
@@ -165,6 +165,41 @@ while (rs.next()) {
 | `CallableStatement`, stored procedures | ❌ | Use standard queries / scripting |
 | Generated keys (`getGeneratedKeys()`) | ❌ | Query the table after INSERT |
 | Named cursors | ❌ | Forward-only iteration |
+| `getMoreResults()` / `getMoreResults(int)` | ✅ | Walks a multi-statement script's results — [see below](#multi-statement-script-results) |
+
+#### Multi-statement script results
+
+BigQuery runs a multi-statement script as one job with a **child job per executed
+statement**. The parent job carries only the last statement's result, so the JDBC way to
+reach the rest is `getMoreResults()`:
+
+```java
+boolean isResultSet = stmt.execute("SELECT 1 AS a; INSERT INTO t VALUES (2); SELECT 3 AS c;");
+while (true) {
+    if (isResultSet) {
+        try (ResultSet rs = stmt.getResultSet()) { /* … */ }
+    } else if (stmt.getUpdateCount() == -1) {
+        break;                       // no more results
+    }
+    isResultSet = stmt.getMoreResults();
+    if (!isResultSet && stmt.getUpdateCount() == -1) {
+        break;
+    }
+}
+```
+
+- Results come back **in execution order**, and the first result is the first statement's.
+- A `SELECT` step is a `ResultSet`; every other statement type is an update count — DML
+  reports its affected rows, DDL reports 0.
+- Only statements that **actually ran** appear. A `DECLARE` produces none, and neither does
+  an untaken `IF` branch, so the sequence is the execution trace rather than the script text.
+- `getMoreResults(KEEP_CURRENT_RESULT)` leaves the previous `ResultSet` open; the other two
+  constants close it. Any other argument throws.
+- Running anything else on the same `Statement` discards the walk.
+
+> **Changed in 4.0.0.** `executeQuery()` on a script previously returned the parent job's
+> result, which is the **last** statement's rows, and no other statement was reachable. It
+> now returns the first statement's result, as JDBC specifies.
 
 ### Advanced types
 
