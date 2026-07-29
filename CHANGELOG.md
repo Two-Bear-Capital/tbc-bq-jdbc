@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-07-29
+
+### 🐛 Bug Fixes
+
+- **types:** Render RANGE from getString instead of throwing ([#238](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/238))
+
+### 🔀 Pull Requests
+
+- Merge pull request #236 from Two-Bear-Capital/test/232-nested-benchmark
+
+test(benchmark): add a nested-type Storage vs REST comparison
+- Merge pull request #239 from Two-Bear-Capital/release/3.3.0
+
+Release 3.3.0
+
+### 🧪 Testing
+
+- **benchmark:** Add a nested-type Storage vs REST comparison
+- **benchmark:** Record that the Storage path wins by more on nested types ([#237](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/237))
+
 ## [3.2.0] - 2026-07-29
 
 ### ⚡ Features
@@ -2557,6 +2577,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[3.2.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.0.9...v3.1.0
 [3.0.9]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.0.8...v3.0.9
