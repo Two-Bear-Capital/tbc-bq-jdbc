@@ -383,6 +383,22 @@ class ConnectionUrlParserTest {
 	}
 
 	@Test
+	void testParseUrlWithMetadataIncludeDescriptions() throws SQLException {
+		String url = "jdbc:bigquery:my-project?metadataIncludeDescriptions=false";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertFalse(props.metadataIncludeDescriptions());
+	}
+
+	@Test
+	void testMetadataIncludeDescriptionsDefaultsToOn() throws SQLException {
+		// REMARKS is empty for every table without this read, so a default of off
+		// would leave the gap in place for everyone who never finds the property.
+		String url = "jdbc:bigquery:my-project";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.metadataIncludeDescriptions());
+	}
+
+	@Test
 	void testParseUrlWithMetadataCacheDisabled() throws SQLException {
 		String url = "jdbc:bigquery:my-project?metadataCacheEnabled=false";
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);

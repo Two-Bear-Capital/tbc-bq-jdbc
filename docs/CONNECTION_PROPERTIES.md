@@ -213,7 +213,7 @@ or scripts before any transaction), or to make the session cost explicit at conn
 ### Performance Tuning
 
 Covers `useStorageApi`, `metadataCacheEnabled`, `metadataCacheTtl`,
-`metadataCacheMaxRows`, and `metadataLazyLoad` (see the
+`metadataCacheMaxRows`, `metadataLazyLoad`, and `metadataIncludeDescriptions` (see the
 [generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
@@ -294,6 +294,18 @@ somewhere memory-constrained.
 dominates the cost and every subsequent one within the TTL is served from memory.
 Lazy loading removes the upfront load entirely, at the cost of an empty result for
 tools that enumerate everything without a pattern.
+
+**`metadataIncludeDescriptions`:**
+- `true` (default) - `getTables()` reports each table's description in `REMARKS`
+- `false` - skip the read; `REMARKS` is empty for tables, and a view still carries its
+  defining SQL
+
+Descriptions are not in the `tables.list` response BigQuery answers `getTables()` with,
+so reading them costs one `INFORMATION_SCHEMA` query per dataset scanned — about a
+second per dataset on a cold call, run up to 16 datasets at a time and cached for
+`metadataCacheTtl`. Datasets containing views pay nothing extra, because the same query
+supplies their definitions. Turn it off on projects with enough datasets for that to be
+felt on every cold refresh.
 
 **Recommended Configurations:**
 
@@ -528,6 +540,7 @@ driver's `getPropertyInfo()`, so it never goes stale.
 | `metadataCacheEnabled=true` | Repeated metadata queries served from memory | Lower (fewer API calls) |
 | `metadataCacheTtl` | Higher = more cache hits, staler schema | Lower |
 | `metadataLazyLoad=true` | No upfront metadata load | Lower (fewer API calls) |
+| `metadataIncludeDescriptions=true` | One `INFORMATION_SCHEMA` query per dataset on a cold `getTables()` | None — `INFORMATION_SCHEMA` reads are not billed |
 
 ---
 

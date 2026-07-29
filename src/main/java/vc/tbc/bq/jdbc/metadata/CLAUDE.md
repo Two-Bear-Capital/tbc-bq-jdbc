@@ -8,6 +8,20 @@
 - Parallel loading lives in `getTables`/`getColumns`/`getProcedures` and the key-constraint
   scans, **not** in `getSchemas()`, which is a single sequential dataset listing
 
+### getTables REMARKS
+- Neither the description nor a view's defining SQL is in the `tables.list` response
+  `getTables()` lists with — only `tables.get` carries either, which would be one API
+  call per table. Both come from one `INFORMATION_SCHEMA` read per dataset instead
+- **One query serves both**, joining `TABLES` to `TABLE_OPTIONS`. Keeping them separate
+  would add a second query to every dataset that already paid for the view read, and the
+  descriptions apply to every table where the definitions apply only to views
+- Precedence: description, then a view's DDL, then empty. `undescribedViews` is computed
+  from the listing *before* the read, so the definition pass fills only rows the
+  description pass left blank
+- `TABLE_OPTIONS.option_value` is **the SQL that would set the option**, not the value:
+  `"hello \"there\""`. `util/SqlStringLiterals.unquote` decodes it
+- `metadataIncludeDescriptions=false` falls back to the narrower view-only read
+
 ### Key Constraints (PK/FK)
 - BigQuery supports `PRIMARY KEY`/`FOREIGN KEY ... NOT ENFORCED` and never validates
   them; `getPrimaryKeys`/`getImportedKeys`/`getExportedKeys`/`getCrossReference` report

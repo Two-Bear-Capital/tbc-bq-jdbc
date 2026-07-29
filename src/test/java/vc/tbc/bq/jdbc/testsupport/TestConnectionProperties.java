@@ -26,7 +26,7 @@ import java.util.Map;
  * about its shape.
  *
  * <p>
- * {@code ConnectionProperties} is a record with 23 components, most of them
+ * {@code ConnectionProperties} is a record with 24 components, most of them
  * nullable and several of them adjacent primitives. Calling the canonical
  * constructor positionally from a test means a wall of {@code null}s, and
  * changing the record breaks every such call at once — with compiler errors
@@ -73,6 +73,7 @@ public final class TestConnectionProperties {
 	private Boolean enableQueryCostEstimation;
 	private Boolean nativeComplexTypes;
 	private Integer metadataCacheMaxRows;
+	private Boolean metadataIncludeDescriptions;
 
 	private TestConnectionProperties() {
 	}
@@ -203,6 +204,11 @@ public final class TestConnectionProperties {
 		return this;
 	}
 
+	public TestConnectionProperties metadataIncludeDescriptions(Boolean value) {
+		this.metadataIncludeDescriptions = value;
+		return this;
+	}
+
 	/**
 	 * The single site in the test tree that depends on the record's positional
 	 * order. A change to {@link ConnectionProperties} should break here and nowhere
@@ -215,6 +221,6 @@ public final class TestConnectionProperties {
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
-				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows);
+				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, metadataIncludeDescriptions);
 	}
 }
