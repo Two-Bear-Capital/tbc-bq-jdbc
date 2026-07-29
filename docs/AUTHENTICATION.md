@@ -493,12 +493,17 @@ fails fast with a message naming it:
 
 Errors raised by Google Cloud rather than the driver — expired credentials, insufficient
 IAM permissions, a project that does not exist — surface with the service's own message.
+When the service returns an explanation the client library's summary leaves out, the driver
+appends it to `SQLException.getMessage()`, so it is visible without walking the cause chain.
 
 Impersonation is validated by Google Cloud, not the driver, and the token is minted on the
 first query rather than at connection time. A missing
-`roles/iam.serviceAccountTokenCreator` grant therefore fails on that first statement with
-`Error requesting access token`; the `PERMISSION_DENIED` naming
-`iam.serviceAccounts.getAccessToken` is in the exception's cause chain.
+`roles/iam.serviceAccountTokenCreator` grant therefore fails on that first statement:
+
+```
+Error requesting access token (HTTP 403: Permission 'iam.serviceAccounts.getAccessToken'
+denied on resource (or it may not exist). Remediate access with this Troubleshooter URL …)
+```
 
 ---
 
