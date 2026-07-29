@@ -17,6 +17,7 @@ package vc.tbc.bq.jdbc.config;
 
 import vc.tbc.bq.jdbc.auth.*;
 
+import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -363,12 +364,14 @@ public final class ConnectionUrlParser {
 		Boolean enableQueryCostEstimation = parseBooleanObject(properties, "enableQueryCostEstimation");
 		Boolean nativeComplexTypes = parseBooleanObject(properties, "nativeComplexTypes");
 		Integer metadataCacheMaxRows = parseInteger(properties, "metadataCacheMaxRows");
+		BigDecimal queryPricePerTiB = parseBigDecimal(properties, "queryPricePerTiB");
 		Boolean metadataIncludeDescriptions = parseBooleanObject(properties, "metadataIncludeDescriptions");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
-				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, metadataIncludeDescriptions);
+				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
+				metadataIncludeDescriptions);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
@@ -430,6 +433,23 @@ public final class ConnectionUrlParser {
 			return Long.parseLong(value);
 		} catch (NumberFormatException e) {
 			throw new SQLException("Invalid long value for " + key + ": " + value, e);
+		}
+	}
+
+	/**
+	 * Parses a decimal property, rejecting a blank value rather than treating it as
+	 * zero: {@code queryPricePerTiB=} reads as "I did not set this", and a zero
+	 * rate would price every query at nothing.
+	 */
+	private static BigDecimal parseBigDecimal(Map<String, String> properties, String key) throws SQLException {
+		String value = properties.get(key);
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			return new BigDecimal(value.trim());
+		} catch (NumberFormatException e) {
+			throw new SQLException("Invalid decimal value for " + key + ": " + value, e);
 		}
 	}
 

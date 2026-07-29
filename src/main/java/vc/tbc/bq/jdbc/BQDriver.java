@@ -185,8 +185,12 @@ public final class BQDriver implements Driver {
 				new String[]{"true", "false"}));
 
 		props.add(prop(info, "enableQueryCostEstimation", "false",
-				"Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings. Sequential batches are not estimated (one job per entry already)",
+				"Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings and readable as typed values via BQStatement.getCostEstimates(). Sequential batches are not estimated (one job per entry already)",
 				false, new String[]{"true", "false"}));
+
+		props.add(prop(info, "queryPricePerTiB", "",
+				"Price of one tebibyte of billed query data, used to turn cost estimates into money (blank = report bytes only). Any currency; BigQuery's on-demand rate is 6.25 USD/TiB, but editions and negotiated contracts differ",
+				false, null));
 
 		props.add(prop(info, "maxResults", "", "Maximum number of query result rows to return (blank = unlimited)",
 				false, null));

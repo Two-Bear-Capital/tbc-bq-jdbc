@@ -19,7 +19,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import vc.tbc.bq.jdbc.BQPreparedStatement;
+import vc.tbc.bq.jdbc.base.AbstractBQStatement;
+import vc.tbc.bq.jdbc.util.QueryCostEstimate;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -27,11 +31,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -54,7 +61,13 @@ class RealQueryCostEstimationTest extends AbstractRealBigQueryIntegrationTest {
 
 	private static final String TEST_TABLE = tableName("cost_estimation");
 
+	/** A rate to price estimates at. Nothing in the driver assumes this number. */
+	private static final BigDecimal RATE = new BigDecimal("6.25");
+
 	private Connection costConnection;
+
+	/** Estimation on, no rate configured. */
+	private Connection pricedConnection;
 
 	@BeforeAll
 	void setUpClass() throws SQLException {
@@ -63,12 +76,16 @@ class RealQueryCostEstimationTest extends AbstractRealBigQueryIntegrationTest {
 				"jdbc:bigquery:%s/%s?authType=ADC&enableQueryCostEstimation=true&maxBillingBytes=1073741824",
 				TEST_PROJECT_ID, TEST_DATASET);
 		costConnection = DriverManager.getConnection(url);
+		pricedConnection = DriverManager.getConnection(url + "&queryPricePerTiB=" + RATE);
 	}
 
 	@AfterAll
 	void tearDownClass() throws SQLException {
 		if (costConnection != null && !costConnection.isClosed()) {
 			costConnection.close();
+		}
+		if (pricedConnection != null && !pricedConnection.isClosed()) {
+			pricedConnection.close();
 		}
 		dropSharedTestTable(TEST_TABLE);
 	}
@@ -204,12 +221,141 @@ class RealQueryCostEstimationTest extends AbstractRealBigQueryIntegrationTest {
 			SQLWarning warning = pstmt.getWarnings();
 			assertIsCostWarning(warning);
 			assertNull(warning.getNextWarning(), "Three rows collapse into one chunk, so one estimate");
+			assertEquals(1, pstmt.unwrap(AbstractBQStatement.class).getCostEstimates().size(),
+					"The typed estimates track the warning chain, one entry per chunk");
 		} finally {
 			try (Statement cleanup = costConnection.createStatement()) {
 				cleanup.execute("DROP TABLE IF EXISTS " + table);
 			} catch (SQLException ignored) {
 				// best effort
 			}
+		}
+	}
+
+	@Test
+	void testEstimatesAreReadableAsTypedValues() throws SQLException {
+		// #195: the SQLWarning used to be the only way to read an estimate, so a
+		// caller wanting the byte count had to parse an English sentence.
+		try (Statement stmt = costConnection.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT * FROM " + TEST_TABLE)) {
+			assertTrue(rs.next());
+
+			List<QueryCostEstimate> estimates = stmt.unwrap(AbstractBQStatement.class).getCostEstimates();
+			assertEquals(1, estimates.size(), "One statement, one dry-run, one estimate");
+
+			QueryCostEstimate estimate = estimates.get(0);
+			assertNotNull(estimate.totalBytesProcessed(), "BigQuery reports bytes processed for a table scan");
+			assertTrue(estimate.totalBytesProcessed() > 0, "A real scan reads something");
+			assertTrue(estimate.billableBytes() >= 10L * 1024 * 1024, "BigQuery's 10 MiB minimum applies to a scan");
+		}
+	}
+
+	@Test
+	void testDryRunsReportNoBilledBytes() throws SQLException {
+		// Pins the fact the pricing depends on: BigQuery bills nothing for a dry run,
+		// so totalBytesBilled is 0 on every estimate however much the query reads.
+		// Pricing that figure -- which the driver used to do -- costs every query at
+		// zero. If BigQuery ever starts populating it, this test says so.
+		try (Statement stmt = connection.createStatement()) {
+			QueryCostEstimate estimate = stmt.unwrap(AbstractBQStatement.class)
+					.estimateCost("SELECT * FROM " + TEST_TABLE);
+
+			assertEquals(0L, estimate.totalBytesBilled(), "A dry run is not billed");
+			assertTrue(estimate.totalBytesProcessed() > 0, "but it does report what the query would read");
+		}
+	}
+
+	@Test
+	void testEstimatesCarryNoCostWithoutAConfiguredRate() throws SQLException {
+		// The driver cannot see a customer's contract. Reporting bytes and no money
+		// is the honest answer; inventing the on-demand rate is wrong for anyone on
+		// editions or a negotiated price.
+		try (Statement stmt = costConnection.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT * FROM " + TEST_TABLE)) {
+			assertTrue(rs.next());
+
+			QueryCostEstimate estimate = stmt.unwrap(AbstractBQStatement.class).getCostEstimates().get(0);
+			assertNull(estimate.estimatedCost());
+			assertNull(estimate.pricePerTiB());
+			assertFalse(estimate.isPriced());
+			assertFalse(stmt.getWarnings().getMessage().contains("estimated cost"),
+					"An unpriced estimate must not quote a cost: " + stmt.getWarnings().getMessage());
+		}
+	}
+
+	@Test
+	void testEstimatesArePricedWhenARateIsConfigured() throws SQLException {
+		try (Statement stmt = pricedConnection.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT * FROM " + TEST_TABLE)) {
+			assertTrue(rs.next());
+
+			QueryCostEstimate estimate = stmt.unwrap(AbstractBQStatement.class).getCostEstimates().get(0);
+			assertTrue(estimate.isPriced());
+			assertEquals(RATE, estimate.pricePerTiB());
+			// The cost prices what the query reads, which is the figure the warning
+			// quotes. It is not zero, which pricing totalBytesBilled would have made it.
+			assertEquals(QueryCostEstimate.calculateCost(estimate.totalBytesProcessed(), RATE),
+					estimate.estimatedCost());
+			assertTrue(estimate.estimatedCost().signum() > 0, "A real scan costs something");
+			assertTrue(stmt.getWarnings().getMessage().contains("estimated cost"),
+					"A priced estimate should quote its cost: " + stmt.getWarnings().getMessage());
+		}
+	}
+
+	@Test
+	void testEstimateCostPricesAStatementWithoutRunningIt() throws SQLException {
+		// The point of the on-demand API: no enableQueryCostEstimation on this
+		// connection, and the statement must not execute. An INSERT makes that
+		// checkable — if the dry-run ran it, the row would be there.
+		String table = tableName("estimate_only");
+		try (Statement ddl = connection.createStatement()) {
+			ddl.execute("CREATE OR REPLACE TABLE " + table + " (id INT64) "
+					+ "OPTIONS(expiration_timestamp = TIMESTAMP_ADD(CURRENT_TIMESTAMP(), INTERVAL 2 HOUR))");
+		}
+		try (Statement stmt = connection.createStatement()) {
+			QueryCostEstimate estimate = stmt.unwrap(AbstractBQStatement.class)
+					.estimateCost("INSERT INTO " + table + " (id) VALUES (1)");
+
+			assertNotNull(estimate, "estimateCost works without the connection property");
+			assertNotNull(estimate.totalBytesProcessed());
+			// Not the advisory path, so it raises no warning of its own.
+			assertNull(stmt.getWarnings(), "estimateCost is a typed call, not a SQLWarning");
+
+			try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM " + table)) {
+				assertTrue(rs.next());
+				assertEquals(0, rs.getInt("cnt"), "A dry run must not insert the row");
+			}
+		} finally {
+			try (Statement cleanup = connection.createStatement()) {
+				cleanup.execute("DROP TABLE IF EXISTS " + table);
+			} catch (SQLException ignored) {
+				// best effort; the table expires on its own
+			}
+		}
+	}
+
+	@Test
+	void testEstimateCostThrowsWhenBigQueryRejectsTheStatement() throws SQLException {
+		// The caller asked for the estimate, so a failure to produce one is an answer
+		// they need. The automatic path swallows instead, because there an estimate
+		// must never be the reason a statement does not run.
+		try (Statement stmt = connection.createStatement()) {
+			assertThrows(SQLException.class,
+					() -> stmt.unwrap(AbstractBQStatement.class).estimateCost("SELECT * FROM no_such_table_here"));
+		}
+	}
+
+	@Test
+	void testPreparedStatementEstimateCostUsesTheBoundParameters() throws SQLException {
+		// BigQuery rejects a dry-run of a parameterized statement with no parameters,
+		// so this returning an estimate at all proves the bindings were sent.
+		try (PreparedStatement pstmt = connection.prepareStatement("SELECT * FROM " + TEST_TABLE + " WHERE id = ?")) {
+			pstmt.setInt(1, 1);
+
+			QueryCostEstimate estimate = pstmt.unwrap(BQPreparedStatement.class).estimateCost();
+
+			assertNotNull(estimate);
+			assertNotNull(estimate.totalBytesProcessed());
 		}
 	}
 

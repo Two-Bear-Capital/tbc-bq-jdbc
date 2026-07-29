@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.config;
 import com.google.cloud.bigquery.DatasetId;
 import vc.tbc.bq.jdbc.auth.AuthType;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Objects;
 
@@ -81,6 +82,10 @@ import java.util.Objects;
  * @param metadataCacheMaxRows
  *            row ceiling for a single cached metadata result (default:
  *            {@link MetadataCache#DEFAULT_MAX_ROWS})
+ * @param queryPricePerTiB
+ *            price of one tebibyte of billed query data, in whatever currency
+ *            the caller uses (optional). Unset means cost estimates report
+ *            bytes only, because the driver cannot know a customer's contract.
  * @param metadataIncludeDescriptions
  *            whether {@code getTables} reads table descriptions into
  *            {@code REMARKS} (default: true). Costs one
@@ -92,7 +97,8 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
 		Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
 		Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
-		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, Boolean metadataIncludeDescriptions) {
+		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
+		Boolean metadataIncludeDescriptions) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -190,16 +196,26 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			// project large enough to feel it.
 			metadataIncludeDescriptions = true;
 		}
+		// No default: a rate the driver invented would be wrong for every customer
+		// not on on-demand pricing, and would silently go stale. Unset means
+		// estimates report bytes and no money. Rejected rather than clamped,
+		// because a negative price is a typo, not an intent.
+		if (queryPricePerTiB != null && queryPricePerTiB.signum() < 0) {
+			throw new IllegalArgumentException("queryPricePerTiB cannot be negative: " + queryPricePerTiB);
+		}
 	}
 
 	/**
-	 * Creates properties without {@code metadataIncludeDescriptions}, which then
-	 * takes its default.
+	 * Creates properties without {@code queryPricePerTiB} or
+	 * {@code metadataIncludeDescriptions}, which then take their defaults.
 	 *
 	 * <p>
-	 * Present for the same reason as the overload below it: the canonical
-	 * constructor of a public record is part of its ABI, so growing the component
-	 * list would break existing callers at source and binary level.
+	 * This is the canonical shape as of 3.1.0, and the reason both this and the
+	 * overload below it exist: the canonical constructor of a public record is part
+	 * of its ABI, so growing the component list would break existing callers at
+	 * source and binary level. Two components were added in 3.2.0 and neither has
+	 * shipped on its own, so one overload covers both rather than there being a
+	 * separate step per component.
 	 *
 	 * @param projectId
 	 *            the GCP project id
@@ -257,7 +273,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
 				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
-				nativeComplexTypes, metadataCacheMaxRows, null);
+				nativeComplexTypes, metadataCacheMaxRows, null, null);
 	}
 
 	/**
