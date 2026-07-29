@@ -24,6 +24,7 @@ import vc.tbc.bq.jdbc.metadata.BQParameterMetaData;
 import vc.tbc.bq.jdbc.util.BatchInsertRewriter;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.ParameterConverter;
+import vc.tbc.bq.jdbc.util.StructTypeNames;
 import vc.tbc.bq.jdbc.util.TimezoneUtils;
 
 import java.math.BigDecimal;
@@ -32,7 +33,9 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -552,8 +555,182 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 			case byte[] bytes -> setParameter(parameterIndex, QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES));
 			case java.sql.Array a -> setArray(parameterIndex, a);
 			case java.util.List<?> list -> setListParameter(parameterIndex, list);
+			case java.sql.Struct s -> setParameter(parameterIndex, toStructParameter(s, parameterIndex));
+			case java.util.Map<?, ?> m -> setParameter(parameterIndex, toStructParameter(m, parameterIndex));
 			default -> throw new SQLException("Unsupported parameter type: " + x.getClass().getName());
 		}
+	}
+
+	/**
+	 * Binds a {@link java.sql.Struct} as a BigQuery struct parameter, taking the
+	 * field names from its {@code STRUCT<...>} type name.
+	 *
+	 * <p>
+	 * The type name is the only place the names can come from: {@code Struct}
+	 * carries its attributes positionally. A struct this driver returned from
+	 * {@link java.sql.ResultSet#getObject} always has them, which is what lets a
+	 * struct that was read be bound straight back.
+	 *
+	 * @param struct
+	 *            the struct to bind
+	 * @param parameterIndex
+	 *            the parameter index, for error messages
+	 * @return the BigQuery parameter
+	 * @throws SQLException
+	 *             if the type name declares no usable field names, or the attribute
+	 *             count disagrees with it
+	 */
+	private QueryParameterValue toStructParameter(java.sql.Struct struct, int parameterIndex) throws SQLException {
+		Object[] attributes = struct.getAttributes();
+		List<StructTypeNames.StructField> fields = StructTypeNames.parse(struct.getSQLTypeName());
+		if (fields.isEmpty()) {
+			throw new BQSQLException("Cannot bind the struct at parameter " + parameterIndex + ": its type name ("
+					+ struct.getSQLTypeName() + ") does not name its fields, and BigQuery struct parameters "
+					+ "are named. Use Connection.createStruct(\"STRUCT<a INT64, b STRING>\", ...), or pass a "
+					+ "Map<String, Object> to setObject", BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+		if (attributes.length != fields.size()) {
+			throw new BQSQLException(
+					"The struct at parameter " + parameterIndex + " has " + attributes.length + " attribute(s) but its "
+							+ "type name declares " + fields.size() + ": " + struct.getSQLTypeName(),
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+
+		Map<String, QueryParameterValue> values = new LinkedHashMap<>();
+		for (int i = 0; i < fields.size(); i++) {
+			StructTypeNames.StructField field = fields.get(i);
+			values.put(field.name(), toFieldParameter(attributes[i], field.type(), parameterIndex));
+		}
+		return QueryParameterValue.struct(values);
+	}
+
+	/**
+	 * Binds a {@code Map} as a BigQuery struct parameter, which is the shape
+	 * BigQuery itself uses — {@code QueryParameterValue.struct} takes named fields.
+	 *
+	 * <p>
+	 * Iteration order is preserved, so a {@code LinkedHashMap} binds its fields in
+	 * the order they were added. Names are what BigQuery matches on, so the order
+	 * only affects the struct's declared shape.
+	 *
+	 * <p>
+	 * Field types are inferred from the values, so a {@code null} value has nothing
+	 * to infer from and binds as a {@code STRING} null. Where that is not the right
+	 * type, name the fields with {@code createStruct} instead — a declared type
+	 * answers what a null value cannot.
+	 *
+	 * @param map
+	 *            the field names and values
+	 * @param parameterIndex
+	 *            the parameter index, for error messages
+	 * @return the BigQuery parameter
+	 * @throws SQLException
+	 *             if a key is not a string, or a value has no BigQuery mapping
+	 */
+	private QueryParameterValue toStructParameter(Map<?, ?> map, int parameterIndex) throws SQLException {
+		Map<String, QueryParameterValue> values = new LinkedHashMap<>();
+		for (Map.Entry<?, ?> entry : map.entrySet()) {
+			if (!(entry.getKey() instanceof String name)) {
+				throw new BQSQLException(
+						"The map at parameter " + parameterIndex + " has a non-String key ("
+								+ (entry.getKey() == null ? "null" : entry.getKey().getClass().getName())
+								+ "); BigQuery struct field names are strings",
+						BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+			}
+			values.put(name, toFieldParameter(entry.getValue(), null, parameterIndex));
+		}
+		return QueryParameterValue.struct(values);
+	}
+
+	/**
+	 * Converts one struct field value to a parameter.
+	 *
+	 * <p>
+	 * Mirrors the scalar cases of {@link #setObject(int, Object)} so a value binds
+	 * the same way inside a struct as it does on its own, and recurses for the
+	 * nested shapes: a map or struct becomes a nested struct, a list or array
+	 * becomes an array.
+	 *
+	 * @param value
+	 *            the field value, possibly null
+	 * @param declaredType
+	 *            the type from the struct's type name, or null when the field was
+	 *            not declared. Used only to type a null
+	 * @param parameterIndex
+	 *            the parameter index, for error messages
+	 * @return the BigQuery parameter
+	 * @throws SQLException
+	 *             if the value has no BigQuery mapping
+	 */
+	private QueryParameterValue toFieldParameter(Object value, StandardSQLTypeName declaredType, int parameterIndex)
+			throws SQLException {
+		if (value == null) {
+			// BigQuery rejects an untyped null, so one is needed either way. The
+			// declared type is the honest answer where there is one; STRING is the
+			// fallback, which is why createStruct beats a map for nullable fields.
+			return QueryParameterValue.of(null, declaredType != null ? declaredType : StandardSQLTypeName.STRING);
+		}
+
+		return switch (value) {
+			case String s -> QueryParameterValue.of(s, StandardSQLTypeName.STRING);
+			case Integer i -> QueryParameterValue.of(Long.valueOf(i), StandardSQLTypeName.INT64);
+			case Long l -> QueryParameterValue.of(l, StandardSQLTypeName.INT64);
+			case Short sh -> QueryParameterValue.of(Long.valueOf(sh), StandardSQLTypeName.INT64);
+			case Byte b -> QueryParameterValue.of(Long.valueOf(b), StandardSQLTypeName.INT64);
+			case Float f -> QueryParameterValue.of(Double.valueOf(f), StandardSQLTypeName.FLOAT64);
+			case Double d -> QueryParameterValue.of(d, StandardSQLTypeName.FLOAT64);
+			case Boolean b -> QueryParameterValue.of(b, StandardSQLTypeName.BOOL);
+			case BigDecimal bd -> QueryParameterValue.of(bd, StandardSQLTypeName.NUMERIC);
+			// Through the same typed factories setTimestamp and setTime use, not the
+			// string forms setObject reaches for. QueryParameterValue rejects an
+			// ISO-8601 timestamp string client-side, and wants exactly six fractional
+			// digits on a TIME — see timestampParameter and TIME_FORMATTER.
+			case Timestamp ts -> timestampParameter(ts);
+			case Time t -> QueryParameterValue.time(TIME_FORMATTER.format(t.toLocalTime()));
+			case Date dt -> QueryParameterValue.of(dt.toString(), StandardSQLTypeName.DATE);
+			case byte[] bytes -> QueryParameterValue.of(bytes, StandardSQLTypeName.BYTES);
+			case java.sql.Struct nested -> toStructParameter(nested, parameterIndex);
+			case Map<?, ?> nested -> toStructParameter(nested, parameterIndex);
+			case List<?> list -> toArrayFieldParameter(list, parameterIndex);
+			case Object[] array -> toArrayFieldParameter(Arrays.asList(array), parameterIndex);
+			case java.sql.Array array -> toArrayFieldParameter(arrayElements(array), parameterIndex);
+			default -> throw new BQSQLException(
+					"Unsupported struct field type at parameter " + parameterIndex + ": " + value.getClass().getName(),
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		};
+	}
+
+	/** The elements of a {@link java.sql.Array}, as a list. */
+	private static List<?> arrayElements(java.sql.Array array) throws SQLException {
+		Object elements = array.getArray();
+		return elements instanceof Object[] objects ? Arrays.asList(objects) : List.of();
+	}
+
+	/**
+	 * Binds a struct field that is itself an array.
+	 *
+	 * <p>
+	 * BigQuery arrays are homogeneous, so the element type is taken from the first
+	 * non-null element and every element is bound with it. An array of all nulls
+	 * has nothing to infer from and is rejected rather than guessed at, because a
+	 * wrong element type surfaces as a query error far from its cause.
+	 */
+	private QueryParameterValue toArrayFieldParameter(List<?> elements, int parameterIndex) throws SQLException {
+		if (elements.isEmpty()) {
+			return QueryParameterValue.array(new QueryParameterValue[0], StandardSQLTypeName.STRING);
+		}
+		Object first = elements.stream().filter(java.util.Objects::nonNull).findFirst().orElse(null);
+		if (first == null) {
+			throw new BQSQLException("The array struct field at parameter " + parameterIndex
+					+ " contains only nulls, so its element " + "type cannot be inferred",
+					BQSQLException.SQLSTATE_INVALID_PARAMETER_VALUE);
+		}
+		StandardSQLTypeName elementType = inferSqlType(first);
+		QueryParameterValue[] values = new QueryParameterValue[elements.size()];
+		for (int i = 0; i < elements.size(); i++) {
+			values[i] = toFieldParameter(elements.get(i), elementType, parameterIndex);
+		}
+		return QueryParameterValue.array(values, elementType);
 	}
 
 	@Override

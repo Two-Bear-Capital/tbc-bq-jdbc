@@ -156,8 +156,9 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=600&pageSize=5000
   `java.sql.Struct`
 - `rs.getArray()`, `PreparedStatement.setArray()` and `Connection.createArrayOf()` work
   regardless of the setting — an explicit typed call is never gated
-- There is no write path for STRUCT: `Connection.createStruct()` is unsupported and
-  passing a `java.sql.Struct` to `setObject()` throws. Build struct values in SQL
+- `Connection.createStruct()`, `setArray()` and `createArrayOf()` work regardless of the
+  setting — an explicit typed call is never gated. `setObject()` also accepts a
+  `Map<String, Object>` as a STRUCT; see [Type Mapping](TYPE_MAPPING.md#complex-types)
 
 ---
 
