@@ -82,7 +82,16 @@ CI runs `./mvnw spotless:check` and it must pass.
   (`-0.66666666666666663`, and a TIMESTAMP 0.1us short of the stored value) while
   Arrow carries the exact value. This is why `StorageApiParityTest` can assert byte
   equality with no exemptions — do not reintroduce one, fix the encoding instead
-- Scalar columns only. Arrays, structs and INTERVAL fall back to REST
+- Covers scalars, ARRAY, STRUCT and INTERVAL. Only `RANGE` still falls back to REST
+- **ARRAY/STRUCT recurse against the BigQuery schema, never `vector.getObject()`.** Arrow
+  hands back a `JsonStringArrayList`/`JsonStringHashMap` whose `toString()` looks like
+  JSON; using it would render every nested scalar Arrow's way instead of this class's,
+  and would take struct member order from a map rather than the schema
+- INTERVAL arrives as an `IntervalMonthDayNanoVector` → `PeriodDuration`. Its three parts
+  are signed independently (`-1-2 3 -4:5:6`), and REST pads fractional seconds to a whole
+  number of milliseconds — 700000µs is `.700`, 10µs is `.000010`
+- `isSupported` recurses: a `RANGE` nested inside `ARRAY<STRUCT<...>>` must disqualify the
+  whole result, or it fails mid-ResultSet after rows have reached the caller
 - **Needs `--add-opens=java.base/java.nio=ALL-UNNAMED`** or Arrow cannot allocate.
   `ArrowSupport` probes for this once per JVM (it must actually *allocate* — merely
   constructing a `RootAllocator` succeeds without the flag) and the driver falls

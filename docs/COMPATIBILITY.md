@@ -82,7 +82,7 @@ Details:
 | Temp tables | ✅ | Requires sessions to survive across statements |
 | Multi-statement SQL | ✅ | Runs as a single job; a session is needed only for temp entities or transactions spanning statements |
 | Transactions | ⚠️ | Session-backed; no isolation levels or savepoints |
-| Storage Read API | ⚠️ | Opt-in via `useStorageApi=true` (always) or `auto` (large results); scalar columns only, and needs `--add-opens=java.base/java.nio=ALL-UNNAMED`. Falls back to the standard path when unavailable |
+| Storage Read API | ⚠️ | Opt-in via `useStorageApi=true` (always) or `auto` (large results); covers scalars, ARRAY, STRUCT and INTERVAL, and needs `--add-opens=java.base/java.nio=ALL-UNNAMED`. A `RANGE` column sends the result to the standard path, as does anything else that makes the Storage API unavailable |
 | Query labels | ✅ | Job labels for tracking |
 | Location routing | ✅ | Multi-region support |
 | Query timeout | ✅ | Hard timeout enforcement |
