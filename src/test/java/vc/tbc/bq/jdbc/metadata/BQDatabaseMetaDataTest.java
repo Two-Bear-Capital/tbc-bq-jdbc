@@ -19,6 +19,7 @@ import com.google.api.gax.paging.Page;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.Dataset;
 import com.google.cloud.bigquery.DatasetId;
+import com.google.cloud.bigquery.FieldValueList;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.Table;
 import com.google.cloud.bigquery.TableResult;
@@ -669,6 +670,71 @@ class BQDatabaseMetaDataTest {
 		metaData.getProcedures("safe-project", "shop", null).close();
 
 		verify(bigQuery).query(any(QueryJobConfiguration.class));
+	}
+
+	/**
+	 * An interrupt reaching a per-dataset read must leave the thread's interrupt
+	 * flag set, or whoever asked for the cancellation never learns it landed.
+	 *
+	 * <p>
+	 * The helper is invoked directly rather than through {@code getProcedures()}
+	 * because in production it only ever runs on the virtual threads of the
+	 * parallel scan: by the time the scan returns, the thread carrying the flag has
+	 * terminated and the flag is gone. Driving it on the test's own thread is the
+	 * only way to observe the thing being fixed.
+	 */
+	@Test
+	void testInterruptedDatasetReadRestoresTheInterruptFlag() throws Exception {
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class)))
+				.thenThrow(new InterruptedException("cancelled"));
+
+		try {
+			Object rows = invokeQueryInformationSchema();
+
+			assertEquals(java.util.List.of(), rows, "an interrupted read contributes no rows");
+			assertTrue(Thread.currentThread().isInterrupted(),
+					"the interrupt flag must outlive the swallowed exception");
+		} finally {
+			// Clear it so the flag cannot leak into unrelated tests on this thread.
+			Thread.interrupted();
+		}
+	}
+
+	/**
+	 * The control for the test above: only an interrupt sets the flag. Without
+	 * this, catching {@code Exception} first and interrupting unconditionally would
+	 * still pass.
+	 */
+	@Test
+	void testFailedDatasetReadLeavesTheInterruptFlagAlone() throws Exception {
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class)))
+				.thenThrow(new IllegalStateException("permission denied"));
+
+		try {
+			Object rows = invokeQueryInformationSchema();
+
+			assertEquals(java.util.List.of(), rows, "an unreadable dataset contributes no rows");
+			assertFalse(Thread.currentThread().isInterrupted(), "a plain failure is not a cancellation");
+		} finally {
+			Thread.interrupted();
+		}
+	}
+
+	/**
+	 * Calls the private per-dataset read helper on the current thread. The
+	 * identifiers are deliberately safe ones so the call reaches the query rather
+	 * than the identifier guard.
+	 */
+	private Object invokeQueryInformationSchema() throws Exception {
+		java.lang.reflect.Method helper = BQDatabaseMetaData.class.getDeclaredMethod("queryInformationSchema",
+				String.class, String.class, String.class, String.class, String.class,
+				java.util.function.Function.class);
+		helper.setAccessible(true);
+		java.util.function.Function<FieldValueList, Object[]> rowMapper = row -> new Object[0];
+		return helper.invoke(metaData, "test-project", "shop", "procedures", "INFORMATION_SCHEMA.ROUTINES",
+				"SELECT routine_name FROM `test-project`.`shop`.INFORMATION_SCHEMA.ROUTINES", rowMapper);
 	}
 
 	/**
