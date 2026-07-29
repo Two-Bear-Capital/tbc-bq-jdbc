@@ -92,6 +92,12 @@ CI runs `./mvnw spotless:check` and it must pass.
   number of milliseconds — 700000µs is `.700`, 10µs is `.000010`
 - `isSupported` recurses: a `RANGE` nested inside `ARRAY<STRUCT<...>>` must disqualify the
   whole result, or it fails mid-ResultSet after rows have reached the caller
+- **Authenticates with the connection's scoped credential, not a freshly built one.**
+  `BigQueryOptions` scopes anything whose `createScopedRequired()` is true, but
+  `FixedCredentialsProvider` scopes nothing, so the two paths used different credentials for
+  the same connection and `useStorageApi` could decide whether a connection authenticated
+  (#243). Reading it off `getBigQuery().getOptions().getScopedCredentials()` means there is
+  no second scope list to keep in step
 - **Needs `--add-opens=java.base/java.nio=ALL-UNNAMED`** or Arrow cannot allocate.
   `ArrowSupport` probes for this once per JVM (it must actually *allocate* — merely
   constructing a `RootAllocator` succeeds without the flag) and the driver falls

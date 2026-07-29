@@ -181,14 +181,44 @@ public class StorageReadResultSet extends BQResultSet {
 	private static BigQueryReadClient openClient(BQStatement statement) throws SQLException {
 		try {
 			BQConnection connection = (BQConnection) statement.getConnection();
-			Credentials credentials = CredentialsCache.forAuthType(connection.getProperties().authType());
 			return BigQueryReadClient.create(BigQueryReadSettings.newBuilder()
-					.setCredentialsProvider(FixedCredentialsProvider.create(credentials)).build());
+					.setCredentialsProvider(FixedCredentialsProvider.create(scopedCredentials(connection))).build());
 		} catch (SQLException e) {
 			throw e;
 		} catch (Exception e) {
 			throw new BQSQLException("Failed to create a BigQuery Storage read client", e);
 		}
+	}
+
+	/**
+	 * The same credential the REST path uses, scopes included.
+	 *
+	 * <p>
+	 * Taken from the connection's own {@code BigQueryOptions} rather than rebuilt
+	 * from {@link CredentialsCache}, because the two paths applied different
+	 * credentials to the same connection. {@code ServiceOptions} calls
+	 * {@code createScoped()} on anything whose {@code createScopedRequired()} is
+	 * true, so the REST client gets a scoped copy; {@link FixedCredentialsProvider}
+	 * does exactly what its name says and scopes nothing, so the Storage client was
+	 * handed the unscoped original.
+	 *
+	 * <p>
+	 * A service account key file produces exactly such a credential —
+	 * {@code ServiceAccountCredentials.fromStream()} carries no scopes — which made
+	 * {@code useStorageApi} decide whether a connection authenticated correctly.
+	 * That is not something a performance switch may decide.
+	 *
+	 * <p>
+	 * Reading it off the options rather than re-deriving a scope list is what makes
+	 * the two paths provably identical: there is no second list to keep in step,
+	 * and a future change to the client's default scopes reaches both.
+	 *
+	 * @param connection
+	 *            the connection whose credential to reuse
+	 * @return the scoped credential
+	 */
+	static Credentials scopedCredentials(BQConnection connection) {
+		return connection.getBigQuery().getOptions().getScopedCredentials();
 	}
 
 	private static ReadSession createReadSession(BigQueryReadClient client, BQStatement statement, TableId destination,
