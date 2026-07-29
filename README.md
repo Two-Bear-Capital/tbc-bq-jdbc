@@ -221,6 +221,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 - **[Observability](docs/OBSERVABILITY.md)** - Driver metrics for diagnosing your own workload
 - **[Why tbc-bq-jdbc](docs/JETBRAINS_ISSUES.md)** - JetBrains driver issues this resolves
 - **[Integration Tests](docs/contributing/INTEGRATION_TESTS.md)** - Running integration tests
+- **[Release Branches](docs/contributing/RELEASE_BRANCHES.md)** - How a milestone's work is grouped into one release
 
 ## URL Format
 
