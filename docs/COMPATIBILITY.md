@@ -167,7 +167,7 @@ while (rs.next()) {
 | Feature | Support | Notes |
 |---------|:------:|-------|
 | `Array` | ✅ | `getObject()` returns a JSON string by default, or a `java.sql.Array` with `nativeComplexTypes=true`. `getArray()`, `setArray()` and `Connection.createArrayOf()` always work |
-| `Struct` | ⚠️ | `getObject()` returns a JSON string by default, or a `java.sql.Struct` with `nativeComplexTypes=true`. `Connection.createStruct()` and passing a `Struct` to `setObject()` are not supported |
+| `Struct` | ⚠️ | `getObject()` returns a JSON string by default, or a `java.sql.Struct` with `nativeComplexTypes=true`. Writable: `Connection.createStruct("STRUCT<a INT64, b STRING>", …)`, or pass a `Map<String, Object>` or `Struct` to `setObject()`. A `Struct` whose type name does not name its fields cannot be bound |
 | `Blob`, `Clob`, `NClob` | ❌ | Use `byte[]` and `String` |
 | `SQLXML` | ❌ | Use `String` with JSON |
 | `Ref`, `RowId`, Sharding API | ❌ | Not applicable to BigQuery |

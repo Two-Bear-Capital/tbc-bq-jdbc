@@ -118,7 +118,12 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
 - Updatable ResultSets (no `updateRow()`, `insertRow()`)
 - Savepoints and transaction isolation levels (transactions themselves work via sessions)
 - CallableStatement (limited UDF support)
-- Full Array/Struct JDBC support (returned as JSON)
+- Array/Struct are returned as JSON by default (`nativeComplexTypes=true` for the JDBC
+  types). Both are fully writable: `setArray`/`createArrayOf`, and `createStruct` or a
+  `Map<String, Object>` through `setObject`. **BigQuery struct parameters are named**,
+  so `createStruct` needs a type name that names its fields —
+  `STRUCT<id INT64, name STRING>`, the same form `getObject()` reports — which is what
+  lets a struct that was read be bound straight back (`util/StructTypeNames`)
 
 ## Adding New Features
 
