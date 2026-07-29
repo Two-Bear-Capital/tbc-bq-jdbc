@@ -192,10 +192,10 @@ projects, but a tool that enumerates everything up front will see nothing.
 | Method | Support | Notes |
 |--------|:------:|-------|
 | `getCatalogs()` | ✅ | One row: the connection's project. Cached |
-| `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached |
-| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry |
+| `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached. Also reports a synthetic `INFORMATION_SCHEMA` schema unless `includeInformationSchema=false` |
+| `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry. `INFORMATION_SCHEMA` views are included as `SYSTEM TABLE` — see below |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
-| `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW |
+| `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW, and SYSTEM TABLE while `includeInformationSchema` is on |
 | `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keyword and function lists | ✅ | JDBC version reports 4.3. `getDatabaseProductName()` is `BigQuery (TBC Driver)` and `getDatabaseProductVersion()` is `2.0` |
@@ -208,6 +208,42 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
 | `getUDTs()`, `getSuperTypes()`, `getSuperTables()`, `getAttributes()` | ⚠️ | BigQuery has no user-defined types; returns empty |
 | `getClientInfoProperties()` | ⚠️ | The driver accepts no client info properties; returns empty |
+
+### Browsing INFORMATION_SCHEMA
+
+BigQuery's `INFORMATION_SCHEMA` views are ordinary queryable views, but the datasets API
+does not list them and neither does BigQuery's own `INFORMATION_SCHEMA.SCHEMATA`. The
+driver reports them so they can be browsed and autocompleted. This costs no BigQuery
+query — the view list is static.
+
+BigQuery scopes the views in two places, and the two sets are disjoint:
+
+| Scope | Queried as | Reported as | Views |
+|-------|-----------|-------------|-------|
+| Project | `` `project`.INFORMATION_SCHEMA.SCHEMATA `` | a schema named `INFORMATION_SCHEMA`, holding tables named `SCHEMATA`, `JOBS`, … | `SCHEMATA`, `SCHEMATA_OPTIONS`, `SCHEMATA_LINKS`, `JOBS`, `JOBS_BY_PROJECT`, `JOBS_BY_USER`, `JOBS_TIMELINE`, `JOBS_TIMELINE_BY_USER`, `SESSIONS_BY_PROJECT`, `SESSIONS_BY_USER`, `TABLE_STORAGE`, `TABLE_STORAGE_TIMELINE`, `OBJECT_PRIVILEGES`, `STREAMING_TIMELINE_BY_PROJECT`, `WRITE_API_TIMELINE_BY_PROJECT`, `SHARED_DATASET_USAGE`, `RECOMMENDATIONS`, `INSIGHTS` |
+| Dataset | `` `project`.`dataset`.INFORMATION_SCHEMA.TABLES `` | tables of the dataset, named `INFORMATION_SCHEMA.TABLES`, … | `TABLES`, `TABLE_OPTIONS`, `TABLE_CONSTRAINTS`, `TABLE_SNAPSHOTS`, `COLUMNS`, `COLUMN_FIELD_PATHS`, `VIEWS`, `MATERIALIZED_VIEWS`, `ROUTINES`, `ROUTINE_OPTIONS`, `PARAMETERS`, `KEY_COLUMN_USAGE`, `CONSTRAINT_COLUMN_USAGE`, `PARTITIONS`, `SEARCH_INDEXES`, `SEARCH_INDEX_COLUMNS`, `VECTOR_INDEXES` |
+
+A dataset-scoped view needs four name parts and JDBC has three, which is why the last two
+are carried together in the table name. BigQuery accepts that name however a tool quotes
+it:
+
+```sql
+SELECT table_name FROM `my-project`.`sales`.`INFORMATION_SCHEMA.TABLES`
+SELECT table_name FROM `my-project`.`sales`.INFORMATION_SCHEMA.TABLES
+```
+
+All of them are reported with `TABLE_TYPE` of `SYSTEM TABLE`, so
+`getTables(..., new String[]{"TABLE", "VIEW"})` excludes them.
+
+`getColumns()` describes these views from the live service, so the column lists never go
+stale. Resolving one costs a dry run — no job, no bytes billed — and each is resolved at
+most once per connection.
+
+Region-qualified views (`` `project`.`region-us`.INFORMATION_SCHEMA.JOBS ``) are not
+reported. They need a region the connection does not necessarily know, and the ones unique
+to that scope scan the whole organisation's job history.
+
+Set `includeInformationSchema=false` to turn all of this off.
 
 ### Unenforced primary and foreign keys
 

@@ -58,3 +58,33 @@
   encourages
 - `getExportedKeys` must scan every dataset — a FK is recorded only in the dataset of
   the referencing table. Cross-*project* FKs are not discoverable
+
+### INFORMATION_SCHEMA browsing (`includeInformationSchema`)
+- On by default, unlike `collapseShardedTables`: these views are real and queryable, so
+  this fills in entries rather than removing or renaming them. It also costs no query —
+  `InformationSchemaViews` is a static list
+- **The two scopes are disjoint and that is the whole design.** BigQuery resolves each
+  view at exactly one of them; a view listed at the wrong scope produces a well-formed
+  `getTables` row that fails when clicked. `InformationSchemaViewsTest` holds disjointness,
+  and `RealInformationSchemaMetadataTest` queries every advertised name — the only check
+  that can tell a correct entry from a plausible one
+- Project scope is a 3-part name and maps straight onto catalog/schema/table. Dataset
+  scope is **4 parts**, one more than JDBC has, so the last two ride together in the table
+  name (`INFORMATION_SCHEMA.TABLES`). BigQuery accepts that however a tool quotes it
+- Reported as `SYSTEM TABLE`, and `getTableTypes()` advertises that type **only while the
+  property is on** — a type nothing is reported under reads as "no such tables"
+- **`getColumns` resolves each view with a dry run**, not a hard-coded column list: these
+  views have ~25 columns each and Google adds to them. A dry run creates no job and bills
+  nothing. Memoised per view name, *not* per dataset — every dataset's `TABLES` has the
+  same columns, so keying by dataset would multiply the cost for one answer
+- Region-qualified views are deliberately absent: they need a region the connection may
+  not know, and the ones unique to that scope scan the org's whole job history
+
+### Metadata cache keys carry the connection's result-shaping settings
+- The cache is shared **statically** across connections to a project, but the call-site
+  keys describe only the arguments. Two connections disagreeing about
+  `includeInformationSchema`, `collapseShardedTables` or `metadataIncludeDescriptions`
+  were served each other's rows — whichever connected first decided for the whole TTL
+- Fixed by prefixing every key in `getCachedOrExecute`, the one seam all of them pass
+  through. **A new result-shaping property must be added to `metadataShapeKey()`**
+- Only built when a cache exists; with caching off the string is never read

@@ -21,6 +21,8 @@ import com.google.cloud.bigquery.DatasetId;
 import com.google.cloud.bigquery.Field;
 import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
+import com.google.cloud.bigquery.JobInfo;
+import com.google.cloud.bigquery.JobStatistics;
 import com.google.cloud.bigquery.MaterializedViewDefinition;
 import com.google.cloud.bigquery.QueryJobConfiguration;
 import com.google.cloud.bigquery.Schema;
@@ -1112,9 +1114,88 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		logger.debug("Using parallel loading for {} datasets", datasetIds.size());
 		java.util.List<Object[]> rows = queryTablesParallel(projectId, datasetIds, tableNamePattern, types);
 
+		rows.addAll(informationSchemaTableRows(projectId, datasetIds, schemaPattern, tableNamePattern, types));
+
 		logger.debug("getTables() returning {} table(s)", rows.size());
 
 		return createResultSet(MetadataColumns.Tables.COLUMN_NAMES, MetadataColumns.Tables.COLUMN_TYPES, rows);
+	}
+
+	/**
+	 * Whether this connection asked for {@code INFORMATION_SCHEMA} to be listed.
+	 */
+	private boolean includesInformationSchema() {
+		return connection.getProperties().includeInformationSchema();
+	}
+
+	/**
+	 * The {@code getTables()} rows for {@code INFORMATION_SCHEMA}, at both scopes.
+	 *
+	 * <p>
+	 * Built from a static list, so this issues no BigQuery query and cannot fail
+	 * the call. The two scopes are disjoint — see {@link InformationSchemaViews} —
+	 * so the project-scoped views appear once under the synthetic schema and the
+	 * dataset-scoped ones once per dataset already being listed.
+	 *
+	 * @param projectId
+	 *            the project being listed
+	 * @param datasetIds
+	 *            the datasets the caller's schema pattern already selected
+	 * @param schemaPattern
+	 *            the caller's schema pattern, which also decides whether the
+	 *            synthetic schema is in scope
+	 * @param tableNamePattern
+	 *            the caller's table pattern
+	 * @param types
+	 *            the caller's type filter
+	 * @return the rows to append, possibly empty
+	 */
+	private java.util.List<Object[]> informationSchemaTableRows(String projectId, java.util.List<String> datasetIds,
+			String schemaPattern, String tableNamePattern, String[] types) {
+		if (!includesInformationSchema()) {
+			return java.util.List.of();
+		}
+		// Applied once here rather than per row: these are all one type, so a filter
+		// that excludes it excludes every row this method could produce.
+		if (types != null && !java.util.Arrays.asList(types).contains(InformationSchemaViews.TABLE_TYPE)) {
+			return java.util.List.of();
+		}
+
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+
+		if (schemaPattern == null || matchesPattern(InformationSchemaViews.SCHEMA_NAME, schemaPattern)) {
+			for (String view : InformationSchemaViews.PROJECT_SCOPED) {
+				if (tableNamePattern == null || matchesPattern(view, tableNamePattern)) {
+					rows.add(informationSchemaTableRow(projectId, InformationSchemaViews.SCHEMA_NAME, view));
+				}
+			}
+		}
+
+		for (String datasetId : datasetIds) {
+			for (String view : InformationSchemaViews.DATASET_SCOPED) {
+				String tableName = InformationSchemaViews.datasetTableName(view);
+				if (tableNamePattern == null || matchesPattern(tableName, tableNamePattern)) {
+					rows.add(informationSchemaTableRow(projectId, datasetId, tableName));
+				}
+			}
+		}
+
+		return rows;
+	}
+
+	/** One {@code getTables()} row for an {@code INFORMATION_SCHEMA} view. */
+	private static Object[] informationSchemaTableRow(String projectId, String schema, String tableName) {
+		return new Object[]{projectId, // TABLE_CAT
+				schema, // TABLE_SCHEM
+				tableName, // TABLE_NAME
+				InformationSchemaViews.TABLE_TYPE, // TABLE_TYPE
+				"", // REMARKS
+				null, // TYPE_CAT
+				null, // TYPE_SCHEM
+				null, // TYPE_NAME
+				null, // SELF_REFERENCING_COL_NAME
+				null // REF_GENERATION
+		};
 	}
 
 	/**
@@ -1441,6 +1522,12 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			rows.add(new Object[]{"TABLE"});
 			rows.add(new Object[]{"VIEW"});
 			rows.add(new Object[]{"MATERIALIZED VIEW"});
+			if (includesInformationSchema()) {
+				// Listed only when it can occur. A type nothing is reported under is a
+				// filter that silently returns nothing, which reads as "no such tables"
+				// rather than "that type does not exist here".
+				rows.add(new Object[]{InformationSchemaViews.TABLE_TYPE});
+			}
 
 			return createResultSet(MetadataColumns.TableTypes.COLUMN_NAMES, MetadataColumns.TableTypes.COLUMN_TYPES,
 					rows);
@@ -1832,7 +1919,137 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Object[]> rows = queryColumnsParallel(projectId, datasetIds, tableNamePattern,
 				columnNamePattern);
 
+		rows.addAll(
+				informationSchemaColumnRows(projectId, datasetIds, schemaPattern, tableNamePattern, columnNamePattern));
+
 		return createResultSet(MetadataColumns.Columns.COLUMN_NAMES, MetadataColumns.Columns.COLUMN_TYPES, rows);
+	}
+
+	/**
+	 * Per-view result schemas, resolved once and reused for the connection's life.
+	 *
+	 * <p>
+	 * Keyed by bare view name, not by dataset: {@code sales.INFORMATION_SCHEMA
+	 * .TABLES} and {@code marketing.INFORMATION_SCHEMA.TABLES} have identical
+	 * columns, so resolving per dataset would multiply the cost by the dataset
+	 * count for the same answer. An empty value records a view that could not be
+	 * resolved, so a project without permission on {@code JOBS} does not re-probe
+	 * it on every introspection pass.
+	 */
+	private final java.util.concurrent.ConcurrentHashMap<String, java.util.Optional<Schema>> viewSchemas = new java.util.concurrent.ConcurrentHashMap<>();
+
+	/**
+	 * The {@code getColumns()} rows for the {@code INFORMATION_SCHEMA} views in
+	 * scope.
+	 *
+	 * <p>
+	 * Unlike the listing, this cannot come from a static table: the views have
+	 * dozens of columns each and Google adds to them, so a hard-coded set would be
+	 * wrong within a release. Each view's schema comes instead from a <b>dry
+	 * run</b> of {@code SELECT * FROM <view>}, which returns the exact current
+	 * columns, creates no job and bills nothing.
+	 *
+	 * <p>
+	 * Only views the caller's pattern selects are resolved, and each is resolved at
+	 * most once per connection. Asking for every column of every table therefore
+	 * costs one dry run per view the first time and none afterwards.
+	 *
+	 * @return the rows to append, possibly empty
+	 */
+	private java.util.List<Object[]> informationSchemaColumnRows(String projectId, java.util.List<String> datasetIds,
+			String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException {
+		if (!includesInformationSchema()) {
+			return java.util.List.of();
+		}
+
+		record Target(String schema, String tableName, String view, boolean datasetScoped) {
+		}
+
+		java.util.List<Target> targets = new java.util.ArrayList<>();
+		if (schemaPattern == null || matchesPattern(InformationSchemaViews.SCHEMA_NAME, schemaPattern)) {
+			for (String view : InformationSchemaViews.PROJECT_SCOPED) {
+				if (tableNamePattern == null || matchesPattern(view, tableNamePattern)) {
+					targets.add(new Target(InformationSchemaViews.SCHEMA_NAME, view, view, false));
+				}
+			}
+		}
+		for (String datasetId : datasetIds) {
+			for (String view : InformationSchemaViews.DATASET_SCOPED) {
+				String tableName = InformationSchemaViews.datasetTableName(view);
+				if (tableNamePattern == null || matchesPattern(tableName, tableNamePattern)) {
+					targets.add(new Target(datasetId, tableName, view, true));
+				}
+			}
+		}
+		if (targets.isEmpty()) {
+			return java.util.List.of();
+		}
+
+		// One dataset stands in for all of them, because the schema does not vary by
+		// dataset. Resolution needs *a* dataset only to name something that exists.
+		String sampleDataset = datasetIds.isEmpty() ? null : datasetIds.get(0);
+
+		return executeInParallel(targets, target -> {
+			Schema schema = resolveViewSchema(projectId, sampleDataset, target.view(), target.datasetScoped());
+			if (schema == null) {
+				return java.util.List.<Object[]>of();
+			}
+			return columnRowsFor(projectId, target.schema(), target.tableName(), schema, columnNamePattern);
+		}, "Error resolving INFORMATION_SCHEMA columns in parallel");
+	}
+
+	/**
+	 * Resolves one view's columns with a dry run, memoised across calls.
+	 *
+	 * @return the view's schema, or null when it could not be resolved — which is
+	 *         ordinary for the job and session views, whose project-level roles
+	 *         most callers do not hold
+	 */
+	private Schema resolveViewSchema(String projectId, String sampleDataset, String view, boolean datasetScoped) {
+		if (datasetScoped && sampleDataset == null) {
+			return null;
+		}
+		return viewSchemas.computeIfAbsent(view, key -> {
+			String fqn = datasetScoped
+					? InformationSchemaViews.datasetScopedName(projectId, sampleDataset, key)
+					: InformationSchemaViews.projectScopedName(projectId, key);
+			try {
+				QueryJobConfiguration config = QueryJobConfiguration.newBuilder("SELECT * FROM " + fqn).setDryRun(true)
+						.setUseQueryCache(false).build();
+				JobStatistics.QueryStatistics statistics = connection.getBigQuery().create(JobInfo.of(config))
+						.getStatistics();
+				return java.util.Optional.ofNullable(statistics.getSchema());
+			} catch (RuntimeException e) {
+				// Debug, not warn: a caller without bigquery.jobs.listAll cannot read
+				// JOBS, and that is the normal case rather than a defect. The view is
+				// still listed by getTables — it exists, it just cannot be described.
+				logger.debug("Could not resolve columns for {}: {}", fqn, e.getMessage());
+				return java.util.Optional.empty();
+			}
+		}).orElse(null);
+	}
+
+	/** Maps a BigQuery schema to {@code getColumns()} rows for one table. */
+	private java.util.List<Object[]> columnRowsFor(String projectId, String schemaName, String tableName, Schema schema,
+			String columnNamePattern) {
+		java.util.List<Object[]> rows = new java.util.ArrayList<>();
+		int ordinalPosition = 1;
+		for (Field field : schema.getFields()) {
+			String columnName = field.getName();
+			if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
+				ordinalPosition++;
+				continue;
+			}
+			StandardSQLTypeName type = field.getType().getStandardType();
+			int nullable = field.getMode() == Field.Mode.REQUIRED
+					? DatabaseMetaData.columnNoNulls
+					: DatabaseMetaData.columnNullable;
+			rows.add(buildColumnRow(projectId, schemaName, tableName, columnName, TypeMapper.toJdbcType(field),
+					TypeMapper.getTypeName(field), TypeMapper.getColumnSize(type), TypeMapper.getDecimalDigits(type),
+					nullable, ordinalPosition, field.getDescription()));
+			ordinalPosition++;
+		}
+		return rows;
 	}
 
 	@Override
@@ -2676,9 +2893,18 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			BigQuery bigquery = connection.getBigQuery();
 
 			java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
-			java.util.List<Object[]> rows = new java.util.ArrayList<>(datasetIds.size());
+			java.util.List<Object[]> rows = new java.util.ArrayList<>(datasetIds.size() + 1);
 			for (String datasetId : datasetIds) {
 				rows.add(new Object[]{datasetId, projectId});
+			}
+
+			// Appended rather than merged into the loop above: listDatasets does not
+			// report it and neither does BigQuery's own INFORMATION_SCHEMA.SCHEMATA, so
+			// it is not a dataset that happened to be missed — it is a schema this
+			// driver injects, and keeping it out of the dataset path makes that obvious.
+			if (includesInformationSchema()
+					&& (schemaPattern == null || matchesPattern(InformationSchemaViews.SCHEMA_NAME, schemaPattern))) {
+				rows.add(new Object[]{InformationSchemaViews.SCHEMA_NAME, projectId});
 			}
 
 			// Register schemas for adaptive pre-warming: fires speculative IS queries
@@ -3083,7 +3309,37 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 * @throws SQLException
 	 *             if query execution fails
 	 */
-	private ResultSet getCachedOrExecute(String cacheKey, SqlSupplier<ResultSet> supplier) throws SQLException {
+	/**
+	 * Distinguishes cache entries by the connection settings that change what a
+	 * metadata call returns.
+	 *
+	 * <p>
+	 * The metadata cache is shared statically between every connection to a project
+	 * — deliberately, because IntelliJ reopens connections constantly and the cache
+	 * surviving that is the point. But the call-site keys describe only the
+	 * arguments, so two connections to one project that disagree about how metadata
+	 * should be shaped were served each other's rows: whichever connected first
+	 * decided, for the whole TTL, whether sharded tables collapsed, whether REMARKS
+	 * was populated, and whether {@code INFORMATION_SCHEMA} was listed.
+	 *
+	 * <p>
+	 * Prefixed here rather than at the dozen call sites for the usual reason: a new
+	 * cached method cannot forget a step it does not perform. A new result-shaping
+	 * property must be added to this string.
+	 *
+	 * @return a compact encoding of the result-shaping settings
+	 */
+	private String metadataShapeKey() {
+		ConnectionProperties properties = connection.getProperties();
+		return (properties.includeInformationSchema() ? "i" : "-") + (properties.collapseShardedTables() ? "s" : "-")
+				+ (properties.metadataIncludeDescriptions() ? "d" : "-") + "|";
+	}
+
+	private ResultSet getCachedOrExecute(String rawKey, SqlSupplier<ResultSet> supplier) throws SQLException {
+		// Only built when there is a cache to key: with caching off the string is
+		// never read, and reading the settings to compose it would be pure work.
+		String cacheKey = cache == null ? rawKey : metadataShapeKey() + rawKey;
+
 		// Check cache if enabled
 		if (cache != null) {
 			java.util.Optional<ResultSet> cached = cache.get(cacheKey);

@@ -136,6 +136,21 @@ jdbc:bigquery:my-project/my_dataset?impersonateServiceAccount=etl@my-project.iam
 
 ---
 
+### Metadata Properties
+
+`includeInformationSchema` (default `true`) makes BigQuery's `INFORMATION_SCHEMA` views
+browsable — a synthetic `INFORMATION_SCHEMA` schema per project, and the dataset-scoped
+views as `INFORMATION_SCHEMA.<view>` tables inside each dataset, all typed `SYSTEM TABLE`.
+It issues no BigQuery query. See
+[Browsing INFORMATION_SCHEMA](COMPATIBILITY.md#browsing-information_schema).
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?includeInformationSchema=false
+```
+
+---
+
 ### Query Execution Properties
 
 Covers `timeout`, `maxResults`, `useLegacySql`, `pageSize`, and `nativeComplexTypes` (see the
