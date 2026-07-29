@@ -423,6 +423,27 @@ class MetadataColumnsTest {
 	}
 
 	@Test
+	void testPseudoColumnsColumnCount() {
+		assertEquals(12, MetadataColumns.PseudoColumns.COLUMN_NAMES.length);
+		assertEquals(12, MetadataColumns.PseudoColumns.COLUMN_TYPES.length);
+	}
+
+	@Test
+	void testPseudoColumnsColumnNamesAndTypes() {
+		String[] names = MetadataColumns.PseudoColumns.COLUMN_NAMES;
+		int[] types = MetadataColumns.PseudoColumns.COLUMN_TYPES;
+
+		assertEquals("TABLE_CAT", names[0]);
+		assertEquals("COLUMN_NAME", names[3]);
+		assertEquals("DATA_TYPE", names[4]);
+		assertEquals("COLUMN_USAGE", names[8]);
+		assertEquals("CHAR_OCTET_LENGTH", names[10]);
+		assertEquals("IS_NULLABLE", names[11]);
+		assertEquals(Types.INTEGER, types[4]);
+		assertEquals(Types.VARCHAR, types[8]);
+	}
+
+	@Test
 	void testFunctionsColumnCount() {
 		assertEquals(6, MetadataColumns.Functions.COLUMN_NAMES.length);
 		assertEquals(6, MetadataColumns.Functions.COLUMN_TYPES.length);

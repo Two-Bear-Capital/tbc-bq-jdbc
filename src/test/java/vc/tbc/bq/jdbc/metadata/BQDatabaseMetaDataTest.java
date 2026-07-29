@@ -654,6 +654,7 @@ class BQDatabaseMetaDataTest {
 		metaData.getProcedureColumns(maliciousCatalog, "shop", null, null).close();
 		metaData.getFunctions(maliciousCatalog, "shop", null).close();
 		metaData.getFunctionColumns(maliciousCatalog, "shop", null, null).close();
+		metaData.getPseudoColumns(maliciousCatalog, "shop", null, null).close();
 
 		verify(bigQuery, never()).query(any(QueryJobConfiguration.class));
 	}
@@ -693,6 +694,27 @@ class BQDatabaseMetaDataTest {
 			assertEquals("FUNCTION_CAT", functions.getMetaData().getColumnName(1));
 			assertEquals(17, columns.getMetaData().getColumnCount());
 			assertEquals("SPECIFIC_NAME", columns.getMetaData().getColumnName(17));
+		}
+	}
+
+	/**
+	 * Which pseudo columns a table has depends on its partitioning, so a mocked
+	 * project can only pin the shape — {@code RealPseudoColumnMetadataTest} covers
+	 * the selection against real partitioned tables.
+	 */
+	@Test
+	void testGetPseudoColumnsReturnsTheJdbcShape() throws Exception {
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(connection.getBigQuery()).thenReturn(bigQuery);
+		lenient().when(bigQuery.listDatasets(anyString())).thenReturn(emptyDatasetPage);
+		lenient().when(emptyDatasetPage.iterateAll()).thenReturn(java.util.List.of());
+
+		try (ResultSet rs = metaData.getPseudoColumns(null, null, null, null)) {
+			assertEquals(12, rs.getMetaData().getColumnCount());
+			assertEquals("TABLE_CAT", rs.getMetaData().getColumnName(1));
+			assertEquals("COLUMN_USAGE", rs.getMetaData().getColumnName(9));
+			assertEquals("IS_NULLABLE", rs.getMetaData().getColumnName(12));
+			assertFalse(rs.next());
 		}
 	}
 

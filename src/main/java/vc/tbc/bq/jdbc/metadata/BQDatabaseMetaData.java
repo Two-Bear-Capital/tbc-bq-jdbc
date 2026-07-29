@@ -2569,10 +2569,117 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				});
 	}
 
+	/**
+	 * Retrieves the pseudo columns of the matching tables.
+	 *
+	 * <p>
+	 * BigQuery's are the ingestion-time partitioning columns: {@code
+	 * _PARTITIONTIME} on every ingestion-time partitioned table, and {@code
+	 * _PARTITIONDATE} on those partitioned by day. Both are queryable — and are
+	 * what a partition filter is written against — but neither is declared in the
+	 * table's schema, which is the gap this method exists to fill.
+	 *
+	 * <p>
+	 * {@code _PARTITIONDATE} is reported only for daily partitioning because that
+	 * is the only granularity BigQuery exposes it at: on an hourly, monthly or
+	 * yearly table, selecting it fails with "Unrecognized name". Announcing a
+	 * column that cannot be queried would be worse than announcing none, so the
+	 * granularity is read rather than assumed.
+	 *
+	 * <p>
+	 * {@code COLUMN_USAGE} is
+	 * {@link java.sql.PseudoColumnUsage#NO_USAGE_RESTRICTIONS}: these can be used
+	 * in both the select list and predicates, and {@code PseudoColumnUsage.SELECT}
+	 * would deny the second — which is the one that matters, since filtering on
+	 * {@code _PARTITIONTIME} is how partition pruning is expressed. No enum value
+	 * captures the real restriction, that BigQuery will not accept a pseudo column
+	 * as a DML target.
+	 *
+	 * <p>
+	 * Note that {@code _PARTITIONTIME} also appears in {@link #getColumns} today,
+	 * because the {@code INFORMATION_SCHEMA} read there does not filter hidden
+	 * columns. Removing it from there would change an existing result and is left
+	 * alone here.
+	 *
+	 * @since 3.1.0
+	 */
 	@Override
 	public ResultSet getPseudoColumns(String catalog, String schemaPattern, String tableNamePattern,
 			String columnNamePattern) throws SQLException {
-		throw new BQSQLFeatureNotSupportedException("getPseudoColumns not supported");
+		checkClosed();
+
+		logger.debug(
+				"getPseudoColumns() called - catalog: [{}], schemaPattern: [{}], tableNamePattern: [{}], columnNamePattern: [{}]",
+				catalog, schemaPattern, tableNamePattern, columnNamePattern);
+
+		String cacheKey = "pseudoColumns:" + catalog + ":" + schemaPattern + ":" + tableNamePattern + ":"
+				+ columnNamePattern;
+		return getCachedOrExecute(cacheKey,
+				() -> executeGetPseudoColumns(catalog, schemaPattern, tableNamePattern, columnNamePattern));
+	}
+
+	private ResultSet executeGetPseudoColumns(String catalog, String schemaPattern, String tableNamePattern,
+			String columnNamePattern) throws SQLException {
+		String projectId = catalog != null ? catalog : connection.getProperties().projectId();
+		BigQuery bigquery = connection.getBigQuery();
+
+		java.util.List<String> datasetIds = listDatasetsForProject(bigquery, projectId, schemaPattern);
+		java.util.List<Object[]> rows = executeInParallel(datasetIds,
+				datasetId -> queryPseudoColumnsForDataset(projectId, datasetId, tableNamePattern, columnNamePattern),
+				"Error querying pseudo columns in parallel");
+
+		logger.debug("getPseudoColumns() returning {} pseudo column(s)", rows.size());
+		return createResultSet(MetadataColumns.PseudoColumns.COLUMN_NAMES, MetadataColumns.PseudoColumns.COLUMN_TYPES,
+				rows);
+	}
+
+	private java.util.List<Object[]> queryPseudoColumnsForDataset(String projectId, String datasetId,
+			String tableNamePattern, String columnNamePattern) {
+		// One row per pseudo column rather than per table, so the row mapper stays
+		// one-row-in one-row-out. The UNNEST is what expands a daily-partitioned
+		// table into its two.
+		//
+		// The daily test is on the DDL because INFORMATION_SCHEMA cannot answer it
+		// otherwise: an hourly and a daily ingestion-time table are identical in
+		// COLUMNS, both showing only _PARTITIONTIME as system-defined. BigQuery
+		// normalises the clause, so every daily table reads back as
+		// "PARTITION BY DATE(_PARTITIONTIME)" whichever spelling created it, while
+		// the coarser granularities keep TIMESTAMP_TRUNC(_PARTITIONTIME, <unit>).
+		// REGEXP_CONTAINS runs server-side so the DDL itself never crosses the wire.
+		String sql = String.format("SELECT c.table_name AS table_name, pseudo_column AS column_name, "
+				+ "IF(pseudo_column = '_PARTITIONDATE', 'DATE', 'TIMESTAMP') AS data_type "
+				+ "FROM `%1$s`.`%2$s`.INFORMATION_SCHEMA.COLUMNS c "
+				+ "JOIN `%1$s`.`%2$s`.INFORMATION_SCHEMA.TABLES t ON t.table_name = c.table_name "
+				+ "CROSS JOIN UNNEST(IF(REGEXP_CONTAINS(t.ddl, r'PARTITION BY DATE\\(_PARTITIONTIME\\)'), "
+				+ "['_PARTITIONTIME', '_PARTITIONDATE'], ['_PARTITIONTIME'])) AS pseudo_column "
+				+ "WHERE c.is_system_defined = 'YES' AND c.column_name = '_PARTITIONTIME' "
+				+ "ORDER BY c.table_name, pseudo_column", projectId, datasetId);
+		return queryInformationSchema(projectId, datasetId, "pseudo columns", "INFORMATION_SCHEMA.COLUMNS", sql,
+				row -> {
+					String tableName = row.get("table_name").getStringValue();
+					if (tableNamePattern != null && !matchesPattern(tableName, tableNamePattern)) {
+						return null;
+					}
+					String columnName = row.get("column_name").getStringValue();
+					if (columnNamePattern != null && !matchesPattern(columnName, columnNamePattern)) {
+						return null;
+					}
+					String dataType = row.get("data_type").getStringValue();
+					TypeMapper.InfoSchemaTypeInfo typeInfo = TypeMapper.parseInfoSchemaTypeInfo(dataType);
+					return new Object[]{projectId, // TABLE_CAT
+							datasetId, // TABLE_SCHEM
+							tableName, // TABLE_NAME
+							columnName, // COLUMN_NAME
+							typeInfo.jdbcType(), // DATA_TYPE
+							typeInfo.columnSize(), // COLUMN_SIZE
+							typeInfo.decimalDigits(), // DECIMAL_DIGITS
+							10, // NUM_PREC_RADIX
+							java.sql.PseudoColumnUsage.NO_USAGE_RESTRICTIONS.name(), // COLUMN_USAGE
+							"Ingestion-time partitioning pseudo column", // REMARKS
+							null, // CHAR_OCTET_LENGTH
+							"YES" // IS_NULLABLE
+					};
+				});
 	}
 
 	@Override
