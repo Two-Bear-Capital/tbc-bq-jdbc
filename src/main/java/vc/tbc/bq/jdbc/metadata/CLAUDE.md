@@ -22,6 +22,19 @@
   `"hello \"there\""`. `util/SqlStringLiterals.unquote` decodes it
 - `metadataIncludeDescriptions=false` falls back to the narrower view-only read
 
+### Table types (#187)
+- `TABLE`, `VIEW`, `MATERIALIZED VIEW`, `EXTERNAL`, `SNAPSHOT`, `CLONE`. The last three are
+  a driver convention — JDBC standardises only the first two — and use BigQuery's own
+  `INFORMATION_SCHEMA.TABLES.table_type` vocabulary
+- All but `CLONE` come free from `TableDefinition` on the listing. **BigQuery's `tables.list`
+  reports a clone as an ordinary table**; only `INFORMATION_SCHEMA` tells them apart, so the
+  refinement rides on the description read `fillInRemarks` already does. With
+  `metadataIncludeDescriptions=false` a clone is reported as `TABLE`, which is documented
+- **The type filter must run after that refinement**, not in the listing loop. Filtering
+  first let a clone through a `types={"TABLE"}` request and *then* relabelled it — the
+  caller got a `CLONE` row it had excluded — while `types={"CLONE"}` matched nothing at all.
+  `filterByType` runs between `fillInRemarks` and `collapseShards`
+
 ### Sharded tables (`collapseShardedTables`)
 - Off by default, and must stay that way: sharding is a naming convention BigQuery never
   declares, so collapsing on by default would make a table legitimately ending in a date

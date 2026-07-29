@@ -230,7 +230,7 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getSchemas()` | ✅ | Datasets, with pattern filtering. Cached. Also reports a synthetic `INFORMATION_SCHEMA` schema unless `includeInformationSchema=false` |
 | `getTables()` | ✅ | Tables, views, materialized views. Loaded in parallel, cached. `REMARKS` carries the table's description, falling back to the defining SQL for a view or materialized view that has none. Set `metadataIncludeDescriptions=false` to skip the description read. With `collapseShardedTables=true`, date-sharded sets report as one `events_*` entry. `INFORMATION_SCHEMA` views are included as `SYSTEM TABLE` — see below |
 | `getColumns()` | ✅ | 24-column metadata with accurate precision/scale. Loaded in parallel, cached |
-| `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW, and SYSTEM TABLE while `includeInformationSchema` is on |
+| `getTableTypes()` | ✅ | TABLE, VIEW, MATERIALIZED VIEW, EXTERNAL, SNAPSHOT, CLONE, and SYSTEM TABLE while `includeInformationSchema` is on — [see below](#table-types) |
 | `getProcedures()` / `getProcedureColumns()` | ✅ | Stored procedures from `INFORMATION_SCHEMA`, cached. UDFs and table functions are reported by `getFunctions()` instead. `REMARKS` carries the routine body |
 | `getTypeInfo()` | ✅ | BigQuery type information |
 | Product info, JDBC version, SQL keyword and function lists | ✅ | JDBC version reports 4.3. `getDatabaseProductName()` is `BigQuery (TBC Driver)` and `getDatabaseProductVersion()` is `2.0` |
@@ -243,6 +243,35 @@ projects, but a tool that enumerates everything up front will see nothing.
 | `getBestRowIdentifier()` | ⚠️ | BigQuery enforces no uniqueness, so no column set can be promised to identify a row; returns empty |
 | `getUDTs()`, `getSuperTypes()`, `getSuperTables()`, `getAttributes()` | ⚠️ | BigQuery has no user-defined types; returns empty |
 | `getClientInfoProperties()` | ⚠️ | The driver accepts no client info properties; returns empty |
+
+### Table types
+
+`getTables()` distinguishes the kinds of table BigQuery does, because they do not behave
+alike — an external table cannot be the target of DML, and a snapshot is read-only and
+point-in-time.
+
+| `TABLE_TYPE` | BigQuery |
+|---|---|
+| `TABLE` | an ordinary table (`BASE TABLE`) |
+| `VIEW` | a view |
+| `MATERIALIZED VIEW` | a materialized view |
+| `EXTERNAL` | a table over external data (GCS, Sheets, …) |
+| `SNAPSHOT` | a table snapshot — read-only, point-in-time |
+| `CLONE` | a table clone — writable, sharing storage with its base until diverged |
+| `SYSTEM TABLE` | an `INFORMATION_SCHEMA` view, while `includeInformationSchema` is on |
+
+JDBC standardises only `TABLE` and `VIEW`, so the rest are a driver convention. The strings
+are BigQuery's own — the values `INFORMATION_SCHEMA.TABLES.table_type` reports — so what the
+driver says and what you see in BigQuery are the same word.
+
+> **Changed in 4.0.0.** External tables, snapshots and clones were previously reported as
+> `TABLE`. A caller filtering `getTables(…, new String[]{"TABLE"})` no longer receives them.
+
+**One caveat.** BigQuery's `tables.list` reports a clone as an ordinary table; only
+`INFORMATION_SCHEMA` distinguishes it. The driver reads that view anyway for table
+descriptions, so recognising clones costs no extra query — but with
+`metadataIncludeDescriptions=false` there is no such read, and a clone is reported as
+`TABLE`. Every other type comes from the listing itself and is unaffected.
 
 ### Browsing more than one project
 
