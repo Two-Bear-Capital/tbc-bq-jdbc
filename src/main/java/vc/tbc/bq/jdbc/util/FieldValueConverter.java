@@ -261,8 +261,12 @@ public final class FieldValueConverter {
 	 *
 	 * <p>
 	 * <b>This is deliberately only {@code getString}.</b> {@code getObject} still
-	 * returns the {@link Range}; changing that is a result change, and belongs with
-	 * the rest of the RANGE work in 4.0.0 (#231).
+	 * returns the {@link Range}, which is a deliberate difference rather than an
+	 * oversight.
+	 *
+	 * <p>
+	 * Shared with {@link #nestedScalar}, so a RANGE inside a STRUCT or ARRAY reads
+	 * the same as a RANGE column (#260).
 	 */
 	private static String rangeLiteral(Range range) {
 		return "[" + rangeBound(range.getStart(), range) + ", " + rangeBound(range.getEnd(), range) + ")";
@@ -415,7 +419,8 @@ public final class FieldValueConverter {
 	 * (e.g. TIMESTAMP → {@link java.sql.Timestamp}, BOOL → Boolean). This ensures
 	 * correct behaviour when primitives appear inside complex types (STRUCT,
 	 * ARRAY). Falls back to {@link FieldValue#getStringValue()} when no schema is
-	 * available.
+	 * available — except for a RANGE, whose FieldValue holds an object and would
+	 * throw; see {@link #nestedScalar}.
 	 *
 	 * @param fieldValue
 	 *            the FieldValue to extract from (must not be null or isNull())
@@ -435,8 +440,35 @@ public final class FieldValueConverter {
 				case DATE -> java.sql.Date.valueOf(fieldValue.getStringValue());
 				case TIME -> java.sql.Time.valueOf(fieldValue.getStringValue());
 				case DATETIME, TIMESTAMP -> new java.sql.Timestamp(fieldValue.getTimestampValue() / 1000);
-				default -> fieldValue.getStringValue();
+				default -> nestedScalar(fieldValue);
 			};
+		}
+		return nestedScalar(fieldValue);
+	}
+
+	/**
+	 * A nested scalar with no type-specific handling above, as something safe to
+	 * render.
+	 *
+	 * <p>
+	 * Exists for RANGE, the one type whose {@code FieldValue} holds an object
+	 * rather than a string. {@code getStringValue()} on one throws
+	 * {@code ClassCastException} — an unchecked exception out of {@code getString},
+	 * which is the defect #238 fixed for a top-level RANGE and left one level down,
+	 * because the nested renderer never learned (#260).
+	 *
+	 * <p>
+	 * Rendered through the same {@link #rangeLiteral} a top-level RANGE uses, so a
+	 * range reads identically whether it is a column or a struct member. Rendering
+	 * it any other way here would be the drift this class exists to prevent.
+	 *
+	 * <p>
+	 * The {@code Range} check is on the value rather than on a declared type,
+	 * because this is also the no-schema fallback, where there is no type to read.
+	 */
+	private static Object nestedScalar(FieldValue fieldValue) {
+		if (fieldValue.getValue() instanceof Range range) {
+			return rangeLiteral(range);
 		}
 		return fieldValue.getStringValue();
 	}
