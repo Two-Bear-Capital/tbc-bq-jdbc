@@ -125,4 +125,21 @@ class RealRangeStringTest extends AbstractRealBigQueryIntegrationTest {
 					"getObject should still hand back the client's Range, got: " + value.getClass().getName());
 		}
 	}
+
+	@Test
+	void testRangeNestedInsideStructAndArrayRenders() throws SQLException {
+		// Given: A RANGE inside a STRUCT and inside an ARRAY<STRUCT<...>>
+		String sql = "SELECT [STRUCT(1 AS n, RANGE(DATE '2020-01-01', DATE '2020-12-31') AS r)] AS a, "
+				+ "STRUCT(RANGE<DATE>'[2020-01-01, UNBOUNDED)' AS rr) AS st FROM UNNEST([1]) AS i";
+
+		try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+			assertTrue(rs.next());
+
+			// Then: Both read as the same literal a RANGE column does. getString used
+			// to throw ClassCastException here — #238 taught it about a top-level
+			// Range and the nested renderer never learned (#260)
+			assertEquals("[{\"n\":1,\"r\":\"[2020-01-01, 2020-12-31)\"}]", rs.getString("a"));
+			assertEquals("{\"rr\":\"[2020-01-01, UNBOUNDED)\"}", rs.getString("st"));
+		}
+	}
 }
