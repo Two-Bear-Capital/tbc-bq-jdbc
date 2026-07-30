@@ -35,6 +35,25 @@
         -->
         <exclude name="LooseCoupling"/>
 
+        <!--
+            AvoidReassigningLoopVariables: re-included below configured to allow the
+            skip-ahead form, which the escape decoder in SqlStringLiterals depends on.
+        -->
+        <exclude name="AvoidReassigningLoopVariables"/>
+
+    </rule>
+
+    <!--
+        Re-include AvoidReassigningLoopVariables allowing a loop to skip iterations.
+        SqlStringLiterals scans a string one character at a time and consumes the
+        character after a backslash with charAt(++i); advancing the cursor past the
+        escape IS the algorithm, and rewriting it as a while loop only moves the same
+        mutation somewhere less obvious.
+    -->
+    <rule ref="category/java/bestpractices.xml/AvoidReassigningLoopVariables">
+        <properties>
+            <property name="forReassign" value="skip"/>
+        </properties>
     </rule>
 
     <!-- Re-include GuardLogStatement scoped to trace level only -->
@@ -80,6 +99,57 @@
         -->
         <exclude name="AvoidLiteralsInIfCondition"/>
 
+        <!--
+            AssignmentInOperand: re-included below allowing increment and decrement,
+            which is the only form this codebase uses.
+        -->
+        <exclude name="AssignmentInOperand"/>
+
+        <!--
+            CloseResource: re-included below with the borrowed types allowed.
+        -->
+        <exclude name="CloseResource"/>
+
+    </rule>
+
+    <!--
+        Re-include AssignmentInOperand permitting increment and decrement. Every hit was
+        a post-increment reading and advancing a cursor in the same expression
+        (ordinal++ while numbering columns, rowInBatch++ while walking an Arrow batch),
+        which is idiomatic rather than the hidden side effect the rule is aimed at.
+        Assignment proper in an operand stays reported.
+    -->
+    <rule ref="category/java/errorprone.xml/AssignmentInOperand">
+        <properties>
+            <property name="allowIncrementDecrement" value="true"/>
+        </properties>
+    </rule>
+
+    <!--
+        Re-include CloseResource with the types this driver borrows rather than owns.
+        The rule cannot tell the two apart, and closing any of these would be a bug:
+
+          - Arrow FieldVector/ListVector/StructVector come from VectorSchemaRoot.getVector()
+            and ListVector.getDataVector(). They belong to the root, which
+            StorageReadResultSet closes once; releasing one per row would free buffers
+            still being read.
+          - BQConnection is the caller's connection, reached through
+            Statement.getConnection(). A ResultSet closing it would close the session
+            around it.
+          - TableDataWriteChannel is closed deliberately and in order in the batch load
+            path, because the load job does not exist until the channel is closed.
+    -->
+    <rule ref="category/java/errorprone.xml/CloseResource">
+        <properties>
+            <!--
+                Comma-delimited, not pipe-delimited: PMD parses each entry as a Java
+                binary name, so a pipe-joined string is one invalid name and the rule
+                throws on every file instead of running. That failure looks like a
+                clean report, because a rule that errored reports no violations.
+            -->
+            <property name="allowedResourceTypes"
+                      value="java.io.ByteArrayOutputStream,java.io.ByteArrayInputStream,java.io.StringWriter,java.io.CharArrayWriter,java.util.stream.Stream,org.apache.arrow.vector.FieldVector,org.apache.arrow.vector.complex.ListVector,org.apache.arrow.vector.complex.StructVector,vc.tbc.bq.jdbc.BQConnection,com.google.cloud.bigquery.TableDataWriteChannel"/>
+        </properties>
     </rule>
 
 </ruleset>
