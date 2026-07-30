@@ -82,7 +82,17 @@ CI runs `./mvnw spotless:check` and it must pass.
   (`-0.66666666666666663`, and a TIMESTAMP 0.1us short of the stored value) while
   Arrow carries the exact value. This is why `StorageApiParityTest` can assert byte
   equality with no exemptions — do not reintroduce one, fix the encoding instead
-- Covers scalars, ARRAY, STRUCT and INTERVAL. Only `RANGE` still falls back to REST
+- Covers every BigQuery type, `RANGE` included (#231). **No type sends a result to REST any
+  more**, so the all-or-nothing fallback is unreachable from SQL — the mechanism still
+  rejects an unknown type, but no current type triggers it
+- RANGE arrives as an Arrow **struct of `start`/`end`** and is encoded into a `FieldValue`
+  holding a `Range`, the same shape REST produces, so both render through
+  `FieldValueConverter.rangeLiteral` and parity needs no exemption. Encoding a literal here
+  instead would put a second renderer in the driver. It became encodable only once #238 gave
+  the REST path a string form to reproduce — before that `getString` on a RANGE threw
+- A RANGE renders the same literal nested inside a STRUCT or ARRAY as it does as a column;
+  the nested renderer shares `rangeLiteral` with the top-level one (#260), which #238 had
+  left behind
 - **ARRAY/STRUCT recurse against the BigQuery schema, never `vector.getObject()`.** Arrow
   hands back a `JsonStringArrayList`/`JsonStringHashMap` whose `toString()` looks like
   JSON; using it would render every nested scalar Arrow's way instead of this class's,

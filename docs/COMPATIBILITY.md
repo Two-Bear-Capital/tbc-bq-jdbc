@@ -208,7 +208,7 @@ while (true) {
 | Feature | Support | Notes |
 |---------|:------:|-------|
 | `Array` | ✅ | `getObject()` returns a JSON string by default, or a `java.sql.Array` with `nativeComplexTypes=true`. `getArray()`, `setArray()` and `Connection.createArrayOf()` always work |
-| `RANGE` | ⚠️ | `getString()` returns the BigQuery literal, e.g. `[2020-01-01, 2020-12-31)`, with `UNBOUNDED` for an absent bound. `getObject()` returns the client's `Range` object. A RANGE column sends the result to the standard path rather than the Storage Read API |
+| `RANGE` | ⚠️ | `getString()` returns the BigQuery literal, e.g. `[2020-01-01, 2020-12-31)`, with `UNBOUNDED` for an absent bound. `getObject()` returns the client's `Range` object. Reads through the Storage Read API path like any other type, and renders the same literal nested inside a STRUCT or ARRAY as it does as a column |
 | `Struct` | ⚠️ | `getObject()` returns a JSON string by default, or a `java.sql.Struct` with `nativeComplexTypes=true`. Writable: `Connection.createStruct("STRUCT<a INT64, b STRING>", …)`, or pass a `Map<String, Object>` or `Struct` to `setObject()`. A `Struct` whose type name does not name its fields cannot be bound |
 | `Blob`, `Clob`, `NClob` | ❌ | Use `byte[]` and `String` |
 | `SQLXML` | ❌ | Use `String` with JSON |
