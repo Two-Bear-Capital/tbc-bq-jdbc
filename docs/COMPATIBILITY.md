@@ -21,6 +21,8 @@ What works, what doesn't, and how to work around BigQuery's constraints.
 | Feature | Support | Notes |
 |---------|:------:|-------|
 | `DriverManager` registration | ✅ | Automatic via ServiceLoader |
+| `javax.sql.DataSource` | ✅ | `BQDataSource`, with a setter per connection property; `Serializable` and `Referenceable` for JNDI. See [DataSource](DATASOURCE.md) |
+| `javax.sql.ConnectionPoolDataSource` | ❌ | Pool `Connection` directly with HikariCP or another pool — see [Connection pools](#connection-pools) |
 | `Connection` lifecycle | ✅ | open, close, isValid |
 | `Statement` execution | ✅ | executeQuery, executeUpdate, execute |
 | `PreparedStatement` | ✅ | Positional parameters (`?`) |
@@ -518,6 +520,10 @@ config.setMaxLifetime(1800000);
 HikariDataSource ds = new HikariDataSource(config);
 ```
 
+Pass `config.setDataSource(bqDataSource)` instead of a URL to pool a
+[`BQDataSource`](DATASOURCE.md) configured as a bean. The driver defers `BEGIN TRANSACTION` to the
+first statement, so a pool toggling auto-commit between checkouts costs no BigQuery jobs.
+
 ### BI & database tools
 
 | Tool | Support | Notes |
@@ -543,7 +549,7 @@ the full mapping.
 
 | Framework | Support | Notes |
 |-----------|:------:|-------|
-| Spring JDBC (`JdbcTemplate`) | ✅ | Recommended for writes |
+| Spring JDBC (`JdbcTemplate`) | ✅ | Recommended for writes; bind a `BQDataSource` bean — see [DataSource](DATASOURCE.md#spring) |
 | MyBatis | ✅ | Full support |
 | Spring Data JDBC, jOOQ | ✅ | Basic features / code generation work |
 | Hibernate, JPA | ⚠️ | Read-only recommended — no `@Id` generation, `@Version`, or cascading |
@@ -583,4 +589,5 @@ All major BigQuery capabilities are supported: Standard SQL (GoogleSQL) and Lega
 
 - [Quick Start](QUICKSTART.md) — get started quickly
 - [Connection Properties](CONNECTION_PROPERTIES.md) — configuration and performance options
+- [DataSource](DATASOURCE.md) — `javax.sql.DataSource` for Spring, JPA and JNDI
 - [Type Mapping](TYPE_MAPPING.md) — data type conversions

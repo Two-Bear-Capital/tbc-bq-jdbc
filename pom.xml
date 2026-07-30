@@ -629,6 +629,10 @@
                                         <exclude>logback.xml</exclude>
                                         <!-- Exclude protocol buffer definition files (not needed at runtime) -->
                                         <exclude>**/*.proto</exclude>
+                                        <!-- Five Arrow artifacts each ship their own build stamp at this
+                                             path, so shade would keep one of them arbitrarily and warn
+                                             about the overlap. Nothing reads it at runtime. -->
+                                        <exclude>arrow-git.properties</exclude>
                                     </excludes>
                                 </filter>
                                 <!-- Exclude logback from standard shaded jar -->
@@ -703,6 +707,10 @@
                                         <exclude>META-INF/versions/*/module-info.class</exclude>
                                         <!-- Exclude protocol buffer definition files (not needed at runtime) -->
                                         <exclude>**/*.proto</exclude>
+                                        <!-- Five Arrow artifacts each ship their own build stamp at this
+                                             path, so shade would keep one of them arbitrarily and warn
+                                             about the overlap. Nothing reads it at runtime. -->
+                                        <exclude>arrow-git.properties</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
@@ -996,6 +1004,21 @@
                                  table and routine names. Threads spend nearly all their time
                                  blocked on BigQuery, so the pool is sized well above the core
                                  count. -->
+                            <!-- The timeout entries below are the backstop on a wedged test. The
+                                 connections the base class hands out already cap queries at 60s,
+                                 but fourteen classes build their own URL and would otherwise
+                                 inherit the driver's 300s default; at that length a few stuck
+                                 queries exhaust this job's 20-minute budget and the run is
+                                 cancelled with no result rather than failing with one.
+
+                                 SEPARATE_THREAD is the half that matters. The default SAME_THREAD
+                                 mode interrupts nothing - it lets the method run to completion and
+                                 only then reports it as having overrun, so the wall clock is
+                                 unchanged and the setting would buy nothing here. SEPARATE_THREAD
+                                 abandons the blocked call.
+
+                                 120s against a slowest observed class total of ~40s, so it fires on
+                                 a hang and not on a slow-but-working test. -->
                             <properties>
                                 <configurationParameters>
                                     junit.jupiter.execution.parallel.enabled=true
@@ -1003,6 +1026,8 @@
                                     junit.jupiter.execution.parallel.mode.classes.default=concurrent
                                     junit.jupiter.execution.parallel.config.strategy=fixed
                                     junit.jupiter.execution.parallel.config.fixed.parallelism=8
+                                    junit.jupiter.execution.timeout.testable.method.default=120s
+                                    junit.jupiter.execution.timeout.thread.mode.default=SEPARATE_THREAD
                                 </configurationParameters>
                             </properties>
                         </configuration>

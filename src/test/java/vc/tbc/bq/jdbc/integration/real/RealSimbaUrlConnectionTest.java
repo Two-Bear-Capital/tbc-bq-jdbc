@@ -71,8 +71,8 @@ class RealSimbaUrlConnectionTest extends AbstractRealBigQueryIntegrationTest {
 
 	/** OAuthType=3 is Simba's spelling of Application Default Credentials. */
 	private String buildSimbaUrl(String extraParams) {
-		String base = String.format("jdbc:bigquery://%s;ProjectId=%s;DefaultDataset=%s;OAuthType=3", SIMBA_HOST,
-				TEST_PROJECT_ID, TEST_DATASET);
+		String base = String.format("jdbc:bigquery://%s;ProjectId=%s;DefaultDataset=%s;OAuthType=3%s", SIMBA_HOST,
+				TEST_PROJECT_ID, TEST_DATASET, SIMBA_TEST_CONNECTION_DEFAULTS);
 		return extraParams == null || extraParams.isEmpty() ? base : base + ";" + extraParams;
 	}
 
@@ -170,7 +170,8 @@ class RealSimbaUrlConnectionTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testSimbaUrlPropertiesViaInfoObjectConnect() throws SQLException {
-		String url = String.format("jdbc:bigquery://%s;ProjectId=%s;OAuthType=3", SIMBA_HOST, TEST_PROJECT_ID);
+		String url = String.format("jdbc:bigquery://%s;ProjectId=%s;OAuthType=3%s", SIMBA_HOST, TEST_PROJECT_ID,
+				SIMBA_TEST_CONNECTION_DEFAULTS);
 
 		Properties info = new Properties();
 		info.setProperty("DefaultDataset", TEST_DATASET);

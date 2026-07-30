@@ -257,7 +257,8 @@ you set this per data source rather than in the IDE's own VM options:
 jdbc:bigquery:my-project/my_dataset?authType=ADC&useStorageApi=auto
 ```
 
-`auto` only engages for results over ~10MB; smaller queries keep using the
+`auto` only engages for results over ~10MB that span more than one page; smaller
+queries, and any result the driver has already fetched in full, keep using the
 standard path, which is faster for them.
 
 **If you skip the flag, nothing breaks.** The driver checks whether Arrow can

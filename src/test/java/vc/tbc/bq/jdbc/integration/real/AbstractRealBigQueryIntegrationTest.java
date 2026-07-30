@@ -98,6 +98,45 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	private static final String COST_CEILING = "&maxBillingBytes=1073741824";
 
 	/**
+	 * Query timeout for test connections, well below the driver's 300-second
+	 * default.
+	 *
+	 * <p>
+	 * Nothing here legitimately runs for a minute: the fixtures are a few rows and
+	 * the slowest whole class takes about 40 seconds. The default exists for a
+	 * production query over a large table, and in a test it only decides how long a
+	 * <em>wedged</em> query holds the suite up. At 300 seconds two of them consume
+	 * half the CI job's 20-minute budget, which is how a handful of stuck queries
+	 * turns a reportable failure into a cancelled run with no result at all.
+	 *
+	 * <p>
+	 * Queries do stall for reasons that are nobody's bug — BigQuery throttling when
+	 * a developer runs the suite locally against the same project as CI, for one.
+	 * Failing those in 60 seconds keeps the rest of the suite reportable.
+	 */
+	private static final String QUERY_TIMEOUT = "&timeout=60";
+
+	/**
+	 * Connection properties every test connection gets. Subclasses that build their
+	 * own URL should append this rather than repeating either setting.
+	 */
+	protected static final String TEST_CONNECTION_DEFAULTS = COST_CEILING + QUERY_TIMEOUT;
+
+	/**
+	 * The same two settings for a Simba-format URL, whose separator is {@code ;}.
+	 *
+	 * <p>
+	 * {@code Timeout} is deliberately Simba's spelling rather than the driver's
+	 * {@code timeout}. The Simba parser maps {@code Timeout} onto {@code timeout}
+	 * and passes unrecognised keys through under their own name, so a URL carrying
+	 * both spellings would put the same property twice from a {@code HashMap} whose
+	 * iteration order decides the winner. Using the spelling a test would override
+	 * with keeps the collision inside the URL, where the later value wins as
+	 * written. {@code maxBillingBytes} has no Simba spelling and passes through.
+	 */
+	protected static final String SIMBA_TEST_CONNECTION_DEFAULTS = ";maxBillingBytes=1073741824;Timeout=60";
+
+	/**
 	 * Returns a session-unique table name by appending {@link #RUN_ID} to the given
 	 * base name.
 	 *
@@ -144,7 +183,8 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 *             if connection fails
 	 */
 	protected Connection createTestConnection() throws SQLException {
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC%s", TEST_PROJECT_ID, TEST_DATASET, COST_CEILING);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC%s", TEST_PROJECT_ID, TEST_DATASET,
+				TEST_CONNECTION_DEFAULTS);
 		logger.debug("Connecting with URL: {}", url);
 		return DriverManager.getConnection(url);
 	}
@@ -314,7 +354,7 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	 */
 	protected Connection createNativeComplexTypesConnection() throws SQLException {
 		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&nativeComplexTypes=true%s", TEST_PROJECT_ID,
-				TEST_DATASET, COST_CEILING);
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 		logger.debug("Connecting with URL (native complex types): {}", url);
 		return DriverManager.getConnection(url);
 	}
@@ -360,7 +400,8 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 		if (CREATED_ROUTINES.isEmpty() || TEST_PROJECT_ID.isEmpty()) {
 			return;
 		}
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC%s", TEST_PROJECT_ID, TEST_DATASET, COST_CEILING);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC%s", TEST_PROJECT_ID, TEST_DATASET,
+				TEST_CONNECTION_DEFAULTS);
 		try (Connection conn = DriverManager.getConnection(url); Statement stmt = conn.createStatement()) {
 			for (String routine : CREATED_ROUTINES) {
 				try {

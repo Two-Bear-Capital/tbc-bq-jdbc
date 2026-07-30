@@ -56,9 +56,8 @@ class RealMultiProjectCatalogTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	private Connection openWith(String extraParams) throws SQLException {
-		return DriverManager
-				.getConnection(String.format("jdbc:bigquery:%s/%s?authType=ADC&maxBillingBytes=1073741824%s",
-						TEST_PROJECT_ID, TEST_DATASET, extraParams));
+		return DriverManager.getConnection(String.format("jdbc:bigquery:%s/%s?authType=ADC%s%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS, extraParams));
 	}
 
 	@Test

@@ -72,9 +72,8 @@ class RealQueryCostEstimationTest extends AbstractRealBigQueryIntegrationTest {
 	@BeforeAll
 	void setUpClass() throws SQLException {
 		createSharedTestTable(TEST_TABLE);
-		String url = String.format(
-				"jdbc:bigquery:%s/%s?authType=ADC&enableQueryCostEstimation=true&maxBillingBytes=1073741824",
-				TEST_PROJECT_ID, TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&enableQueryCostEstimation=true%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 		costConnection = DriverManager.getConnection(url);
 		pricedConnection = DriverManager.getConnection(url + "&queryPricePerTiB=" + RATE);
 	}

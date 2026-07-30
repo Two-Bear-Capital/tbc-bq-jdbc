@@ -110,6 +110,10 @@ class BaseReadOnlyResultSetTest {
 			return 0;
 		}
 
+		// Deprecated in java.sql.ResultSet since JDBC 2.0, but the driver still has to
+		// implement it, so the stub has to override it. Carrying the annotation is
+		// what stops -Xlint:deprecation warning about the override itself.
+		@Deprecated
 		@Override
 		public BigDecimal getBigDecimal(int columnIndex, int scale) {
 			return null;
