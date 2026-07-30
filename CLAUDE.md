@@ -289,3 +289,32 @@ does nothing until the work reaches `main`.
 
 ## Documentation
 **Doc scoping convention:** top-level `docs/*.md` is end-user content (how to *use* the driver) and is synced to the website; anything about building, testing, or releasing belongs in `docs/contributing/`.
+
+### `docs/COMPARISON.md` is maintained per PR, not per pass
+
+**Any PR that changes what the driver can do updates `docs/COMPARISON.md` in the same PR.**
+It is the one doc that goes stale by itself, because half its claims are about someone
+else's code. It was tracked as a periodic re-verification issue (#289) and that did not
+work: between passes it silently described a driver neither project shipped.
+
+Three rules, each of which was broken at least once before they were written down:
+
+1. **Verify against the published release, from source.** Google's driver ships a sources
+   jar to Maven Central — read that, not the `main` branch of `google-cloud-java` and not
+   its documentation. A 4.3.0-era pass credited 1.1.0 with `SSLTrustStoreType`,
+   `SSLTrustStoreProvider`, `useGlobalOpenTelemetry` and the GCP telemetry exporters; all
+   seven landed in 1.2.0. Reading unreleased work as shipped is the easy mistake.
+   ```bash
+   curl -s https://repo1.maven.org/maven2/com/google/cloud/google-cloud-bigquery-jdbc/maven-metadata.xml
+   ```
+2. **Count both sides the same way, and say what the number counts.** Their property list
+   is `BigQueryJdbcUrlUtility.VALID_PROPERTIES` (what `getPropertyInfo()` returns); the
+   names it *recognises* is the larger set of `*_PROPERTY_NAME` constants, minus the
+   `EndpointOverrides` sub-keys (`OAUTH2`, `READ_API`, `BIGQUERY`, `STS`). The two differ
+   by 20, so an unqualified count is meaningless.
+3. **Update the version stamps.** The header names both versions and the read date, and the
+   "At a glance" table repeats them. A shipped release that leaves them behind makes every
+   claim below unfalsifiable.
+
+Both drivers move; a claim that was true when written is not evidence that it is true now.
+Existing doc text is never the source.

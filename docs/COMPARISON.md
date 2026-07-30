@@ -5,8 +5,8 @@ Google published its own first-party BigQuery JDBC driver,
 reaching 1.0.0 on 4 June 2026. This page compares it with `tbc-bq-jdbc` so you can pick the
 right driver for your situation. It is a snapshot, not a running scoreboard.
 
-**Compared:** `tbc-bq-jdbc` 4.2.0 · `google-cloud-bigquery-jdbc` 1.1.0 · Google's driver read
-at **1.1.0 on 29 July 2026** and not re-read since
+**Compared:** `tbc-bq-jdbc` 4.3.0 · `google-cloud-bigquery-jdbc` 1.2.0 · both read from source
+on **30 July 2026**, Google's from the sources jar it published to Maven Central that same day
 
 Google's driver is under heavy active development and this comparison will date quickly.
 Both drivers are Apache 2.0.
@@ -48,13 +48,13 @@ before you run it.
 
 ## At a glance
 
-| | `tbc-bq-jdbc` 4.2.0 | `google-cloud-bigquery-jdbc` 1.1.0 |
+| | `tbc-bq-jdbc` 4.3.0 | `google-cloud-bigquery-jdbc` 1.2.0 |
 |---|---|---|
 | Java baseline | 21+ | 8+ |
 | JDBC spec | 4.3 | 4.2 |
 | Maven Central | ❌ not published | ✅ `com.google.cloud:google-cloud-bigquery-jdbc` |
 | Support | Community | Google, via the `google-cloud-java` issue tracker |
-| Connection properties | 37 | 73 |
+| Connection properties | 45 | 76 recognised, 56 advertised |
 | Simba-style URLs | ⚠️ common subset translated | ✅ broad |
 | Storage Read API (Arrow) | ✅ `useStorageApi` | ✅ `EnableHighThroughputAPI` |
 | Storage Write API | ⏳ tracked ([#267][i267]) — load jobs today | ✅ `EnableWriteAPI` |
@@ -66,6 +66,13 @@ before you run it.
 | `CallableStatement` | ❌ by design ([#272][i272]) | ✅ |
 | `javax.sql.DataSource` | ✅ | ✅ |
 | `ConnectionPoolDataSource` | ❌ by design — pool with HikariCP | ✅ |
+
+Counted the same way for both drivers, from source rather than from documentation. For
+`tbc-bq-jdbc` the two numbers are the same: every property it parses is advertised through
+`Driver.getPropertyInfo()`, and a test fails the build if one is not. Google's driver
+recognises 76 names in a connection URL but lists 56 of them in `VALID_PROPERTIES`, which is
+what its `getPropertyInfo()` returns — so its proxy, OAuth and Private Service Connect
+properties work but are not discoverable by a tool that asks the driver what it accepts.
 
 ---
 
@@ -88,7 +95,7 @@ the difference.
 
 | Area | Detail |
 |---|---|
-| **Session reuse** | With `EnableSession=1` and auto-commit on, Google's driver sets `createSession=true` on *every* query job and never reads the assigned ID back, so each statement gets a **new** session and temp tables do not survive between statements. This was reported as [#13787](https://github.com/googleapis/google-cloud-java/issues/13787) and closed as intended, with a manual `QueryProperties=session_id=…` workaround. `tbc-bq-jdbc` reads the ID from `JobStatistics.getSessionInfo()` once and attaches it as the `session_id` connection property on every later job, so one session serves the whole connection. |
+| **Session reuse** | With `EnableSession=1` and auto-commit on, Google's driver sets `createSession=true` on *every* query job, so each statement gets a **new** session and temp tables do not survive between statements. It does read an assigned session ID back and reuse it — but only on the transaction path, where `beginTransaction()` stores it and later jobs carry it; a connection that never leaves auto-commit never reaches that code. Reported as [#13787](https://github.com/googleapis/google-cloud-java/issues/13787) and closed as intended, with a manual `QueryProperties=session_id=…` workaround. `tbc-bq-jdbc` reads the ID from `JobStatistics.getSessionInfo()` once and attaches it as the `session_id` connection property on every later job, so one session serves the whole connection regardless of auto-commit. |
 | **Deferred `BEGIN TRANSACTION`** | Google's `setAutoCommit(false)` issues a real `BEGIN TRANSACTION` job immediately, and `commit()` issues `COMMIT` *and* a fresh `BEGIN` — so a commit costs two jobs, and a connection pool that toggles auto-commit on checkout pays a job every time. `tbc-bq-jdbc` defers `BEGIN` to the first statement that actually runs (`beginTransactionIfNeeded()`), so toggling auto-commit costs nothing and `commit()` with nothing in flight is a no-op. |
 | **User-managed transactions** | Because Google's driver opens a transaction eagerly, a script that manages its own transaction fails on its own `BEGIN TRANSACTION` — reported as [#13788](https://github.com/googleapis/google-cloud-java/issues/13788) and closed as intended. `tbc-bq-jdbc` issues nothing until a statement runs, so in auto-commit mode such a script executes as written. |
 | **Session cleanup** | `tbc-bq-jdbc` terminates the session with `CALL BQ.ABORT_SESSION()` on connection close, best-effort. Google's driver leaves sessions to BigQuery's 24-hour reaper; wanting to reclaim session temp-table storage sooner is what drives open issue [#13922](https://github.com/googleapis/google-cloud-java/issues/13922). |
@@ -191,8 +198,18 @@ Neither driver has a meaningful edge here.
 ## Notes on reading this page
 
 Every claim above was checked against the source of both drivers at the versions named, not
-against either project's documentation. Google's driver moves fast — 60+ merged pull requests
-between May and July 2026 — so re-verify before relying on any gap listed here.
+against either project's documentation — Google's from the published sources jar on Maven
+Central, this driver's from its own tree.
+
+**Read the published release, not the main branch.** The previous pass named 1.1.0 as its
+baseline but described `SSLTrustStoreType`, `SSLTrustStoreProvider`, `useGlobalOpenTelemetry`
+and the GCP telemetry exporters — none of which existed in 1.1.0. All seven arrived in 1.2.0.
+Reading unreleased work as though it had shipped credits a driver with features nobody can
+use yet, and it is the easiest mistake to make here.
+
+Google's driver moves fast: 1.2.0 was published the same day this page was last verified, and
+it added seven connection properties over 1.1.0. Treat any gap listed here as needing
+re-verification before you rely on it.
 
 The *tracked* and *by design* markers link into this project's issue tracker, where the
 reasoning is recorded and open to argument. They are there so a reader can tell a decision from
