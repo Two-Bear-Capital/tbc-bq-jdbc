@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-07-30
+
+### ⚡ Features
+
+- **transport:** Route BigQuery and OAuth traffic through an HTTP proxy ([#290](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/290))
+- **transport:** Verify TLS against a custom truststore ([#291](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/291))
+
+### 🐛 Bug Fixes
+
+- **datasource:** Name the property when a numeric getter is handed a bad value ([#292](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/292))
+
+### 🔀 Pull Requests
+
+- Merge pull request #288 from Two-Bear-Capital/docs/comparison-refresh
+
+docs(comparison): refresh for 4.2.0 and separate declined scope from tracked gaps
+- Merge pull request #293 from Two-Bear-Capital/release/4.3.0
+
+release: 4.3.0
+
+### 📚 Documentation
+
+- **comparison:** Correct the version and property count for 4.2.0
+- **comparison:** Separate declined scope from tracked gaps
+
 ## [4.2.0] - 2026-07-30
 
 ### ⚡ Features
@@ -2677,6 +2702,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.3.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.1...v4.0.0
