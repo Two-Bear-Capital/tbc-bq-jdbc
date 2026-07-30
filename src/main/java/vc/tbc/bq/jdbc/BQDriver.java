@@ -109,8 +109,8 @@ public final class BQDriver implements Driver {
 		java.util.List<DriverPropertyInfo> props = new java.util.ArrayList<>();
 
 		props.add(prop(info, "authType", "ADC",
-				"Authentication method: ADC (Application Default Credentials), SERVICE_ACCOUNT, USER_OAUTH, WORKFORCE, WORKLOAD",
-				false, new String[]{"ADC", "SERVICE_ACCOUNT", "USER_OAUTH", "WORKFORCE", "WORKLOAD"}));
+				"Authentication method: ADC (Application Default Credentials), SERVICE_ACCOUNT, USER_OAUTH, WORKFORCE, WORKLOAD, ACCESS_TOKEN",
+				false, new String[]{"ADC", "SERVICE_ACCOUNT", "USER_OAUTH", "WORKFORCE", "WORKLOAD", "ACCESS_TOKEN"}));
 
 		props.add(prop(info, "credentials", "",
 				"Path to service account JSON key file (required for SERVICE_ACCOUNT auth)", false, null));
@@ -126,6 +126,14 @@ public final class BQDriver implements Driver {
 
 		props.add(
 				prop(info, "refreshToken", "", "OAuth 2.0 refresh token (required for USER_OAUTH auth)", false, null));
+
+		props.add(prop(info, "accessToken", "",
+				"A pre-generated OAuth 2.0 access token (required for ACCESS_TOKEN auth), for a host application that already holds one. The driver cannot refresh it, so the connection stops working when the token expires",
+				false, null));
+
+		props.add(prop(info, "accessTokenExpiry", "",
+				"When the token set by 'accessToken' expires, as an ISO-8601 instant such as 2026-07-30T20:00:00Z. Optional: supplying it makes an expired token fail as it opens the connection, naming the expiry, instead of as a 401 on the first statement",
+				false, null));
 
 		props.add(prop(info, "impersonateServiceAccount", "",
 				"Email of a service account to impersonate, using the configured authType as the source identity",

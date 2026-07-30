@@ -50,6 +50,7 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 | `OAuthClientId` | `clientId` | OAuth 2.0 client ID |
 | `OAuthClientSecret` | `clientSecret` | OAuth 2.0 client secret |
 | `OAuthRefreshToken` | `refreshToken` | OAuth 2.0 refresh token |
+| `OAuthAccessToken` | `accessToken` | Pre-generated OAuth 2.0 access token |
 | `Timeout` | `timeout` | Query timeout in seconds |
 | `MaxResults` | `maxResults` | Maximum rows to fetch |
 | `UseLegacySQL` | `useLegacySql` | Use legacy SQL dialect |
@@ -71,7 +72,7 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 |-----------|-------------------|---------------------|-------------------|
 | `0` | Service Account | `SERVICE_ACCOUNT` | `OAuthPvtKeyPath` |
 | `1` | User OAuth | `USER_OAUTH` | `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken` |
-| `2` | Pre-generated Token | ❌ Not supported | - |
+| `2` | Pre-generated Token | `ACCESS_TOKEN` | `OAuthAccessToken` |
 | `3` | Application Default | `ADC` | None (recommended) |
 | `4` | External Account | `WORKLOAD` | `credentialConfigFile` (via Properties) |
 
@@ -94,10 +95,9 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 **Migration from Simba:**
 
 Replace the Simba JDBC driver with tbc-bq-jdbc and set the driver class to
-`vc.tbc.bq.jdbc.BQDriver`. The twenty-one Simba property names in the table above are
-translated automatically, so most connection strings work unchanged. Two things to check:
+`vc.tbc.bq.jdbc.BQDriver`. The twenty-two Simba property names in the table above are
+translated automatically, so most connection strings work unchanged. One thing to check:
 
-- `OAuthType=2` (pre-generated access tokens) is rejected with an error. Use `0` or `3`.
 - Any other property name is passed through untranslated. Native tbc-bq-jdbc property
   names therefore work in a Simba-format URL, but Simba-only options the driver has no
   equivalent for (`OAuthPvtKey`, `AllowLargeResults`, `LogLevel`, …) are accepted and

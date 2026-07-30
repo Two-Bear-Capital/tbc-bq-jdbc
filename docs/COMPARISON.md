@@ -5,7 +5,7 @@ Google published its own first-party BigQuery JDBC driver,
 reaching 1.0.0 on 4 June 2026. This page compares it with `tbc-bq-jdbc` so you can pick the
 right driver for your situation. It is a snapshot, not a running scoreboard.
 
-**Compared:** `tbc-bq-jdbc` 4.3.0 · `google-cloud-bigquery-jdbc` 1.2.0 · both read from source
+**Compared:** `tbc-bq-jdbc` 4.4.0 · `google-cloud-bigquery-jdbc` 1.2.0 · both read from source
 on **30 July 2026**, Google's from the sources jar it published to Maven Central that same day
 
 Google's driver is under heavy active development and this comparison will date quickly.
@@ -48,13 +48,13 @@ before you run it.
 
 ## At a glance
 
-| | `tbc-bq-jdbc` 4.3.0 | `google-cloud-bigquery-jdbc` 1.2.0 |
+| | `tbc-bq-jdbc` 4.4.0 | `google-cloud-bigquery-jdbc` 1.2.0 |
 |---|---|---|
 | Java baseline | 21+ | 8+ |
 | JDBC spec | 4.3 | 4.2 |
 | Maven Central | ❌ not published | ✅ `com.google.cloud:google-cloud-bigquery-jdbc` |
 | Support | Community | Google, via the `google-cloud-java` issue tracker |
-| Connection properties | 45 | 76 recognised, 56 advertised |
+| Connection properties | 47 | 76 recognised, 56 advertised |
 | Simba-style URLs | ⚠️ common subset translated | ✅ broad |
 | Storage Read API (Arrow) | ✅ `useStorageApi` | ✅ `EnableHighThroughputAPI` |
 | Storage Write API | ⏳ tracked ([#267][i267]) — load jobs today | ✅ `EnableWriteAPI` |
@@ -155,7 +155,7 @@ Anything unmarked is a genuine difference that is simply not addressed here.
 |---|---|
 | **`ConnectionPoolDataSource`** *(by design)* | Google implements the optional JDBC pooling API — `ConnectionPoolDataSource` and `PooledConnection`, with `ConnectionPoolSize` and `ListenerPoolSize`. `tbc-bq-jdbc` ships a [`DataSource`](DATASOURCE.md) and stops there: HikariCP, Tomcat JDBC and Spring all pool `java.sql.Connection` directly, `beginRequest()`/`endRequest()` are the modern hint and are implemented, and the deferred `BEGIN TRANSACTION` exists precisely because an external pool is assumed. Wrap it in HikariCP. |
 | **`CallableStatement`** *(by design — [#272][i272])* | Implemented, for calling BigQuery stored procedures. `tbc-bq-jdbc` throws `SQLFeatureNotSupportedException`. |
-| **Pre-generated access tokens** *(tracked — [#273][i273])* | `OAuthType=2` is supported. `tbc-bq-jdbc` rejects it, and supports JSON service-account keys only — Google also accepts P12 (`OAuthP12Password`). |
+| **P12 service-account keys** *(by design — [#273][i273])* | Google accepts P12 alongside JSON (`OAuthP12Password`). `tbc-bq-jdbc` takes JSON only: P12 is Google's legacy key format, a P12 key can be converted to JSON, and carrying a second key-file format for one on the way out is surface area kept forever. |
 
 ### Performance
 
@@ -187,7 +187,7 @@ Neither driver has a meaningful edge here.
 | **Multi-statement scripts** | Both run a script as one parent job, enumerate its child jobs, order them oldest-first, and produce a `ResultSet` for a child only when its statement type is `SELECT`. Both walk the children through `getMoreResults()`. |
 | **Storage Read API** | Both read Arrow over the Storage Read API and fall back to the REST path when the read session cannot be created or permission is denied. |
 | **Key metadata** | Both report primary and foreign keys from BigQuery's table constraints. |
-| **Authentication** | Both cover ADC, service-account keys, user OAuth refresh tokens, service-account impersonation, and workload/workforce identity federation. Google additionally supports P12 keys and pre-generated access tokens. |
+| **Authentication** | Both cover ADC, service-account keys, user OAuth refresh tokens, pre-generated access tokens, service-account impersonation, and workload/workforce identity federation. Google additionally supports P12 keys. `tbc-bq-jdbc` is alone in accepting an expiry for a pre-generated token, which turns the eventual 401 into a connection-time error naming the expiry. |
 | **Parallel metadata fan-out** | Both fan out per-dataset metadata queries across a bounded thread pool. `tbc-bq-jdbc` uses `INFORMATION_SCHEMA` queries; Google uses the REST list APIs. |
 | **Cancellation and timeouts** | Both implement `Statement.cancel()` and query timeouts against the underlying job. |
 | **Metadata completeness** | Both implement the full `DatabaseMetaData` surface including `getProcedures`, `getProcedureColumns`, `getFunctions` and `getFunctionColumns`. |
