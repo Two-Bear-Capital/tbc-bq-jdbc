@@ -35,6 +35,7 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 /**
@@ -1355,33 +1356,73 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	}
 
 	/**
-	 * @throws NumberFormatException
+	 * @throws IllegalArgumentException
 	 *             if the value was stored through {@link #setProperty} and is not
 	 *             an integer; a typed setter cannot produce one
 	 */
 	private Integer getInteger(String name) {
 		String value = get(name);
-		return value == null ? null : Integer.valueOf(value.trim());
+		return value == null ? null : parsed(name, value, Integer::valueOf);
 	}
 
 	/**
-	 * @throws NumberFormatException
+	 * @throws IllegalArgumentException
 	 *             if the value was stored through {@link #setProperty} and is not a
 	 *             long
 	 */
 	private Long getLong(String name) {
 		String value = get(name);
-		return value == null ? null : Long.valueOf(value.trim());
+		return value == null ? null : parsed(name, value, Long::valueOf);
 	}
 
 	/**
-	 * @throws NumberFormatException
+	 * @throws IllegalArgumentException
 	 *             if the value was stored through {@link #setProperty} and is not a
 	 *             decimal
 	 */
 	private BigDecimal getBigDecimal(String name) {
 		String value = get(name);
-		return value == null ? null : new BigDecimal(value.trim());
+		return value == null ? null : parsed(name, value, BigDecimal::new);
+	}
+
+	/**
+	 * Parses a stored value, reporting a malformed one by name.
+	 *
+	 * <p>
+	 * A bare {@link NumberFormatException} says only {@code For input string:
+	 * "abc"} — not which of the driver's properties held it, and not that a
+	 * {@code BQDataSource} was involved at all. That stack trace is often the only
+	 * thing an operator sees, because the way a bad value gets stored is a
+	 * container reading an untyped deployment descriptor through
+	 * {@link BQDataSourceFactory} and {@link #setProperty}. The typed setters
+	 * cannot produce one; the compiler stops them.
+	 *
+	 * <p>
+	 * This does not weaken the rule that setters never throw. That rule exists
+	 * because a container populates a bean in its own order, so a validating setter
+	 * would fail or not depending on ordering. A getter has no such problem: the
+	 * value is already stored, and reading it back is what a container is expected
+	 * to do. {@code getConnection()} remains where a bad value is reported for
+	 * anyone who never calls the getter.
+	 *
+	 * @param <T>
+	 *            the parsed type
+	 * @param name
+	 *            the property name, for the message
+	 * @param value
+	 *            the stored value, parsed after trimming
+	 * @param parser
+	 *            the conversion, which signals failure by
+	 *            {@link NumberFormatException}
+	 * @return the parsed value
+	 */
+	private static <T> T parsed(String name, String value, Function<String, T> parser) {
+		try {
+			return parser.apply(value.trim());
+		} catch (NumberFormatException e) {
+			throw new IllegalArgumentException(
+					"Invalid value for BQDataSource property '" + name + "': " + value.trim(), e);
+		}
 	}
 
 	private Boolean getBoolean(String name) {
