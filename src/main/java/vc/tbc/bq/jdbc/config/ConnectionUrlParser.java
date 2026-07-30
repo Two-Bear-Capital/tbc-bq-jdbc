@@ -31,7 +31,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses BigQuery JDBC connection URLs.
+ * Parses BigQuery JDBC connection URLs, and is also the single place that turns
+ * a property bag into {@link ConnectionProperties} — see
+ * {@link #fromProperties(Properties)}, which {@code BQDataSource} uses so that
+ * a bean and a URL cannot disagree about what a property means.
  *
  * <p>
  * Supports two URL formats:
@@ -107,6 +110,41 @@ public final class ConnectionUrlParser {
 	}
 
 	/**
+	 * Builds connection properties from a property bag alone, with no URL.
+	 *
+	 * <p>
+	 * This is the entry point for {@code javax.sql.DataSource}, which is configured
+	 * by JavaBean setters rather than by a URL. {@code projectId} and
+	 * {@code datasetId} are read from the bag instead of from a URL path;
+	 * everything else is parsed exactly as it is for a URL, so the two
+	 * configuration styles cannot drift in what a property means or defaults to.
+	 *
+	 * @param info
+	 *            the connection properties, keyed by the names
+	 *            {@code Driver.getPropertyInfo()} advertises
+	 * @return the parsed connection properties
+	 * @throws SQLException
+	 *             if {@code projectId} is missing or a property is invalid
+	 * @since 4.2.0
+	 */
+	public static ConnectionProperties fromProperties(Properties info) throws SQLException {
+		Map<String, String> properties = new HashMap<>();
+		if (info != null) {
+			for (String key : info.stringPropertyNames()) {
+				properties.put(key, info.getProperty(key));
+			}
+		}
+
+		String projectId = properties.remove("projectId");
+		if (projectId == null || projectId.isBlank()) {
+			throw new SQLException("projectId is required: set it on the DataSource, or supply a URL");
+		}
+		String datasetId = blankToNull(properties.remove("datasetId"));
+
+		return buildConnectionProperties(projectId.trim(), datasetId, properties);
+	}
+
+	/**
 	 * Determines if the URL is in Simba format.
 	 *
 	 * @param url
@@ -159,7 +197,27 @@ public final class ConnectionUrlParser {
 			}
 		}
 
+		// The project and dataset are the URL path, but an explicit property still
+		// overrides them — the same rule as every other property above, and the same
+		// rule the Simba path already applies, where both come from the property map
+		// to begin with. Without this a caller holding a URL and a property bag (an
+		// application server, a DataSource) could not change the dataset at all: the
+		// key was read on one path and silently dropped on the other.
+		String projectOverride = blankToNull(properties.remove("projectId"));
+		if (projectOverride != null) {
+			projectId = projectOverride.trim();
+		}
+		String datasetOverride = blankToNull(properties.remove("datasetId"));
+		if (datasetOverride != null) {
+			datasetId = datasetOverride;
+		}
+
 		return buildConnectionProperties(projectId, datasetId, properties);
+	}
+
+	/** Treats an unset property and a property set to whitespace alike. */
+	private static String blankToNull(String value) {
+		return value == null || value.isBlank() ? null : value;
 	}
 
 	/**
