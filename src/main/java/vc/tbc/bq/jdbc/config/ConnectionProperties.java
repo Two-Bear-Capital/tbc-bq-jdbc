@@ -17,7 +17,7 @@ package vc.tbc.bq.jdbc.config;
 
 import com.google.cloud.bigquery.DatasetId;
 import vc.tbc.bq.jdbc.auth.AuthType;
-import vc.tbc.bq.jdbc.transport.ProxyConfig;
+import vc.tbc.bq.jdbc.transport.TransportConfig;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -42,8 +42,8 @@ import java.util.Objects;
  *            the authentication type (required)
  * @param host
  *            custom BigQuery API endpoint, e.g. Private Service Connect
- *            (optional). Says where BigQuery is; see {@code proxy} for how the
- *            driver reaches it
+ *            (optional). Says where BigQuery is; see {@code transport} for how
+ *            the driver reaches it
  * @param port
  *            custom port for BigQuery API (optional)
  * @param timeoutSeconds
@@ -123,12 +123,14 @@ import java.util.Objects;
  *            true). Applies only to the {@code INFORMATION_SCHEMA} queries this
  *            driver issues for {@link java.sql.DatabaseMetaData}, never to a
  *            caller's own statements.
- * @param proxy
- *            the HTTP proxy BigQuery calls and OAuth token requests are routed
- *            through, or null to connect directly (default: whatever the JVM's
- *            {@code https.proxyHost} says, which is usually nothing). Distinct
- *            from {@code host}, which changes <em>where</em> BigQuery is rather
- *            than how the driver gets there.
+ * @param transport
+ *            how BigQuery calls and OAuth token requests reach Google: the
+ *            proxy to route through and the truststore to verify against
+ *            (default: {@link TransportConfig#direct()}, adjusted by whatever
+ *            the JVM's own {@code https.proxy*} and
+ *            {@code javax.net.ssl.trustStore*} properties say). Distinct from
+ *            {@code host}, which changes <em>where</em> BigQuery is rather than
+ *            how the driver gets there. Never null.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
@@ -139,7 +141,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
 		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold,
 		Boolean includeInformationSchema, List<String> additionalProjects, Boolean includeStructFields,
-		Boolean metadataJobCreationOptional, ProxyConfig proxy) {
+		Boolean metadataJobCreationOptional, TransportConfig transport) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -279,6 +281,11 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 			// rather than for anyone worried about the rows.
 			metadataJobCreationOptional = true;
 		}
+		// Never null, so properties.transport().proxy() needs no null check at any
+		// call site. "Nothing configured" is a value here, not an absence.
+		if (transport == null) {
+			transport = TransportConfig.direct();
+		}
 		// No default: a load job is a different mechanism, not a faster one of the
 		// same kind. It is not DML-quota bound, but neither is it transactional nor
 		// atomic with surrounding DML, so switching to it at some row count would
@@ -296,8 +303,10 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	}
 
 	/**
-	 * Creates properties without {@code proxy}, which then means a direct
-	 * connection unless the JVM's {@code https.proxy*} properties say otherwise.
+	 * Creates properties without {@code transport}, which then means a direct
+	 * connection verified against the JDK truststore, unless the JVM's own
+	 * {@code https.proxy*} or {@code javax.net.ssl.trustStore*} properties say
+	 * otherwise.
 	 *
 	 * <p>
 	 * Same reason as the overloads below it: a record's canonical constructor is

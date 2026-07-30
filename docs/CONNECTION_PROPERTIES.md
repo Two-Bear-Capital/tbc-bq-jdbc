@@ -60,6 +60,10 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 | `ProxyPort` | `proxyPort` | HTTP proxy port |
 | `ProxyUid` | `proxyUser` | Proxy username |
 | `ProxyPwd` | `proxyPassword` | Proxy password |
+| `SSLTrustStore` | `trustStore` | TLS truststore path |
+| `SSLTrustStorePwd` | `trustStorePassword` | Truststore password |
+| `SSLTrustStoreType` | `trustStoreType` | Truststore format |
+| `SSLTrustStoreProvider` | `trustStoreProvider` | JCE provider for the truststore |
 
 **OAuthType Values:**
 
@@ -90,7 +94,7 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 **Migration from Simba:**
 
 Replace the Simba JDBC driver with tbc-bq-jdbc and set the driver class to
-`vc.tbc.bq.jdbc.BQDriver`. The seventeen Simba property names in the table above are
+`vc.tbc.bq.jdbc.BQDriver`. The twenty-one Simba property names in the table above are
 translated automatically, so most connection strings work unchanged. Two things to check:
 
 - `OAuthType=2` (pre-generated access tokens) is rejected with an error. Use `0` or `3`.
@@ -279,6 +283,48 @@ jdbc:bigquery:my-project/my_dataset?proxyHost=proxy.corp.example.com&proxyPort=3
   properties itself. Configure the proxy through the JVM properties, not just these
   connection properties, if you use it.
 - A proxy password is never written to a log line.
+
+---
+
+### TLS Truststore
+
+Covers `trustStore`, `trustStorePassword`, `trustStoreType` and `trustStoreProvider` (see
+the [generated table](generated/connection-properties.md) for defaults and allowed values).
+
+Set these when egress is re-signed by a private certificate authority — a TLS-inspecting
+middlebox — and connections otherwise fail with:
+
+```
+PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException:
+unable to find valid certification path to requested target
+```
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?trustStore=/etc/pki/corp-ca.p12&trustStorePassword=secret
+```
+
+**Through a TLS-inspecting proxy**, both sets of properties apply to the same connection:
+```
+jdbc:bigquery:my-project/my_dataset?proxyHost=proxy.corp.example.com&proxyPort=3128&trustStore=/etc/pki/corp-ca.p12
+```
+
+**Notes:**
+- The truststore **replaces** the JDK's trust anchors rather than adding to them. A store
+  holding only a corporate CA will not verify a public certificate, so include any public
+  roots you also need — which is what the tooling that produces these stores normally does.
+- Only `trustStore` is required. `trustStoreType` defaults to the JVM's own
+  (PKCS12 on current JDKs), `trustStoreProvider` to the standard provider search order, and
+  a store with no password is read without one.
+- With no `trustStore` set, the driver falls back to the JVM's standard
+  `javax.net.ssl.trustStore`, `javax.net.ssl.trustStorePassword`,
+  `javax.net.ssl.trustStoreType` and `javax.net.ssl.trustStoreProvider` system properties.
+  An explicit `trustStore` wins outright and does not inherit a password from them.
+- The truststore applies to OAuth token requests as well as BigQuery calls, so a private CA
+  does not have to be trusted twice.
+- A truststore password is never written to a log line.
+- A store that cannot be read or parsed fails when the connection opens, with a message
+  naming the path.
 
 ---
 

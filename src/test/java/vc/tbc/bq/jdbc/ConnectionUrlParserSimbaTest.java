@@ -573,9 +573,23 @@ class ConnectionUrlParserSimbaTest {
 
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
 
-		assertEquals("proxy.example.com", props.proxy().host());
-		assertEquals(3128, props.proxy().port());
-		assertEquals("someone", props.proxy().user());
-		assertEquals("secret", props.proxy().password());
+		assertEquals("proxy.example.com", props.transport().proxy().host());
+		assertEquals(3128, props.transport().proxy().port());
+		assertEquals("someone", props.transport().proxy().user());
+		assertEquals("secret", props.transport().proxy().password());
+	}
+
+	@Test
+	void testSimbaTrustStorePropertiesMapToTheDriversOwn() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3"
+				+ ";SSLTrustStore=/etc/pki/corp.p12;SSLTrustStorePwd=secret;SSLTrustStoreType=PKCS12"
+				+ ";SSLTrustStoreProvider=SunJSSE";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertEquals("/etc/pki/corp.p12", props.transport().tls().path());
+		assertEquals("secret", props.transport().tls().password());
+		assertEquals("PKCS12", props.transport().tls().type());
+		assertEquals("SunJSSE", props.transport().tls().provider());
 	}
 }

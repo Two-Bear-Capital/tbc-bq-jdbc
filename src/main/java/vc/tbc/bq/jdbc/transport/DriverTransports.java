@@ -22,10 +22,15 @@ import com.google.auth.http.HttpTransportFactory;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.DefaultProxyRoutePlanner;
 
+import javax.net.ssl.SSLContext;
+
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,7 +44,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * token requests keep going direct and a proxy-only network fails before any
  * BigQuery call is made — the shape of
  * <a href="https://github.com/googleapis/google-cloud-java/issues/13494">
- * googleapis/google-cloud-java#13494</a>.
+ * googleapis/google-cloud-java#13494</a>. The same applies to a private CA: a
+ * truststore reaching only the API client fails at token refresh with
+ * {@code PKIX path building failed}.
  *
  * <p>
  * <b>A proxied connection uses Apache HttpClient, an unproxied one does
@@ -53,19 +60,26 @@ import java.util.concurrent.ConcurrentHashMap;
  * authenticates the tunnel natively, and is already on the classpath through
  * {@code google-http-client-apache-v2}, so this costs no dependency.
  *
+ * <p>
+ * A custom truststore does not force that choice: both stacks are configured
+ * from the one {@link SSLContext} {@link TlsConfig#toSslContext()} builds, so
+ * an unproxied connection with a private CA stays on {@code NetHttpTransport}
+ * and the trust decision cannot differ between the two.
+ *
  * @since 4.3.0
  */
 public final class DriverTransports {
 
 	/**
-	 * One transport per distinct proxy, so connections share a connection pool
-	 * rather than each opening their own. Small and bounded in practice: a JVM
-	 * configures one proxy, occasionally two.
+	 * One transport per distinct configuration, so connections share a connection
+	 * pool rather than each opening their own — and, for a truststore, so the store
+	 * is read once rather than per connection. Small and bounded in practice: a JVM
+	 * configures one route, occasionally two.
 	 */
-	private static final ConcurrentHashMap<ProxyConfig, HttpTransportFactory> PROXIED = new ConcurrentHashMap<>();
+	private static final ConcurrentHashMap<TransportConfig, HttpTransportFactory> CONFIGURED = new ConcurrentHashMap<>();
 
 	/**
-	 * The unproxied transport, shared for the same reason the library shares its
+	 * The unconfigured transport, shared for the same reason the library shares its
 	 * own.
 	 */
 	private static final HttpTransportFactory DIRECT = fixed(new NetHttpTransport());
@@ -78,23 +92,72 @@ public final class DriverTransports {
 	 * Returns the transport factory for a connection.
 	 *
 	 * <p>
-	 * Never null, so no caller has to decide what the library default is. A null
-	 * {@code proxy} is answered with a direct {@link NetHttpTransport}, which is
-	 * what {@code google-auth-library} would have chosen anyway.
+	 * Never null, so no caller has to decide what the library default is. An
+	 * unconfigured transport is answered with a direct {@link NetHttpTransport},
+	 * which is what {@code google-auth-library} would have chosen anyway.
 	 *
-	 * @param proxy
-	 *            the connection's proxy, or null to connect directly
+	 * @param transport
+	 *            the connection's route and trust settings, never null
 	 * @return the factory to hand to the API client and to every credential
+	 * @throws IOException
+	 *             if a configured truststore cannot be read or parsed
 	 */
-	public static HttpTransportFactory forProxy(ProxyConfig proxy) {
-		if (proxy == null) {
+	public static HttpTransportFactory forTransport(TransportConfig transport) throws IOException {
+		if (transport.isDefault()) {
 			return DIRECT;
 		}
-		return PROXIED.computeIfAbsent(proxy, DriverTransports::buildProxied);
+		// Not computeIfAbsent: building a truststore-backed transport reads a file,
+		// and that would hold a bin lock across the I/O, blocking unrelated keys.
+		// Two threads racing here each build one and the loser's copy is discarded,
+		// which is harmless — they are equivalent.
+		HttpTransportFactory cached = CONFIGURED.get(transport);
+		if (cached != null) {
+			return cached;
+		}
+		HttpTransportFactory created = build(transport);
+		CONFIGURED.put(transport, created);
+		return created;
 	}
 
-	/** Builds an Apache-backed transport routed through {@code proxy}. */
-	private static HttpTransportFactory buildProxied(ProxyConfig proxy) {
+	/** Builds the transport described by {@code transport}. */
+	private static HttpTransportFactory build(TransportConfig transport) throws IOException {
+		SSLContext sslContext = sslContextFor(transport.tls());
+		if (transport.proxy() == null) {
+			return fixed(directTransport(sslContext));
+		}
+		return fixed(proxiedTransport(transport.proxy(), sslContext));
+	}
+
+	/**
+	 * Builds the {@link SSLContext} for a truststore, or null to keep the JDK's.
+	 *
+	 * <p>
+	 * Failures are reported as {@link IOException} naming the store, so a typo in
+	 * the path surfaces as a connection error a caller can act on rather than as a
+	 * {@link GeneralSecurityException} out of the middle of the transport. The
+	 * password is deliberately absent from the message.
+	 */
+	private static SSLContext sslContextFor(TlsConfig tls) throws IOException {
+		if (tls == null) {
+			return null;
+		}
+		try {
+			return tls.toSslContext();
+		} catch (GeneralSecurityException e) {
+			throw new IOException("Cannot use the truststore at " + tls.path() + ": " + e.getMessage(), e);
+		}
+	}
+
+	/** An unproxied transport, on the same stack as a default connection. */
+	private static HttpTransport directTransport(SSLContext sslContext) {
+		if (sslContext == null) {
+			return new NetHttpTransport();
+		}
+		return new NetHttpTransport.Builder().setSslSocketFactory(sslContext.getSocketFactory()).build();
+	}
+
+	/** An Apache-backed transport routed through {@code proxy}. */
+	private static HttpTransport proxiedTransport(ProxyConfig proxy, SSLContext sslContext) {
 		HttpHost proxyHost = new HttpHost(proxy.host(), proxy.port());
 		// setRoutePlanner, not setProxy. HttpClientBuilder only derives a planner
 		// from setProxy when no planner was set, and newDefaultHttpClientBuilder has
@@ -102,6 +165,12 @@ public final class DriverTransports {
 		// no-op and every request goes direct.
 		HttpClientBuilder builder = ApacheHttpTransport.newDefaultHttpClientBuilder()
 				.setRoutePlanner(new DefaultProxyRoutePlanner(proxyHost));
+		if (sslContext != null) {
+			// setSSLSocketFactory, not setSSLContext, and for the same reason:
+			// newDefaultHttpClientBuilder has already set a socket factory, which
+			// build() prefers over any context set afterwards.
+			builder.setSSLSocketFactory(new SSLConnectionSocketFactory(sslContext));
+		}
 		if (proxy.isAuthenticated()) {
 			// Scoped to the proxy host: an AuthScope of ANY would offer these
 			// credentials to BigQuery itself if it ever answered a 401.
@@ -110,7 +179,7 @@ public final class DriverTransports {
 					new UsernamePasswordCredentials(proxy.user(), proxy.password()));
 			builder.setDefaultCredentialsProvider(credentials);
 		}
-		return fixed(new ApacheHttpTransport(builder.build()));
+		return new ApacheHttpTransport(builder.build());
 	}
 
 	/** Wraps one transport as a factory that always returns it. */
@@ -119,13 +188,13 @@ public final class DriverTransports {
 	}
 
 	/**
-	 * Discards the cached proxied transports.
+	 * Discards the cached transports.
 	 *
 	 * <p>
-	 * For tests, which stand up a proxy per case and would otherwise reuse a
-	 * transport pointing at a port nothing is listening on any more.
+	 * For tests, which stand up a proxy or a certificate authority per case and
+	 * would otherwise reuse a transport built against the last one.
 	 */
 	static void clear() {
-		PROXIED.clear();
+		CONFIGURED.clear();
 	}
 }

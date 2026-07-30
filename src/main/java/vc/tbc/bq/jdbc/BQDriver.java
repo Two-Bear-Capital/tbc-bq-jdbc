@@ -156,6 +156,21 @@ public final class BQDriver implements Driver {
 
 		props.add(prop(info, "proxyPassword", "", "Password for the user set by 'proxyUser'", false, null));
 
+		props.add(prop(info, "trustStore", "",
+				"Path to a truststore holding the certificate authorities to verify TLS against, for networks whose egress is re-signed by a private CA and would otherwise fail with 'PKIX path building failed'. Replaces the JDK's trust anchors rather than adding to them, so include any public roots you also need. Blank falls back to the JVM's javax.net.ssl.trustStore",
+				false, null));
+
+		props.add(prop(info, "trustStorePassword", "",
+				"Password protecting the store set by 'trustStore' (blank = an unprotected store)", false, null));
+
+		props.add(prop(info, "trustStoreType", "",
+				"Format of the store set by 'trustStore'. Blank uses the JVM default, which is PKCS12 on current JDKs",
+				false, new String[]{"JKS", "PKCS12"}));
+
+		props.add(prop(info, "trustStoreProvider", "",
+				"JCE provider name to load the store set by 'trustStore' through. Blank uses the standard provider search order",
+				false, null));
+
 		props.add(prop(info, "location", "",
 				"BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location.",
 				false, null));

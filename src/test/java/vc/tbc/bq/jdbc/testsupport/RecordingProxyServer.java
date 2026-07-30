@@ -15,9 +15,8 @@
  */
 package vc.tbc.bq.jdbc.testsupport;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -33,12 +32,19 @@ import java.util.concurrent.TimeUnit;
  * A local HTTP proxy that records the {@code CONNECT} tunnels asked of it.
  *
  * <p>
- * Enough of a proxy to prove traffic reached one, and no more: it records the
- * tunnel request and then refuses it, so whatever was being sent fails with an
- * {@link IOException} instead of leaving the JVM. That is deliberate — a test
- * that relayed to Google would need credentials and a network, and this needs
- * neither while still proving the thing worth proving, which is that the
- * request was addressed to the proxy rather than to Google directly.
+ * By default it records the tunnel request and then refuses it, so whatever was
+ * being sent fails with an {@link IOException} instead of leaving the JVM. That
+ * is deliberate — a test that relayed to Google would need credentials and a
+ * network, and this needs neither while still proving the thing worth proving,
+ * which is that the request was addressed to the proxy rather than to Google
+ * directly.
+ *
+ * <p>
+ * {@link #relaying()} is the exception: it grants the tunnel and pipes bytes
+ * both ways, for a test that needs the request to actually arrive somewhere — a
+ * local TLS server, never the internet. That is what lets a proxy and a private
+ * certificate authority be exercised together, which is the case
+ * {@code TlsConfig} exists for.
  *
  * <p>
  * The point of testing at this level is
@@ -80,10 +86,12 @@ public final class RecordingProxyServer implements AutoCloseable {
 	private final ServerSocket serverSocket;
 	private final BlockingQueue<Connect> connects = new LinkedBlockingQueue<>();
 	private final String expectedCredentials;
+	private final boolean relay;
 	private volatile boolean running = true;
 
-	private RecordingProxyServer(String expectedCredentials) throws IOException {
+	private RecordingProxyServer(String expectedCredentials, boolean relay) throws IOException {
 		this.expectedCredentials = expectedCredentials;
+		this.relay = relay;
 		this.serverSocket = new ServerSocket(0, 0, InetAddress.getLoopbackAddress());
 		Thread.ofVirtual().name("recording-proxy").start(this::acceptLoop);
 	}
@@ -96,7 +104,23 @@ public final class RecordingProxyServer implements AutoCloseable {
 	 *             if the listening socket cannot be opened
 	 */
 	public static RecordingProxyServer start() throws IOException {
-		return new RecordingProxyServer(null);
+		return new RecordingProxyServer(null, false);
+	}
+
+	/**
+	 * Starts a proxy that grants tunnels and pipes bytes through them.
+	 *
+	 * <p>
+	 * For a test whose request has to reach a real listener — a local TLS server.
+	 * Point it at anything reachable from the internet and the test stops being a
+	 * unit test.
+	 *
+	 * @return the running proxy
+	 * @throws IOException
+	 *             if the listening socket cannot be opened
+	 */
+	public static RecordingProxyServer relaying() throws IOException {
+		return new RecordingProxyServer(null, true);
 	}
 
 	/**
@@ -111,7 +135,7 @@ public final class RecordingProxyServer implements AutoCloseable {
 	 *             if the listening socket cannot be opened
 	 */
 	public static RecordingProxyServer requiringAuth(String user, String password) throws IOException {
-		return new RecordingProxyServer(user + ":" + password);
+		return new RecordingProxyServer(user + ":" + password, false);
 	}
 
 	/**
@@ -148,15 +172,14 @@ public final class RecordingProxyServer implements AutoCloseable {
 	}
 
 	private void handle(Socket socket) {
-		try (socket;
-				BufferedReader in = new BufferedReader(
-						new InputStreamReader(socket.getInputStream(), StandardCharsets.ISO_8859_1))) {
+		try (socket) {
+			InputStream in = socket.getInputStream();
 			OutputStream out = socket.getOutputStream();
 			// Loops rather than handling one request: a proxy demanding credentials
 			// answers the first CONNECT with 407 and the client retries on the same
 			// connection, so both attempts arrive here.
 			while (true) {
-				String requestLine = in.readLine();
+				String requestLine = readLine(in);
 				if (requestLine == null) {
 					return;
 				}
@@ -165,7 +188,8 @@ public final class RecordingProxyServer implements AutoCloseable {
 					write(out, "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n");
 					return;
 				}
-				connects.add(new Connect(requestLine.split(" ")[1], proxyAuthorization));
+				String target = requestLine.split(" ")[1];
+				connects.add(new Connect(target, proxyAuthorization));
 
 				if (expectedCredentials != null && !expectedCredentials.equals(decode(proxyAuthorization))) {
 					// Content-Length keeps the connection reusable, so the authenticated
@@ -173,6 +197,11 @@ public final class RecordingProxyServer implements AutoCloseable {
 					write(out, "HTTP/1.1 407 Proxy Authentication Required\r\n"
 							+ "Proxy-Authenticate: Basic realm=\"recording-proxy\"\r\n" + "Content-Length: 0\r\n\r\n");
 					continue;
+				}
+				if (relay) {
+					write(out, "HTTP/1.1 200 Connection established\r\n\r\n");
+					relayTo(target, socket);
+					return;
 				}
 				// Refused rather than granted. Granting would leave the client starting a
 				// TLS handshake into a socket about to close, which it spends seconds
@@ -186,11 +215,59 @@ public final class RecordingProxyServer implements AutoCloseable {
 		}
 	}
 
+	/** Pipes bytes between the client and {@code host:port} until either closes. */
+	private void relayTo(String target, Socket client) throws IOException {
+		int colon = target.lastIndexOf(':');
+		String host = target.substring(0, colon);
+		int port = Integer.parseInt(target.substring(colon + 1));
+
+		try (Socket upstream = new Socket(host, port)) {
+			Thread outbound = Thread.ofVirtual().start(() -> pipe(client, upstream));
+			pipe(upstream, client);
+			outbound.join();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	/** Copies one socket into the other, half-closing the target when done. */
+	private static void pipe(Socket from, Socket to) {
+		try {
+			from.getInputStream().transferTo(to.getOutputStream());
+			to.shutdownOutput();
+		} catch (IOException e) {
+			// Either end closing first is the normal way a tunnel ends
+		}
+	}
+
+	/**
+	 * Reads one CRLF-terminated line straight from the socket.
+	 *
+	 * <p>
+	 * Deliberately unbuffered. A {@link java.io.BufferedReader} could pull the
+	 * first bytes of the tunnelled conversation into its buffer while reading the
+	 * request, and those bytes would then never be relayed — a corruption that
+	 * would show up as an intermittent handshake failure.
+	 */
+	private static String readLine(InputStream in) throws IOException {
+		StringBuilder line = new StringBuilder();
+		int c;
+		while ((c = in.read()) != -1) {
+			if (c == '\n') {
+				return line.toString();
+			}
+			if (c != '\r') {
+				line.append((char) c);
+			}
+		}
+		return line.isEmpty() ? null : line.toString();
+	}
+
 	/** Reads to the blank line, returning the Proxy-Authorization value if any. */
-	private static String readHeaders(BufferedReader in) throws IOException {
+	private static String readHeaders(InputStream in) throws IOException {
 		String proxyAuthorization = null;
 		String line;
-		while ((line = in.readLine()) != null && !line.isEmpty()) {
+		while ((line = readLine(in)) != null && !line.isEmpty()) {
 			if (line.regionMatches(true, 0, "Proxy-Authorization:", 0, "Proxy-Authorization:".length())) {
 				proxyAuthorization = line.substring("Proxy-Authorization:".length()).trim();
 			}

@@ -30,14 +30,14 @@ cache, one reused BigQuery session per connection, auto-commit toggling that cos
 query cost estimation, and REST/Arrow result parity enforced by a test.
 
 **Google's driver is built for reach.** Java 8 onward, on Maven Central, broad Simba property
-translation, and the networking a restricted corporate estate needs — custom TLS truststore,
-Private Service Connect. It also implements the optional JDBC pooling API and comes
+translation, and the networking a restricted corporate estate needs — Private Service
+Connect, a universe domain. It also implements the optional JDBC pooling API and comes
 with a support relationship.
 
 So:
 
-**Choose Google's driver if** you are on Java 8–17, connect through a TLS-inspecting middlebox,
-want `ConnectionPoolDataSource` rather than an external pool, need `CallableStatement` or
+**Choose Google's driver if** you are on Java 8–17, need Private Service Connect, want
+`ConnectionPoolDataSource` rather than an external pool, need `CallableStatement` or
 OpenTelemetry today, or want first-party support.
 
 **Choose `tbc-bq-jdbc` if** you are on Java 21+ and your friction is schema introspection in an
@@ -62,6 +62,7 @@ before you run it.
 | Sessions | One per connection, reused | New session per statement in auto-commit |
 | OpenTelemetry | ⏳ tracked ([#269][i269]) — own counters today | ✅ traces + GCP exporters |
 | HTTP proxy | ✅ `proxyHost`/`proxyPort`, with proxy auth | ✅ |
+| Custom TLS truststore | ✅ `trustStore`, incl. type and provider | ✅ |
 | `CallableStatement` | ❌ by design ([#272][i272]) | ✅ |
 | `javax.sql.DataSource` | ✅ | ✅ |
 | `ConnectionPoolDataSource` | ❌ by design — pool with HikariCP | ✅ |
@@ -139,7 +140,6 @@ Anything unmarked is a genuine difference that is simply not addressed here.
 
 | Area | Detail |
 |---|---|
-| **Custom TLS truststore** *(tracked — [#270][i270])* | `SSLTrustStore`, `SSLTrustStorePwd`, `SSLTrustStoreType`, `SSLTrustStoreProvider`, and it honours the standard JVM truststore properties. `tbc-bq-jdbc` has none of these. |
 | **Private Service Connect** | `PrivateServiceConnectUris`, `EndpointOverrides`, `universeDomain`. `tbc-bq-jdbc` offers only a single `host`/`port` endpoint override. |
 
 ### JDBC surface
@@ -200,7 +200,6 @@ a backlog item; they are not a promise of when, or whether, a tracked item ships
 
 [i267]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/267
 [i269]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/269
-[i270]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/270
 [i272]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/272
 [i273]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/273
 [i276]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/276

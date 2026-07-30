@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **41** connection properties.
+There are **45** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -26,6 +26,10 @@ There are **41** connection properties.
 | `proxyPort` | _(none)_ | any | Port of the proxy set by 'proxyHost'. Required whenever proxyHost is set — there is no conventional proxy port to assume |
 | `proxyUser` | _(none)_ | any | Username for a proxy that demands Proxy-Authorization (blank = anonymous proxy) |
 | `proxyPassword` | _(none)_ | any | Password for the user set by 'proxyUser' |
+| `trustStore` | _(none)_ | any | Path to a truststore holding the certificate authorities to verify TLS against, for networks whose egress is re-signed by a private CA and would otherwise fail with 'PKIX path building failed'. Replaces the JDK's trust anchors rather than adding to them, so include any public roots you also need. Blank falls back to the JVM's javax.net.ssl.trustStore |
+| `trustStorePassword` | _(none)_ | any | Password protecting the store set by 'trustStore' (blank = an unprotected store) |
+| `trustStoreType` | _(none)_ | `JKS`, `PKCS12` | Format of the store set by 'trustStore'. Blank uses the JVM default, which is PKCS12 on current JDKs |
+| `trustStoreProvider` | _(none)_ | any | JCE provider name to load the store set by 'trustStore' through. Blank uses the standard provider search order |
 | `location` | _(none)_ | any | BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location. |
 | `timeout` | `300` | any | Query execution timeout in seconds |
 | `connectionTimeout` | `30` | any | Timeout in seconds for establishing the HTTP connection (not query duration) |

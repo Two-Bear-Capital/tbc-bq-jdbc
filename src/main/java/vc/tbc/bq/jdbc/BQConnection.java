@@ -133,7 +133,7 @@ public final class BQConnection extends AbstractBQConnection {
 		try {
 			// Shared across connections authenticating the same way: building these
 			// means an ADC probe plus token fetch, or reading and parsing a key file
-			Credentials credentials = CredentialsCache.forAuthType(properties.authType(), properties.proxy());
+			Credentials credentials = CredentialsCache.forAuthType(properties.authType(), properties.transport());
 			this.bigquery = buildOptions(properties, credentials).build().getService();
 			logger.debug("Connected to BigQuery project: {}", properties.projectId());
 
@@ -170,8 +170,11 @@ public final class BQConnection extends AbstractBQConnection {
 	 * @param credentials
 	 *            credentials for the connection
 	 * @return the configured options builder
+	 * @throws IOException
+	 *             if a configured truststore cannot be read or parsed
 	 */
-	static BigQueryOptions.Builder buildOptions(ConnectionProperties properties, Credentials credentials) {
+	static BigQueryOptions.Builder buildOptions(ConnectionProperties properties, Credentials credentials)
+			throws IOException {
 		BigQueryOptions.Builder builder = BigQueryOptions.newBuilder().setProjectId(properties.projectId())
 				.setCredentials(credentials);
 
@@ -204,13 +207,18 @@ public final class BQConnection extends AbstractBQConnection {
 			customTransport = true;
 		}
 		// The same factory the connection's credentials were built on — see
-		// DriverTransports. Left unset when there is no proxy so the unproxied path
-		// keeps the client library's own default transport rather than an
+		// DriverTransports. Left unset when nothing is configured so the default
+		// path keeps the client library's own transport rather than an
 		// equivalent-looking copy of it.
-		if (properties.proxy() != null) {
-			transport.setHttpTransportFactory(DriverTransports.forProxy(properties.proxy()));
+		if (!properties.transport().isDefault()) {
+			transport.setHttpTransportFactory(DriverTransports.forTransport(properties.transport()));
 			customTransport = true;
-			logger.info("Routing BigQuery traffic through proxy {}", properties.proxy());
+			if (properties.transport().proxy() != null) {
+				logger.info("Routing BigQuery traffic through proxy {}", properties.transport().proxy());
+			}
+			if (properties.transport().tls() != null) {
+				logger.info("Verifying TLS against the truststore at {}", properties.transport().tls());
+			}
 		}
 		if (customTransport) {
 			builder.setTransportOptions(transport.build());
