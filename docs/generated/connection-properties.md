@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **36** connection properties.
+There are **37** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -37,6 +37,7 @@ There are **36** connection properties.
 | `includeStructFields` | `false` | `true`, `false` | Add a getColumns() row per STRUCT field, named by its dotted path (person.name). Costs one extra INFORMATION_SCHEMA query per dataset. Fields under an ARRAY are excluded because such a path needs UNNEST and cannot be selected as written. Off by default: it changes the row count of every getColumns() call |
 | `includeInformationSchema` | `true` | `true`, `false` | Make INFORMATION_SCHEMA browsable: a synthetic INFORMATION_SCHEMA schema per project holding the project-scoped views (SCHEMATA, JOBS, ...), plus the dataset-scoped views (TABLES, COLUMNS, ...) as tables named INFORMATION_SCHEMA.<view> inside each dataset. Reported as SYSTEM TABLE so a caller can filter them out. Costs no BigQuery query — the view list is static |
 | `metadataIncludeDescriptions` | `true` | `true`, `false` | Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets |
+| `metadataJobCreationOptional` | `true` | `true`, `false` | Ask BigQuery to answer the driver's own INFORMATION_SCHEMA reads without creating a job (jobCreationMode=JOB_CREATION_OPTIONAL), removing job creation from the latency of metadata introspection. Applies only to metadata queries, never to a caller's statements. BigQuery decides per request and creates a job anyway for larger results, so this cannot change the rows returned; jobless queries still appear in INFORMATION_SCHEMA.JOBS |
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |

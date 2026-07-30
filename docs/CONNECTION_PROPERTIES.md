@@ -168,6 +168,22 @@ It issues no BigQuery query. See
 jdbc:bigquery:my-project/my_dataset?includeInformationSchema=false
 ```
 
+
+`metadataJobCreationOptional` (default `true`) asks BigQuery to answer the driver's own
+`INFORMATION_SCHEMA` reads without creating a job, which takes job creation out of the
+latency of schema introspection. It applies only to the queries the driver issues for
+`DatabaseMetaData`, never to statements you execute.
+
+BigQuery decides per request: it answers small results inline and creates a job anyway for
+larger ones, so the rows are the same either way. A query answered without a job is still
+listed in `INFORMATION_SCHEMA.JOBS`. Set it to `false` if you need every metadata read to
+produce a job.
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?metadataJobCreationOptional=false
+```
+
 ---
 
 ### Query Execution Properties
@@ -442,7 +458,7 @@ See **[IntelliJ Integration Guide](INTELLIJ.md)** for complete setup instruction
 
 ### Job Configuration
 
-Covers `labels`, `jobCreationMode`, and `maxBillingBytes` (see the
+Covers `labels` and `maxBillingBytes` (see the
 [generated table](generated/connection-properties.md) for defaults and allowed values).
 
 **Example:**
@@ -465,8 +481,9 @@ Format: `key1=value1,key2=value2`
   [custom cost control](https://cloud.google.com/bigquery/docs/custom-quotas).
   To see an estimate before running, set `enableQueryCostEstimation=true`
 
-> **`jobCreationMode` is accepted but not yet applied.** The driver parses it, but it is
-> not currently sent to BigQuery.
+> **`jobCreationMode` is not a supported property.** The driver does not read it, and
+> setting it has no effect. For metadata reads, `metadataJobCreationOptional` is the
+> equivalent setting — see [Metadata Properties](#metadata-properties).
 
 ---
 
@@ -624,8 +641,8 @@ jdbc:bigquery:my-project/reporting?\
 
 ### Valid Values
 
-The allowed values for each property (e.g. `authType`, `useStorageApi`, `jobCreationMode`,
-`useLegacySql`) are listed in the **[generated property table](generated/connection-properties.md)**,
+The allowed values for each property (e.g. `authType`, `useStorageApi`, `useLegacySql`)
+are listed in the **[generated property table](generated/connection-properties.md)**,
 produced directly from the driver.
 
 ### What is validated

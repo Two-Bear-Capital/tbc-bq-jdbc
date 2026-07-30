@@ -198,6 +198,10 @@ public final class BQDriver implements Driver {
 				"Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets",
 				false, new String[]{"true", "false"}));
 
+		props.add(prop(info, "metadataJobCreationOptional", "true",
+				"Ask BigQuery to answer the driver's own INFORMATION_SCHEMA reads without creating a job (jobCreationMode=JOB_CREATION_OPTIONAL), removing job creation from the latency of metadata introspection. Applies only to metadata queries, never to a caller's statements. BigQuery decides per request and creates a job anyway for larger results, so this cannot change the rows returned; jobless queries still appear in INFORMATION_SCHEMA.JOBS",
+				false, new String[]{"true", "false"}));
+
 		props.add(prop(info, "useStorageApi", "false",
 				"BigQuery Storage Read API mode for large result sets: much faster on big results, "
 						+ "but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED "
