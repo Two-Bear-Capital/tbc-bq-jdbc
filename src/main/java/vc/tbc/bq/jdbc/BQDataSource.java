@@ -1069,6 +1069,30 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	}
 
 	/**
+	 * Returns whether metadata reads ask BigQuery to skip job creation.
+	 *
+	 * @return true if job creation is optional, or null for the default (on)
+	 */
+	public Boolean getMetadataJobCreationOptional() {
+		return getBoolean("metadataJobCreationOptional");
+	}
+
+	/**
+	 * Sets whether the driver's own {@code INFORMATION_SCHEMA} reads ask BigQuery
+	 * to answer without creating a job, which takes job creation out of the latency
+	 * of schema introspection. Applies only to metadata queries, never to
+	 * statements the caller executes. BigQuery creates a job anyway for larger
+	 * results, so this cannot change the rows returned.
+	 *
+	 * @param metadataJobCreationOptional
+	 *            false to make every metadata read create a job, or null for the
+	 *            default
+	 */
+	public void setMetadataJobCreationOptional(Boolean metadataJobCreationOptional) {
+		set("metadataJobCreationOptional", metadataJobCreationOptional);
+	}
+
+	/**
 	 * Returns whether date-sharded tables collapse to one wildcard entry.
 	 *
 	 * @return true if shards collapse, or null for the default (off)
