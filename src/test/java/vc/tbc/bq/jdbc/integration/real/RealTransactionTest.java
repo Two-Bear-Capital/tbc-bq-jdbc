@@ -115,8 +115,8 @@ class RealTransactionTest extends AbstractRealBigQueryIntegrationTest {
 
 	@Test
 	void testEnableSessionsConnectionCreatesSessionEagerly() throws SQLException {
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&enableSessions=true", TEST_PROJECT_ID,
-				TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&enableSessions=true%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 
 		try (Connection sessionConn = DriverManager.getConnection(url)) {
 			BQConnection bqConnection = sessionConn.unwrap(BQConnection.class);

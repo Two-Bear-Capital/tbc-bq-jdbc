@@ -67,8 +67,8 @@ class RealBatchLoadTest extends AbstractRealBigQueryIntegrationTest {
 	private static final String INSERT = " (id, name, score, amount, flag, d, ts, payload) VALUES (?,?,?,?,?,?,?,?)";
 
 	private Connection loadConnection() throws SQLException {
-		return DriverManager.getConnection(String.format("jdbc:bigquery:%s/%s?authType=ADC&batchLoadThreshold=%d",
-				TEST_PROJECT_ID, TEST_DATASET, THRESHOLD));
+		return DriverManager.getConnection(String.format("jdbc:bigquery:%s/%s?authType=ADC&batchLoadThreshold=%d%s",
+				TEST_PROJECT_ID, TEST_DATASET, THRESHOLD, TEST_CONNECTION_DEFAULTS));
 	}
 
 	private String createTable(String suffix) throws SQLException {

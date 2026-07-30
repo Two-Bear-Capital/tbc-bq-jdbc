@@ -83,8 +83,8 @@ class RealImpersonationTest extends AbstractRealBigQueryIntegrationTest {
 	 * source, with an optional delegation chain.
 	 */
 	private String impersonatingUrl(String delegates) {
-		String url = String.format("jdbc:bigquery:%s/%s?impersonateServiceAccount=%s&maxBillingBytes=1073741824",
-				TEST_PROJECT_ID, TEST_DATASET, TARGET_SA);
+		String url = String.format("jdbc:bigquery:%s/%s?impersonateServiceAccount=%s%s", TEST_PROJECT_ID, TEST_DATASET,
+				TARGET_SA, TEST_CONNECTION_DEFAULTS);
 		return delegates == null ? url : url + "&impersonateDelegates=" + delegates;
 	}
 
@@ -160,8 +160,8 @@ class RealImpersonationTest extends AbstractRealBigQueryIntegrationTest {
 	void testImpersonatingAnUngrantedServiceAccountFails() {
 		// Given: A target the caller holds no serviceAccountTokenCreator role on
 		String url = String.format(
-				"jdbc:bigquery:%s/%s?impersonateServiceAccount=no-such-sa@%s.iam.gserviceaccount.com", TEST_PROJECT_ID,
-				TEST_DATASET, TEST_PROJECT_ID);
+				"jdbc:bigquery:%s/%s?impersonateServiceAccount=no-such-sa@%s.iam.gserviceaccount.com%s",
+				TEST_PROJECT_ID, TEST_DATASET, TEST_PROJECT_ID, TEST_CONNECTION_DEFAULTS);
 
 		// Then: The failure should surface rather than silently falling back to the
 		// source identity, which would run the query with more access than asked for

@@ -96,8 +96,8 @@ class RealCrossRegionJobTest extends AbstractRealBigQueryIntegrationTest {
 	 * dataset.
 	 */
 	private Connection connectionInRegion(String region) throws SQLException {
-		String url = String.format("jdbc:bigquery:%s?authType=ADC&location=%s&maxBillingBytes=1073741824",
-				TEST_PROJECT_ID, region);
+		String url = String.format("jdbc:bigquery:%s?authType=ADC&location=%s%s", TEST_PROJECT_ID, region,
+				TEST_CONNECTION_DEFAULTS);
 		logger.debug("Connecting with URL: {}", url);
 		return DriverManager.getConnection(url);
 	}

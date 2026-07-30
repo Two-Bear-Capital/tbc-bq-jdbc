@@ -79,8 +79,8 @@ class RealMetadataJobCreationTest extends AbstractRealBigQueryIntegrationTest {
 
 	private Connection openWith(boolean jobCreationOptional) throws SQLException {
 		String url = String.format(
-				"jdbc:bigquery:%s/%s?authType=ADC&metadataCacheEnabled=false&metadataJobCreationOptional=%s",
-				TEST_PROJECT_ID, TEST_DATASET, jobCreationOptional);
+				"jdbc:bigquery:%s/%s?authType=ADC&metadataCacheEnabled=false&metadataJobCreationOptional=%s%s",
+				TEST_PROJECT_ID, TEST_DATASET, jobCreationOptional, TEST_CONNECTION_DEFAULTS);
 		return DriverManager.getConnection(url);
 	}
 
