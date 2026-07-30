@@ -209,8 +209,7 @@ final class ArrowRowConverter {
 	 */
 	FieldValueList convert(VectorSchemaRoot root, int rowIndex) throws SQLException {
 		List<FieldValue> values = new ArrayList<>(fields.size());
-		for (int column = 0; column < fields.size(); column++) {
-			Field field = fields.get(column);
+		for (Field field : fields) {
 			FieldVector vector = root.getVector(field.getName());
 			if (vector == null) {
 				throw new BQSQLException("Storage Read API returned no column named '" + field.getName() + "'");

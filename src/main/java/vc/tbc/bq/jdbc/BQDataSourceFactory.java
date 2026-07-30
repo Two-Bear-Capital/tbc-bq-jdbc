@@ -59,7 +59,11 @@ public class BQDataSourceFactory implements ObjectFactory {
 		// Instantiated reflectively by the naming provider
 	}
 
+	// Hashtable is the parameter type javax.naming.spi.ObjectFactory declares.
+	// A Map here would not override the interface method, so JNDI would never
+	// call it.
 	@Override
+	@SuppressWarnings("PMD.ReplaceHashtableWithMap")
 	public Object getObjectInstance(Object obj, Name name, Context nameCtx, Hashtable<?, ?> environment) {
 		if (!(obj instanceof Reference reference)) {
 			// Contract: returning null lets the naming provider try another factory

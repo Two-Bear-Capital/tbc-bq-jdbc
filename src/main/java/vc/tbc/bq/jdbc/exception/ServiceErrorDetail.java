@@ -133,6 +133,10 @@ public final class ServiceErrorDetail {
 	 * another, and the innermost is the one that was not merely observed on the way
 	 * out.
 	 */
+	// The == below is a deliberate identity check for a cause chain pointing at
+	// itself, which is the loop this walk must break out of. equals() would ask a
+	// different question, and the wrong one on a type that overrides it.
+	@SuppressWarnings("PMD.CompareObjectsWithEquals")
 	private static HttpResponseException findHttpResponse(Throwable cause) {
 		HttpResponseException found = null;
 		Throwable current = cause;
