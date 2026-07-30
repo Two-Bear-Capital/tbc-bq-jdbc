@@ -81,7 +81,7 @@ query cost estimation, or the batch-insert and metadata-shaping controls listed 
 
 | Area | Detail |
 |---|---|
-| **Short query optimization** | `JobCreationMode` sets `JOB_CREATION_OPTIONAL`, letting BigQuery answer small queries without creating a job at all. This removes a round trip and job-creation latency from every short query. `tbc-bq-jdbc` always creates a job. |
+| **Short query optimization** | `JobCreationMode` sets `JOB_CREATION_OPTIONAL` for *every* query, letting BigQuery answer short ones without creating a job at all. `tbc-bq-jdbc` applies this to its own metadata reads (`metadataJobCreationOptional`, on by default) but not to statements you execute, which always create a job. |
 | **Storage Write API inserts** | Bulk inserts can stream through `JsonStreamWriter` (`EnableWriteAPI`, `SWA_ActivationRowCount`, `SWA_AppendRowCount`), which avoids both DML statement quotas and load-job quotas. `tbc-bq-jdbc`'s largest-batch path is a load job. |
 | **Adaptive Arrow activation** | Read API use is decided per result from `HighThroughputMinTableSize` and `HighThroughputActivationRatio`, and explicitly declines when `hasNextPage()` is false so it never discards an already-complete first page. `tbc-bq-jdbc`'s `auto` mode uses a flat 10 MB estimate (`rows × 1 KB`) with no such guard. |
 | **Streaming metadata** | Metadata fetches are submitted to a connection-scoped executor and rows are consumed as they arrive, so large schemas start returning sooner. `MetaDataFetchThreadCount` is configurable; `tbc-bq-jdbc` hard-codes a cap of 16. |

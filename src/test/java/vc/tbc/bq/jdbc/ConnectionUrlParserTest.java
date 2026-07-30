@@ -401,6 +401,24 @@ class ConnectionUrlParserTest {
 	}
 
 	@Test
+	void testParseUrlWithMetadataJobCreationOptional() throws SQLException {
+		String url = "jdbc:bigquery:my-project?metadataJobCreationOptional=false";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertFalse(props.metadataJobCreationOptional());
+	}
+
+	@Test
+	void testMetadataJobCreationOptionalDefaultsToOn() throws SQLException {
+		// On by default because BigQuery owns the fallback: it creates a job anyway
+		// for anything it will not answer inline, so the rows cannot differ and the
+		// only effect is latency. The opt-out is for a caller that needs a real job
+		// id per metadata read, not for anyone worried about the results.
+		String url = "jdbc:bigquery:my-project";
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+		assertTrue(props.metadataJobCreationOptional());
+	}
+
+	@Test
 	void testParseUrlWithQueryPricePerTiB() throws SQLException {
 		String url = "jdbc:bigquery:my-project?queryPricePerTiB=6.25";
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);

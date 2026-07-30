@@ -8,6 +8,34 @@
 - Parallel loading lives in `getTables`/`getColumns`/`getProcedures` and the key-constraint
   scans, **not** in `getSchemas()`, which is a single sequential dataset listing
 
+### Jobless metadata reads (`metadataJobCreationOptional`, #265)
+- On by default. Every metadata read goes through `bigquery.query(...)`, never
+  `bigquery.create(JobInfo)` — so they already take the `jobs.query` path, which is the
+  only one with a `jobCreationMode` field. `metadataQuery(String)` is the single seam
+  that builds these configs; **add a new metadata query through it, not by calling
+  `QueryJobConfiguration.newBuilder` again**
+- Scoped to metadata deliberately. The statement path's `cancel()`, Storage Read API
+  destination table, script child jobs, DML update counts and `runJob()` metrics all
+  need a job; none of them exists here, so this needed no eligibility gate and no
+  fallback logic. Doing the same for user statements is a separate, much larger change
+- **BigQuery owns the fallback.** `JOB_CREATION_OPTIONAL` is a request: the service
+  answers small results inline and creates a job anyway above a size threshold of its
+  own (measured between 3,065 and 5,526 `INFORMATION_SCHEMA.COLUMNS` rows). So a
+  dataset too large to qualify behaves exactly as before, and the driver has nothing to
+  detect
+- Measured 19–37% off the p50 of a qualifying metadata read (121–305ms), against the
+  integration dataset and public datasets spanning three orders of magnitude
+- The client library would NPE on a jobless result that pages — `queryRpc` does
+  `JobId.fromPb(results.getJobReference())` unguarded — but that combination could not be
+  produced, including with `maxResults=1` forcing a page on a 10-row result. BigQuery
+  creates a job whenever it must page, and `ConnectionImpl` depends on that too
+- **Not in `metadataShapeKey()`, and must not be.** It does not shape results — the rows
+  are identical either way — so two connections disagreeing about it can share cache
+  entries safely. `RealMetadataJobCreationTest` is what holds that claim, and it disables
+  the cache precisely so both modes actually reach BigQuery
+- A jobless query still appears in `INFORMATION_SCHEMA.JOBS`, with `job_id` set to the
+  query id, so this costs no audit visibility
+
 ### getTables REMARKS
 - Neither the description nor a view's defining SQL is in the `tables.list` response
   `getTables()` lists with — only `tables.get` carries either, which would be one API

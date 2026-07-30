@@ -804,8 +804,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
 			BigQuery bigquery = connection.getBigQuery();
-			QueryJobConfiguration config = QueryJobConfiguration.newBuilder(sql).build();
-			TableResult result = bigquery.query(config);
+			TableResult result = bigquery.query(metadataQuery(sql));
 			for (FieldValueList row : result.iterateAll()) {
 				Object[] mapped = rowMapper.apply(row);
 				if (mapped != null) {
@@ -826,6 +825,38 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 			logger.warn("Could not query {} for dataset {}: {}", view, datasetId, e.getMessage());
 		}
 		return rows;
+	}
+
+	/**
+	 * Builds the configuration for one of the driver's own
+	 * {@code INFORMATION_SCHEMA} reads.
+	 *
+	 * <p>
+	 * These queries all reach BigQuery through {@code bigquery.query(...)}, which
+	 * takes the {@code jobs.query} path whenever the configuration allows it — none
+	 * of them sets a destination table, priority or partitioning, so all of them
+	 * do. That path accepts {@code jobCreationMode}, which {@code jobs.insert} has
+	 * no field for; this is why the setting can apply here and not to a caller's
+	 * own statements, which go through {@code bigquery.create(JobInfo)} in
+	 * {@code AbstractBQStatement}.
+	 *
+	 * <p>
+	 * {@code JOB_CREATION_OPTIONAL} is a request rather than an instruction.
+	 * BigQuery answers small results without creating a job and creates one anyway
+	 * above a threshold of its own, so nothing here needs an eligibility test: a
+	 * dataset too large to qualify simply behaves as it did before. The rows are
+	 * identical either way — only the job behind them is optional (#265).
+	 *
+	 * @param sql
+	 *            the query to run
+	 * @return the configuration to hand to {@code bigquery.query}
+	 */
+	private QueryJobConfiguration metadataQuery(String sql) {
+		QueryJobConfiguration.Builder builder = QueryJobConfiguration.newBuilder(sql).setUseLegacySql(false);
+		if (connection.getProperties().metadataJobCreationOptional()) {
+			builder.setJobCreationMode(QueryJobConfiguration.JobCreationMode.JOB_CREATION_OPTIONAL);
+		}
+		return builder.build();
 	}
 
 	/**
@@ -1830,9 +1861,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		String sql = "SELECT table_name, column_name, ordinal_position, is_nullable, data_type" + " FROM `" + projectId
 				+ "." + datasetId + ".INFORMATION_SCHEMA.COLUMNS`" + " ORDER BY table_name, ordinal_position";
 
-		QueryJobConfiguration queryConfig = QueryJobConfiguration.newBuilder(sql).setUseLegacySql(false).build();
-
-		TableResult results = bigquery.query(queryConfig);
+		TableResult results = bigquery.query(metadataQuery(sql));
 
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		for (FieldValueList row : results.iterateAll()) {
@@ -1907,7 +1936,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 
 		String sql = "SELECT table_name, column_name, field_path, data_type" + " FROM `" + projectId + "." + datasetId
 				+ ".INFORMATION_SCHEMA.COLUMN_FIELD_PATHS`" + " ORDER BY table_name, field_path";
-		TableResult results = bigquery.query(QueryJobConfiguration.newBuilder(sql).setUseLegacySql(false).build());
+		TableResult results = bigquery.query(metadataQuery(sql));
 
 		// Every path's declared type, so a path can be tested for an ARRAY ancestor.
 		java.util.Map<String, String> typesByPath = new java.util.HashMap<>();
@@ -2705,9 +2734,7 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		java.util.List<Object[]> rows = new java.util.ArrayList<>();
 		try {
 			BigQuery bigquery = connection.getBigQuery();
-			QueryJobConfiguration config = QueryJobConfiguration
-					.newBuilder(KeyConstraints.constraintQuery(projectId, datasetId)).build();
-			TableResult result = bigquery.query(config);
+			TableResult result = bigquery.query(metadataQuery(KeyConstraints.constraintQuery(projectId, datasetId)));
 			for (FieldValueList row : result.iterateAll()) {
 				rows.add(KeyConstraints.snapshotRow(row, datasetId));
 			}

@@ -431,13 +431,14 @@ public final class ConnectionUrlParser {
 		Boolean includeInformationSchema = parseBooleanObject(properties, "includeInformationSchema");
 		List<String> additionalProjects = parseProjectList(properties.get("additionalProjects"));
 		Boolean includeStructFields = parseBooleanObject(properties, "includeStructFields");
+		Boolean metadataJobCreationOptional = parseBooleanObject(properties, "metadataJobCreationOptional");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
 				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
-				additionalProjects, includeStructFields);
+				additionalProjects, includeStructFields, metadataJobCreationOptional);
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
