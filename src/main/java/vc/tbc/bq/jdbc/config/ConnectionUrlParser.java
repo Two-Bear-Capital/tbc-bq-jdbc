@@ -17,6 +17,8 @@ package vc.tbc.bq.jdbc.config;
 
 import vc.tbc.bq.jdbc.auth.*;
 import vc.tbc.bq.jdbc.transport.ProxyConfig;
+import vc.tbc.bq.jdbc.transport.TlsConfig;
+import vc.tbc.bq.jdbc.transport.TransportConfig;
 
 import java.math.BigDecimal;
 import java.net.URLDecoder;
@@ -354,6 +356,10 @@ public final class ConnectionUrlParser {
 				case "ProxyPort" -> properties.put("proxyPort", value);
 				case "ProxyUid" -> properties.put("proxyUser", value);
 				case "ProxyPwd" -> properties.put("proxyPassword", value);
+				case "SSLTrustStore" -> properties.put("trustStore", value);
+				case "SSLTrustStorePwd" -> properties.put("trustStorePassword", value);
+				case "SSLTrustStoreType" -> properties.put("trustStoreType", value);
+				case "SSLTrustStoreProvider" -> properties.put("trustStoreProvider", value);
 				default -> properties.put(key, value); // Pass through — handles native tbc-bq-jdbc property names
 			}
 		}
@@ -440,34 +446,42 @@ public final class ConnectionUrlParser {
 		List<String> additionalProjects = parseProjectList(properties.get("additionalProjects"));
 		Boolean includeStructFields = parseBooleanObject(properties, "includeStructFields");
 		Boolean metadataJobCreationOptional = parseBooleanObject(properties, "metadataJobCreationOptional");
-		ProxyConfig proxy = parseProxy(properties);
+		TransportConfig transport = parseTransport(properties);
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
 				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
-				additionalProjects, includeStructFields, metadataJobCreationOptional, proxy);
+				additionalProjects, includeStructFields, metadataJobCreationOptional, transport);
 	}
 
 	/**
-	 * Resolves the proxy for a connection, or null when nothing asks for one.
+	 * Resolves how a connection reaches Google: its proxy and its truststore.
 	 *
 	 * <p>
-	 * {@link ProxyConfig#resolve} throws {@link IllegalArgumentException} for a
-	 * configuration that cannot be honoured — a port outside the range, a password
-	 * with no username, a port with no host. Those are all connection-string
+	 * Both resolvers throw {@link IllegalArgumentException} for a configuration
+	 * that cannot be honoured — a port outside the range, a password with no
+	 * username, a store password with no store. Those are all connection-string
 	 * mistakes, so they surface here as {@link SQLException} like every other bad
 	 * property rather than as an unchecked exception out of
 	 * {@code DriverManager.getConnection}.
+	 *
+	 * <p>
+	 * A truststore that cannot be <em>read</em> is a different matter and is not
+	 * checked here: that is I/O, it happens when the transport is built, and
+	 * failing at parse time would mean reading the file once per parse.
 	 */
-	private static ProxyConfig parseProxy(Map<String, String> properties) throws SQLException {
+	private static TransportConfig parseTransport(Map<String, String> properties) throws SQLException {
 		Integer proxyPort = parseInteger(properties, "proxyPort");
 		try {
-			return ProxyConfig.resolve(properties.get("proxyHost"), proxyPort, properties.get("proxyUser"),
+			ProxyConfig proxy = ProxyConfig.resolve(properties.get("proxyHost"), proxyPort, properties.get("proxyUser"),
 					properties.get("proxyPassword"));
+			TlsConfig tls = TlsConfig.resolve(properties.get("trustStore"), properties.get("trustStorePassword"),
+					properties.get("trustStoreType"), properties.get("trustStoreProvider"));
+			return TransportConfig.of(proxy, tls);
 		} catch (IllegalArgumentException e) {
-			throw new SQLException("Invalid proxy configuration: " + e.getMessage(), e);
+			throw new SQLException("Invalid transport configuration: " + e.getMessage(), e);
 		}
 	}
 

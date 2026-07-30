@@ -121,7 +121,8 @@ class ProxiedCredentialsTest {
 	@Test
 	void anAuthenticatedProxyIsAnsweredWithProxyAuthorization() throws Exception {
 		try (RecordingProxyServer proxy = RecordingProxyServer.requiringAuth("proxy-user", "proxy-secret")) {
-			ProxyConfig config = new ProxyConfig("localhost", proxy.port(), "proxy-user", "proxy-secret");
+			TransportConfig config = TransportConfig
+					.of(new ProxyConfig("localhost", proxy.port(), "proxy-user", "proxy-secret"), null);
 			GoogleCredentials credentials = (GoogleCredentials) CredentialsCache
 					.forAuthType(new UserOAuthAuth("client-id", "client-secret", "refresh-token"), config);
 
@@ -144,7 +145,7 @@ class ProxiedCredentialsTest {
 	 * Builds credentials routed through {@code proxy}, the way a connection does.
 	 */
 	private static GoogleCredentials credentialsFor(AuthType authType, RecordingProxyServer proxy) throws IOException {
-		ProxyConfig config = new ProxyConfig("localhost", proxy.port(), null, null);
+		TransportConfig config = TransportConfig.of(new ProxyConfig("localhost", proxy.port(), null, null), null);
 		return (GoogleCredentials) CredentialsCache.forAuthType(authType, config);
 	}
 

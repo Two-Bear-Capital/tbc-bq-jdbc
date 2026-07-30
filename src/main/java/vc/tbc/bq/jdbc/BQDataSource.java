@@ -579,6 +579,99 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	}
 
 	/**
+	 * Returns the truststore TLS is verified against.
+	 *
+	 * @return the truststore path, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStore() {
+		return get("trustStore");
+	}
+
+	/**
+	 * Sets a truststore holding the certificate authorities to verify TLS against.
+	 *
+	 * <p>
+	 * For a network whose egress is re-signed by a private CA, which otherwise
+	 * fails with {@code PKIX path building failed}. Replaces the JDK's trust
+	 * anchors rather than adding to them. Leaving this unset falls back to the
+	 * JVM's {@code javax.net.ssl.trustStore}.
+	 *
+	 * @param trustStore
+	 *            the truststore path, or null to use the JDK's own
+	 * @since 4.3.0
+	 */
+	public void setTrustStore(String trustStore) {
+		set("trustStore", trustStore);
+	}
+
+	/**
+	 * Returns the password for the store set by {@link #setTrustStore(String)}.
+	 *
+	 * @return the truststore password, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStorePassword() {
+		return get("trustStorePassword");
+	}
+
+	/**
+	 * Sets the password protecting the store set by {@link #setTrustStore(String)}.
+	 *
+	 * @param trustStorePassword
+	 *            the truststore password, or null for an unprotected store
+	 * @since 4.3.0
+	 */
+	public void setTrustStorePassword(String trustStorePassword) {
+		set("trustStorePassword", trustStorePassword);
+	}
+
+	/**
+	 * Returns the format of the store set by {@link #setTrustStore(String)}.
+	 *
+	 * @return the truststore type, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStoreType() {
+		return get("trustStoreType");
+	}
+
+	/**
+	 * Sets the format of the store set by {@link #setTrustStore(String)}, such as
+	 * {@code JKS} or {@code PKCS12}.
+	 *
+	 * @param trustStoreType
+	 *            the truststore type, or null for the JVM default
+	 * @since 4.3.0
+	 */
+	public void setTrustStoreType(String trustStoreType) {
+		set("trustStoreType", trustStoreType);
+	}
+
+	/**
+	 * Returns the JCE provider the store set by {@link #setTrustStore(String)} is
+	 * loaded through.
+	 *
+	 * @return the provider name, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStoreProvider() {
+		return get("trustStoreProvider");
+	}
+
+	/**
+	 * Sets the JCE provider to load the store set by {@link #setTrustStore(String)}
+	 * through.
+	 *
+	 * @param trustStoreProvider
+	 *            the provider name, or null for the standard search order
+	 * @since 4.3.0
+	 */
+	public void setTrustStoreProvider(String trustStoreProvider) {
+		set("trustStoreProvider", trustStoreProvider);
+	}
+
+	/**
 	 * Returns the additional projects reported by {@code getCatalogs()}.
 	 *
 	 * @return a comma-separated project list, or null if unset

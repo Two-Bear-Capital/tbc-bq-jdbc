@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.auth;
 import com.google.auth.Credentials;
 import com.google.auth.http.HttpTransportFactory;
 import vc.tbc.bq.jdbc.transport.DriverTransports;
+import vc.tbc.bq.jdbc.transport.TransportConfig;
 
 import java.io.IOException;
 
@@ -48,7 +49,7 @@ public sealed interface AuthType permits ServiceAccountAuth, ApplicationDefaultA
 	 *             if credentials cannot be created
 	 */
 	default Credentials toCredentials() throws IOException {
-		return toCredentials(DriverTransports.forProxy(null));
+		return toCredentials(DriverTransports.forTransport(TransportConfig.direct()));
 	}
 
 	/**
@@ -64,7 +65,7 @@ public sealed interface AuthType permits ServiceAccountAuth, ApplicationDefaultA
 	 *
 	 * @param transportFactory
 	 *            the transport to fetch and refresh tokens over, from
-	 *            {@link DriverTransports#forProxy}
+	 *            {@link DriverTransports#forTransport}
 	 * @return the Google Cloud credentials
 	 * @throws IOException
 	 *             if credentials cannot be created

@@ -835,9 +835,9 @@ class ConnectionUrlParserTest {
 
 		// Then: The proxy is resolved, and is not confused with the 'host' property
 		// that says where BigQuery itself is
-		assertEquals("proxy.example.com", props.proxy().host());
-		assertEquals(3128, props.proxy().port());
-		assertFalse(props.proxy().isAuthenticated());
+		assertEquals("proxy.example.com", props.transport().proxy().host());
+		assertEquals(3128, props.transport().proxy().port());
+		assertFalse(props.transport().proxy().isAuthenticated());
 		assertNull(props.host());
 	}
 
@@ -848,16 +848,16 @@ class ConnectionUrlParserTest {
 
 		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
 
-		assertTrue(props.proxy().isAuthenticated());
-		assertEquals("someone", props.proxy().user());
-		assertEquals("secret", props.proxy().password());
+		assertTrue(props.transport().proxy().isAuthenticated());
+		assertEquals("someone", props.transport().proxy().user());
+		assertEquals("secret", props.transport().proxy().password());
 	}
 
 	@Test
 	void testNoProxyPropertiesMeansNoProxy() throws SQLException {
 		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project", null);
 
-		assertNull(props.proxy());
+		assertNull(props.transport().proxy());
 	}
 
 	@Test
@@ -868,5 +868,48 @@ class ConnectionUrlParserTest {
 				() -> ConnectionUrlParser.parse("jdbc:bigquery:my-project?proxyHost=proxy.example.com", null));
 
 		assertTrue(e.getMessage().contains("proxyPort"), e.getMessage());
+	}
+
+	@Test
+	void testTrustStorePropertiesAreParsed() throws SQLException {
+		String url = "jdbc:bigquery:my-project?trustStore=/etc/pki/corp.p12&trustStorePassword=secret"
+				+ "&trustStoreType=PKCS12&trustStoreProvider=SunJSSE";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertEquals("/etc/pki/corp.p12", props.transport().tls().path());
+		assertEquals("secret", props.transport().tls().password());
+		assertEquals("PKCS12", props.transport().tls().type());
+		assertEquals("SunJSSE", props.transport().tls().provider());
+	}
+
+	@Test
+	void testAProxyAndATrustStoreShareOneTransport() throws SQLException {
+		// A TLS-inspecting proxy is the case that needs both, so they must land on
+		// one transport rather than each own one
+		String url = "jdbc:bigquery:my-project?proxyHost=proxy.example.com&proxyPort=3128"
+				+ "&trustStore=/etc/pki/corp.p12";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertEquals("proxy.example.com", props.transport().proxy().host());
+		assertEquals("/etc/pki/corp.p12", props.transport().tls().path());
+		assertFalse(props.transport().isDefault());
+	}
+
+	@Test
+	void testNoTransportPropertiesMeansTheDefaultTransport() throws SQLException {
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project", null);
+
+		assertTrue(props.transport().isDefault());
+		assertNull(props.transport().tls());
+	}
+
+	@Test
+	void testATrustStorePasswordWithoutAStoreIsASQLException() {
+		SQLException e = assertThrows(SQLException.class,
+				() -> ConnectionUrlParser.parse("jdbc:bigquery:my-project?trustStorePassword=secret", null));
+
+		assertTrue(e.getMessage().contains("trustStore"), e.getMessage());
 	}
 }

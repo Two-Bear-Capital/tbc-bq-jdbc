@@ -18,7 +18,7 @@ package vc.tbc.bq.jdbc.testsupport;
 import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
 import vc.tbc.bq.jdbc.auth.AuthType;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
-import vc.tbc.bq.jdbc.transport.ProxyConfig;
+import vc.tbc.bq.jdbc.transport.TransportConfig;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -79,7 +79,7 @@ public final class TestConnectionProperties {
 	private Boolean metadataIncludeDescriptions;
 	private Boolean collapseShardedTables;
 	private Integer batchLoadThreshold;
-	private ProxyConfig proxy;
+	private TransportConfig transport;
 
 	private TestConnectionProperties() {
 	}
@@ -230,8 +230,8 @@ public final class TestConnectionProperties {
 		return this;
 	}
 
-	public TestConnectionProperties proxy(ProxyConfig value) {
-		this.proxy = value;
+	public TestConnectionProperties transport(TransportConfig value) {
+		this.transport = value;
 		return this;
 	}
 
@@ -251,6 +251,7 @@ public final class TestConnectionProperties {
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
-				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, null, null, null, null, proxy);
+				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, null, null, null, null,
+				transport);
 	}
 }
