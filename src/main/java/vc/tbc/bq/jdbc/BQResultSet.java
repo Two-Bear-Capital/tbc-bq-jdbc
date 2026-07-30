@@ -487,72 +487,12 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		});
 	}
 
-	@Override
-	public String getString(String columnLabel) throws SQLException {
-		return getString(findColumn(columnLabel));
-	}
+	// The label-based getters (getString(String), getInt(String), …) are inherited
+	// from BaseReadOnlyResultSet, which already delegates each one to its
+	// index-based form via findColumn(). Re-declaring them here duplicated the base
+	// class verbatim; the inherited versions dispatch virtually to the index-based
+	// getters this class overrides, so the behaviour is identical either way.
 
-	@Override
-	public boolean getBoolean(String columnLabel) throws SQLException {
-		return getBoolean(findColumn(columnLabel));
-	}
-
-	@Override
-	public byte getByte(String columnLabel) throws SQLException {
-		return getByte(findColumn(columnLabel));
-	}
-
-	@Override
-	public short getShort(String columnLabel) throws SQLException {
-		return getShort(findColumn(columnLabel));
-	}
-
-	@Override
-	public int getInt(String columnLabel) throws SQLException {
-		return getInt(findColumn(columnLabel));
-	}
-
-	@Override
-	public long getLong(String columnLabel) throws SQLException {
-		return getLong(findColumn(columnLabel));
-	}
-
-	@Override
-	public float getFloat(String columnLabel) throws SQLException {
-		return getFloat(findColumn(columnLabel));
-	}
-
-	@Override
-	public double getDouble(String columnLabel) throws SQLException {
-		return getDouble(findColumn(columnLabel));
-	}
-
-	@Deprecated
-	@SuppressWarnings("deprecation")
-	@Override
-	public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
-		return getBigDecimal(findColumn(columnLabel), scale);
-	}
-
-	@Override
-	public byte[] getBytes(String columnLabel) throws SQLException {
-		return getBytes(findColumn(columnLabel));
-	}
-
-	@Override
-	public Date getDate(String columnLabel) throws SQLException {
-		return getDate(findColumn(columnLabel));
-	}
-
-	@Override
-	public Time getTime(String columnLabel) throws SQLException {
-		return getTime(findColumn(columnLabel));
-	}
-
-	@Override
-	public Timestamp getTimestamp(String columnLabel) throws SQLException {
-		return getTimestamp(findColumn(columnLabel));
-	}
 	@Override
 	public ResultSetMetaData getMetaData() throws SQLException {
 		checkClosed();
@@ -575,11 +515,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 			}
 		}
 		return FieldValueConverter.toObject(value, field);
-	}
-
-	@Override
-	public Object getObject(String columnLabel) throws SQLException {
-		return getObject(findColumn(columnLabel));
 	}
 
 	@Override
@@ -625,11 +560,6 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
 		FieldValue value = getFieldValue(columnIndex);
 		return value.isNull() ? null : convert(columnIndex, "BigDecimal", value::getNumericValue);
-	}
-
-	@Override
-	public BigDecimal getBigDecimal(String columnLabel) throws SQLException {
-		return getBigDecimal(findColumn(columnLabel));
 	}
 
 	@Override
