@@ -397,38 +397,73 @@ class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("a query with unsupported types falls back and still returns rows")
-	void unsupportedTypesFallBackToRest() throws SQLException {
-		// RANGE, not ARRAY or STRUCT: those two moved onto the Storage path in #193,
-		// and this test asserted their fallback until then. The fallback itself still
-		// has to work, so the assertion moves to a type that is still outside the
-		// converter's remit rather than being deleted with the limitation.
+	@DisplayName("a RANGE column takes the Storage path and matches REST cell for cell")
+	void rangeColumnsMatchAcrossPaths() throws SQLException {
+		// RANGE was the last type outside the converter, and this class asserted its
+		// fallback until #231. What made it unencodable was the absence of a shared
+		// FieldValue shape — getString on a RANGE threw, so there was nothing for the
+		// converter to reproduce. #238 settled the REST path on the [start, end)
+		// literal, and the converter now produces a FieldValue holding a Range just
+		// as REST does, so the usual string comparison applies with no exemption.
+		String sql = "SELECT RANGE(DATE '2020-01-01', DATE '2020-12-31') AS bounded, "
+				+ "RANGE<DATE>'[2020-01-01, UNBOUNDED)' AS open_ended, "
+				+ "RANGE<TIMESTAMP>'[2020-01-01 00:00:00+00, 2021-01-01 00:00:00+00)' AS stamped, "
+				+ "CAST(NULL AS RANGE<DATE>) AS absent FROM UNNEST([1]) AS i";
+
+		List<List<String>> viaRest = readAllAsStrings(restConnection(), sql);
+		List<List<String>> viaStorage = readAllAsStrings(storageConnection(), sql);
+
+		assertEquals(viaRest.size(), viaStorage.size(), "row count differs between the two paths");
+		assertFalse(viaRest.isEmpty(), "fixture produced no rows");
+		for (int row = 0; row < viaRest.size(); row++) {
+			for (int col = 0; col < viaRest.get(row).size(); col++) {
+				assertCellsMatch(viaRest.get(row).get(col), viaStorage.get(row).get(col),
+						"row " + row + ", column " + (col + 1));
+			}
+		}
+	}
+
+	@Test
+	@DisplayName("a RANGE column no longer forces the REST path")
+	void rangeColumnsUseTheStoragePath() throws SQLException {
 		try (Connection conn = storageConnection();
 				Statement stmt = conn.createStatement();
 				ResultSet rs = stmt.executeQuery(
 						"SELECT RANGE(DATE '2020-01-01', DATE '2020-12-31') AS r FROM UNNEST([1]) AS i")) {
 
-			assertEquals("vc.tbc.bq.jdbc.BQResultSet", rs.getClass().getName(),
-					"unsupported column types must fall back to the REST path");
+			// Before #231 this asserted BQResultSet, which was the fallback working.
+			assertEquals("vc.tbc.bq.jdbc.storage.StorageReadResultSet", rs.getClass().getName(),
+					"a RANGE column should now take the Storage Read API path");
 			assertTrue(rs.next());
-			// getObject, not getString: the REST path hands a RANGE back as a Range
-			// object, which is the point -- it has no string encoding to compare.
 			assertNotNull(rs.getObject("r"));
 		}
 	}
 
 	@Test
-	@DisplayName("one unsupported column sends the whole result to REST, complex columns included")
-	void oneUnsupportedColumnDisqualifiesTheWholeResult() throws SQLException {
-		// The path is all-or-nothing per result, and a struct now hides the reason
-		// three levels down: this checks the recursive support test actually recurses.
+	@DisplayName("a RANGE three levels down no longer disqualifies the result")
+	void nestedRangeTakesTheStoragePath() throws SQLException {
+		// This asserted the opposite until #231: a RANGE inside an ARRAY<STRUCT<...>>
+		// used to disqualify the whole result, and the point was that the recursive
+		// support check found the reason three levels down. The recursion still has
+		// to work — it now has to say yes.
+		//
+		// No cell comparison, unlike the top-level test above: getString on a RANGE
+		// nested inside a STRUCT throws ClassCastException on *both* paths. That is a
+		// REST-path defect older than this change — #238 taught getString about a
+		// top-level Range and the nested renderer never learned — so it is filed
+		// separately rather than widened into this one.
+		//
+		// Note also that no BigQuery type is now rejected by the converter, so the
+		// all-or-nothing fallback can no longer be provoked by a real query. The
+		// mechanism is unchanged and still rejects an unknown type; it is simply
+		// unreachable from SQL now that RANGE is the last one in.
 		try (Connection conn = storageConnection();
 				Statement stmt = conn.createStatement();
 				ResultSet rs = stmt.executeQuery("SELECT [STRUCT(1 AS n, "
 						+ "RANGE(DATE '2020-01-01', DATE '2020-12-31') AS r)] AS a FROM UNNEST([1]) AS i")) {
 
-			assertEquals("vc.tbc.bq.jdbc.BQResultSet", rs.getClass().getName(),
-					"a RANGE nested inside an ARRAY<STRUCT<...>> must still disqualify the result");
+			assertEquals("vc.tbc.bq.jdbc.storage.StorageReadResultSet", rs.getClass().getName(),
+					"a nested RANGE should no longer disqualify the result");
 			assertTrue(rs.next());
 		}
 	}
