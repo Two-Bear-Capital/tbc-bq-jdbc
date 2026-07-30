@@ -165,8 +165,27 @@ jobs:
             exit 1
           fi
           echo "BQ_TEST_PROJECT is set (${#BQ_TEST_PROJECT} chars)"
+
+          # Same reasoning, for the impersonation fixtures. RealImpersonationTest
+          # is gated on these because a maintainer running locally has no
+          # serviceAccountTokenCreator on them, so the class must be able to skip
+          # off-CI. On CI it must not: these are the only tests that reach the IAM
+          # generateAccessToken call, and nothing else can prove impersonation
+          # works. Values come from the Terraform outputs
+          # impersonation_target_service_account and
+          # impersonation_delegate_service_account.
+          for name in BQ_TEST_IMPERSONATE_SA BQ_TEST_IMPERSONATE_DELEGATE; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is empty or unset. RealImpersonationTest would" \
+                   "silently skip, leaving impersonation untested."
+              exit 1
+            fi
+            echo "$name is set"
+          done
         env:
           BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
+          BQ_TEST_IMPERSONATE_SA: ${{ secrets.BQ_TEST_IMPERSONATE_SA }}
+          BQ_TEST_IMPERSONATE_DELEGATE: ${{ secrets.BQ_TEST_IMPERSONATE_DELEGATE }}
 
       # One Maven invocation, integration tests only. `./mvnw clean install` followed
       # by `./mvnw verify` built the shaded JARs and javadoc twice and re-ran the
@@ -196,20 +215,14 @@ jobs:
         env:
           BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
           BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
-          # Impersonation fixtures (#197). Unlike BQ_TEST_PROJECT these are not
-          # pre-flight checked: the service accounts are created by terraform/,
-          # which only applies on main, so RealImpersonationTest has to be able to
-          # skip on a release branch that has not reached main yet. Set both
-          # secrets once `terraform apply` has run, from the
-          # impersonation_target_service_account and
-          # impersonation_delegate_service_account outputs.
+          # Impersonation fixtures (#197). Required in CI and checked before the
+          # run below, because RealImpersonationTest skips without them and a
+          # skipped class reports green having verified nothing. Local runs may
+          # leave them unset — no human holds serviceAccountTokenCreator on the
+          # fixtures unless they name themselves in the
+          # impersonation_source_principals Terraform variable.
           BQ_TEST_IMPERSONATE_SA: ${{ secrets.BQ_TEST_IMPERSONATE_SA }}
           BQ_TEST_IMPERSONATE_DELEGATE: ${{ secrets.BQ_TEST_IMPERSONATE_DELEGATE }}
-          # Table snapshot fixtures (#187). Same reason as above: the grant that
-          # allows them (dataOwner on the test dataset) is applied by terraform/,
-          # which only runs on main. Set this secret to any non-empty value once
-          # it has. See #252.
-          BQ_TEST_SNAPSHOT_FIXTURES: ${{ secrets.BQ_TEST_SNAPSHOT_FIXTURES }}
           TZ: Asia/Kolkata
 
       # Second half of the same guard: the pre-flight check proves the secret is set,

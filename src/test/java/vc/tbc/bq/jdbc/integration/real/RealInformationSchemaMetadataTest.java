@@ -153,24 +153,22 @@ class RealInformationSchemaMetadataTest extends AbstractRealBigQueryIntegrationT
 	}
 
 	@Test
-	void testGetColumnsOnAProjectScopedViewDegradesRatherThanFailing() throws SQLException {
-		// Given: A project-scoped view. Unlike the dataset scope, reading one needs
-		// a project-level role, and the identity running this suite may not hold it
-		// — CI's service account has bigquery.jobUser and dataset-scoped dataEditor
-		// and nothing wider. Asserting the columns are present would be asserting
-		// the grader's IAM, so this asserts the contract that holds either way.
-		//
-		// #248 strengthens this to the same column assertions the dataset-scoped
-		// test makes, once the CI service account has roles/bigquery.metadataViewer.
+	void testGetColumnsDescribesAProjectScopedView() throws SQLException {
+		// When: Asking for a project-scoped view's columns
 		try (ResultSet rs = connection.getMetaData().getColumns(null, INFORMATION_SCHEMA, "SCHEMATA", null)) {
-
-			// Then: A view the caller cannot read contributes no columns, and must
-			// not fail the call — the listing still reports it, because a view you
-			// cannot read is not a view that does not exist
+			List<String> columns = new ArrayList<>();
 			while (rs.next()) {
 				assertEquals(INFORMATION_SCHEMA, rs.getString("TABLE_SCHEM"));
 				assertEquals("SCHEMATA", rs.getString("TABLE_NAME"));
+				columns.add(rs.getString("COLUMN_NAME"));
 			}
+
+			// Then: Its real columns, resolved from the service by a dry run rather
+			// than a hard-coded list. Reading a project-scoped view needs a
+			// project-level role, so this can only be asserted where the caller has
+			// one — CI's service account holds roles/bigquery.metadataViewer (#248)
+			assertTrue(columns.contains("schema_name"), columns.toString());
+			assertTrue(columns.contains("catalog_name"), columns.toString());
 		}
 	}
 

@@ -16,9 +16,11 @@
 package vc.tbc.bq.jdbc.storage;
 
 import com.google.cloud.bigquery.Field;
+import com.google.cloud.bigquery.FieldElementType;
 import com.google.cloud.bigquery.FieldList;
 import com.google.cloud.bigquery.FieldValue;
 import com.google.cloud.bigquery.FieldValueList;
+import com.google.cloud.bigquery.Range;
 import com.google.cloud.bigquery.Schema;
 import com.google.cloud.bigquery.StandardSQLTypeName;
 import org.apache.arrow.vector.FieldVector;
@@ -107,15 +109,21 @@ final class ArrowRowConverter {
 	 * <p>
 	 * ARRAY and STRUCT are handled by recursion rather than by a type of their own:
 	 * a repeated field's mode and a struct's subfields say what to do, and the
-	 * element type still has to appear here. {@code RANGE} is the one composite
-	 * type left out, having no {@code FieldValue} shape the REST path agrees on.
+	 * element type still has to appear here.
+	 *
+	 * <p>
+	 * {@code RANGE} was the last one left out, for want of a {@code FieldValue}
+	 * shape the REST path agreed on — {@code getString} on one used to throw. Once
+	 * the REST path settled on the {@code [start, end)} literal (#238), the shape
+	 * to reproduce existed: a {@code FieldValue} holding a {@link Range}, which
+	 * both paths then render through the same code.
 	 */
 	private static final Set<StandardSQLTypeName> SUPPORTED = EnumSet.of(StandardSQLTypeName.INT64,
 			StandardSQLTypeName.FLOAT64, StandardSQLTypeName.NUMERIC, StandardSQLTypeName.BIGNUMERIC,
 			StandardSQLTypeName.BOOL, StandardSQLTypeName.STRING, StandardSQLTypeName.BYTES, StandardSQLTypeName.DATE,
 			StandardSQLTypeName.TIME, StandardSQLTypeName.DATETIME, StandardSQLTypeName.TIMESTAMP,
 			StandardSQLTypeName.GEOGRAPHY, StandardSQLTypeName.JSON, StandardSQLTypeName.INTERVAL,
-			StandardSQLTypeName.STRUCT);
+			StandardSQLTypeName.STRUCT, StandardSQLTypeName.RANGE);
 
 	private final FieldList fields;
 
@@ -154,6 +162,20 @@ final class ArrowRowConverter {
 		StandardSQLTypeName type = field.getType() == null ? null : field.getType().getStandardType();
 		if (type == null || !SUPPORTED.contains(type)) {
 			return false;
+		}
+		if (type == StandardSQLTypeName.RANGE) {
+			// A range's support is its element type's. BigQuery allows only DATE,
+			// DATETIME and TIMESTAMP, all three of which encode, but reading the
+			// declared type rather than assuming keeps this honest if that widens.
+			FieldElementType element = field.getRangeElementType();
+			if (element == null || element.getType() == null) {
+				return false;
+			}
+			try {
+				return SUPPORTED.contains(StandardSQLTypeName.valueOf(element.getType()));
+			} catch (IllegalArgumentException e) {
+				return false;
+			}
 		}
 		FieldList subFields = field.getSubFields();
 		if (type == StandardSQLTypeName.STRUCT) {
@@ -224,6 +246,9 @@ final class ArrowRowConverter {
 		if (field.getType().getStandardType() == StandardSQLTypeName.STRUCT) {
 			return FieldValue.of(FieldValue.Attribute.RECORD, structMembers(vector, rowIndex, field));
 		}
+		if (field.getType().getStandardType() == StandardSQLTypeName.RANGE) {
+			return FieldValue.of(FieldValue.Attribute.PRIMITIVE, range(vector, rowIndex, field));
+		}
 		Object raw = vector.getObject(rowIndex);
 		StandardSQLTypeName type = field.getType().getStandardType();
 		return FieldValue.of(FieldValue.Attribute.PRIMITIVE, encode(raw, type, field));
@@ -276,6 +301,57 @@ final class ArrowRowConverter {
 		// With the schema attached, getRecordValue() can be indexed by name, which
 		// is what FieldValueConverter does when rendering a struct.
 		return FieldValueList.of(values, subFields);
+	}
+
+	/**
+	 * Reads a RANGE, which Arrow delivers as a struct of {@code start} and
+	 * {@code end}.
+	 *
+	 * <p>
+	 * The result is a {@link Range} rather than a string, which is the whole point:
+	 * the REST path's {@code FieldValue} holds one too, so
+	 * {@code FieldValueConverter} renders both paths through the same code and
+	 * {@code StorageApiParityTest} needs no exemption for this type. Encoding a
+	 * literal here instead would put a second renderer in the driver and invite the
+	 * two to drift.
+	 *
+	 * <p>
+	 * Endpoints go through {@link #encode} as the range's element type, so a
+	 * TIMESTAMP bound is canonicalised the same way a TIMESTAMP column is. An
+	 * absent bound is left unset, which is how the client represents
+	 * {@code UNBOUNDED}.
+	 */
+	private static Range range(FieldVector vector, int rowIndex, Field field) throws SQLException {
+		if (!(vector instanceof StructVector struct)) {
+			throw unexpected(field, vector, "a struct vector");
+		}
+		FieldElementType element = field.getRangeElementType();
+		StandardSQLTypeName elementType = StandardSQLTypeName.valueOf(element.getType());
+
+		Range.Builder builder = Range.newBuilder().setType(element);
+		builder.setStart(rangeBound(struct, rowIndex, field, "start", elementType));
+		builder.setEnd(rangeBound(struct, rowIndex, field, "end", elementType));
+		return builder.build();
+	}
+
+	/**
+	 * One endpoint of a range, or null when the bound is absent.
+	 *
+	 * @return the encoded bound as the client's builder wants it, or null for
+	 *         {@code UNBOUNDED}
+	 */
+	private static String rangeBound(StructVector struct, int rowIndex, Field field, String name,
+			StandardSQLTypeName elementType) throws SQLException {
+		FieldVector child = struct.getChild(name);
+		if (child == null) {
+			throw new BQSQLException(
+					"Storage Read API returned no '" + name + "' bound inside RANGE column '" + field.getName() + "'");
+		}
+		if (child.isNull(rowIndex)) {
+			return null;
+		}
+		Object encoded = encode(child.getObject(rowIndex), elementType, field);
+		return encoded == null ? null : encoded.toString();
 	}
 
 	/**

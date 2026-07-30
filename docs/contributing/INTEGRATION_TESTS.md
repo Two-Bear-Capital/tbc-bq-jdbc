@@ -76,13 +76,20 @@ variable — CI's service account already has the grant. Without it the tests fa
 on the first statement with `Error requesting access token (HTTP 403: Permission
 'iam.serviceAccounts.getAccessToken' denied …)`.
 
+**These are the only tests that reach the IAM `generateAccessToken` call**, so
+nothing else can show impersonation works. The class is gated so a local run
+without the grant skips rather than fails — which means CI must not be allowed to
+skip it quietly: `build.yml` fails the job before running anything if either
+variable is unset, the same two-sided guard `BQ_TEST_PROJECT` has.
+
 ### Table snapshot tests
 
 `RealTableTypeMetadataTest` creates a real table snapshot, which needs
 `bigquery.tables.createSnapshot` and `deleteSnapshot` —
-`roles/bigquery.dataEditor` does not carry them. Set `BQ_TEST_SNAPSHOT_FIXTURES`
-to any non-empty value to enable it. A maintainer running the suite under their
-own credentials on the Terraform-provisioned project already has the access.
+`roles/bigquery.dataEditor` does not carry them. No configuration is needed: CI's
+service account has `roles/bigquery.dataOwner` on the test dataset, and a
+maintainer running under their own credentials on the Terraform-provisioned
+project already has the access.
 
 ## Running
 
@@ -189,6 +196,8 @@ that job.
 | `WIF_SERVICE_ACCOUNT` | Terraform output `ci_service_account_email` |
 | `BQ_TEST_PROJECT` | Terraform output `project_id` |
 | `BQ_TEST_DATASET` | Terraform output `dataset_id` |
+| `BQ_TEST_IMPERSONATE_SA` | Terraform output `impersonation_target_service_account` |
+| `BQ_TEST_IMPERSONATE_DELEGATE` | Terraform output `impersonation_delegate_service_account` |
 | `GCP_TERRAFORM_SA_KEY` | Bootstrap SA key, used by `terraform.yml` only |
 
 ## Infrastructure
