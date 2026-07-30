@@ -2,7 +2,7 @@
 
 What works, what doesn't, and how to work around BigQuery's constraints.
 
-**Specification:** JDBC 4.3 (Java 21+) · **Compliance:** partial. `Driver.jdbcCompliant()` returns `false`. BigQuery enforces no keys, has no indexes, and supports no savepoints, configurable isolation levels, updatable result sets, or `CallableStatement`.
+**Specification:** JDBC 4.3 (Java 21+) · **Compliance:** partial. `Driver.jdbcCompliant()` returns `false`. BigQuery enforces no keys, has no indexes, and supports no savepoints, configurable isolation levels or updatable result sets. `CallableStatement` is unimplemented by choice rather than prevented — see [below](#callablestatement).
 
 **Legend** — used in every support table below:
 
@@ -164,7 +164,7 @@ while (rs.next()) {
 
 | Feature | Support | Workaround |
 |---------|:------:|------------|
-| `CallableStatement`, stored procedures | ❌ | Use standard queries / scripting |
+| `CallableStatement` | ❌ | A driver decision, not a BigQuery limit — see [below](#callablestatement). Call a procedure with `CALL my_dataset.my_proc(…)` through an ordinary `Statement` |
 | Generated keys (`getGeneratedKeys()`) | ❌ | Query the table after INSERT |
 | Named cursors | ❌ | Forward-only iteration |
 | `getMoreResults()` / `getMoreResults(int)` | ✅ | Walks a multi-statement script's results — [see below](#multi-statement-script-results) |
@@ -384,6 +384,36 @@ to that scope scan the whole organisation's job history.
 
 Set `includeInformationSchema=false` to turn all of this off.
 
+### CallableStatement
+
+Not implemented, and **not because BigQuery cannot do it.** BigQuery has stored procedures,
+`CALL my_dataset.my_proc(…)` is valid GoogleSQL, and procedures take `OUT` and `INOUT`
+arguments — the thing `CallableStatement` exists for. The driver already reads procedures
+and their parameter modes from `INFORMATION_SCHEMA` for `getProcedures()` and
+`getProcedureColumns()`.
+
+It is unimplemented because the interface is wide — `registerOutParameter` across every
+type, named parameters, and reading values back after execution — and BigQuery returns `OUT`
+values through the script's result rather than through a separate protocol, so the mapping
+needs designing before any of it is written. That work has not been done.
+
+**What to do instead.** Call a procedure through an ordinary `Statement`:
+
+```java
+try (Statement stmt = conn.createStatement()) {
+    stmt.execute("CALL my_dataset.my_proc('arg')");
+}
+```
+
+A procedure that returns rows produces them as a script result, reachable with
+`getMoreResults()` — see [multi-statement script results](#multi-statement-script-results).
+For `OUT` values, have the procedure `SELECT` them, or write them to a temp table and query
+it in the same session.
+
+Tracked as [#199](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/199), deliberately
+on no milestone. `prepareCall()` throws `SQLFeatureNotSupportedException` rather than
+silently misbehaving.
+
 ### Unenforced primary and foreign keys
 
 BigQuery accepts declarative key constraints, but only as `NOT ENFORCED`:
@@ -448,7 +478,7 @@ Things worth knowing:
 | `CREATE TABLE` / `DROP TABLE` | ✅ | Via DDL |
 | `CREATE VIEW` | ✅ | Via DDL |
 | `ALTER TABLE` | ⚠️ | Limited to the column operations BigQuery supports |
-| `CREATE PROCEDURE` / `CREATE FUNCTION` | ✅ | Executed as DDL like any other statement. `getProcedures()` lists the results; `CallableStatement` is not supported |
+| `CREATE PROCEDURE` / `CREATE FUNCTION` | ✅ | Executed as DDL like any other statement. `getProcedures()` lists the results; call one with `CALL` through a `Statement` rather than a `CallableStatement` |
 | `CREATE SEARCH INDEX` / `CREATE VECTOR INDEX` | ✅ | Executed as DDL. BigQuery has no B-tree indexes, and `getIndexInfo()` always returns empty |
 | `CREATE TRIGGER` | ❌ | Not supported in BigQuery |
 
