@@ -123,9 +123,6 @@ What remains genuinely undone in this driver, as a decision rather than a BigQue
 - `CallableStatement` — BigQuery has stored procedures and `OUT` parameters, so this is
   buildable; it is
   [tracked and deliberately not started](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/199)
-- a `RANGE` column sends its result down the REST path rather than the faster Storage Read
-  API path ([#231](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/231)); the query
-  is correct either way
 
 Anything else is on the
 [issue list](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement).

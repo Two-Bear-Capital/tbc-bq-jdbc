@@ -90,8 +90,9 @@ CI runs `./mvnw spotless:check` and it must pass.
   `FieldValueConverter.rangeLiteral` and parity needs no exemption. Encoding a literal here
   instead would put a second renderer in the driver. It became encodable only once #238 gave
   the REST path a string form to reproduce — before that `getString` on a RANGE threw
-- `getString` on a RANGE **nested** inside a STRUCT or ARRAY still throws on both paths
-  (#260); that is a REST-path gap #238 left, not a Storage one
+- A RANGE renders the same literal nested inside a STRUCT or ARRAY as it does as a column;
+  the nested renderer shares `rangeLiteral` with the top-level one (#260), which #238 had
+  left behind
 - **ARRAY/STRUCT recurse against the BigQuery schema, never `vector.getObject()`.** Arrow
   hands back a `JsonStringArrayList`/`JsonStringHashMap` whose `toString()` looks like
   JSON; using it would render every nested scalar Arrow's way instead of this class's,

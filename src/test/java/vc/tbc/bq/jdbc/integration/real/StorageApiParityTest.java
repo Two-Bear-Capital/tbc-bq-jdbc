@@ -447,24 +447,36 @@ class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 		// support check found the reason three levels down. The recursion still has
 		// to work — it now has to say yes.
 		//
-		// No cell comparison, unlike the top-level test above: getString on a RANGE
-		// nested inside a STRUCT throws ClassCastException on *both* paths. That is a
-		// REST-path defect older than this change — #238 taught getString about a
-		// top-level Range and the nested renderer never learned — so it is filed
-		// separately rather than widened into this one.
+		// Cells are compared, not just the path: #260 taught the nested renderer
+		// about a Range, so getString works at depth and the exemption this test
+		// carried when it was written is gone.
 		//
-		// Note also that no BigQuery type is now rejected by the converter, so the
+		// Note that no BigQuery type is now rejected by the converter, so the
 		// all-or-nothing fallback can no longer be provoked by a real query. The
 		// mechanism is unchanged and still rejects an unknown type; it is simply
 		// unreachable from SQL now that RANGE is the last one in.
+		String sql = "SELECT [STRUCT(1 AS n, RANGE(DATE '2020-01-01', DATE '2020-12-31') AS r), "
+				+ "STRUCT(2 AS n, CAST(NULL AS RANGE<DATE>) AS r)] AS a, "
+				+ "STRUCT(RANGE<DATE>'[2020-01-01, UNBOUNDED)' AS rr) AS st FROM UNNEST([1]) AS i";
+
 		try (Connection conn = storageConnection();
 				Statement stmt = conn.createStatement();
-				ResultSet rs = stmt.executeQuery("SELECT [STRUCT(1 AS n, "
-						+ "RANGE(DATE '2020-01-01', DATE '2020-12-31') AS r)] AS a FROM UNNEST([1]) AS i")) {
-
+				ResultSet rs = stmt.executeQuery(sql)) {
 			assertEquals("vc.tbc.bq.jdbc.storage.StorageReadResultSet", rs.getClass().getName(),
 					"a nested RANGE should no longer disqualify the result");
 			assertTrue(rs.next());
+		}
+
+		List<List<String>> viaRest = readAllAsStrings(restConnection(), sql);
+		List<List<String>> viaStorage = readAllAsStrings(storageConnection(), sql);
+
+		assertEquals(viaRest.size(), viaStorage.size(), "row count differs between the two paths");
+		assertFalse(viaRest.isEmpty(), "fixture produced no rows");
+		for (int row = 0; row < viaRest.size(); row++) {
+			for (int col = 0; col < viaRest.get(row).size(); col++) {
+				assertCellsMatch(viaRest.get(row).get(col), viaStorage.get(row).get(col),
+						"row " + row + ", column " + (col + 1));
+			}
 		}
 	}
 
