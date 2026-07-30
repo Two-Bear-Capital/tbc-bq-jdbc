@@ -89,9 +89,9 @@ class RealShardedTableMetadataTest extends AbstractRealBigQueryIntegrationTest {
 			stmt.execute("CREATE OR REPLACE TABLE " + qualify(DECOY) + " " + EXPIRES + " AS SELECT 1 AS id");
 			stmt.execute("CREATE OR REPLACE TABLE " + qualify(LONE) + " " + EXPIRES + " AS SELECT 1 AS id");
 		}
-		collapsing = DriverManager.getConnection(
-				String.format("jdbc:bigquery:%s/%s?authType=ADC&collapseShardedTables=true&metadataCacheEnabled=false",
-						TEST_PROJECT_ID, TEST_DATASET));
+		collapsing = DriverManager.getConnection(String.format(
+				"jdbc:bigquery:%s/%s?authType=ADC&collapseShardedTables=true&metadataCacheEnabled=false%s",
+				TEST_PROJECT_ID, TEST_DATASET, TEST_CONNECTION_DEFAULTS));
 	}
 
 	@AfterAll

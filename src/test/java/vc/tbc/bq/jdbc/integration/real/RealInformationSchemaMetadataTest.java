@@ -203,8 +203,8 @@ class RealInformationSchemaMetadataTest extends AbstractRealBigQueryIntegrationT
 		// metadata cache is shared statically between connections, so this also
 		// covers the cache being keyed by the setting rather than by the project
 		// alone — without that, this connection is served the other one's rows
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&includeInformationSchema=false", TEST_PROJECT_ID,
-				TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&includeInformationSchema=false%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 
 		try (Connection optedOut = DriverManager.getConnection(url)) {
 			DatabaseMetaData metaData = optedOut.getMetaData();

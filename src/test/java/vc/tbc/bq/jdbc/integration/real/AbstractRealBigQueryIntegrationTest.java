@@ -123,6 +123,20 @@ public abstract class AbstractRealBigQueryIntegrationTest {
 	protected static final String TEST_CONNECTION_DEFAULTS = COST_CEILING + QUERY_TIMEOUT;
 
 	/**
+	 * The same two settings for a Simba-format URL, whose separator is {@code ;}.
+	 *
+	 * <p>
+	 * {@code Timeout} is deliberately Simba's spelling rather than the driver's
+	 * {@code timeout}. The Simba parser maps {@code Timeout} onto {@code timeout}
+	 * and passes unrecognised keys through under their own name, so a URL carrying
+	 * both spellings would put the same property twice from a {@code HashMap} whose
+	 * iteration order decides the winner. Using the spelling a test would override
+	 * with keeps the collision inside the URL, where the later value wins as
+	 * written. {@code maxBillingBytes} has no Simba spelling and passes through.
+	 */
+	protected static final String SIMBA_TEST_CONNECTION_DEFAULTS = ";maxBillingBytes=1073741824;Timeout=60";
+
+	/**
 	 * Returns a session-unique table name by appending {@link #RUN_ID} to the given
 	 * base name.
 	 *

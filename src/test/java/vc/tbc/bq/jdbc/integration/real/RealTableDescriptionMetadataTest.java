@@ -140,8 +140,8 @@ class RealTableDescriptionMetadataTest extends AbstractRealBigQueryIntegrationTe
 		// query each is felt. It must actually stop the read, which shows up as the
 		// description no longer arriving.
 		String url = String.format(
-				"jdbc:bigquery:%s/%s?authType=ADC&metadataIncludeDescriptions=false" + "&metadataCacheEnabled=false",
-				TEST_PROJECT_ID, TEST_DATASET);
+				"jdbc:bigquery:%s/%s?authType=ADC&metadataIncludeDescriptions=false&metadataCacheEnabled=false%s",
+				TEST_PROJECT_ID, TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 		try (Connection plain = DriverManager.getConnection(url)) {
 			assertEquals("", tableRemarks(plain).get(DESCRIBED_TABLE),
 					"with the property off, REMARKS goes back to empty");

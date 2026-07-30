@@ -517,4 +517,48 @@ class ConnectionUrlParserSimbaTest {
 		assertTrue(props.metadataLazyLoad());
 		assertTrue(props.enableQueryCostEstimation());
 	}
+
+	/**
+	 * A repeated Simba key takes its last value, which is what lets a caller append
+	 * an override to a URL that already carries a default.
+	 *
+	 * <p>
+	 * The real-tier harness relies on this: every Simba test URL now starts from a
+	 * shared {@code Timeout=60} and individual tests append their own
+	 * {@code Timeout=...} after it. Nothing pinned that precedence before, so this
+	 * is the test that stops a parser change from silently making the shared
+	 * default win instead.
+	 */
+	@Test
+	void testLaterOccurrenceOfARepeatedKeyWins() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3"
+				+ ";Timeout=60;Timeout=120";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertEquals(120, props.timeoutSeconds());
+	}
+
+	/**
+	 * The driver's own {@code timeout} spelling and Simba's {@code Timeout} both
+	 * land on the same property, and which of them wins is decided by a
+	 * {@code HashMap}'s iteration order rather than by the order they appear in the
+	 * URL. A caller must therefore pick one spelling and stay with it — the real
+	 * harness uses Simba's for exactly this reason.
+	 *
+	 * <p>
+	 * This asserts only that the value is one of the two, which is all that is
+	 * actually guaranteed; asserting a specific winner would pin behaviour the
+	 * implementation does not promise.
+	 */
+	@Test
+	void testMixingBothTimeoutSpellingsIsNotOrderedByTheUrl() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3"
+				+ ";Timeout=60;timeout=120";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertTrue(props.timeoutSeconds() == 60 || props.timeoutSeconds() == 120,
+				"expected one of the two spellings to win, got " + props.timeoutSeconds());
+	}
 }

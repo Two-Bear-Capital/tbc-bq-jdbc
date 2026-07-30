@@ -85,8 +85,8 @@ class RealSessionTest extends AbstractRealBigQueryIntegrationTest {
 
 	/** A connection with {@code enableSessions=true}, i.e. an eager session. */
 	private Connection createSessionConnection() throws SQLException {
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&enableSessions=true&maxBillingBytes=1073741824",
-				TEST_PROJECT_ID, TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&enableSessions=true%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 		return DriverManager.getConnection(url);
 	}
 

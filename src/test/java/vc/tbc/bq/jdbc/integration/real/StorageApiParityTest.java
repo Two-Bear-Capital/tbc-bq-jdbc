@@ -144,14 +144,14 @@ class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 	private Connection storageConnection() throws SQLException {
 		// useStorageApi=true rather than auto: these results are deliberately small,
 		// and auto would decline them.
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=true&maxBillingBytes=1073741824",
-				TEST_PROJECT_ID, TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=true%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 		return DriverManager.getConnection(url);
 	}
 
 	private Connection restConnection() throws SQLException {
-		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=false&maxBillingBytes=1073741824",
-				TEST_PROJECT_ID, TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=false%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 		return DriverManager.getConnection(url);
 	}
 
@@ -234,10 +234,11 @@ class StorageApiParityTest extends AbstractRealBigQueryIntegrationTest {
 		// would break if member order or nesting were taken from Arrow rather than
 		// from the BigQuery schema.
 		String sql = "SELECT STRUCT(1 AS n, STRUCT('x' AS deep) AS nested) AS s, [1, 2, 3] AS a FROM UNNEST([1]) AS i";
-		String storageUrl = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=true&nativeComplexTypes=true",
-				TEST_PROJECT_ID, TEST_DATASET);
-		String restUrl = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=false&nativeComplexTypes=true",
-				TEST_PROJECT_ID, TEST_DATASET);
+		String storageUrl = String.format(
+				"jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=true&nativeComplexTypes=true%s", TEST_PROJECT_ID,
+				TEST_DATASET, TEST_CONNECTION_DEFAULTS);
+		String restUrl = String.format("jdbc:bigquery:%s/%s?authType=ADC&useStorageApi=false&nativeComplexTypes=true%s",
+				TEST_PROJECT_ID, TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 
 		Object[] storageStruct;
 		Object[] restStruct;

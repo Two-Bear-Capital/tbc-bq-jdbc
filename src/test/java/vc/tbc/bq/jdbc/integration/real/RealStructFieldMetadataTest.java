@@ -66,9 +66,8 @@ class RealStructFieldMetadataTest extends AbstractRealBigQueryIntegrationTest {
 	}
 
 	private Connection openWith(boolean structFields) throws SQLException {
-		return DriverManager.getConnection(
-				String.format("jdbc:bigquery:%s/%s?authType=ADC&maxBillingBytes=1073741824&includeStructFields=%s",
-						TEST_PROJECT_ID, TEST_DATASET, structFields));
+		return DriverManager.getConnection(String.format("jdbc:bigquery:%s/%s?authType=ADC&includeStructFields=%s%s",
+				TEST_PROJECT_ID, TEST_DATASET, structFields, TEST_CONNECTION_DEFAULTS));
 	}
 
 	private List<String> columnNames(Connection conn) throws SQLException {

@@ -166,9 +166,8 @@ class RealTableTypeMetadataTest extends AbstractRealBigQueryIntegrationTest {
 	@Test
 	void testASnapshotIsIdentifiedWithoutTheDescriptionRead() throws SQLException {
 		// Given: A connection that has turned off the INFORMATION_SCHEMA read
-		String url = String.format(
-				"jdbc:bigquery:%s/%s?authType=ADC&maxBillingBytes=1073741824&metadataIncludeDescriptions=false",
-				TEST_PROJECT_ID, TEST_DATASET);
+		String url = String.format("jdbc:bigquery:%s/%s?authType=ADC&metadataIncludeDescriptions=false%s",
+				TEST_PROJECT_ID, TEST_DATASET, TEST_CONNECTION_DEFAULTS);
 
 		try (Connection conn = DriverManager.getConnection(url)) {
 			Map<String, String> types = reportedTypes(conn);
