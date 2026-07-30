@@ -29,6 +29,11 @@ Modern JDBC driver for Google BigQuery, optimized for development tools and data
 - Workforce Identity Federation
 - Workload Identity Federation
 
+🔌 **Framework Integration**
+- `javax.sql.DataSource` with a setter per connection property
+- Spring, JPA/Hibernate and JNDI bind it directly
+- Serializable and `Referenceable` for application-server lookup
+
 📊 **BigQuery Sessions**
 - Temporary tables (`CREATE TEMP TABLE`)
 - Multi-statement SQL scripts
@@ -215,6 +220,7 @@ try (Connection conn = DriverManager.getConnection(url)) {
 - **[Quick Start](docs/QUICKSTART.md)** - Get started in 5 minutes
 - **[Authentication Guide](docs/AUTHENTICATION.md)** - All authentication methods with examples
 - **[Connection Properties](docs/CONNECTION_PROPERTIES.md)** - Complete configuration reference
+- **[DataSource](docs/DATASOURCE.md)** - `javax.sql.DataSource` for Spring, JPA and JNDI
 - **[Type Mapping](docs/TYPE_MAPPING.md)** - BigQuery ↔ JDBC type conversions
 - **[Compatibility Matrix](docs/COMPATIBILITY.md)** - JDBC features and limitations
 - **[Comparison with Google's driver](docs/COMPARISON.md)** - How this driver differs from `google-cloud-bigquery-jdbc`
@@ -321,6 +327,13 @@ HikariDataSource dataSource = new HikariDataSource(config);
 try (Connection conn = dataSource.getConnection()) {
     // Execute queries...
 }
+```
+
+Pool a [`BQDataSource`](docs/DATASOURCE.md) instead of a URL when the settings are configured as
+a bean:
+
+```java
+config.setDataSource(bigQueryDataSource);
 ```
 
 ## Authentication

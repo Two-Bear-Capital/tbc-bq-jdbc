@@ -730,4 +730,98 @@ class ConnectionUrlParserTest {
 		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:p?additionalProjects=q", null);
 		assertThrows(UnsupportedOperationException.class, () -> props.additionalProjects().add("late"));
 	}
+
+	// ------------------------------------------------------------------
+	// Configuration with no URL (BQDataSource), and path overrides
+	// ------------------------------------------------------------------
+
+	@Test
+	void testFromPropertiesMatchesTheEquivalentUrl() throws SQLException {
+		// Given: The same settings expressed as properties and as a URL
+		Properties info = new Properties();
+		info.setProperty("projectId", "my-project");
+		info.setProperty("datasetId", "my_dataset");
+		info.setProperty("authType", "ADC");
+		info.setProperty("timeout", "60");
+
+		// When: Parsing each
+		ConnectionProperties fromProperties = ConnectionUrlParser.fromProperties(info);
+		ConnectionProperties fromUrl = ConnectionUrlParser
+				.parse("jdbc:bigquery:my-project/my_dataset?authType=ADC&timeout=60", null);
+
+		// Then: Neither path may apply a default or a rule the other does not
+		assertEquals(fromUrl, fromProperties);
+	}
+
+	@Test
+	void testFromPropertiesRequiresAProjectId() {
+		// Given: Properties with everything but the project
+		Properties info = new Properties();
+		info.setProperty("authType", "ADC");
+
+		// Then: There is no URL path to fall back on
+		SQLException e = assertThrows(SQLException.class, () -> ConnectionUrlParser.fromProperties(info));
+		assertTrue(e.getMessage().contains("projectId"));
+	}
+
+	@Test
+	void testFromPropertiesAppliesDefaults() throws SQLException {
+		// Given: Only the required property
+		Properties info = new Properties();
+		info.setProperty("projectId", "my-project");
+
+		// When: Parsing with no URL
+		ConnectionProperties props = ConnectionUrlParser.fromProperties(info);
+
+		// Then: The same defaults a bare URL gets
+		assertEquals(ConnectionProperties.DEFAULT_TIMEOUT_SECONDS, props.timeoutSeconds());
+		assertEquals(ConnectionProperties.DEFAULT_PAGE_SIZE, props.pageSize());
+		assertInstanceOf(ApplicationDefaultAuth.class, props.authType());
+		assertNull(props.datasetId());
+	}
+
+	@Test
+	void testExplicitDatasetIdOverridesTheUrlPath() throws SQLException {
+		// Given: A URL naming one dataset and a property naming another
+		Properties info = new Properties();
+		info.setProperty("datasetId", "other_dataset");
+
+		// When: Parsing
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project/url_dataset", info);
+
+		// Then: The property wins, as it does for every other property, and as the
+		// Simba format already does — both come from the property map there
+		assertEquals("my-project", props.projectId());
+		assertEquals("other_dataset", props.datasetId());
+	}
+
+	@Test
+	void testExplicitProjectIdOverridesTheUrlPath() throws SQLException {
+		// Given: A URL naming one project and a property naming another
+		Properties info = new Properties();
+		info.setProperty("projectId", "other-project");
+
+		// When: Parsing
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:url-project/my_dataset", info);
+
+		// Then: The property wins and the dataset is untouched
+		assertEquals("other-project", props.projectId());
+		assertEquals("my_dataset", props.datasetId());
+	}
+
+	@Test
+	void testBlankPathOverridesAreIgnored() throws SQLException {
+		// Given: Properties set to blank, which reads as "not set" rather than as
+		// "clear the URL's value"
+		Properties info = new Properties();
+		info.setProperty("projectId", "  ");
+		info.setProperty("datasetId", "");
+
+		// When: Parsing
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project/my_dataset", info);
+
+		// Then: The URL path stands
+		assertEquals("my-project", props.projectId());
+		assertEquals("my_dataset", props.datasetId());
+	}
 }

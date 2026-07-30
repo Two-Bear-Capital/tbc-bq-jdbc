@@ -19,9 +19,9 @@ Both drivers are Apache 2.0.
 
 ## Pick a driver
 
-**Choose Google's driver if** you need Java 8–17, HTTP proxy support, a custom TLS truststore,
-`javax.sql.DataSource` / connection pooling, `CallableStatement`, OpenTelemetry tracing, or a
-first-party support relationship.
+**Choose Google's driver if** you need Java 8–17, HTTP proxy support, a custom TLS truststore, the
+optional JDBC pooling API (`ConnectionPoolDataSource`), `CallableStatement`, OpenTelemetry
+tracing, or a first-party support relationship.
 
 **Choose `tbc-bq-jdbc` if** you are on Java 21+ and want metadata caching for interactive SQL
 tools, one BigQuery session per connection, cheap auto-commit toggling under a connection pool,
@@ -46,7 +46,8 @@ query cost estimation, or the batch-insert and metadata-shaping controls listed 
 | OpenTelemetry | ❌ (own counters instead) | ✅ traces + GCP exporters |
 | HTTP proxy | ❌ | ✅ |
 | `CallableStatement` | ❌ | ✅ |
-| `javax.sql.DataSource` | ❌ | ✅ incl. pooling |
+| `javax.sql.DataSource` | ✅ | ✅ |
+| `ConnectionPoolDataSource` | ❌ (pool with HikariCP) | ✅ |
 
 ---
 
@@ -72,7 +73,7 @@ query cost estimation, or the batch-insert and metadata-shaping controls listed 
 
 | Area | Detail |
 |---|---|
-| **`javax.sql.DataSource`** | A full `DataSource`, plus `ConnectionPoolDataSource` and `PooledConnection` with `ConnectionPoolSize` and `ListenerPoolSize`. `tbc-bq-jdbc` provides `java.sql.Driver` only and relies on an external pool such as HikariCP. |
+| **`ConnectionPoolDataSource`** | Google implements the optional JDBC pooling API — `ConnectionPoolDataSource` and `PooledConnection`, with `ConnectionPoolSize` and `ListenerPoolSize`. `tbc-bq-jdbc` ships a [`DataSource`](DATASOURCE.md) but no pooling API, and relies on an external pool such as HikariCP. |
 | **`CallableStatement`** | Implemented, for calling BigQuery stored procedures. `tbc-bq-jdbc` throws `SQLFeatureNotSupportedException`. |
 | **Pre-generated access tokens** | `OAuthType=2` is supported. `tbc-bq-jdbc` rejects it, and supports JSON service-account keys only — Google also accepts P12 (`OAuthP12Password`). |
 
