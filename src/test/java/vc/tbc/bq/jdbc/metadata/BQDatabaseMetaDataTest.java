@@ -88,6 +88,10 @@ class BQDatabaseMetaDataTest {
 		// that does not model it makes every metadata call list a null project.
 		lenient().when(connection.getCurrentCatalog()).thenReturn("test-project");
 		lenient().when(properties.metadataCacheEnabled()).thenReturn(false);
+		// The record's canonical constructor defaults this, so it is never null on a
+		// real connection; an unstubbed mock returns null and unboxes to an NPE in
+		// every metadata read rather than in one obviously-related test.
+		lenient().when(properties.metadataJobCreationOptional()).thenReturn(true);
 		metaData = new BQDatabaseMetaData(connection);
 	}
 
@@ -841,6 +845,49 @@ class BQDatabaseMetaDataTest {
 		cached.getCrossReference(null, "shop", "customers", null, "shop", "orders").close();
 
 		verify(bigQuery, times(1)).query(any(QueryJobConfiguration.class));
+	}
+
+	/**
+	 * The metadata reads must carry {@code JOB_CREATION_OPTIONAL}, which is the
+	 * whole of #265: the mode is a field of the {@code jobs.query} request, so a
+	 * config that omits it silently costs a job creation per metadata query.
+	 */
+	@Test
+	void testMetadataQueriesRequestOptionalJobCreation() throws Exception {
+		stubOneDataset();
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(properties.metadataJobCreationOptional()).thenReturn(true);
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class))).thenReturn(tableResult);
+		lenient().when(tableResult.iterateAll()).thenReturn(java.util.List.of());
+
+		metaData.getProcedures("test-project", "shop", null).close();
+
+		org.mockito.ArgumentCaptor<QueryJobConfiguration> config = org.mockito.ArgumentCaptor
+				.forClass(QueryJobConfiguration.class);
+		verify(bigQuery).query(config.capture());
+		assertEquals(QueryJobConfiguration.JobCreationMode.JOB_CREATION_OPTIONAL,
+				config.getValue().getJobCreationMode());
+	}
+
+	/**
+	 * The opt-out has to reach the request too. Left unset the client falls back to
+	 * {@code BigQueryOptions.getDefaultJobCreationMode()}, which the driver never
+	 * sets, so a null here is the pre-#265 behaviour rather than an absent setting.
+	 */
+	@Test
+	void testMetadataJobCreationOptionalCanBeTurnedOff() throws Exception {
+		stubOneDataset();
+		lenient().when(connection.isClosed()).thenReturn(false);
+		lenient().when(properties.metadataJobCreationOptional()).thenReturn(false);
+		lenient().when(bigQuery.query(any(QueryJobConfiguration.class))).thenReturn(tableResult);
+		lenient().when(tableResult.iterateAll()).thenReturn(java.util.List.of());
+
+		metaData.getProcedures("test-project", "shop", null).close();
+
+		org.mockito.ArgumentCaptor<QueryJobConfiguration> config = org.mockito.ArgumentCaptor
+				.forClass(QueryJobConfiguration.class);
+		verify(bigQuery).query(config.capture());
+		assertNull(config.getValue().getJobCreationMode());
 	}
 
 	@Test
