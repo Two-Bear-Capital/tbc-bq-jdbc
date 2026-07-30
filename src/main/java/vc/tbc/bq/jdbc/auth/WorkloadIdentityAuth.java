@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpTransportFactory;
 import com.google.auth.oauth2.ExternalAccountCredentials;
 
 import java.io.FileInputStream;
@@ -90,11 +91,11 @@ public record WorkloadIdentityAuth(String credentialConfigFile) implements AuthT
 	}
 
 	@Override
-	public Credentials toCredentials() throws IOException {
+	public Credentials toCredentials(HttpTransportFactory transportFactory) throws IOException {
 		// try-with-resources: the stream was previously left open, leaking a file
 		// descriptor for every connection opened with this auth type
 		try (FileInputStream configStream = new FileInputStream(credentialConfigFile)) {
-			return ExternalAccountCredentials.fromStream(configStream);
+			return ExternalAccountCredentials.fromStream(configStream, transportFactory);
 		}
 	}
 }

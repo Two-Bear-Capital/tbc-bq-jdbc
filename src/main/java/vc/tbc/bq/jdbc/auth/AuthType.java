@@ -16,6 +16,8 @@
 package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpTransportFactory;
+import vc.tbc.bq.jdbc.transport.DriverTransports;
 
 import java.io.IOException;
 
@@ -38,11 +40,35 @@ public sealed interface AuthType permits ServiceAccountAuth, ApplicationDefaultA
 		WorkforceIdentityAuth, WorkloadIdentityAuth, ImpersonatedAuth {
 
 	/**
-	 * Converts this authentication type to Google Cloud credentials.
+	 * Converts this authentication type to Google Cloud credentials, connecting
+	 * directly.
 	 *
 	 * @return the Google Cloud credentials
 	 * @throws IOException
 	 *             if credentials cannot be created
 	 */
-	Credentials toCredentials() throws IOException;
+	default Credentials toCredentials() throws IOException {
+		return toCredentials(DriverTransports.forProxy(null));
+	}
+
+	/**
+	 * Converts this authentication type to Google Cloud credentials fetched over
+	 * {@code transportFactory}.
+	 *
+	 * <p>
+	 * The factory is not optional and not a detail an implementation may ignore: a
+	 * credential holds the transport it refreshes its token over, so one built
+	 * without it goes direct even when the rest of the connection is proxied. That
+	 * failure surfaces while minting the credential, before any BigQuery call, and
+	 * is invisible to a test that only asserts the API client was configured.
+	 *
+	 * @param transportFactory
+	 *            the transport to fetch and refresh tokens over, from
+	 *            {@link DriverTransports#forProxy}
+	 * @return the Google Cloud credentials
+	 * @throws IOException
+	 *             if credentials cannot be created
+	 * @since 4.3.0
+	 */
+	Credentials toCredentials(HttpTransportFactory transportFactory) throws IOException;
 }

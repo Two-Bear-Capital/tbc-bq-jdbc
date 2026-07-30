@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc.testsupport;
 import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
 import vc.tbc.bq.jdbc.auth.AuthType;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
+import vc.tbc.bq.jdbc.transport.ProxyConfig;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -78,6 +79,7 @@ public final class TestConnectionProperties {
 	private Boolean metadataIncludeDescriptions;
 	private Boolean collapseShardedTables;
 	private Integer batchLoadThreshold;
+	private ProxyConfig proxy;
 
 	private TestConnectionProperties() {
 	}
@@ -228,6 +230,11 @@ public final class TestConnectionProperties {
 		return this;
 	}
 
+	public TestConnectionProperties proxy(ProxyConfig value) {
+		this.proxy = value;
+		return this;
+	}
+
 	/**
 	 * The single site in the test tree that depends on the record's positional
 	 * order. A change to {@link ConnectionProperties} should break here and nowhere
@@ -237,10 +244,13 @@ public final class TestConnectionProperties {
 	 *         anything left unset
 	 */
 	public ConnectionProperties build() {
+		// The canonical constructor, not one of the compatibility overloads: the
+		// components this builder does not expose are passed as null so they take
+		// the record's own defaults, which is exactly what those overloads do.
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
-				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold);
+				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, null, null, null, null, proxy);
 	}
 }

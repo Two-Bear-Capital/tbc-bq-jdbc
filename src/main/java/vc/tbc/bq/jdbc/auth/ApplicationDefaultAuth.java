@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpTransportFactory;
 import com.google.auth.oauth2.GoogleCredentials;
 
 import java.io.IOException;
@@ -37,7 +38,10 @@ import java.io.IOException;
 public record ApplicationDefaultAuth() implements AuthType {
 
 	@Override
-	public Credentials toCredentials() throws IOException {
-		return GoogleCredentials.getApplicationDefault();
+	public Credentials toCredentials(HttpTransportFactory transportFactory) throws IOException {
+		// The factory reaches further here than for the other types: ADC probes the
+		// GCE metadata server over it as well as fetching the token, so a proxied
+		// connection that skipped it would hang on that probe rather than fail.
+		return GoogleCredentials.getApplicationDefault(transportFactory);
 	}
 }

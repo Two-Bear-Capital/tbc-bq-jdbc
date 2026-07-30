@@ -824,4 +824,49 @@ class ConnectionUrlParserTest {
 		assertEquals("my-project", props.projectId());
 		assertEquals("my_dataset", props.datasetId());
 	}
+
+	@Test
+	void testProxyPropertiesAreParsed() throws SQLException {
+		// Given: A URL naming a proxy the driver should route through
+		String url = "jdbc:bigquery:my-project/my_dataset?proxyHost=proxy.example.com&proxyPort=3128";
+
+		// When: Parsing
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: The proxy is resolved, and is not confused with the 'host' property
+		// that says where BigQuery itself is
+		assertEquals("proxy.example.com", props.proxy().host());
+		assertEquals(3128, props.proxy().port());
+		assertFalse(props.proxy().isAuthenticated());
+		assertNull(props.host());
+	}
+
+	@Test
+	void testProxyCredentialsAreParsed() throws SQLException {
+		String url = "jdbc:bigquery:my-project?proxyHost=proxy.example.com&proxyPort=3128"
+				+ "&proxyUser=someone&proxyPassword=secret";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertTrue(props.proxy().isAuthenticated());
+		assertEquals("someone", props.proxy().user());
+		assertEquals("secret", props.proxy().password());
+	}
+
+	@Test
+	void testNoProxyPropertiesMeansNoProxy() throws SQLException {
+		ConnectionProperties props = ConnectionUrlParser.parse("jdbc:bigquery:my-project", null);
+
+		assertNull(props.proxy());
+	}
+
+	@Test
+	void testAnIncompleteProxyIsASQLException() {
+		// Surfaced as SQLException like every other bad property, rather than as an
+		// IllegalArgumentException escaping DriverManager.getConnection
+		SQLException e = assertThrows(SQLException.class,
+				() -> ConnectionUrlParser.parse("jdbc:bigquery:my-project?proxyHost=proxy.example.com", null));
+
+		assertTrue(e.getMessage().contains("proxyPort"), e.getMessage());
+	}
 }

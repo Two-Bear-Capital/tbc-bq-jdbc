@@ -561,4 +561,21 @@ class ConnectionUrlParserSimbaTest {
 		assertTrue(props.timeoutSeconds() == 60 || props.timeoutSeconds() == 120,
 				"expected one of the two spellings to win, got " + props.timeoutSeconds());
 	}
+
+	/**
+	 * Named as Simba names them, because the people this matters to already have a
+	 * proxy in a connection string they did not write and cannot easily rewrite.
+	 */
+	@Test
+	void testSimbaProxyPropertiesMapToTheDriversOwn() throws SQLException {
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=3"
+				+ ";ProxyHost=proxy.example.com;ProxyPort=3128;ProxyUid=someone;ProxyPwd=secret";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertEquals("proxy.example.com", props.proxy().host());
+		assertEquals(3128, props.proxy().port());
+		assertEquals("someone", props.proxy().user());
+		assertEquals("secret", props.proxy().password());
+	}
 }

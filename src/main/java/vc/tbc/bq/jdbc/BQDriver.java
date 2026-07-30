@@ -135,13 +135,26 @@ public final class BQDriver implements Driver {
 				"Comma-separated intermediate service account emails, source-first, for a delegated impersonation chain",
 				false, null));
 
-		props.add(
-				prop(info, "host", "",
-						"Alternative BigQuery endpoint, e.g. a proxy or Private Service Connect address. "
-								+ "Defaults to https when no scheme is given; blank uses Google's endpoints",
-						false, null));
+		props.add(prop(info, "host", "",
+				"Alternative BigQuery endpoint, e.g. a Private Service Connect address. "
+						+ "Says where BigQuery is, not how to reach it — use 'proxyHost' for a proxy. "
+						+ "Defaults to https when no scheme is given; blank uses Google's endpoints",
+				false, null));
 
 		props.add(prop(info, "port", "", "Port for the alternative endpoint set by 'host'", false, null));
+
+		props.add(prop(info, "proxyHost", "",
+				"Hostname of an HTTP proxy to route BigQuery calls and OAuth token requests through. Unlike 'host' this does not change where BigQuery is, only how the driver reaches it. Blank falls back to the JVM's https.proxyHost, which the gRPC Storage Read API path follows regardless",
+				false, null));
+
+		props.add(prop(info, "proxyPort", "",
+				"Port of the proxy set by 'proxyHost'. Required whenever proxyHost is set — there is no conventional proxy port to assume",
+				false, null));
+
+		props.add(prop(info, "proxyUser", "",
+				"Username for a proxy that demands Proxy-Authorization (blank = anonymous proxy)", false, null));
+
+		props.add(prop(info, "proxyPassword", "", "Password for the user set by 'proxyUser'", false, null));
 
 		props.add(prop(info, "location", "",
 				"BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location.",

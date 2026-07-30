@@ -17,6 +17,8 @@ package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
 import vc.tbc.bq.jdbc.metrics.DriverMetrics;
+import vc.tbc.bq.jdbc.transport.DriverTransports;
+import vc.tbc.bq.jdbc.transport.ProxyConfig;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,7 +67,26 @@ public final class CredentialsCache {
 	private record Entry(Credentials credentials, long builtAtNanos) {
 	}
 
-	private static final ConcurrentHashMap<AuthType, Entry> CACHE = new ConcurrentHashMap<>();
+	/**
+	 * What makes two connections' credentials interchangeable.
+	 *
+	 * <p>
+	 * The proxy belongs in the key because a credential holds the transport it
+	 * refreshes over. Keying on {@link AuthType} alone would let whichever
+	 * connection opened first decide, for every later one sharing its
+	 * authentication, whether token refresh goes through the proxy — so the same
+	 * URL would work or fail depending on what else the JVM had already connected
+	 * to.
+	 *
+	 * @param authType
+	 *            how the credential is obtained
+	 * @param proxy
+	 *            the route it is obtained over, or null for direct
+	 */
+	private record Key(AuthType authType, ProxyConfig proxy) {
+	}
+
+	private static final ConcurrentHashMap<Key, Entry> CACHE = new ConcurrentHashMap<>();
 
 	private CredentialsCache() {
 		throw new AssertionError("Utility class should not be instantiated");
@@ -88,7 +109,27 @@ public final class CredentialsCache {
 	 *             if credentials cannot be created
 	 */
 	public static Credentials forAuthType(AuthType authType) throws IOException {
-		Entry cached = CACHE.get(authType);
+		return forAuthType(authType, null);
+	}
+
+	/**
+	 * Returns credentials for the given authentication type, fetched through
+	 * {@code proxy}.
+	 *
+	 * @param authType
+	 *            the authentication type
+	 * @param proxy
+	 *            the proxy to mint and refresh tokens through, or null for a direct
+	 *            connection
+	 * @return credentials, shared with other connections using the same auth and
+	 *         the same route
+	 * @throws IOException
+	 *             if credentials cannot be created
+	 * @since 4.3.0
+	 */
+	public static Credentials forAuthType(AuthType authType, ProxyConfig proxy) throws IOException {
+		Key key = new Key(authType, proxy);
+		Entry cached = CACHE.get(key);
 		if (cached != null && !isExpired(cached)) {
 			DriverMetrics.recordCredentialCacheHit();
 			return cached.credentials();
@@ -97,11 +138,11 @@ public final class CredentialsCache {
 		// Counted as a miss whether the entry was absent or stale: both mean this
 		// call paid to build credentials, which is the cost worth seeing.
 		DriverMetrics.recordCredentialCacheMiss();
-		Credentials created = authType.toCredentials();
+		Credentials created = authType.toCredentials(DriverTransports.forProxy(proxy));
 		// put rather than putIfAbsent: an expired entry must be replaced. Two threads
 		// racing here each build credentials and the last write wins, which is
 		// harmless — the discarded copy is equivalent.
-		CACHE.put(authType, new Entry(created, System.nanoTime()));
+		CACHE.put(key, new Entry(created, System.nanoTime()));
 		return created;
 	}
 
@@ -162,7 +203,7 @@ public final class CredentialsCache {
 	}
 
 	/**
-	 * Returns how many distinct authentication types are cached.
+	 * Returns how many distinct authentication-and-route combinations are cached.
 	 *
 	 * @return the number of cached entries
 	 */

@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpTransportFactory;
 import com.google.auth.oauth2.UserCredentials;
 
 import java.io.IOException;
@@ -86,8 +87,8 @@ public record UserOAuthAuth(String clientId, String clientSecret, String refresh
 	}
 
 	@Override
-	public Credentials toCredentials() throws IOException {
+	public Credentials toCredentials(HttpTransportFactory transportFactory) throws IOException {
 		return UserCredentials.newBuilder().setClientId(clientId).setClientSecret(clientSecret)
-				.setRefreshToken(refreshToken).build();
+				.setRefreshToken(refreshToken).setHttpTransportFactory(transportFactory).build();
 	}
 }

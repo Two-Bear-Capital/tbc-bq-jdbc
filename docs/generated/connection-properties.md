@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **37** connection properties.
+There are **41** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -20,8 +20,12 @@ There are **37** connection properties.
 | `refreshToken` | _(none)_ | any | OAuth 2.0 refresh token (required for USER_OAUTH auth) |
 | `impersonateServiceAccount` | _(none)_ | any | Email of a service account to impersonate, using the configured authType as the source identity |
 | `impersonateDelegates` | _(none)_ | any | Comma-separated intermediate service account emails, source-first, for a delegated impersonation chain |
-| `host` | _(none)_ | any | Alternative BigQuery endpoint, e.g. a proxy or Private Service Connect address. Defaults to https when no scheme is given; blank uses Google's endpoints |
+| `host` | _(none)_ | any | Alternative BigQuery endpoint, e.g. a Private Service Connect address. Says where BigQuery is, not how to reach it — use 'proxyHost' for a proxy. Defaults to https when no scheme is given; blank uses Google's endpoints |
 | `port` | _(none)_ | any | Port for the alternative endpoint set by 'host' |
+| `proxyHost` | _(none)_ | any | Hostname of an HTTP proxy to route BigQuery calls and OAuth token requests through. Unlike 'host' this does not change where BigQuery is, only how the driver reaches it. Blank falls back to the JVM's https.proxyHost, which the gRPC Storage Read API path follows regardless |
+| `proxyPort` | _(none)_ | any | Port of the proxy set by 'proxyHost'. Required whenever proxyHost is set — there is no conventional proxy port to assume |
+| `proxyUser` | _(none)_ | any | Username for a proxy that demands Proxy-Authorization (blank = anonymous proxy) |
+| `proxyPassword` | _(none)_ | any | Password for the user set by 'proxyUser' |
 | `location` | _(none)_ | any | BigQuery processing location (e.g., US, EU, us-central1). Leave blank to use the dataset's location. |
 | `timeout` | `300` | any | Query execution timeout in seconds |
 | `connectionTimeout` | `30` | any | Timeout in seconds for establishing the HTTP connection (not query duration) |

@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc.config;
 
 import vc.tbc.bq.jdbc.auth.*;
+import vc.tbc.bq.jdbc.transport.ProxyConfig;
 
 import java.math.BigDecimal;
 import java.net.URLDecoder;
@@ -346,6 +347,13 @@ public final class ConnectionUrlParser {
 				case "Location" -> properties.put("location", value);
 				case "DatasetProjectId" -> properties.put("datasetProjectId", value);
 				case "EnableSessions" -> properties.put("enableSessions", value);
+				// Named as Simba names them, because someone migrating already has
+				// these four in a connection string and a proxy is the one setting they
+				// cannot work around by editing the driver's own properties.
+				case "ProxyHost" -> properties.put("proxyHost", value);
+				case "ProxyPort" -> properties.put("proxyPort", value);
+				case "ProxyUid" -> properties.put("proxyUser", value);
+				case "ProxyPwd" -> properties.put("proxyPassword", value);
 				default -> properties.put(key, value); // Pass through — handles native tbc-bq-jdbc property names
 			}
 		}
@@ -432,13 +440,35 @@ public final class ConnectionUrlParser {
 		List<String> additionalProjects = parseProjectList(properties.get("additionalProjects"));
 		Boolean includeStructFields = parseBooleanObject(properties, "includeStructFields");
 		Boolean metadataJobCreationOptional = parseBooleanObject(properties, "metadataJobCreationOptional");
+		ProxyConfig proxy = parseProxy(properties);
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
 				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
-				additionalProjects, includeStructFields, metadataJobCreationOptional);
+				additionalProjects, includeStructFields, metadataJobCreationOptional, proxy);
+	}
+
+	/**
+	 * Resolves the proxy for a connection, or null when nothing asks for one.
+	 *
+	 * <p>
+	 * {@link ProxyConfig#resolve} throws {@link IllegalArgumentException} for a
+	 * configuration that cannot be honoured — a port outside the range, a password
+	 * with no username, a port with no host. Those are all connection-string
+	 * mistakes, so they surface here as {@link SQLException} like every other bad
+	 * property rather than as an unchecked exception out of
+	 * {@code DriverManager.getConnection}.
+	 */
+	private static ProxyConfig parseProxy(Map<String, String> properties) throws SQLException {
+		Integer proxyPort = parseInteger(properties, "proxyPort");
+		try {
+			return ProxyConfig.resolve(properties.get("proxyHost"), proxyPort, properties.get("proxyUser"),
+					properties.get("proxyPassword"));
+		} catch (IllegalArgumentException e) {
+			throw new SQLException("Invalid proxy configuration: " + e.getMessage(), e);
+		}
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
