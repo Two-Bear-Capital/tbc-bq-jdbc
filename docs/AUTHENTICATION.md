@@ -544,6 +544,31 @@ String url = "jdbc:bigquery:my-project/my_dataset?" +
 
 ---
 
+## Authenticating through an HTTP proxy
+
+Every authentication method above fetches and refreshes its token over a separate connection
+from the one queries use. When `proxyHost` is set, both go through the proxy — including the
+Application Default Credentials metadata-server probe, and both legs of the token exchange
+that service account impersonation performs.
+
+```
+jdbc:bigquery:my-project/my_dataset?authType=SERVICE_ACCOUNT&credentials=/path/to/key.json
+  &proxyHost=proxy.corp.example.com&proxyPort=3128
+```
+
+A failure on the credential leg surfaces while the connection is opening, before any query
+runs, and names the token endpoint rather than BigQuery:
+
+```
+Failed to create BigQuery connection … connect timed out (oauth2.googleapis.com)
+```
+
+If you see that with queries otherwise expected to work, the proxy settings reached the API
+client but not the credentials — check that `proxyHost` is on the connection rather than
+only on the JVM, or vice versa. See [HTTP Proxy](CONNECTION_PROPERTIES.md#http-proxy).
+
+---
+
 ## See Also
 
 - [Connection Properties](CONNECTION_PROPERTIES.md) - All configuration options

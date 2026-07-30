@@ -489,6 +489,96 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	}
 
 	/**
+	 * Returns the HTTP proxy host.
+	 *
+	 * @return the proxy hostname, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getProxyHost() {
+		return get("proxyHost");
+	}
+
+	/**
+	 * Sets an HTTP proxy to route BigQuery calls and OAuth token requests through.
+	 *
+	 * <p>
+	 * Distinct from {@link #setHost(String)}, which says where BigQuery is rather
+	 * than how the driver reaches it. Leaving this unset falls back to the JVM's
+	 * {@code https.proxyHost}.
+	 *
+	 * @param proxyHost
+	 *            the proxy hostname, or null
+	 * @since 4.3.0
+	 */
+	public void setProxyHost(String proxyHost) {
+		set("proxyHost", proxyHost);
+	}
+
+	/**
+	 * Returns the port of the proxy set by {@link #setProxyHost(String)}.
+	 *
+	 * @return the proxy port, or null if unset
+	 * @since 4.3.0
+	 */
+	public Integer getProxyPort() {
+		return getInteger("proxyPort");
+	}
+
+	/**
+	 * Sets the port of the proxy set by {@link #setProxyHost(String)}, which is
+	 * required whenever that is set.
+	 *
+	 * @param proxyPort
+	 *            the proxy port, or null
+	 * @since 4.3.0
+	 */
+	public void setProxyPort(Integer proxyPort) {
+		set("proxyPort", proxyPort);
+	}
+
+	/**
+	 * Returns the username sent to a proxy demanding authentication.
+	 *
+	 * @return the proxy username, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getProxyUser() {
+		return get("proxyUser");
+	}
+
+	/**
+	 * Sets the username for a proxy that demands {@code Proxy-Authorization}.
+	 *
+	 * @param proxyUser
+	 *            the proxy username, or null for an anonymous proxy
+	 * @since 4.3.0
+	 */
+	public void setProxyUser(String proxyUser) {
+		set("proxyUser", proxyUser);
+	}
+
+	/**
+	 * Returns the password for the user set by {@link #setProxyUser(String)}.
+	 *
+	 * @return the proxy password, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getProxyPassword() {
+		return get("proxyPassword");
+	}
+
+	/**
+	 * Sets the password for the user set by {@link #setProxyUser(String)}.
+	 *
+	 * @param proxyPassword
+	 *            the proxy password, or null
+	 * @since 4.3.0
+	 */
+	public void setProxyPassword(String proxyPassword) {
+		set("proxyPassword", proxyPassword);
+	}
+
+	/**
 	 * Returns the additional projects reported by {@code getCatalogs()}.
 	 *
 	 * @return a comma-separated project list, or null if unset

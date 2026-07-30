@@ -148,6 +148,26 @@
             <artifactId>google-cloud-bigquerystorage</artifactId>
         </dependency>
 
+        <!--
+            Apache HttpClient is what the driver's proxy path runs on (see
+            DriverTransports): it is the only stack on this classpath that can
+            authenticate a CONNECT tunnel without JVM-global state. It arrives
+            transitively through google-http-client-apache-v2 and needs no version
+            here, but it logs through commons-logging, which the Google BOM excludes
+            transitively — so ApacheHttpTransport fails with NoClassDefFoundError on
+            org.apache.commons.logging.LogFactory unless something provides it.
+
+            jcl-over-slf4j is that something: it implements the commons-logging API on
+            top of the slf4j the driver already uses, rather than adding a second
+            logging framework to the jar. Shade relocates it, so a host application
+            with its own commons-logging is unaffected.
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>jcl-over-slf4j</artifactId>
+            <version>${slf4j.version}</version>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -610,6 +630,14 @@
                                     <pattern>com.google</pattern>
                                     <shadedPattern>vc.tbc.bq.jdbc.shaded.google</shadedPattern>
                                 </relocation>
+                                <!-- jcl-over-slf4j implements the commons-logging API Apache
+                                     HttpClient calls. Relocated so it cannot collide with a host
+                                     application's own commons-logging; shade rewrites the calls
+                                     inside the bundled httpclient to match. -->
+                                <relocation>
+                                    <pattern>org.apache.commons.logging</pattern>
+                                    <shadedPattern>vc.tbc.bq.jdbc.shaded.jcl</shadedPattern>
+                                </relocation>
                             </relocations>
                             <filters>
                                 <filter>
@@ -684,6 +712,11 @@
                                 <relocation>
                                     <pattern>com.google</pattern>
                                     <shadedPattern>vc.tbc.bq.jdbc.shaded.google</shadedPattern>
+                                </relocation>
+                                <!-- See the standard shaded JAR above -->
+                                <relocation>
+                                    <pattern>org.apache.commons.logging</pattern>
+                                    <shadedPattern>vc.tbc.bq.jdbc.shaded.jcl</shadedPattern>
                                 </relocation>
                                 <!-- Relocate Logback to avoid conflicts -->
                                 <relocation>

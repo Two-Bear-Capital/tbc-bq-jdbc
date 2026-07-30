@@ -20,6 +20,8 @@ import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.http.HttpTransportOptions;
 import org.junit.jupiter.api.Test;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
+import vc.tbc.bq.jdbc.transport.DriverTransports;
+import vc.tbc.bq.jdbc.transport.ProxyConfig;
 
 import static vc.tbc.bq.jdbc.testsupport.TestConnectionProperties.props;
 
@@ -29,6 +31,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -164,5 +167,41 @@ class ClientTuningPropertiesTest {
 		BigQueryOptions options = optionsFor(null, null, "bigquery.internal.example.com", null);
 
 		assertTrue(options.getHost().startsWith("https://"), "expected https, got " + options.getHost());
+	}
+
+	@Test
+	void aProxyReachesTheClientTransport() {
+		ConnectionProperties properties = props().proxy(new ProxyConfig("proxy.example.com", 3128, null, null)).build();
+
+		HttpTransportOptions transport = (HttpTransportOptions) BQConnection.buildOptions(properties, NO_OP_CREDENTIALS)
+				.build().getTransportOptions();
+
+		assertSame(DriverTransports.forProxy(properties.proxy()), transport.getHttpTransportFactory(),
+				"the client must use the same transport the connection's credentials were built on");
+	}
+
+	@Test
+	void aProxyAndAConnectTimeoutComposeIntoOneTransportOptions() {
+		// They are two fields of the same object. Setting them through separate
+		// setTransportOptions calls would mean the second silently discarding the
+		// first, which is why buildOptions builds one HttpTransportOptions.
+		ConnectionProperties properties = props().connectionTimeout(45)
+				.proxy(new ProxyConfig("proxy.example.com", 3128, null, null)).build();
+
+		HttpTransportOptions transport = (HttpTransportOptions) BQConnection.buildOptions(properties, NO_OP_CREDENTIALS)
+				.build().getTransportOptions();
+
+		assertEquals(45_000, transport.getConnectTimeout());
+		assertSame(DriverTransports.forProxy(properties.proxy()), transport.getHttpTransportFactory());
+	}
+
+	@Test
+	void noProxyLeavesTheClientLibraryTransportAlone() {
+		// The unproxied path must keep the client's own default rather than an
+		// equivalent-looking copy of it
+		HttpTransportOptions transport = (HttpTransportOptions) optionsFor(null, 45, null, null).getTransportOptions();
+
+		assertEquals(BigQueryOptions.getDefaultHttpTransportOptions().getHttpTransportFactory().getClass(),
+				transport.getHttpTransportFactory().getClass());
 	}
 }

@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpTransportFactory;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 
 import java.io.FileInputStream;
@@ -82,9 +83,9 @@ public record ServiceAccountAuth(String jsonKeyPath) implements AuthType {
 	}
 
 	@Override
-	public Credentials toCredentials() throws IOException {
+	public Credentials toCredentials(HttpTransportFactory transportFactory) throws IOException {
 		try (FileInputStream fis = new FileInputStream(jsonKeyPath)) {
-			return ServiceAccountCredentials.fromStream(fis);
+			return ServiceAccountCredentials.fromStream(fis, transportFactory);
 		}
 	}
 }

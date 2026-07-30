@@ -17,6 +17,7 @@ package vc.tbc.bq.jdbc.config;
 
 import com.google.cloud.bigquery.DatasetId;
 import vc.tbc.bq.jdbc.auth.AuthType;
+import vc.tbc.bq.jdbc.transport.ProxyConfig;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -40,8 +41,9 @@ import java.util.Objects;
  * @param authType
  *            the authentication type (required)
  * @param host
- *            custom BigQuery API endpoint, e.g. a proxy or Private Service
- *            Connect (optional)
+ *            custom BigQuery API endpoint, e.g. Private Service Connect
+ *            (optional). Says where BigQuery is; see {@code proxy} for how the
+ *            driver reaches it
  * @param port
  *            custom port for BigQuery API (optional)
  * @param timeoutSeconds
@@ -121,6 +123,12 @@ import java.util.Objects;
  *            true). Applies only to the {@code INFORMATION_SCHEMA} queries this
  *            driver issues for {@link java.sql.DatabaseMetaData}, never to a
  *            caller's own statements.
+ * @param proxy
+ *            the HTTP proxy BigQuery calls and OAuth token requests are routed
+ *            through, or null to connect directly (default: whatever the JVM's
+ *            {@code https.proxyHost} says, which is usually nothing). Distinct
+ *            from {@code host}, which changes <em>where</em> BigQuery is rather
+ *            than how the driver gets there.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
@@ -131,7 +139,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
 		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold,
 		Boolean includeInformationSchema, List<String> additionalProjects, Boolean includeStructFields,
-		Boolean metadataJobCreationOptional) {
+		Boolean metadataJobCreationOptional, ProxyConfig proxy) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -285,6 +293,95 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		if (queryPricePerTiB != null && queryPricePerTiB.signum() < 0) {
 			throw new IllegalArgumentException("queryPricePerTiB cannot be negative: " + queryPricePerTiB);
 		}
+	}
+
+	/**
+	 * Creates properties without {@code proxy}, which then means a direct
+	 * connection unless the JVM's {@code https.proxy*} properties say otherwise.
+	 *
+	 * <p>
+	 * Same reason as the overloads below it: a record's canonical constructor is
+	 * part of its ABI, so growing the component list would break existing callers
+	 * at source and binary level.
+	 *
+	 * @param projectId
+	 *            the GCP project id
+	 * @param datasetId
+	 *            the default dataset, or null
+	 * @param datasetProjectId
+	 *            the project owning the dataset, or null to use {@code projectId}
+	 * @param authType
+	 *            the authentication type
+	 * @param host
+	 *            the API host override, or null
+	 * @param port
+	 *            the API port override, or null
+	 * @param timeoutSeconds
+	 *            query timeout in seconds
+	 * @param maxResults
+	 *            maximum rows to return, or null
+	 * @param useLegacySql
+	 *            whether to use legacy SQL
+	 * @param location
+	 *            the dataset location, or null
+	 * @param labels
+	 *            job labels
+	 * @param pageSize
+	 *            result page size
+	 * @param useStorageApi
+	 *            Storage Read API setting
+	 * @param enableSessions
+	 *            whether to create a session eagerly
+	 * @param connectionTimeout
+	 *            connection timeout in seconds
+	 * @param retryCount
+	 *            retry count
+	 * @param maxBillingBytes
+	 *            per-query billed-bytes ceiling, or null
+	 * @param metadataCacheTtl
+	 *            metadata cache TTL in seconds
+	 * @param metadataCacheEnabled
+	 *            whether the metadata cache is enabled
+	 * @param metadataLazyLoad
+	 *            whether metadata loads lazily
+	 * @param enableQueryCostEstimation
+	 *            whether to estimate query cost
+	 * @param nativeComplexTypes
+	 *            whether ARRAY/STRUCT map to native JDBC types
+	 * @param metadataCacheMaxRows
+	 *            row ceiling for one cached metadata result
+	 * @param queryPricePerTiB
+	 *            price per tebibyte billed, or null
+	 * @param metadataIncludeDescriptions
+	 *            whether table descriptions are read into REMARKS
+	 * @param collapseShardedTables
+	 *            whether date-sharded tables collapse to one wildcard entry
+	 * @param batchLoadThreshold
+	 *            row count at which executeBatch uses a load job, or null
+	 * @param includeInformationSchema
+	 *            whether INFORMATION_SCHEMA is browsable
+	 * @param additionalProjects
+	 *            further projects reported from getCatalogs()
+	 * @param includeStructFields
+	 *            whether getColumns() adds a row per STRUCT field
+	 * @param metadataJobCreationOptional
+	 *            whether metadata reads ask BigQuery to skip job creation
+	 */
+	public ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
+			String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
+			Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
+			Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
+			Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
+			Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
+			Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold,
+			Boolean includeInformationSchema, List<String> additionalProjects, Boolean includeStructFields,
+			Boolean metadataJobCreationOptional) {
+		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
+				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
+				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
+				nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB, metadataIncludeDescriptions,
+				collapseShardedTables, batchLoadThreshold, includeInformationSchema, additionalProjects,
+				includeStructFields, metadataJobCreationOptional, null);
 	}
 
 	/**

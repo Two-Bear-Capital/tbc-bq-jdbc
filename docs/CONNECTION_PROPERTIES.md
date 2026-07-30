@@ -56,6 +56,10 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 | `Location` | `location` | BigQuery location |
 | `DatasetProjectId` | `datasetProjectId` | Cross-project dataset access |
 | `EnableSessions` | `enableSessions` | Create a BigQuery session at connection open |
+| `ProxyHost` | `proxyHost` | HTTP proxy hostname |
+| `ProxyPort` | `proxyPort` | HTTP proxy port |
+| `ProxyUid` | `proxyUser` | Proxy username |
+| `ProxyPwd` | `proxyPassword` | Proxy password |
 
 **OAuthType Values:**
 
@@ -86,14 +90,14 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 **Migration from Simba:**
 
 Replace the Simba JDBC driver with tbc-bq-jdbc and set the driver class to
-`vc.tbc.bq.jdbc.BQDriver`. The thirteen Simba property names in the table above are
+`vc.tbc.bq.jdbc.BQDriver`. The seventeen Simba property names in the table above are
 translated automatically, so most connection strings work unchanged. Two things to check:
 
 - `OAuthType=2` (pre-generated access tokens) is rejected with an error. Use `0` or `3`.
 - Any other property name is passed through untranslated. Native tbc-bq-jdbc property
   names therefore work in a Simba-format URL, but Simba-only options the driver has no
-  equivalent for (`OAuthPvtKey`, `AllowLargeResults`, `LogLevel`, `ProxyHost`, …) are
-  accepted and ignored rather than rejected.
+  equivalent for (`OAuthPvtKey`, `AllowLargeResults`, `LogLevel`, …) are accepted and
+  ignored rather than rejected.
 
 **Host and port.** By default the driver talks to Google's BigQuery endpoints, and the
 `https://www.googleapis.com/bigquery/v2:443` authority in a typical Simba URL changes
@@ -238,6 +242,43 @@ jdbc:bigquery:my-project/my_dataset?authType=ADC&location=EU
 **Notes:**
 - If `location` is not set, BigQuery uses the dataset's location
 - `datasetProjectId` allows querying datasets in other projects you have access to
+
+---
+
+### HTTP Proxy
+
+Covers `proxyHost`, `proxyPort`, `proxyUser` and `proxyPassword` (see the
+[generated table](generated/connection-properties.md) for defaults).
+
+Set these when outbound HTTPS has to leave the network through a proxy. They are distinct
+from `host`/`port`, which change *where BigQuery is*; a proxy changes *how the driver gets
+there*, and BigQuery remains at its own address.
+
+**Example:**
+```
+jdbc:bigquery:my-project/my_dataset?proxyHost=proxy.corp.example.com&proxyPort=3128
+```
+
+**Authenticated proxy:**
+```
+jdbc:bigquery:my-project/my_dataset?proxyHost=proxy.corp.example.com&proxyPort=3128&proxyUser=someone&proxyPassword=secret
+```
+
+**Notes:**
+- `proxyPort` is required whenever `proxyHost` is set. There is no conventional outbound
+  proxy port to assume, and a wrong guess fails as a connection refused against an
+  unrelated port rather than as an error naming the missing setting.
+- Both BigQuery API calls and OAuth token requests go through the proxy. Credentials are
+  minted and refreshed over a separate connection from queries, so a proxy that covered
+  only one of the two would fail before a query was ever sent.
+- With no `proxyHost` set, the driver falls back to the JVM's standard
+  `https.proxyHost`, `https.proxyPort`, `https.proxyUser` and `https.proxyPassword` system
+  properties. An explicit `proxyHost` wins outright and does not inherit credentials from
+  them.
+- The Storage Read API (`useStorageApi`) is gRPC, and reads those same JVM system
+  properties itself. Configure the proxy through the JVM properties, not just these
+  connection properties, if you use it.
+- A proxy password is never written to a log line.
 
 ---
 
