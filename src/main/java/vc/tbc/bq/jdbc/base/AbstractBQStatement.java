@@ -29,6 +29,8 @@ import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.exception.ServiceErrorDetail;
 import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 import vc.tbc.bq.jdbc.storage.ArrowSupport;
+import vc.tbc.bq.jdbc.telemetry.DriverTracing;
+import vc.tbc.bq.jdbc.telemetry.QuerySpan;
 import vc.tbc.bq.jdbc.storage.StorageReadResultSet;
 import vc.tbc.bq.jdbc.util.ScriptResults;
 import vc.tbc.bq.jdbc.util.QueryCostEstimate;
@@ -1356,61 +1358,95 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		// next. See DriverMetrics.
 		long startNanos = System.nanoTime();
 		boolean succeeded = false;
+		String failureSqlState = null;
+		Throwable failure = null;
 
 		// Counted before the call, not after it returns: this is what makes
 		// queriesInFlight() meaningful. Incrementing it alongside the terminal
 		// counters would make it their sum by construction and in-flight always zero.
 		DriverMetrics.recordQuerySubmitted();
 
-		try {
-			// No JobId is supplied, deliberately. BigQuery job ids are location-scoped
-			// and the client builds one that carries the connection's location:
-			// BigQueryImpl.create() generates JobId.of().setLocation(options.location),
-			// and getJob/cancel fall back to that same location for an id without one.
-			// Passing our own id would take this off the library's random-id path,
-			// which is what lets a create RPC that fails after BigQuery accepted the
-			// job recover by fetching it rather than reporting an error for a job that
-			// is running and billing. RealCrossRegionJobTest holds the round-trip.
-			Job job = bigquery.create(JobInfo.of(config));
+		// The span sits alongside the counters and at the same choke point, for the
+		// one thing they cannot express: which BigQuery job made this request slow.
+		// No-op unless the host supplied the OpenTelemetry API and registered an SDK.
+		try (QuerySpan span = DriverTracing.start("BigQuery." + operation.toLowerCase(Locale.ROOT),
+				properties.enableTracing())) {
+			span.setAttribute("db.system.name", "bigquery");
+			span.setAttribute("db.namespace", properties.projectId());
+			span.setAttribute("db.operation.name", operation);
+			try {
+				// No JobId is supplied, deliberately. BigQuery job ids are location-scoped
+				// and the client builds one that carries the connection's location:
+				// BigQueryImpl.create() generates JobId.of().setLocation(options.location),
+				// and getJob/cancel fall back to that same location for an id without one.
+				// Passing our own id would take this off the library's random-id path,
+				// which is what lets a create RPC that fails after BigQuery accepted the
+				// job recover by fetching it rather than reporting an error for a job that
+				// is running and billing. RealCrossRegionJobTest holds the round-trip.
+				Job job = bigquery.create(JobInfo.of(config));
 
-			// currentJob is volatile: this single reference write is already visible
-			// to cancel() on another thread. It used to also hold the monitor, which
-			// added nothing and implied an invariant that does not exist.
-			this.currentJob = job;
+				// currentJob is volatile: this single reference write is already visible
+				// to cancel() on another thread. It used to also hold the monitor, which
+				// added nothing and implied an invariant that does not exist.
+				this.currentJob = job;
 
-			logger.debug("{} job created: {}", getLogPrefix(), job.getJobId());
+				logger.debug("{} job created: {}", getLogPrefix(), job.getJobId());
+				// The attribute the whole span exists for: it is what turns a slow
+				// application request into a job someone can look up in the console or in
+				// INFORMATION_SCHEMA.JOBS.
+				//
+				// Null-guarded because getJobId() can be null, which the debug line above
+				// tolerates by formatting and this would not. Telemetry must never be the
+				// reason a query fails.
+				if (job.getJobId() != null) {
+					span.setAttribute("bigquery.job_id", job.getJobId().getJob());
+				}
 
-			job = job.waitFor();
+				job = job.waitFor();
 
-			if (job == null) {
-				throw new QueryJobFailure("Job no longer exists", BQSQLException.SQLSTATE_GENERAL_ERROR, null);
+				if (job == null) {
+					throw new QueryJobFailure("Job no longer exists", BQSQLException.SQLSTATE_GENERAL_ERROR, null);
+				}
+
+				JobStatus status = job.getStatus();
+				if (status.getError() != null) {
+					BigQueryError error = status.getError();
+					throw new QueryJobFailure(
+							operation + " failed (job: " + job.getJobId() + "): " + error.getMessage(),
+							sqlStateFor(error), null);
+				}
+
+				succeeded = true;
+				return job;
+
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				failureSqlState = BQSQLException.SQLSTATE_OPERATION_CANCELED;
+				failure = e;
+				throw new QueryJobFailure(operation + " interrupted", BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
+			} catch (QueryJobFailure e) {
+				// Caught only to give the span the SQLState the caller will see, then
+				// rethrown unchanged. Classification stays where it was.
+				failureSqlState = e.getSQLState();
+				failure = e;
+				throw e;
+			} catch (RuntimeException e) {
+				failure = e;
+				throw e;
+			} finally {
+				// In a finally block so a job that fails, times out or is cancelled is
+				// counted too. A workload whose queries fail slowly is precisely the shape
+				// worth being able to see, and recording only the successes would hide it.
+				long elapsedNanos = System.nanoTime() - startNanos;
+				if (succeeded) {
+					DriverMetrics.recordQuerySucceeded(elapsedNanos);
+				} else {
+					DriverMetrics.recordQueryFailed(elapsedNanos);
+					span.recordFailure(failureSqlState, failure);
+				}
+				logger.debug("{} {} {} in {} ms", getLogPrefix(), operation, succeeded ? "completed" : "failed",
+						TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
 			}
-
-			JobStatus status = job.getStatus();
-			if (status.getError() != null) {
-				BigQueryError error = status.getError();
-				throw new QueryJobFailure(operation + " failed (job: " + job.getJobId() + "): " + error.getMessage(),
-						sqlStateFor(error), null);
-			}
-
-			succeeded = true;
-			return job;
-
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new QueryJobFailure(operation + " interrupted", BQSQLException.SQLSTATE_OPERATION_CANCELED, e);
-		} finally {
-			// In a finally block so a job that fails, times out or is cancelled is
-			// counted too. A workload whose queries fail slowly is precisely the shape
-			// worth being able to see, and recording only the successes would hide it.
-			long elapsedNanos = System.nanoTime() - startNanos;
-			if (succeeded) {
-				DriverMetrics.recordQuerySucceeded(elapsedNanos);
-			} else {
-				DriverMetrics.recordQueryFailed(elapsedNanos);
-			}
-			logger.debug("{} {} {} in {} ms", getLogPrefix(), operation, succeeded ? "completed" : "failed",
-					TimeUnit.NANOSECONDS.toMillis(elapsedNanos));
 		}
 	}
 

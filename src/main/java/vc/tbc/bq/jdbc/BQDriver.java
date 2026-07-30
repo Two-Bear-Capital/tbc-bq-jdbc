@@ -244,6 +244,10 @@ public final class BQDriver implements Driver {
 						+ "and falls back to the standard path when unavailable",
 				false, new String[]{"auto", "true", "false"}));
 
+		props.add(prop(info, "enableTracing", "true",
+				"Emit an OpenTelemetry span per query, metadata read, session and credential build, carrying the BigQuery job id so a slow application request can be traced to the job that caused it. Requires the host application to put the OpenTelemetry API on the classpath and register an SDK — the driver bundles neither, and without both a span is a no-op. Set false to keep the driver silent inside a host that traces everything else",
+				false, new String[]{"true", "false"}));
+
 		props.add(prop(info, "enableSessions", "false",
 				"Enable BigQuery sessions to support transactions and temporary tables", false,
 				new String[]{"true", "false"}));

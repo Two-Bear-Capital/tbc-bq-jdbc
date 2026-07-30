@@ -131,6 +131,13 @@ import java.util.Objects;
  *            {@code javax.net.ssl.trustStore*} properties say). Distinct from
  *            {@code host}, which changes <em>where</em> BigQuery is rather than
  *            how the driver gets there. Never null.
+ * @param enableTracing
+ *            whether the driver emits OpenTelemetry spans (default: true).
+ *            Emitting requires the host to supply the OpenTelemetry API and
+ *            register an SDK — without both, a span costs a no-op call and
+ *            nothing leaves the process — so the useful setting is
+ *            {@code false}, to keep a driver quiet inside a host that traces
+ *            everything else.
  * @since 1.0.0
  */
 public record ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
@@ -141,7 +148,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
 		Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold,
 		Boolean includeInformationSchema, List<String> additionalProjects, Boolean includeStructFields,
-		Boolean metadataJobCreationOptional, TransportConfig transport) {
+		Boolean metadataJobCreationOptional, TransportConfig transport, Boolean enableTracing) {
 
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -286,6 +293,14 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		if (transport == null) {
 			transport = TransportConfig.direct();
 		}
+		if (enableTracing == null) {
+			// On by default, unlike every other opt-in here, because the gate that
+			// matters is not this flag: with no OpenTelemetry SDK registered the span
+			// is OpenTelemetry's own no-op and nothing is emitted. A host that has
+			// configured tracing has already opted in, and would otherwise have to
+			// repeat itself in every connection string to see the driver's spans.
+			enableTracing = true;
+		}
 		// No default: a load job is a different mechanism, not a faster one of the
 		// same kind. It is not DML-quota bound, but neither is it transactional nor
 		// atomic with surrounding DML, so switching to it at some row count would
@@ -300,6 +315,96 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 		if (queryPricePerTiB != null && queryPricePerTiB.signum() < 0) {
 			throw new IllegalArgumentException("queryPricePerTiB cannot be negative: " + queryPricePerTiB);
 		}
+	}
+
+	/**
+	 * Creates properties without {@code enableTracing}, which then defaults to on.
+	 *
+	 * <p>
+	 * Same reason as the overloads below it: a record's canonical constructor is
+	 * part of its ABI, so growing the component list would break existing callers
+	 * at source and binary level. This is the canonical shape as of 4.3.0.
+	 *
+	 * @param projectId
+	 *            the GCP project id
+	 * @param datasetId
+	 *            the default dataset, or null
+	 * @param datasetProjectId
+	 *            the project owning the dataset, or null to use {@code projectId}
+	 * @param authType
+	 *            the authentication type
+	 * @param host
+	 *            the API host override, or null
+	 * @param port
+	 *            the API port override, or null
+	 * @param timeoutSeconds
+	 *            query timeout in seconds
+	 * @param maxResults
+	 *            maximum rows to return, or null
+	 * @param useLegacySql
+	 *            whether to use legacy SQL
+	 * @param location
+	 *            the dataset location, or null
+	 * @param labels
+	 *            job labels
+	 * @param pageSize
+	 *            result page size
+	 * @param useStorageApi
+	 *            Storage Read API setting
+	 * @param enableSessions
+	 *            whether to create a session eagerly
+	 * @param connectionTimeout
+	 *            connection timeout in seconds
+	 * @param retryCount
+	 *            retry count
+	 * @param maxBillingBytes
+	 *            per-query billed-bytes ceiling, or null
+	 * @param metadataCacheTtl
+	 *            metadata cache TTL in seconds
+	 * @param metadataCacheEnabled
+	 *            whether the metadata cache is enabled
+	 * @param metadataLazyLoad
+	 *            whether metadata loads lazily
+	 * @param enableQueryCostEstimation
+	 *            whether to estimate query cost
+	 * @param nativeComplexTypes
+	 *            whether ARRAY/STRUCT map to native JDBC types
+	 * @param metadataCacheMaxRows
+	 *            row ceiling for one cached metadata result
+	 * @param queryPricePerTiB
+	 *            price per tebibyte billed, or null
+	 * @param metadataIncludeDescriptions
+	 *            whether table descriptions are read into REMARKS
+	 * @param collapseShardedTables
+	 *            whether date-sharded tables collapse to one wildcard entry
+	 * @param batchLoadThreshold
+	 *            row count at which executeBatch uses a load job, or null
+	 * @param includeInformationSchema
+	 *            whether INFORMATION_SCHEMA is browsable
+	 * @param additionalProjects
+	 *            further projects reported from getCatalogs()
+	 * @param includeStructFields
+	 *            whether getColumns() adds a row per STRUCT field
+	 * @param metadataJobCreationOptional
+	 *            whether metadata reads ask BigQuery to skip job creation
+	 * @param transport
+	 *            the proxy and truststore settings, or null for the defaults
+	 */
+	public ConnectionProperties(String projectId, String datasetId, String datasetProjectId, AuthType authType,
+			String host, Integer port, Integer timeoutSeconds, Long maxResults, boolean useLegacySql, String location,
+			Map<String, String> labels, Integer pageSize, String useStorageApi, boolean enableSessions,
+			Integer connectionTimeout, Integer retryCount, Long maxBillingBytes, Integer metadataCacheTtl,
+			Boolean metadataCacheEnabled, Boolean metadataLazyLoad, Boolean enableQueryCostEstimation,
+			Boolean nativeComplexTypes, Integer metadataCacheMaxRows, BigDecimal queryPricePerTiB,
+			Boolean metadataIncludeDescriptions, Boolean collapseShardedTables, Integer batchLoadThreshold,
+			Boolean includeInformationSchema, List<String> additionalProjects, Boolean includeStructFields,
+			Boolean metadataJobCreationOptional, TransportConfig transport) {
+		this(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds, maxResults, useLegacySql,
+				location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout, retryCount,
+				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
+				nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB, metadataIncludeDescriptions,
+				collapseShardedTables, batchLoadThreshold, includeInformationSchema, additionalProjects,
+				includeStructFields, metadataJobCreationOptional, transport, null);
 	}
 
 	/**
@@ -390,7 +495,7 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 				maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad, enableQueryCostEstimation,
 				nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB, metadataIncludeDescriptions,
 				collapseShardedTables, batchLoadThreshold, includeInformationSchema, additionalProjects,
-				includeStructFields, metadataJobCreationOptional, null);
+				includeStructFields, metadataJobCreationOptional, null, null);
 	}
 
 	/**

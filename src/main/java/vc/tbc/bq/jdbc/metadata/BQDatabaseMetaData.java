@@ -42,6 +42,8 @@ import vc.tbc.bq.jdbc.base.BaseJdbcWrapper;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
+import vc.tbc.bq.jdbc.telemetry.DriverTracing;
+import vc.tbc.bq.jdbc.telemetry.QuerySpan;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
 import vc.tbc.bq.jdbc.util.SqlStringLiterals;
@@ -3619,17 +3621,43 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 		// never read, and reading the settings to compose it would be pure work.
 		String cacheKey = cache == null ? rawKey : metadataShapeKey() + rawKey;
 
-		// Check cache if enabled
-		if (cache != null) {
-			java.util.Optional<ResultSet> cached = cache.get(cacheKey);
-			if (cached.isPresent()) {
-				cacheHits++;
-				logger.trace("Cache hit for: {}", cacheKey);
-				logCacheStatsIfNeeded();
-				return cached.get();
-			}
-		}
+		// Spanned here rather than at MetadataCache.get(), which sees only the
+		// lookup. This covers hit-or-load, so the INFORMATION_SCHEMA job spans a miss
+		// fans out get a parent naming the metadata call they belong to — a
+		// getTables that took three seconds over twelve datasets reads as one tree
+		// rather than twelve unattached jobs.
+		try (QuerySpan span = DriverTracing.start("BigQuery.metadata", connection.getProperties().enableTracing())) {
+			span.setAttribute("db.system.name", "bigquery");
+			// The key's prefix, never the key: everything after the first colon is
+			// the caller's catalog and pattern arguments, which are unbounded and
+			// theirs.
+			span.setAttribute("db.operation.name", operationOf(rawKey));
 
+			// Check cache if enabled
+			if (cache != null) {
+				java.util.Optional<ResultSet> cached = cache.get(cacheKey);
+				if (cached.isPresent()) {
+					cacheHits++;
+					logger.trace("Cache hit for: {}", cacheKey);
+					logCacheStatsIfNeeded();
+					span.setAttribute("bigquery.metadata.cache", "hit");
+					return cached.get();
+				}
+			}
+			span.setAttribute("bigquery.metadata.cache", "miss");
+			return executeAndCache(cacheKey, supplier);
+		}
+	}
+
+	/**
+	 * The operation a cache key names, which is everything before its first colon.
+	 */
+	private static String operationOf(String rawKey) {
+		int colon = rawKey.indexOf(':');
+		return colon < 0 ? rawKey : rawKey.substring(0, colon);
+	}
+
+	private ResultSet executeAndCache(String cacheKey, SqlSupplier<ResultSet> supplier) throws SQLException {
 		// Execute query
 		cacheMisses++;
 		logger.trace("Cache miss for: {}", cacheKey);

@@ -54,13 +54,13 @@ before you run it.
 | JDBC spec | 4.3 | 4.2 |
 | Maven Central | ❌ not published | ✅ `com.google.cloud:google-cloud-bigquery-jdbc` |
 | Support | Community | Google, via the `google-cloud-java` issue tracker |
-| Connection properties | 47 | 76 recognised, 56 advertised |
+| Connection properties | 48 | 76 recognised, 56 advertised |
 | Simba-style URLs | ⚠️ common subset translated | ✅ broad |
 | Storage Read API (Arrow) | ✅ `useStorageApi` | ✅ `EnableHighThroughputAPI` |
 | Storage Write API | ⏳ tracked ([#267][i267]) — load jobs today | ✅ `EnableWriteAPI` |
 | Metadata caching | ✅ TTL cache, shared across connections | ❌ none |
 | Sessions | One per connection, reused | New session per statement in auto-commit |
-| OpenTelemetry | ⏳ tracked ([#269][i269]) — own counters today | ✅ traces + GCP exporters |
+| OpenTelemetry | ✅ traces, API-only — plus own counters | ✅ traces + GCP exporters |
 | HTTP proxy | ✅ `proxyHost`/`proxyPort`, with proxy auth | ✅ |
 | Custom TLS truststore | ✅ `trustStore`, incl. type and provider | ✅ |
 | `CallableStatement` | ❌ by design ([#272][i272]) | ✅ |
@@ -170,7 +170,7 @@ Anything unmarked is a genuine difference that is simply not addressed here.
 
 | Area | Detail |
 |---|---|
-| **OpenTelemetry** *(tracked — [#269][i269])* | Traces and spans, GCP trace and log exporters, `useGlobalOpenTelemetry`, and trace/span IDs injected into local logs. `tbc-bq-jdbc` exposes JVM-global counters through `DriverMetrics` and no tracing. |
+| **Bundled telemetry exporters** *(by design — [#269][i269])* | Google ships GCP trace and log exporters and injects trace/span IDs into local log lines (`enableGcpTraceExporter`, `enableGcpLogExporter`, `gcpTelemetryProjectId`, `gcpTelemetryCredentials`). `tbc-bq-jdbc` emits spans through the OpenTelemetry **API only** and bundles no SDK and no exporters: sampling and export belong to the host application, and a driver dropped into an IDE should not drag in an observability stack. Both join an existing SDK — Google through `useGlobalOpenTelemetry`, this driver through `GlobalOpenTelemetry` by default. |
 | **Per-connection log files** *(by design — [#277][i277])* | `LogLevel`/`LogPath` with a per-connection file handler and MDC, matching Simba's diagnostic workflow. `tbc-bq-jdbc` logs through SLF4J and leaves the backend to the host application; the `with-logging` jar bundles one for tools that have none. |
 | **Job controls** *(by design — [#276][i276])* | `KMSKeyName`, `RequestReason`, `PartnerToken`, `AllowLargeResults` with `LargeResultDataset`/`LargeResultTable`, destination table and dataset control, `RetryInitialDelay`/`RetryMaxDelay`, and `QueryDialect` for legacy SQL. `tbc-bq-jdbc` covers `labels`, `maxBillingBytes`, `retryCount` and `useLegacySql` only. |
 | **Project discovery** | `EnableProjectDiscovery` finds projects automatically. `tbc-bq-jdbc` requires them to be listed in `additionalProjects`. |
@@ -189,6 +189,7 @@ Neither driver has a meaningful edge here.
 | **Key metadata** | Both report primary and foreign keys from BigQuery's table constraints. |
 | **Authentication** | Both cover ADC, service-account keys, user OAuth refresh tokens, pre-generated access tokens, service-account impersonation, and workload/workforce identity federation. Google additionally supports P12 keys. `tbc-bq-jdbc` is alone in accepting an expiry for a pre-generated token, which turns the eventual 401 into a connection-time error naming the expiry. |
 | **Parallel metadata fan-out** | Both fan out per-dataset metadata queries across a bounded thread pool. `tbc-bq-jdbc` uses `INFORMATION_SCHEMA` queries; Google uses the REST list APIs. |
+| **Distributed tracing** | Both emit OpenTelemetry spans carrying the BigQuery job id, and both join an SDK the host has registered. They differ in what else ships with them, above. |
 | **Cancellation and timeouts** | Both implement `Statement.cancel()` and query timeouts against the underlying job. |
 | **Metadata completeness** | Both implement the full `DatabaseMetaData` surface including `getProcedures`, `getProcedureColumns`, `getFunctions` and `getFunctionColumns`. |
 | **Unsupported by BigQuery** | Neither offers scrollable or updatable result sets, savepoints, or configurable transaction isolation — BigQuery does not support them. |
