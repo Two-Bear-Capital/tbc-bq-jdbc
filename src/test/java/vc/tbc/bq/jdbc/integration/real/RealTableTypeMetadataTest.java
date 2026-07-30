@@ -19,7 +19,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -44,18 +43,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * test asserts what the driver reports for each.
  *
  * <p>
- * <b>Enabling:</b> creating a snapshot needs
+ * <b>Access:</b> creating a snapshot needs
  * {@code bigquery.tables.createSnapshot} and {@code deleteSnapshot}, which
- * {@code roles/bigquery.dataEditor} does not carry — so this class is gated on
- * {@code BQ_TEST_SNAPSHOT_FIXTURES} rather than failing CI until Terraform has
- * upgraded the CI service account to {@code dataOwner} on the test dataset. A
- * maintainer running the suite under their own credentials already has it. See
- * #252.
+ * {@code roles/bigquery.dataEditor} does not carry. The CI service account
+ * holds {@code roles/bigquery.dataOwner} on the test dataset from
+ * {@code terraform/main.tf}, and a maintainer running under their own
+ * credentials already has it. This was gated on an environment variable until
+ * that grant existed; the gate is gone because a class that can silently stop
+ * running is worse than one that fails.
  *
  * @since 4.0.0
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@EnabledIfEnvironmentVariable(named = "BQ_TEST_SNAPSHOT_FIXTURES", matches = ".+", disabledReason = "BQ_TEST_SNAPSHOT_FIXTURES is not set — the caller may not be able to create table snapshots")
 class RealTableTypeMetadataTest extends AbstractRealBigQueryIntegrationTest {
 
 	private static final String BASE = tableName("types_base");
