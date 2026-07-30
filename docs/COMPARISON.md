@@ -5,7 +5,8 @@ Google published its own first-party BigQuery JDBC driver,
 reaching 1.0.0 on 4 June 2026. This page compares it with `tbc-bq-jdbc` so you can pick the
 right driver for your situation. It is a snapshot, not a running scoreboard.
 
-**Compared:** `tbc-bq-jdbc` 4.1.0 · `google-cloud-bigquery-jdbc` 1.1.0 · **as of 29 July 2026**
+**Compared:** `tbc-bq-jdbc` 4.2.0 · `google-cloud-bigquery-jdbc` 1.1.0 · Google's driver read
+at **1.1.0 on 29 July 2026** and not re-read since
 
 Google's driver is under heavy active development and this comparison will date quickly.
 Both drivers are Apache 2.0.
@@ -19,81 +20,52 @@ Both drivers are Apache 2.0.
 
 ## Pick a driver
 
-**Choose Google's driver if** you need Java 8–17, HTTP proxy support, a custom TLS truststore, the
-optional JDBC pooling API (`ConnectionPoolDataSource`), `CallableStatement`, OpenTelemetry
-tracing, or a first-party support relationship.
+The two drivers aim at different environments, and most of what follows comes from that rather
+than from one being further along than the other.
 
-**Choose `tbc-bq-jdbc` if** you are on Java 21+ and want metadata caching for interactive SQL
-tools, one BigQuery session per connection, cheap auto-commit toggling under a connection pool,
-query cost estimation, or the batch-insert and metadata-shaping controls listed below.
+**`tbc-bq-jdbc` is built for Java 21+ applications and interactive SQL tools.** It assumes a
+modern JVM and a modern deployment — an external connection pool, structured logging, an IDE
+session that introspects a wide schema constantly. That focus is what pays for the metadata
+cache, one reused BigQuery session per connection, auto-commit toggling that costs no jobs,
+query cost estimation, and REST/Arrow result parity enforced by a test.
+
+**Google's driver is built for reach.** Java 8 onward, on Maven Central, broad Simba property
+translation, and the networking a restricted corporate estate needs — Private Service
+Connect, a universe domain. It also implements the optional JDBC pooling API and comes
+with a support relationship.
+
+So:
+
+**Choose Google's driver if** you are on Java 8–17, need Private Service Connect, want
+`ConnectionPoolDataSource` rather than an external pool, need `CallableStatement` or
+OpenTelemetry today, or want first-party support.
+
+**Choose `tbc-bq-jdbc` if** you are on Java 21+ and your friction is schema introspection in an
+IDE, session and transaction behaviour under a connection pool, or knowing what a query will cost
+before you run it.
 
 ---
 
 ## At a glance
 
-| | `tbc-bq-jdbc` 4.1.0 | `google-cloud-bigquery-jdbc` 1.1.0 |
+| | `tbc-bq-jdbc` 4.2.0 | `google-cloud-bigquery-jdbc` 1.1.0 |
 |---|---|---|
 | Java baseline | 21+ | 8+ |
 | JDBC spec | 4.3 | 4.2 |
 | Maven Central | ❌ not published | ✅ `com.google.cloud:google-cloud-bigquery-jdbc` |
 | Support | Community | Google, via the `google-cloud-java` issue tracker |
-| Connection properties | 30 | 73 |
+| Connection properties | 37 | 73 |
 | Simba-style URLs | ⚠️ common subset translated | ✅ broad |
 | Storage Read API (Arrow) | ✅ `useStorageApi` | ✅ `EnableHighThroughputAPI` |
-| Storage Write API | ❌ (uses load jobs) | ✅ `EnableWriteAPI` |
+| Storage Write API | ⏳ tracked ([#267][i267]) — load jobs today | ✅ `EnableWriteAPI` |
 | Metadata caching | ✅ TTL cache, shared across connections | ❌ none |
 | Sessions | One per connection, reused | New session per statement in auto-commit |
-| OpenTelemetry | ❌ (own counters instead) | ✅ traces + GCP exporters |
-| HTTP proxy | ❌ | ✅ |
-| `CallableStatement` | ❌ | ✅ |
+| OpenTelemetry | ⏳ tracked ([#269][i269]) — own counters today | ✅ traces + GCP exporters |
+| HTTP proxy | ✅ `proxyHost`/`proxyPort`, with proxy auth | ✅ |
+| Custom TLS truststore | ✅ `trustStore`, incl. type and provider | ✅ |
+| `CallableStatement` | ❌ by design ([#272][i272]) | ✅ |
 | `javax.sql.DataSource` | ✅ | ✅ |
-| `ConnectionPoolDataSource` | ❌ (pool with HikariCP) | ✅ |
-
----
-
-## Where Google's driver is ahead
-
-### Reach and packaging
-
-| Area | Detail |
-|---|---|
-| **Java 8** | Runs on Java 8 through current. `tbc-bq-jdbc` requires Java 21 — it compiles at `release 21` and uses records and sealed interfaces. This is the single biggest practical gap for older estates and for embedding in tools on legacy JVMs. |
-| **Maven Central** | Published, with thin, fat, and shaded jars, and a documented `Makefile`/Docker build. `tbc-bq-jdbc` is not on Maven Central. |
-| **First-party support** | Filed issues reach the BigQuery drivers team, who also coordinate with the BigQuery backend and Simba teams. |
-
-### Connectivity and enterprise networking
-
-| Area | Detail |
-|---|---|
-| **HTTP proxy** | `ProxyHost`, `ProxyPort`, `ProxyUid`, `ProxyPwd`, propagated to the auth library as well as the API client, and exercised by a dockerised proxy integration suite. `tbc-bq-jdbc` has no proxy support at all. |
-| **Custom TLS truststore** | `SSLTrustStore`, `SSLTrustStorePwd`, `SSLTrustStoreType`, `SSLTrustStoreProvider`, and it honours the standard JVM truststore properties. `tbc-bq-jdbc` has none of these. |
-| **Private Service Connect** | `PrivateServiceConnectUris`, `EndpointOverrides`, `universeDomain`. `tbc-bq-jdbc` offers only a single `host`/`port` endpoint override. |
-
-### JDBC surface
-
-| Area | Detail |
-|---|---|
-| **`ConnectionPoolDataSource`** | Google implements the optional JDBC pooling API — `ConnectionPoolDataSource` and `PooledConnection`, with `ConnectionPoolSize` and `ListenerPoolSize`. `tbc-bq-jdbc` ships a [`DataSource`](DATASOURCE.md) but no pooling API, and relies on an external pool such as HikariCP. |
-| **`CallableStatement`** | Implemented, for calling BigQuery stored procedures. `tbc-bq-jdbc` throws `SQLFeatureNotSupportedException`. |
-| **Pre-generated access tokens** | `OAuthType=2` is supported. `tbc-bq-jdbc` rejects it, and supports JSON service-account keys only — Google also accepts P12 (`OAuthP12Password`). |
-
-### Performance features we lack
-
-| Area | Detail |
-|---|---|
-| **Short query optimization** | `JobCreationMode` sets `JOB_CREATION_OPTIONAL` for *every* query, letting BigQuery answer short ones without creating a job at all. `tbc-bq-jdbc` applies this to its own metadata reads (`metadataJobCreationOptional`, on by default) but not to statements you execute, which always create a job. |
-| **Storage Write API inserts** | Bulk inserts can stream through `JsonStreamWriter` (`EnableWriteAPI`, `SWA_ActivationRowCount`, `SWA_AppendRowCount`), which avoids both DML statement quotas and load-job quotas. `tbc-bq-jdbc`'s largest-batch path is a load job. |
-| **Adaptive Arrow activation** | Read API use is decided per result from `HighThroughputMinTableSize` and `HighThroughputActivationRatio`. `tbc-bq-jdbc`'s `auto` mode also declines a result that arrived complete in one page, but sizes what remains with a flat 10 MB estimate (`rows × 1 KB`) rather than configurable thresholds. |
-| **Streaming metadata** | Metadata fetches are submitted to a connection-scoped executor and rows are consumed as they arrive, so large schemas start returning sooner. `MetaDataFetchThreadCount` is configurable; `tbc-bq-jdbc` hard-codes a cap of 16. |
-
-### Observability and operational controls
-
-| Area | Detail |
-|---|---|
-| **OpenTelemetry** | Traces and spans, GCP trace and log exporters, `useGlobalOpenTelemetry`, and trace/span IDs injected into local logs. `tbc-bq-jdbc` exposes JVM-global counters through `DriverMetrics` and no tracing. |
-| **Per-connection log files** | `LogLevel`/`LogPath` with a per-connection file handler and MDC, matching Simba's diagnostic workflow. |
-| **Job controls** | `KMSKeyName`, `RequestReason`, `PartnerToken`, `AllowLargeResults` with `LargeResultDataset`/`LargeResultTable`, destination table and dataset control, `RetryInitialDelay`/`RetryMaxDelay`, and `QueryDialect` for legacy SQL. `tbc-bq-jdbc` covers `labels`, `maxBillingBytes`, `retryCount` and `useLegacySql` only. |
-| **Project discovery** | `EnableProjectDiscovery` finds projects automatically. `tbc-bq-jdbc` requires them to be listed in `additionalProjects`. |
+| `ConnectionPoolDataSource` | ❌ by design — pool with HikariCP | ✅ |
 
 ---
 
@@ -144,6 +116,60 @@ the difference.
 
 ---
 
+## Where Google's driver is ahead
+
+These are not all the same kind of difference, and the kind matters when you weigh them:
+
+- **Structural** — follows from Google's Java 8 baseline, Maven Central publishing and
+  first-party staffing. Not something this driver is working toward.
+- **Tracked** — a real gap with an open issue, linked inline.
+- **By design** — considered and declined, with the reasoning given. Linked to the issue where
+  that decision is recorded.
+
+Anything unmarked is a genuine difference that is simply not addressed here.
+
+### Reach and packaging
+
+| Area | Detail |
+|---|---|
+| **Java 8** | Runs on Java 8 through current. `tbc-bq-jdbc` requires Java 21 — it compiles at `release 21` and uses records and sealed interfaces. This is the single biggest practical gap for older estates and for embedding in tools on legacy JVMs. |
+| **Maven Central** | Published, with thin, fat, and shaded jars, and a documented `Makefile`/Docker build. `tbc-bq-jdbc` is not on Maven Central. |
+| **First-party support** | Filed issues reach the BigQuery drivers team, who also coordinate with the BigQuery backend and Simba teams. |
+
+### Connectivity and enterprise networking
+
+| Area | Detail |
+|---|---|
+| **Private Service Connect** | `PrivateServiceConnectUris`, `EndpointOverrides`, `universeDomain`. `tbc-bq-jdbc` offers only a single `host`/`port` endpoint override. |
+
+### JDBC surface
+
+| Area | Detail |
+|---|---|
+| **`ConnectionPoolDataSource`** *(by design)* | Google implements the optional JDBC pooling API — `ConnectionPoolDataSource` and `PooledConnection`, with `ConnectionPoolSize` and `ListenerPoolSize`. `tbc-bq-jdbc` ships a [`DataSource`](DATASOURCE.md) and stops there: HikariCP, Tomcat JDBC and Spring all pool `java.sql.Connection` directly, `beginRequest()`/`endRequest()` are the modern hint and are implemented, and the deferred `BEGIN TRANSACTION` exists precisely because an external pool is assumed. Wrap it in HikariCP. |
+| **`CallableStatement`** *(by design — [#272][i272])* | Implemented, for calling BigQuery stored procedures. `tbc-bq-jdbc` throws `SQLFeatureNotSupportedException`. |
+| **Pre-generated access tokens** *(tracked — [#273][i273])* | `OAuthType=2` is supported. `tbc-bq-jdbc` rejects it, and supports JSON service-account keys only — Google also accepts P12 (`OAuthP12Password`). |
+
+### Performance
+
+| Area | Detail |
+|---|---|
+| **Short query optimization** | `JobCreationMode` sets `JOB_CREATION_OPTIONAL` for *every* query, letting BigQuery answer short ones without creating a job at all. `tbc-bq-jdbc` applies this to its own metadata reads (`metadataJobCreationOptional`, on by default) but not to statements you execute, which always create a job. |
+| **Storage Write API inserts** *(tracked — [#267][i267])* | Bulk inserts can stream through `JsonStreamWriter` (`EnableWriteAPI`, `SWA_ActivationRowCount`, `SWA_AppendRowCount`), which avoids both DML statement quotas and load-job quotas. `tbc-bq-jdbc`'s largest-batch path is a load job. |
+| **Adaptive Arrow activation** | Read API use is decided per result from `HighThroughputMinTableSize` and `HighThroughputActivationRatio`. `tbc-bq-jdbc`'s `auto` mode also declines a result that arrived complete in one page, but sizes what remains with a flat 10 MB estimate (`rows × 1 KB`) rather than configurable thresholds. |
+| **Streaming metadata** | Metadata fetches are submitted to a connection-scoped executor and rows are consumed as they arrive, so large schemas start returning sooner. `MetaDataFetchThreadCount` is configurable; `tbc-bq-jdbc` hard-codes a cap of 16. |
+
+### Observability and operational controls
+
+| Area | Detail |
+|---|---|
+| **OpenTelemetry** *(tracked — [#269][i269])* | Traces and spans, GCP trace and log exporters, `useGlobalOpenTelemetry`, and trace/span IDs injected into local logs. `tbc-bq-jdbc` exposes JVM-global counters through `DriverMetrics` and no tracing. |
+| **Per-connection log files** *(by design — [#277][i277])* | `LogLevel`/`LogPath` with a per-connection file handler and MDC, matching Simba's diagnostic workflow. `tbc-bq-jdbc` logs through SLF4J and leaves the backend to the host application; the `with-logging` jar bundles one for tools that have none. |
+| **Job controls** *(by design — [#276][i276])* | `KMSKeyName`, `RequestReason`, `PartnerToken`, `AllowLargeResults` with `LargeResultDataset`/`LargeResultTable`, destination table and dataset control, `RetryInitialDelay`/`RetryMaxDelay`, and `QueryDialect` for legacy SQL. `tbc-bq-jdbc` covers `labels`, `maxBillingBytes`, `retryCount` and `useLegacySql` only. |
+| **Project discovery** | `EnableProjectDiscovery` finds projects automatically. `tbc-bq-jdbc` requires them to be listed in `additionalProjects`. |
+
+---
+
 ## At parity
 
 Neither driver has a meaningful edge here.
@@ -167,3 +193,14 @@ Neither driver has a meaningful edge here.
 Every claim above was checked against the source of both drivers at the versions named, not
 against either project's documentation. Google's driver moves fast — 60+ merged pull requests
 between May and July 2026 — so re-verify before relying on any gap listed here.
+
+The *tracked* and *by design* markers link into this project's issue tracker, where the
+reasoning is recorded and open to argument. They are there so a reader can tell a decision from
+a backlog item; they are not a promise of when, or whether, a tracked item ships.
+
+[i267]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/267
+[i269]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/269
+[i272]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/272
+[i273]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/273
+[i276]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/276
+[i277]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/277

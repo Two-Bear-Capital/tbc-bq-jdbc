@@ -18,6 +18,7 @@ package vc.tbc.bq.jdbc;
 import com.google.auth.Credentials;
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.BigQueryOptions;
+import com.google.cloud.http.HttpTransportOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.auth.CredentialsCache;
@@ -29,6 +30,7 @@ import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.metadata.BQDatabaseMetaData;
+import vc.tbc.bq.jdbc.transport.DriverTransports;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.StructTypeNames;
 import vc.tbc.bq.jdbc.util.UnsupportedOperations;
@@ -131,7 +133,7 @@ public final class BQConnection extends AbstractBQConnection {
 		try {
 			// Shared across connections authenticating the same way: building these
 			// means an ADC probe plus token fetch, or reading and parsing a key file
-			Credentials credentials = CredentialsCache.forAuthType(properties.authType());
+			Credentials credentials = CredentialsCache.forAuthType(properties.authType(), properties.transport());
 			this.bigquery = buildOptions(properties, credentials).build().getService();
 			logger.debug("Connected to BigQuery project: {}", properties.projectId());
 
@@ -168,8 +170,11 @@ public final class BQConnection extends AbstractBQConnection {
 	 * @param credentials
 	 *            credentials for the connection
 	 * @return the configured options builder
+	 * @throws IOException
+	 *             if a configured truststore cannot be read or parsed
 	 */
-	static BigQueryOptions.Builder buildOptions(ConnectionProperties properties, Credentials credentials) {
+	static BigQueryOptions.Builder buildOptions(ConnectionProperties properties, Credentials credentials)
+			throws IOException {
 		BigQueryOptions.Builder builder = BigQueryOptions.newBuilder().setProjectId(properties.projectId())
 				.setCredentials(credentials);
 
@@ -186,13 +191,37 @@ public final class BQConnection extends AbstractBQConnection {
 					.setMaxAttempts(Math.max(1, properties.retryCount())).build());
 		}
 
-		// Applies to establishing the HTTP connection only. Query duration is
-		// governed by the `timeout` property, enforced by the driver itself, so the
-		// read timeout is deliberately left alone — capping it here would sever
-		// long-running queries that are behaving exactly as configured.
+		// One HttpTransportOptions, not one per setting: the connect timeout and the
+		// proxy are two fields of the same object, so setting them separately would
+		// mean the second call discarding the first.
+		//
+		// The connect timeout applies to establishing the HTTP connection only.
+		// Query duration is governed by the `timeout` property, enforced by the
+		// driver itself, so the read timeout is deliberately left alone — capping it
+		// here would sever long-running queries that are behaving exactly as
+		// configured.
+		HttpTransportOptions.Builder transport = BigQueryOptions.getDefaultHttpTransportOptions().toBuilder();
+		boolean customTransport = false;
 		if (properties.connectionTimeout() != null) {
-			builder.setTransportOptions(BigQueryOptions.getDefaultHttpTransportOptions().toBuilder()
-					.setConnectTimeout(Math.toIntExact(properties.connectionTimeout() * 1000L)).build());
+			transport.setConnectTimeout(Math.toIntExact(properties.connectionTimeout() * 1000L));
+			customTransport = true;
+		}
+		// The same factory the connection's credentials were built on — see
+		// DriverTransports. Left unset when nothing is configured so the default
+		// path keeps the client library's own transport rather than an
+		// equivalent-looking copy of it.
+		if (!properties.transport().isDefault()) {
+			transport.setHttpTransportFactory(DriverTransports.forTransport(properties.transport()));
+			customTransport = true;
+			if (properties.transport().proxy() != null) {
+				logger.info("Routing BigQuery traffic through proxy {}", properties.transport().proxy());
+			}
+			if (properties.transport().tls() != null) {
+				logger.info("Verifying TLS against the truststore at {}", properties.transport().tls());
+			}
+		}
+		if (customTransport) {
+			builder.setTransportOptions(transport.build());
 		}
 
 		// Point the client at a non-default BigQuery endpoint.

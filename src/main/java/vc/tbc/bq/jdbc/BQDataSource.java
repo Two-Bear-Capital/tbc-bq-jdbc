@@ -35,6 +35,7 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 /**
@@ -486,6 +487,189 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	 */
 	public void setPort(Integer port) {
 		set("port", port);
+	}
+
+	/**
+	 * Returns the HTTP proxy host.
+	 *
+	 * @return the proxy hostname, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getProxyHost() {
+		return get("proxyHost");
+	}
+
+	/**
+	 * Sets an HTTP proxy to route BigQuery calls and OAuth token requests through.
+	 *
+	 * <p>
+	 * Distinct from {@link #setHost(String)}, which says where BigQuery is rather
+	 * than how the driver reaches it. Leaving this unset falls back to the JVM's
+	 * {@code https.proxyHost}.
+	 *
+	 * @param proxyHost
+	 *            the proxy hostname, or null
+	 * @since 4.3.0
+	 */
+	public void setProxyHost(String proxyHost) {
+		set("proxyHost", proxyHost);
+	}
+
+	/**
+	 * Returns the port of the proxy set by {@link #setProxyHost(String)}.
+	 *
+	 * @return the proxy port, or null if unset
+	 * @since 4.3.0
+	 */
+	public Integer getProxyPort() {
+		return getInteger("proxyPort");
+	}
+
+	/**
+	 * Sets the port of the proxy set by {@link #setProxyHost(String)}, which is
+	 * required whenever that is set.
+	 *
+	 * @param proxyPort
+	 *            the proxy port, or null
+	 * @since 4.3.0
+	 */
+	public void setProxyPort(Integer proxyPort) {
+		set("proxyPort", proxyPort);
+	}
+
+	/**
+	 * Returns the username sent to a proxy demanding authentication.
+	 *
+	 * @return the proxy username, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getProxyUser() {
+		return get("proxyUser");
+	}
+
+	/**
+	 * Sets the username for a proxy that demands {@code Proxy-Authorization}.
+	 *
+	 * @param proxyUser
+	 *            the proxy username, or null for an anonymous proxy
+	 * @since 4.3.0
+	 */
+	public void setProxyUser(String proxyUser) {
+		set("proxyUser", proxyUser);
+	}
+
+	/**
+	 * Returns the password for the user set by {@link #setProxyUser(String)}.
+	 *
+	 * @return the proxy password, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getProxyPassword() {
+		return get("proxyPassword");
+	}
+
+	/**
+	 * Sets the password for the user set by {@link #setProxyUser(String)}.
+	 *
+	 * @param proxyPassword
+	 *            the proxy password, or null
+	 * @since 4.3.0
+	 */
+	public void setProxyPassword(String proxyPassword) {
+		set("proxyPassword", proxyPassword);
+	}
+
+	/**
+	 * Returns the truststore TLS is verified against.
+	 *
+	 * @return the truststore path, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStore() {
+		return get("trustStore");
+	}
+
+	/**
+	 * Sets a truststore holding the certificate authorities to verify TLS against.
+	 *
+	 * <p>
+	 * For a network whose egress is re-signed by a private CA, which otherwise
+	 * fails with {@code PKIX path building failed}. Replaces the JDK's trust
+	 * anchors rather than adding to them. Leaving this unset falls back to the
+	 * JVM's {@code javax.net.ssl.trustStore}.
+	 *
+	 * @param trustStore
+	 *            the truststore path, or null to use the JDK's own
+	 * @since 4.3.0
+	 */
+	public void setTrustStore(String trustStore) {
+		set("trustStore", trustStore);
+	}
+
+	/**
+	 * Returns the password for the store set by {@link #setTrustStore(String)}.
+	 *
+	 * @return the truststore password, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStorePassword() {
+		return get("trustStorePassword");
+	}
+
+	/**
+	 * Sets the password protecting the store set by {@link #setTrustStore(String)}.
+	 *
+	 * @param trustStorePassword
+	 *            the truststore password, or null for an unprotected store
+	 * @since 4.3.0
+	 */
+	public void setTrustStorePassword(String trustStorePassword) {
+		set("trustStorePassword", trustStorePassword);
+	}
+
+	/**
+	 * Returns the format of the store set by {@link #setTrustStore(String)}.
+	 *
+	 * @return the truststore type, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStoreType() {
+		return get("trustStoreType");
+	}
+
+	/**
+	 * Sets the format of the store set by {@link #setTrustStore(String)}, such as
+	 * {@code JKS} or {@code PKCS12}.
+	 *
+	 * @param trustStoreType
+	 *            the truststore type, or null for the JVM default
+	 * @since 4.3.0
+	 */
+	public void setTrustStoreType(String trustStoreType) {
+		set("trustStoreType", trustStoreType);
+	}
+
+	/**
+	 * Returns the JCE provider the store set by {@link #setTrustStore(String)} is
+	 * loaded through.
+	 *
+	 * @return the provider name, or null if unset
+	 * @since 4.3.0
+	 */
+	public String getTrustStoreProvider() {
+		return get("trustStoreProvider");
+	}
+
+	/**
+	 * Sets the JCE provider to load the store set by {@link #setTrustStore(String)}
+	 * through.
+	 *
+	 * @param trustStoreProvider
+	 *            the provider name, or null for the standard search order
+	 * @since 4.3.0
+	 */
+	public void setTrustStoreProvider(String trustStoreProvider) {
+		set("trustStoreProvider", trustStoreProvider);
 	}
 
 	/**
@@ -1172,33 +1356,73 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	}
 
 	/**
-	 * @throws NumberFormatException
+	 * @throws IllegalArgumentException
 	 *             if the value was stored through {@link #setProperty} and is not
 	 *             an integer; a typed setter cannot produce one
 	 */
 	private Integer getInteger(String name) {
 		String value = get(name);
-		return value == null ? null : Integer.valueOf(value.trim());
+		return value == null ? null : parsed(name, value, Integer::valueOf);
 	}
 
 	/**
-	 * @throws NumberFormatException
+	 * @throws IllegalArgumentException
 	 *             if the value was stored through {@link #setProperty} and is not a
 	 *             long
 	 */
 	private Long getLong(String name) {
 		String value = get(name);
-		return value == null ? null : Long.valueOf(value.trim());
+		return value == null ? null : parsed(name, value, Long::valueOf);
 	}
 
 	/**
-	 * @throws NumberFormatException
+	 * @throws IllegalArgumentException
 	 *             if the value was stored through {@link #setProperty} and is not a
 	 *             decimal
 	 */
 	private BigDecimal getBigDecimal(String name) {
 		String value = get(name);
-		return value == null ? null : new BigDecimal(value.trim());
+		return value == null ? null : parsed(name, value, BigDecimal::new);
+	}
+
+	/**
+	 * Parses a stored value, reporting a malformed one by name.
+	 *
+	 * <p>
+	 * A bare {@link NumberFormatException} says only {@code For input string:
+	 * "abc"} — not which of the driver's properties held it, and not that a
+	 * {@code BQDataSource} was involved at all. That stack trace is often the only
+	 * thing an operator sees, because the way a bad value gets stored is a
+	 * container reading an untyped deployment descriptor through
+	 * {@link BQDataSourceFactory} and {@link #setProperty}. The typed setters
+	 * cannot produce one; the compiler stops them.
+	 *
+	 * <p>
+	 * This does not weaken the rule that setters never throw. That rule exists
+	 * because a container populates a bean in its own order, so a validating setter
+	 * would fail or not depending on ordering. A getter has no such problem: the
+	 * value is already stored, and reading it back is what a container is expected
+	 * to do. {@code getConnection()} remains where a bad value is reported for
+	 * anyone who never calls the getter.
+	 *
+	 * @param <T>
+	 *            the parsed type
+	 * @param name
+	 *            the property name, for the message
+	 * @param value
+	 *            the stored value, parsed after trimming
+	 * @param parser
+	 *            the conversion, which signals failure by
+	 *            {@link NumberFormatException}
+	 * @return the parsed value
+	 */
+	private static <T> T parsed(String name, String value, Function<String, T> parser) {
+		try {
+			return parser.apply(value.trim());
+		} catch (NumberFormatException e) {
+			throw new IllegalArgumentException(
+					"Invalid value for BQDataSource property '" + name + "': " + value.trim(), e);
+		}
 	}
 
 	private Boolean getBoolean(String name) {

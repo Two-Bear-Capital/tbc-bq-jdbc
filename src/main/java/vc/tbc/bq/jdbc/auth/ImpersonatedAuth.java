@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc.auth;
 
 import com.google.auth.Credentials;
+import com.google.auth.http.HttpTransportFactory;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ImpersonatedCredentials;
 
@@ -122,8 +123,11 @@ public record ImpersonatedAuth(AuthType source, String targetPrincipal, List<Str
 	}
 
 	@Override
-	public Credentials toCredentials() throws IOException {
-		Credentials sourceCredentials = source.toCredentials();
+	public Credentials toCredentials(HttpTransportFactory transportFactory) throws IOException {
+		// Passed down as well as used here: impersonation is two token exchanges,
+		// one to mint the source identity's token and one to trade it for the
+		// target's. Both have to take the same route.
+		Credentials sourceCredentials = source.toCredentials(transportFactory);
 		// Every permitted AuthType returns a GoogleCredentials today, but the
 		// interface method is declared to return Credentials, so this cannot be a
 		// cast. A new auth type that broke the assumption should say so here rather
@@ -137,6 +141,6 @@ public record ImpersonatedAuth(AuthType source, String targetPrincipal, List<Str
 		// recursing would double-count a single connection's credential build.
 		return ImpersonatedCredentials.newBuilder().setSourceCredentials(googleCredentials)
 				.setTargetPrincipal(targetPrincipal).setDelegates(delegates).setScopes(List.of(CLOUD_PLATFORM_SCOPE))
-				.build();
+				.setHttpTransportFactory(transportFactory).build();
 	}
 }

@@ -345,4 +345,58 @@ class BQDataSourceTest {
 		assertEquals(original.resolveProperties(), restored.resolveProperties());
 		assertNull(restored.getLogWriter());
 	}
+
+	/**
+	 * A malformed value can only be stored through {@code setProperty}, and the way
+	 * that happens in practice is a container reading an untyped deployment
+	 * descriptor through {@code BQDataSourceFactory}. The stack trace from the
+	 * getter is often all an operator sees, so it has to say which of the driver's
+	 * ~41 properties is wrong.
+	 */
+	@Test
+	void aMalformedIntegerNamesThePropertyAndTheValue() {
+		BQDataSource ds = new BQDataSource();
+		ds.setProperty("timeout", "abc");
+
+		IllegalArgumentException e = assertThrows(IllegalArgumentException.class, ds::getTimeout);
+
+		assertTrue(e.getMessage().contains("timeout"), e.getMessage());
+		assertTrue(e.getMessage().contains("abc"), e.getMessage());
+		assertTrue(e.getMessage().contains("BQDataSource"), e.getMessage());
+		// The cause is kept, so anything already catching NumberFormatException by
+		// walking the chain still finds it
+		assertInstanceOf(NumberFormatException.class, e.getCause());
+	}
+
+	@Test
+	void aMalformedLongNamesTheProperty() {
+		BQDataSource ds = new BQDataSource();
+		ds.setProperty("maxBillingBytes", "not-a-long");
+
+		IllegalArgumentException e = assertThrows(IllegalArgumentException.class, ds::getMaxBillingBytes);
+
+		assertTrue(e.getMessage().contains("maxBillingBytes"), e.getMessage());
+	}
+
+	@Test
+	void aMalformedDecimalNamesTheProperty() {
+		// getBigDecimal has the same shape as the other two and is reachable the
+		// same way, though only the integer and long getters were flagged
+		BQDataSource ds = new BQDataSource();
+		ds.setProperty("queryPricePerTiB", "six-dollars");
+
+		IllegalArgumentException e = assertThrows(IllegalArgumentException.class, ds::getQueryPricePerTiB);
+
+		assertTrue(e.getMessage().contains("queryPricePerTiB"), e.getMessage());
+	}
+
+	@Test
+	void aMalformedBooleanIsStillFalseRatherThanAnError() {
+		// Boolean.valueOf never throws, and the URL parser reads anything but
+		// "true" as false — so the bean must not start rejecting what a URL accepts
+		BQDataSource ds = new BQDataSource();
+		ds.setProperty("useLegacySql", "yes-please");
+
+		assertEquals(Boolean.FALSE, ds.getUseLegacySql());
+	}
 }

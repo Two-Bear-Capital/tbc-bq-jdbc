@@ -16,6 +16,9 @@
 package vc.tbc.bq.jdbc.config;
 
 import vc.tbc.bq.jdbc.auth.*;
+import vc.tbc.bq.jdbc.transport.ProxyConfig;
+import vc.tbc.bq.jdbc.transport.TlsConfig;
+import vc.tbc.bq.jdbc.transport.TransportConfig;
 
 import java.math.BigDecimal;
 import java.net.URLDecoder;
@@ -346,6 +349,17 @@ public final class ConnectionUrlParser {
 				case "Location" -> properties.put("location", value);
 				case "DatasetProjectId" -> properties.put("datasetProjectId", value);
 				case "EnableSessions" -> properties.put("enableSessions", value);
+				// Named as Simba names them, because someone migrating already has
+				// these four in a connection string and a proxy is the one setting they
+				// cannot work around by editing the driver's own properties.
+				case "ProxyHost" -> properties.put("proxyHost", value);
+				case "ProxyPort" -> properties.put("proxyPort", value);
+				case "ProxyUid" -> properties.put("proxyUser", value);
+				case "ProxyPwd" -> properties.put("proxyPassword", value);
+				case "SSLTrustStore" -> properties.put("trustStore", value);
+				case "SSLTrustStorePwd" -> properties.put("trustStorePassword", value);
+				case "SSLTrustStoreType" -> properties.put("trustStoreType", value);
+				case "SSLTrustStoreProvider" -> properties.put("trustStoreProvider", value);
 				default -> properties.put(key, value); // Pass through — handles native tbc-bq-jdbc property names
 			}
 		}
@@ -432,13 +446,43 @@ public final class ConnectionUrlParser {
 		List<String> additionalProjects = parseProjectList(properties.get("additionalProjects"));
 		Boolean includeStructFields = parseBooleanObject(properties, "includeStructFields");
 		Boolean metadataJobCreationOptional = parseBooleanObject(properties, "metadataJobCreationOptional");
+		TransportConfig transport = parseTransport(properties);
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
 				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
-				additionalProjects, includeStructFields, metadataJobCreationOptional);
+				additionalProjects, includeStructFields, metadataJobCreationOptional, transport);
+	}
+
+	/**
+	 * Resolves how a connection reaches Google: its proxy and its truststore.
+	 *
+	 * <p>
+	 * Both resolvers throw {@link IllegalArgumentException} for a configuration
+	 * that cannot be honoured — a port outside the range, a password with no
+	 * username, a store password with no store. Those are all connection-string
+	 * mistakes, so they surface here as {@link SQLException} like every other bad
+	 * property rather than as an unchecked exception out of
+	 * {@code DriverManager.getConnection}.
+	 *
+	 * <p>
+	 * A truststore that cannot be <em>read</em> is a different matter and is not
+	 * checked here: that is I/O, it happens when the transport is built, and
+	 * failing at parse time would mean reading the file once per parse.
+	 */
+	private static TransportConfig parseTransport(Map<String, String> properties) throws SQLException {
+		Integer proxyPort = parseInteger(properties, "proxyPort");
+		try {
+			ProxyConfig proxy = ProxyConfig.resolve(properties.get("proxyHost"), proxyPort, properties.get("proxyUser"),
+					properties.get("proxyPassword"));
+			TlsConfig tls = TlsConfig.resolve(properties.get("trustStore"), properties.get("trustStorePassword"),
+					properties.get("trustStoreType"), properties.get("trustStoreProvider"));
+			return TransportConfig.of(proxy, tls);
+		} catch (IllegalArgumentException e) {
+			throw new SQLException("Invalid transport configuration: " + e.getMessage(), e);
+		}
 	}
 
 	private static AuthType parseAuthType(String authTypeStr, Map<String, String> properties) throws SQLException {
