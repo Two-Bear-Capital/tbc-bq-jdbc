@@ -288,6 +288,7 @@ See [Connection Properties](CONNECTION_PROPERTIES.md) for all configuration opti
 
 - [Authentication Guide](AUTHENTICATION.md) - All authentication methods
 - [Connection Properties](CONNECTION_PROPERTIES.md) - Full configuration reference and performance tuning
+- [DataSource](DATASOURCE.md) - `javax.sql.DataSource` for Spring, JPA and JNDI
 - [Type Mapping](TYPE_MAPPING.md) - BigQuery to JDBC type conversions
 - [Logging](LOGGING.md) - Driver logging setup and JAR variants
 - [Compatibility](COMPATIBILITY.md) - JDBC features and limitations

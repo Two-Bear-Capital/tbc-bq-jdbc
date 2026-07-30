@@ -2,6 +2,10 @@
 
 Complete reference for all JDBC connection URL properties.
 
+Every property below can also be set in a `java.util.Properties` passed to
+`DriverManager.getConnection(url, info)`, where it overrides the same property in the URL, or on a
+[`BQDataSource`](DATASOURCE.md) through a setter of the same name.
+
 ## URL Formats
 
 ### Traditional Format
@@ -712,6 +716,7 @@ driver's `getPropertyInfo()`, so it never goes stale.
 
 - [Authentication Guide](AUTHENTICATION.md) - Credential configuration
 - [Quick Start](QUICKSTART.md) - Basic examples
+- [DataSource](DATASOURCE.md) - Setting these properties on a `javax.sql.DataSource`
 - [Type Mapping](TYPE_MAPPING.md) - BigQuery ↔ JDBC type conversions
 - [Compatibility Matrix](COMPATIBILITY.md) - JDBC features and limitations
 - [IntelliJ Integration](INTELLIJ.md) - Database tool setup and optimization

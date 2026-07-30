@@ -143,6 +143,26 @@ See `src/main/java/vc/tbc/bq/jdbc/metadata/CLAUDE.md`.
   `SQLException` proves nothing — the real-tier tests assert on the "Cannot bind parameter"
   wording, and were verified to fail without the fix
 
+### DataSource
+- `BQDataSource` is a JavaBean over a `Properties` bag, **not one field per setting**.
+  `ConnectionUrlParser` stays the only code that knows a property's type, default and
+  validation rules, so a bean and a URL cannot disagree; a setter is a rename
+- `ConnectionUrlParser.fromProperties()` is the no-URL entry point. The traditional URL
+  path now also lets an explicit `projectId`/`datasetId` property override the URL path,
+  which the Simba path always did — the key was read on one path and dropped on the other
+- Setters never throw; the parser validates at `getConnection()`. A container populates a
+  bean in its own order, so a setter that threw would depend on that order
+- `BQDataSourcePropertyCoverageTest` fails when a property reaches
+  `Driver.getPropertyInfo()` without a setter. That test is what makes hand-written
+  setters safe, and is why the bean is not generated
+- `getConnection(user, password)` throws `SQLFeatureNotSupportedException` (`0A000`) for a
+  non-blank argument and defers to `getConnection()` for null/blank ones — pools call the
+  two-arg form with nulls routinely, and BigQuery has no user/password credential to map to
+- **No `ConnectionPoolDataSource`/`PooledConnection`, deliberately.** Hikari, Tomcat JDBC
+  and Spring pool `java.sql.Connection` directly, `beginRequest()`/`endRequest()` are the
+  modern hint and are already implemented, and `beginTransactionIfNeeded()` exists
+  precisely because an external pool is assumed
+
 ### Batch Execution
 - `PreparedStatement.addBatch()/executeBatch()` collapses simple parameterized INSERTs into multi-row `INSERT ... VALUES (...), (...)` query jobs (like PostgreSQL's `reWriteBatchedInserts`)
 - Rewrite logic in `util/BatchInsertRewriter.java`; conservative parser — anything not a placeholder-only single-tuple INSERT falls back to sequential execution (one job per parameter set)
