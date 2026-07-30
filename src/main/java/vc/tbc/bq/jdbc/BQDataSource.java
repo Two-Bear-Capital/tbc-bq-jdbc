@@ -110,7 +110,7 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	 * {@link #toString()}.
 	 */
 	private static final Set<String> SECRETS = Set.of("credentials", "credentialConfigFile", "clientSecret",
-			"refreshToken");
+			"refreshToken", "accessToken", "proxyPassword", "trustStorePassword");
 
 	/**
 	 * Settings, keyed by the names {@code Driver.getPropertyInfo()} advertises.
@@ -487,6 +487,58 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	 */
 	public void setPort(Integer port) {
 		set("port", port);
+	}
+
+	/**
+	 * Returns the pre-generated access token.
+	 *
+	 * @return the access token, or null if unset
+	 * @since 4.4.0
+	 */
+	public String getAccessToken() {
+		return get("accessToken");
+	}
+
+	/**
+	 * Sets a pre-generated OAuth 2.0 access token to authenticate with.
+	 *
+	 * <p>
+	 * For a host application that already holds a token. The driver cannot refresh
+	 * it, so the connection stops working once it expires; see
+	 * {@link #setAccessTokenExpiry(String)}.
+	 *
+	 * @param accessToken
+	 *            the access token, or null
+	 * @since 4.4.0
+	 */
+	public void setAccessToken(String accessToken) {
+		set("accessToken", accessToken);
+	}
+
+	/**
+	 * Returns the expiry of the token set by {@link #setAccessToken(String)}.
+	 *
+	 * @return an ISO-8601 instant, or null if unset
+	 * @since 4.4.0
+	 */
+	public String getAccessTokenExpiry() {
+		return get("accessTokenExpiry");
+	}
+
+	/**
+	 * Sets when the token given to {@link #setAccessToken(String)} expires, as an
+	 * ISO-8601 instant such as {@code 2026-07-30T20:00:00Z}.
+	 *
+	 * <p>
+	 * Optional. Supplying it makes an expired token fail as the connection opens,
+	 * naming the expiry, rather than as a 401 on the first statement.
+	 *
+	 * @param accessTokenExpiry
+	 *            the expiry instant, or null if unknown
+	 * @since 4.4.0
+	 */
+	public void setAccessTokenExpiry(String accessTokenExpiry) {
+		set("accessTokenExpiry", accessTokenExpiry);
 	}
 
 	/**

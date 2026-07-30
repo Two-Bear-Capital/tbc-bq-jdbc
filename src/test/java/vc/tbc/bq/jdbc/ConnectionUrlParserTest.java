@@ -20,11 +20,13 @@ import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
 import vc.tbc.bq.jdbc.auth.ImpersonatedAuth;
 import vc.tbc.bq.jdbc.auth.ServiceAccountAuth;
 import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
+import vc.tbc.bq.jdbc.auth.AccessTokenAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 
@@ -911,5 +913,43 @@ class ConnectionUrlParserTest {
 				() -> ConnectionUrlParser.parse("jdbc:bigquery:my-project?trustStorePassword=secret", null));
 
 		assertTrue(e.getMessage().contains("trustStore"), e.getMessage());
+	}
+
+	@Test
+	void testAccessTokenAuthIsParsed() throws SQLException {
+		String url = "jdbc:bigquery:my-project?authType=ACCESS_TOKEN&accessToken=ya29.test"
+				+ "&accessTokenExpiry=2026-07-30T20:00:00Z";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		AccessTokenAuth auth = assertInstanceOf(AccessTokenAuth.class, props.authType());
+		assertEquals("ya29.test", auth.token());
+		assertEquals(Instant.parse("2026-07-30T20:00:00Z"), auth.expiry());
+	}
+
+	@Test
+	void testAccessTokenExpiryIsOptional() throws SQLException {
+		ConnectionProperties props = ConnectionUrlParser
+				.parse("jdbc:bigquery:my-project?authType=ACCESS_TOKEN&accessToken=ya29.test", null);
+
+		assertNull(((AccessTokenAuth) props.authType()).expiry());
+	}
+
+	@Test
+	void testAccessTokenIsRequiredForThatAuthType() {
+		SQLException e = assertThrows(SQLException.class,
+				() -> ConnectionUrlParser.parse("jdbc:bigquery:my-project?authType=ACCESS_TOKEN", null));
+
+		assertTrue(e.getMessage().contains("accessToken"), e.getMessage());
+	}
+
+	@Test
+	void testAMalformedExpiryNamesThePropertyAndTheExpectedShape() {
+		SQLException e = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(
+				"jdbc:bigquery:my-project?authType=ACCESS_TOKEN&accessToken=ya29.test&accessTokenExpiry=tomorrow",
+				null));
+
+		assertTrue(e.getMessage().contains("accessTokenExpiry"), e.getMessage());
+		assertTrue(e.getMessage().contains("2026-07-30T20:00:00Z"), e.getMessage());
 	}
 }

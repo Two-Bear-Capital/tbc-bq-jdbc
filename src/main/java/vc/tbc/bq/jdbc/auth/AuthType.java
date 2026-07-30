@@ -38,7 +38,7 @@ import java.io.IOException;
  * @since 1.0.0
  */
 public sealed interface AuthType permits ServiceAccountAuth, ApplicationDefaultAuth, UserOAuthAuth,
-		WorkforceIdentityAuth, WorkloadIdentityAuth, ImpersonatedAuth {
+		WorkforceIdentityAuth, WorkloadIdentityAuth, ImpersonatedAuth, AccessTokenAuth {
 
 	/**
 	 * Converts this authentication type to Google Cloud credentials, connecting

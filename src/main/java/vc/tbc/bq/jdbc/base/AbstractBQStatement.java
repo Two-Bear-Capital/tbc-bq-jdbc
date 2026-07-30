@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.BQConnection;
 import vc.tbc.bq.jdbc.BQResultSet;
 import vc.tbc.bq.jdbc.BQStatement;
+import vc.tbc.bq.jdbc.auth.AccessTokenAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.config.SessionManager;
@@ -389,7 +390,18 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 			// Logged with the throwable, not just its message: an NPE here used to
 			// surface as "Dry-run estimation failed: null", which said nothing about
 			// where it came from.
-			logger.warn("Dry-run estimation failed", e);
+			//
+			// The access token case is called out because it is the one where the
+			// failure is a property of the credential rather than of the statement,
+			// and so will repeat for every statement until the setting is changed. A
+			// dry run creates a job, which a read-only token has no scope for.
+			if (properties.authType() instanceof AccessTokenAuth) {
+				logger.warn("Dry-run estimation failed. The connection authenticates with a pre-generated access "
+						+ "token; if it is read-only it cannot create the job a dry run needs, and "
+						+ "enableQueryCostEstimation will not produce estimates on this connection.", e);
+			} else {
+				logger.warn("Dry-run estimation failed", e);
+			}
 		}
 	}
 

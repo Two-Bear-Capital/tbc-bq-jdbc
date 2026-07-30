@@ -17,7 +17,12 @@ package vc.tbc.bq.jdbc;
 
 import org.junit.jupiter.api.Test;
 import vc.tbc.bq.jdbc.auth.*;
+import vc.tbc.bq.jdbc.config.ConnectionProperties;
 
+import static vc.tbc.bq.jdbc.testsupport.TestConnectionProperties.props;
+
+import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -310,5 +315,35 @@ class AuthenticationTest {
 		assertNotEquals(fromAdc, fromKey);
 		assertEquals(fromAdc, new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET));
 		assertEquals(fromAdc.hashCode(), new ImpersonatedAuth(new ApplicationDefaultAuth(), TARGET).hashCode());
+	}
+
+	/**
+	 * An expired token is refused as the connection opens, not on the first
+	 * statement. Reaches no network: the check runs before any credential is built.
+	 */
+	@Test
+	void testAnExpiredAccessTokenIsRefusedWhenTheConnectionOpens() {
+		ConnectionProperties properties = props()
+				.authType(new AccessTokenAuth("ya29.stale", Instant.now().minusSeconds(60))).build();
+
+		SQLException e = assertThrows(SQLException.class, () -> new BQConnection(properties));
+
+		assertEquals("28000", e.getSQLState(), "an expired credential is 're-authenticate', not a connection error");
+		assertTrue(e.getMessage().contains("expired"), e.getMessage());
+		assertTrue(e.getMessage().contains("cannot be refreshed"), e.getMessage());
+	}
+
+	@Test
+	void testATokenWithNoExpiryIsNotRefusedUpFront() {
+		// Unknown is not the same as expired; BigQuery remains the judge. This gets
+		// past the expiry gate and fails later for want of a reachable service,
+		// which is exactly the point being asserted.
+		ConnectionProperties properties = props().authType(new AccessTokenAuth("ya29.unknown-expiry")).build();
+
+		try {
+			new BQConnection(properties).close();
+		} catch (SQLException e) {
+			assertNotEquals("28000", e.getSQLState(), "must not be refused as expired: " + e.getMessage());
+		}
 	}
 }

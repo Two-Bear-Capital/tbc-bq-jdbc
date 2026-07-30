@@ -8,16 +8,18 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **45** connection properties.
+There are **47** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
-| `authType` | `ADC` | `ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`, `WORKFORCE`, `WORKLOAD` | Authentication method: ADC (Application Default Credentials), SERVICE_ACCOUNT, USER_OAUTH, WORKFORCE, WORKLOAD |
+| `authType` | `ADC` | `ADC`, `SERVICE_ACCOUNT`, `USER_OAUTH`, `WORKFORCE`, `WORKLOAD`, `ACCESS_TOKEN` | Authentication method: ADC (Application Default Credentials), SERVICE_ACCOUNT, USER_OAUTH, WORKFORCE, WORKLOAD, ACCESS_TOKEN |
 | `credentials` | _(none)_ | any | Path to service account JSON key file (required for SERVICE_ACCOUNT auth) |
 | `credentialConfigFile` | _(none)_ | any | Path to external account credential config file (required for WORKFORCE or WORKLOAD auth) |
 | `clientId` | _(none)_ | any | OAuth 2.0 client ID (required for USER_OAUTH auth) |
 | `clientSecret` | _(none)_ | any | OAuth 2.0 client secret (required for USER_OAUTH auth) |
 | `refreshToken` | _(none)_ | any | OAuth 2.0 refresh token (required for USER_OAUTH auth) |
+| `accessToken` | _(none)_ | any | A pre-generated OAuth 2.0 access token (required for ACCESS_TOKEN auth), for a host application that already holds one. The driver cannot refresh it, so the connection stops working when the token expires |
+| `accessTokenExpiry` | _(none)_ | any | When the token set by 'accessToken' expires, as an ISO-8601 instant such as 2026-07-30T20:00:00Z. Optional: supplying it makes an expired token fail as it opens the connection, naming the expiry, instead of as a 401 on the first statement |
 | `impersonateServiceAccount` | _(none)_ | any | Email of a service account to impersonate, using the configured authType as the source identity |
 | `impersonateDelegates` | _(none)_ | any | Comma-separated intermediate service account emails, source-first, for a delegated impersonation chain |
 | `host` | _(none)_ | any | Alternative BigQuery endpoint, e.g. a Private Service Connect address. Says where BigQuery is, not how to reach it — use 'proxyHost' for a proxy. Defaults to https when no scheme is given; blank uses Google's endpoints |

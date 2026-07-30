@@ -21,6 +21,8 @@ import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.http.HttpTransportOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vc.tbc.bq.jdbc.auth.AccessTokenAuth;
+import vc.tbc.bq.jdbc.auth.AuthType;
 import vc.tbc.bq.jdbc.auth.CredentialsCache;
 import vc.tbc.bq.jdbc.base.AbstractBQConnection;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
@@ -130,6 +132,7 @@ public final class BQConnection extends AbstractBQConnection {
 	public BQConnection(ConnectionProperties properties) throws SQLException {
 		this.properties = properties;
 		this.currentCatalog = properties.projectId();
+		rejectExpiredAccessToken(properties.authType());
 		try {
 			// Shared across connections authenticating the same way: building these
 			// means an ADC probe plus token fetch, or reading and parsing a key file
@@ -153,10 +156,33 @@ public final class BQConnection extends AbstractBQConnection {
 	}
 
 	/**
-	 * Gets the BigQuery client.
+	 * Refuses to open a connection on an access token that has already expired.
 	 *
-	 * @return the BigQuery client
+	 * <p>
+	 * Checked here rather than left to BigQuery because the answers differ in kind.
+	 * BigQuery would return a 401 on the first statement, which classifies as
+	 * {@code 28000} but arrives a round trip later, after the connection appeared
+	 * to open, and says nothing about which of the credential's properties is at
+	 * fault. This says the token expired, and when.
+	 *
+	 * <p>
+	 * Only possible when the caller supplied {@code accessTokenExpiry}; without it
+	 * the driver has nothing to test and BigQuery remains the judge.
+	 *
+	 * @param authType
+	 *            the connection's authentication
+	 * @throws SQLException
+	 *             with SQLState {@code 28000} when the token is known to be expired
 	 */
+	private static void rejectExpiredAccessToken(AuthType authType) throws SQLException {
+		if (authType instanceof AccessTokenAuth accessToken && accessToken.isExpired()) {
+			throw new BQSQLException(
+					"The access token expired at " + accessToken.expiry()
+							+ ". A pre-generated token cannot be refreshed by the driver; supply a new one.",
+					BQSQLException.SQLSTATE_AUTH_FAILED);
+		}
+	}
+
 	/**
 	 * Builds the BigQuery client options for a connection.
 	 *
