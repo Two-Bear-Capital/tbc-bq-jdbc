@@ -48,6 +48,7 @@ export default defineConfig({
 						{ slug: 'guides/connection-properties' },
 						{ slug: 'guides/type-mapping' },
 						{ slug: 'guides/compatibility' },
+						{ slug: 'guides/comparison' },
 						{ slug: 'guides/logging' },
 						{ slug: 'guides/observability' },
 						{ slug: 'guides/intellij' },
