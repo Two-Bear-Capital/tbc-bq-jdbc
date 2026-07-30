@@ -45,7 +45,23 @@ class StorageReadResultSetTest {
 	 * called due to early returns (e.g., when useStorageApi="false").
 	 */
 	private void setupMockTableResult(long totalRows) {
+		// hasNextPage() is true because these tests are about the size decision, and
+		// auto declines a single-page result before it ever weighs the size (#264).
+		// Left unstubbed a mock returns false, which would make every size assertion
+		// below pass for the wrong reason.
+		setupMockTableResult(totalRows, true);
+	}
+
+	/**
+	 * @param totalRows
+	 *            what {@code getTotalRows()} reports
+	 * @param hasNextPage
+	 *            whether a page token came back, i.e. whether the first page held
+	 *            less than the whole result
+	 */
+	private void setupMockTableResult(long totalRows, boolean hasNextPage) {
 		org.mockito.Mockito.lenient().when(mockTableResult.getTotalRows()).thenReturn(totalRows);
+		org.mockito.Mockito.lenient().when(mockTableResult.hasNextPage()).thenReturn(hasNextPage);
 	}
 
 	// Group 1: shouldUseStorageApi() Static Method Tests (10 tests)
@@ -127,6 +143,46 @@ class StorageReadResultSetTest {
 		assertFalse(StorageReadResultSet.shouldUseStorageApi(null, "false"), "Explicit false always declines");
 		assertTrue(StorageReadResultSet.shouldUseStorageApi(null, "true"),
 				"Explicit true does not depend on result size");
+	}
+
+	/**
+	 * The #264 regression. A result big enough to clear the size threshold but
+	 * small enough to arrive in one page must stay on the REST path: the caller has
+	 * already fetched that page, so a read session would fetch the same rows a
+	 * second time and {@code auto} would be strictly slower than
+	 * {@code useStorageApi=false}.
+	 *
+	 * <p>
+	 * 15,000 rows is inside the band this affects — {@code auto} engages at roughly
+	 * 10,240 rows and the default {@code pageSize} is 50,000.
+	 */
+	@Test
+	void testAutoDeclinesAResultThatArrivedCompleteInOnePage() {
+		setupMockTableResult(15000L, false);
+
+		assertFalse(StorageReadResultSet.shouldUseStorageApi(mockTableResult, "auto"),
+				"auto must not open a read session for rows the caller already has");
+	}
+
+	/** The positive control: the same size, but more pages left to fetch. */
+	@Test
+	void testAutoStillUsesStorageWhenPagesRemain() {
+		setupMockTableResult(15000L, true);
+
+		assertTrue(StorageReadResultSet.shouldUseStorageApi(mockTableResult, "auto"),
+				"auto should still engage when the first page did not hold the whole result");
+	}
+
+	/**
+	 * {@code true} means always, and keeps meaning that. Someone who sets it to
+	 * measure the Storage path must get the Storage path, single page or not.
+	 */
+	@Test
+	void testExplicitTrueIgnoresTheSinglePageGuard() {
+		setupMockTableResult(100L, false);
+
+		assertTrue(StorageReadResultSet.shouldUseStorageApi(mockTableResult, "true"),
+				"explicit true is unconditional by design");
 	}
 
 	@Test

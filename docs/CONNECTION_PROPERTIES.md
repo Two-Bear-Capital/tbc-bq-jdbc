@@ -297,9 +297,11 @@ instead of paging them as JSON over HTTPS. It is dramatically faster on large re
 sets — an order of magnitude on a million rows. On small ones it is *slower*, because
 opening a read session costs a round trip before the first row arrives.
 
-- `auto` - use the Storage API only for result sets estimated over 10 MB. The estimate is
-  the row count times a nominal 1 KB per row, so in practice this is a threshold of about
-  10,000 rows regardless of how wide they are
+- `auto` - use the Storage API only for result sets estimated over 10 MB *that did not
+  already arrive in full*. The estimate is the row count times a nominal 1 KB per row, so
+  in practice this is a threshold of about 10,000 rows regardless of how wide they are.
+  A result that fits in a single page of `pageSize` rows is served from that page, since
+  the driver already holds every row and a read session could only fetch them again
 - `true` - always use it, even for small results where it will not pay off
 - `false` (default) - always use the standard Jobs API path
 
