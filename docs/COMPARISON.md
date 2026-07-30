@@ -5,7 +5,8 @@ Google published its own first-party BigQuery JDBC driver,
 reaching 1.0.0 on 4 June 2026. This page compares it with `tbc-bq-jdbc` so you can pick the
 right driver for your situation. It is a snapshot, not a running scoreboard.
 
-**Compared:** `tbc-bq-jdbc` 4.1.0 · `google-cloud-bigquery-jdbc` 1.1.0 · **as of 29 July 2026**
+**Compared:** `tbc-bq-jdbc` 4.2.0 · `google-cloud-bigquery-jdbc` 1.1.0 · Google's driver read
+at **1.1.0 on 29 July 2026** and not re-read since
 
 Google's driver is under heavy active development and this comparison will date quickly.
 Both drivers are Apache 2.0.
@@ -31,13 +32,13 @@ query cost estimation, or the batch-insert and metadata-shaping controls listed 
 
 ## At a glance
 
-| | `tbc-bq-jdbc` 4.1.0 | `google-cloud-bigquery-jdbc` 1.1.0 |
+| | `tbc-bq-jdbc` 4.2.0 | `google-cloud-bigquery-jdbc` 1.1.0 |
 |---|---|---|
 | Java baseline | 21+ | 8+ |
 | JDBC spec | 4.3 | 4.2 |
 | Maven Central | ❌ not published | ✅ `com.google.cloud:google-cloud-bigquery-jdbc` |
 | Support | Community | Google, via the `google-cloud-java` issue tracker |
-| Connection properties | 30 | 73 |
+| Connection properties | 37 | 73 |
 | Simba-style URLs | ⚠️ common subset translated | ✅ broad |
 | Storage Read API (Arrow) | ✅ `useStorageApi` | ✅ `EnableHighThroughputAPI` |
 | Storage Write API | ❌ (uses load jobs) | ✅ `EnableWriteAPI` |
