@@ -68,6 +68,12 @@ CI runs `./mvnw spotless:check` and it must pass.
 
 ### Storage Read API path
 - Opt-in via `useStorageApi=auto|true`; default stays `false`
+- **`auto` declines a result that arrived complete in one page**, whatever the size
+  estimate says. `createResultSet` runs after `job.getQueryResults()`, so a result with no
+  page token is already fully in hand and a read session would fetch it a second time.
+  Sizing alone made `auto` strictly slower than `false` for the whole band between its
+  ~10,240-row trigger and the 50,000-row default `pageSize` (#264). `true` keeps opening a
+  session regardless — it means "always", and that is the documented cost of asking
 - 11.7x faster than the REST result path on a 1M-row result (#152); a raw-Arrow
   spike reached 19.6x, and the gap is the FieldValue re-encoding below
 - **Rows are re-encoded into `FieldValueList` rather than read straight from Arrow.**
