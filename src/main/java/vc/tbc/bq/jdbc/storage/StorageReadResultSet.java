@@ -124,7 +124,11 @@ public class StorageReadResultSet extends BQResultSet {
 	 *             if the read session cannot be opened, in which case the caller
 	 *             should fall back to the standard ResultSet
 	 */
-	@SuppressWarnings("PMD.CloseResource") // resources are fields closed in close(); cleaned up here only on failure
+	// CloseResource: these become fields, closed in close(). The cleanup here runs
+	// only when construction fails partway through.
+	// NullAssignment: a session with no streams has no stream, and null is what the
+	// empty-iterator branch below tests for.
+	@SuppressWarnings({"PMD.CloseResource", "PMD.NullAssignment"})
 	public StorageReadResultSet(BQStatement statement, TableResult tableResult, TableId destination)
 			throws SQLException {
 		super(statement, tableResult);
@@ -242,7 +246,11 @@ public class StorageReadResultSet extends BQResultSet {
 				.setMaxStreamCount(1).build());
 	}
 
+	// null is the end-of-rows sentinel of the fetchNextRow() seam, not a collection
+	// that happens to be empty: an empty FieldValueList would mean "a row with no
+	// columns" and BQResultSet would hand it to the caller as a row.
 	@Override
+	@SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
 	protected FieldValueList fetchNextRow() throws SQLException {
 		while (true) {
 			if (rowInBatch < rowsInBatch) {
@@ -259,6 +267,12 @@ public class StorageReadResultSet extends BQResultSet {
 	 *
 	 * @return false once the stream is exhausted
 	 */
+	// rowInBatch is reset here and read by fetchNextRow() on the very next call,
+	// not
+	// within this method, which is why PMD sees the reset as dead. Dropping it
+	// would
+	// resume the new batch at the previous batch's cursor.
+	@SuppressWarnings("PMD.UnusedAssignment")
 	private boolean loadNextBatch() throws SQLException {
 		while (responses.hasNext()) {
 			ReadRowsResponse response = responses.next();
@@ -315,8 +329,6 @@ public class StorageReadResultSet extends BQResultSet {
 	}
 
 	@Override
-	@SuppressWarnings("PMD.UseTryWithResources") // multi-resource close with suppressed-exception chaining requires
-													// manual try/catch
 	protected void doClose() throws SQLException {
 		SQLException thrown = null;
 		try {
@@ -353,6 +365,9 @@ public class StorageReadResultSet extends BQResultSet {
 	}
 
 	/** Best-effort cleanup when construction fails partway through. */
+	// The loop below closes every element; PMD reads the array as resources that
+	// escape unclosed because it does not follow the iteration.
+	@SuppressWarnings("PMD.CloseResource")
 	private static void closeQuietly(VectorSchemaRoot root, BufferAllocator allocator, BigQueryReadClient client,
 			Exception primary) {
 		for (AutoCloseable resource : new AutoCloseable[]{root, allocator, client}) {

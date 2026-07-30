@@ -629,6 +629,10 @@
                                         <exclude>logback.xml</exclude>
                                         <!-- Exclude protocol buffer definition files (not needed at runtime) -->
                                         <exclude>**/*.proto</exclude>
+                                        <!-- Five Arrow artifacts each ship their own build stamp at this
+                                             path, so shade would keep one of them arbitrarily and warn
+                                             about the overlap. Nothing reads it at runtime. -->
+                                        <exclude>arrow-git.properties</exclude>
                                     </excludes>
                                 </filter>
                                 <!-- Exclude logback from standard shaded jar -->
@@ -703,6 +707,10 @@
                                         <exclude>META-INF/versions/*/module-info.class</exclude>
                                         <!-- Exclude protocol buffer definition files (not needed at runtime) -->
                                         <exclude>**/*.proto</exclude>
+                                        <!-- Five Arrow artifacts each ship their own build stamp at this
+                                             path, so shade would keep one of them arbitrarily and warn
+                                             about the overlap. Nothing reads it at runtime. -->
+                                        <exclude>arrow-git.properties</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

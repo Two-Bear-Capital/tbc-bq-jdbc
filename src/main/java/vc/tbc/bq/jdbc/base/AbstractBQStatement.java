@@ -899,6 +899,9 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *            the completed script job
 	 * @return the first statement's ResultSet, or null when it produced none
 	 */
+	// Clearing scriptResults is what puts the statement back on the single-result
+	// path; a sentinel cursor object would be a second way to mean "no script".
+	@SuppressWarnings("PMD.NullAssignment")
 	private ResultSet beginScript(Job parent) throws SQLException {
 		scriptResults = ScriptResults.of(connection.getBigQuery(), parent);
 		logger.debug("{} ran a script of {} statement(s)", getLogPrefix(), scriptResults.size());
@@ -971,6 +974,7 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	 *             if the statement is closed, {@code current} is not one of the
 	 *             three constants, or the next result cannot be read
 	 */
+	@Override
 	@SuppressWarnings("PMD.NullAssignment") // getResultSet() must return null once results are exhausted
 	public boolean getMoreResults(int current) throws SQLException {
 		checkClosed();
