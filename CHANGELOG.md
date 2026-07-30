@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-07-30
+
+### ⚡ Features
+
+- **datasource:** Ship javax.sql.DataSource for Spring, JPA and JNDI
+- **metadata:** Skip job creation on the driver's own INFORMATION_SCHEMA reads
+- **datasource:** Expose metadataJobCreationOptional on BQDataSource
+
+### 🐛 Bug Fixes
+
+- **storage:** Stop auto opening a read session for a result already in hand ([#285](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/285))
+
+### 🔀 Pull Requests
+
+- Merge pull request #278 from Two-Bear-Capital/feat/datasource
+
+feat(datasource): ship javax.sql.DataSource for Spring, JPA and JNDI
+- Merge pull request #281 from Two-Bear-Capital/refactor/280-build-hygiene
+
+refactor(build): clear every warning from a clean build
+- Merge pull request #279 from Two-Bear-Capital/feat/265-metadata-job-creation-optional
+
+feat(metadata): skip job creation on the driver's own INFORMATION_SCHEMA reads
+- Merge pull request #283 from Two-Bear-Capital/test/cap-integration-timeouts
+
+test(integration): cap query and test-method timeouts so a hang stays reportable
+- Merge pull request #284 from Two-Bear-Capital/test/share-connection-defaults
+
+test(integration): give every real-tier connection the shared defaults
+- Merge pull request #286 from Two-Bear-Capital/release/4.2.0
+
+release: 4.2.0
+
+### 📚 Documentation
+
+- Compare the driver with Google's first-party BigQuery JDBC driver
+
+### 🧪 Testing
+
+- **integration:** Cap query and test-method timeouts so a hang stays reportable
+- **integration:** Give every real-tier connection the shared defaults
+
+### 🔨 Refactoring
+
+- **build:** Clear every warning from a clean build
+
 ## [4.1.0] - 2026-07-30
 
 ### ⚡ Features
@@ -2631,6 +2677,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.2.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.1...v4.0.0
 [3.2.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.0...v3.2.1
