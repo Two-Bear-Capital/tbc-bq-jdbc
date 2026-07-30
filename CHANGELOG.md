@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-07-30
+
+### ⚡ Features
+
+- **storage:** Encode RANGE, closing the last gap in the Storage path ([#261](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/261))
+
+### 🐛 Bug Fixes
+
+- **types:** Render a nested RANGE instead of throwing ([#262](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/262))
+
+### 🔀 Pull Requests
+
+- Merge pull request #257 from Two-Bear-Capital/test/248-project-scoped-columns
+
+test(metadata): assert a project-scoped view's real columns
+- Merge pull request #258 from Two-Bear-Capital/test/241-252-remove-gates
+
+test(ci): stop the snapshot and impersonation suites skipping unnoticed
+- Merge pull request #263 from Two-Bear-Capital/release/4.1.0
+
+Release 4.1.0
+
+### 📚 Documentation
+
+- Correct capability claims the 4.0.0 work made false ([#259](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/259))
+
+### 🧪 Testing
+
+- **metadata:** Assert a project-scoped view's real columns
+- **ci:** Stop the snapshot and impersonation suites skipping unnoticed
+
 ## [4.0.0] - 2026-07-29
 
 ### ⚡ Features
@@ -2600,6 +2631,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.1.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.1...v4.0.0
 [3.2.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v3.1.0...v3.2.0
