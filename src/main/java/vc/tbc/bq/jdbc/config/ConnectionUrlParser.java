@@ -449,13 +449,14 @@ public final class ConnectionUrlParser {
 		Boolean includeStructFields = parseBooleanObject(properties, "includeStructFields");
 		Boolean metadataJobCreationOptional = parseBooleanObject(properties, "metadataJobCreationOptional");
 		TransportConfig transport = parseTransport(properties);
+		Boolean enableTracing = parseBooleanObject(properties, "enableTracing");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
 				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
-				additionalProjects, includeStructFields, metadataJobCreationOptional, transport);
+				additionalProjects, includeStructFields, metadataJobCreationOptional, transport, enableTracing);
 	}
 
 	/**

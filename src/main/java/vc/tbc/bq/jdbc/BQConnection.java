@@ -32,6 +32,8 @@ import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.metadata.BQDatabaseMetaData;
+import vc.tbc.bq.jdbc.telemetry.DriverTracing;
+import vc.tbc.bq.jdbc.telemetry.QuerySpan;
 import vc.tbc.bq.jdbc.transport.DriverTransports;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.StructTypeNames;
@@ -136,12 +138,20 @@ public final class BQConnection extends AbstractBQConnection {
 		try {
 			// Shared across connections authenticating the same way: building these
 			// means an ADC probe plus token fetch, or reading and parsing a key file
-			Credentials credentials = CredentialsCache.forAuthType(properties.authType(), properties.transport());
+			//
+			// Spanned at the call site rather than inside CredentialsCache, which is
+			// static and has no connection to read the tracing setting from. A cache
+			// hit is a fast span and a miss is the ADC probe and token fetch, which is
+			// the case worth seeing in a trace of a slow first connection.
+			Credentials credentials;
+			try (QuerySpan span = DriverTracing.start("BigQuery.credentials", properties.enableTracing())) {
+				credentials = CredentialsCache.forAuthType(properties.authType(), properties.transport());
+			}
 			this.bigquery = buildOptions(properties, credentials).build().getService();
 			logger.debug("Connected to BigQuery project: {}", properties.projectId());
 
 			// Initialize session manager
-			this.sessionManager = new SessionManager(bigquery);
+			this.sessionManager = new SessionManager(bigquery, properties.enableTracing());
 
 			// Initialize session if enabled
 			if (properties.enableSessions()) {

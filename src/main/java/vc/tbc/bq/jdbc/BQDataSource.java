@@ -490,6 +490,32 @@ public class BQDataSource extends BaseJdbcWrapper implements DataSource, Seriali
 	}
 
 	/**
+	 * Returns whether OpenTelemetry spans are emitted.
+	 *
+	 * @return true, false, or null if unset
+	 * @since 4.4.0
+	 */
+	public Boolean getEnableTracing() {
+		return getBoolean("enableTracing");
+	}
+
+	/**
+	 * Sets whether the driver emits OpenTelemetry spans.
+	 *
+	 * <p>
+	 * On by default, which costs nothing unless the host application supplies the
+	 * OpenTelemetry API and registers an SDK. Set false to keep the driver silent
+	 * inside a host that traces everything else.
+	 *
+	 * @param enableTracing
+	 *            false to disable, or null for the default
+	 * @since 4.4.0
+	 */
+	public void setEnableTracing(Boolean enableTracing) {
+		set("enableTracing", enableTracing);
+	}
+
+	/**
 	 * Returns the pre-generated access token.
 	 *
 	 * @return the access token, or null if unset

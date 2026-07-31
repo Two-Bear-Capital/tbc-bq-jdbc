@@ -8,7 +8,7 @@
 
 The following properties can be supplied as URL query parameters (traditional format) or `java.util.Properties` entries. This table is generated from the driver's own `Driver.getPropertyInfo()`, so it always matches what the driver actually accepts.
 
-There are **47** connection properties.
+There are **48** connection properties.
 
 | Property | Default | Allowed values | Description |
 | --- | --- | --- | --- |
@@ -49,6 +49,7 @@ There are **47** connection properties.
 | `metadataIncludeDescriptions` | `true` | `true`, `false` | Read table descriptions into getTables()' REMARKS column. Costs one INFORMATION_SCHEMA query per dataset scanned, cached for metadataCacheTtl; set false to skip it on projects with very many datasets |
 | `metadataJobCreationOptional` | `true` | `true`, `false` | Ask BigQuery to answer the driver's own INFORMATION_SCHEMA reads without creating a job (jobCreationMode=JOB_CREATION_OPTIONAL), removing job creation from the latency of metadata introspection. Applies only to metadata queries, never to a caller's statements. BigQuery decides per request and creates a job anyway for larger results, so this cannot change the rows returned; jobless queries still appear in INFORMATION_SCHEMA.JOBS |
 | `useStorageApi` | `false` | `auto`, `true`, `false` | BigQuery Storage Read API mode for large result sets: much faster on big results, but needs the JVM started with --add-opens=java.base/java.nio=ALL-UNNAMED and falls back to the standard path when unavailable |
+| `enableTracing` | `true` | `true`, `false` | Emit an OpenTelemetry span per query, metadata read, session and credential build, carrying the BigQuery job id so a slow application request can be traced to the job that caused it. Requires the host application to put the OpenTelemetry API on the classpath and register an SDK — the driver bundles neither, and without both a span is a no-op. Set false to keep the driver silent inside a host that traces everything else |
 | `enableSessions` | `false` | `true`, `false` | Enable BigQuery sessions to support transactions and temporary tables |
 | `useLegacySql` | `false` | `true`, `false` | Use BigQuery legacy SQL dialect instead of standard SQL (GoogleSQL) |
 | `enableQueryCostEstimation` | `false` | `true`, `false` | Run a dry-run before each query and DML statement to estimate cost; estimates are attached as SQLWarnings and readable as typed values via BQStatement.getCostEstimates(). Sequential batches are not estimated (one job per entry already) |

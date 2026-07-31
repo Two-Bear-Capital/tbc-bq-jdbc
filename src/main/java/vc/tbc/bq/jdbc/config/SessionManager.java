@@ -20,6 +20,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import vc.tbc.bq.jdbc.metrics.DriverMetrics;
 
+import vc.tbc.bq.jdbc.telemetry.DriverTracing;
+import vc.tbc.bq.jdbc.telemetry.QuerySpan;
+
 import java.sql.SQLException;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -62,6 +65,7 @@ public class SessionManager {
 	private static final Logger logger = LoggerFactory.getLogger(SessionManager.class);
 
 	private final BigQuery bigquery;
+	private final boolean tracingEnabled;
 	private final ReentrantLock lock = new ReentrantLock();
 	private String sessionId;
 	private boolean initialized = false;
@@ -74,7 +78,27 @@ public class SessionManager {
 	 *            the BigQuery client
 	 */
 	public SessionManager(BigQuery bigquery) {
+		this(bigquery, true);
+	}
+
+	/**
+	 * Creates a session manager that reports its work to the host's tracing.
+	 *
+	 * <p>
+	 * The flag is passed in rather than read from {@code ConnectionProperties}
+	 * because this class deliberately knows only about a {@link BigQuery} client;
+	 * handing it the whole property record to read one boolean would give it a
+	 * dependency on everything else there.
+	 *
+	 * @param bigquery
+	 *            the BigQuery client
+	 * @param tracingEnabled
+	 *            whether to emit spans for session creation and termination
+	 * @since 4.4.0
+	 */
+	public SessionManager(BigQuery bigquery, boolean tracingEnabled) {
 		this.bigquery = bigquery;
+		this.tracingEnabled = tracingEnabled;
 	}
 
 	/**
@@ -85,7 +109,10 @@ public class SessionManager {
 	 */
 	public void initializeSession() throws SQLException {
 		lock.lock();
-		try {
+		// Worth a span of its own: creating a session runs a real BigQuery job that
+		// does not pass through AbstractBQStatement.runJob, so nothing else would
+		// account for the time a connection spends here.
+		try (QuerySpan span = DriverTracing.start("BigQuery.session.create", tracingEnabled)) {
 			if (initialized) {
 				logger.debug("Session already initialized: {}", sessionId);
 				return;
@@ -206,7 +233,9 @@ public class SessionManager {
 											// valid
 	public void close() {
 		lock.lock();
-		try {
+		// Termination is best-effort but not free — it runs CALL BQ.ABORT_SESSION()
+		// — so a connection close that is slow for this reason should be visible.
+		try (QuerySpan span = DriverTracing.start("BigQuery.session.close", tracingEnabled)) {
 			if (closed) {
 				return;
 			}

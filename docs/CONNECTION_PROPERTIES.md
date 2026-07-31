@@ -328,6 +328,24 @@ jdbc:bigquery:my-project/my_dataset?proxyHost=proxy.corp.example.com&proxyPort=3
 
 ---
 
+### Tracing
+
+Controlled by `enableTracing` (default `true`).
+
+The driver emits an OpenTelemetry span per query, metadata read, session and credential
+build, carrying the BigQuery job id. It bundles **no** OpenTelemetry API, SDK or exporters:
+put the API on the classpath and register an SDK in your application, and the spans join
+your traces. Without both, a span is a no-op and nothing leaves the process.
+
+**Example — silence the driver inside a host that traces everything else:**
+```
+jdbc:bigquery:my-project/my_dataset?enableTracing=false
+```
+
+See [Observability](OBSERVABILITY.md#tracing) for what each span carries.
+
+---
+
 ### Session and Transaction Properties
 
 Controlled by `enableSessions` (see the
