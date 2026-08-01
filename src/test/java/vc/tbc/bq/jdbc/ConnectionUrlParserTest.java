@@ -21,6 +21,8 @@ import vc.tbc.bq.jdbc.auth.ImpersonatedAuth;
 import vc.tbc.bq.jdbc.auth.ServiceAccountAuth;
 import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
 import vc.tbc.bq.jdbc.auth.AccessTokenAuth;
+import vc.tbc.bq.jdbc.auth.WorkforceIdentityAuth;
+import vc.tbc.bq.jdbc.auth.WorkloadIdentityAuth;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.ConnectionUrlParser;
 import vc.tbc.bq.jdbc.config.MetadataCache;
@@ -237,6 +239,67 @@ class ConnectionUrlParserTest {
 		// Then: Should throw SQLException
 		SQLException ex = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
 		assertTrue(ex.getMessage().contains("credentials"));
+	}
+
+	@Test
+	void testParseUrlWithWorkforceAuth() throws SQLException {
+		// Given: A URL with workforce identity federation
+		String url = "jdbc:bigquery:my-project/my_dataset?authType=WORKFORCE"
+				+ "&credentialConfigFile=/path/to/workforce-credential-config.json";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: Auth type should be WorkforceIdentityAuth with the config file
+		assertInstanceOf(WorkforceIdentityAuth.class, props.authType());
+		WorkforceIdentityAuth auth = (WorkforceIdentityAuth) props.authType();
+		assertEquals("/path/to/workforce-credential-config.json", auth.credentialConfigFile());
+	}
+
+	@Test
+	void testParseUrlWithWorkloadAuth() throws SQLException {
+		// Given: A URL with workload identity federation
+		String url = "jdbc:bigquery:my-project/my_dataset?authType=WORKLOAD"
+				+ "&credentialConfigFile=/path/to/credential-config.json";
+
+		// When: Parsing the URL
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		// Then: Auth type should be WorkloadIdentityAuth with the config file
+		assertInstanceOf(WorkloadIdentityAuth.class, props.authType());
+		WorkloadIdentityAuth auth = (WorkloadIdentityAuth) props.authType();
+		assertEquals("/path/to/credential-config.json", auth.credentialConfigFile());
+	}
+
+	@Test
+	void testParseMissingWorkforceCredentialConfigFile() {
+		// Given: WORKFORCE auth without the required config file
+		String url = "jdbc:bigquery:my-project?authType=WORKFORCE";
+
+		// Then: Should throw SQLException naming the missing property
+		SQLException ex = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
+		assertTrue(ex.getMessage().contains("credentialConfigFile"));
+	}
+
+	@Test
+	void testParseMissingWorkloadCredentialConfigFile() {
+		// Given: WORKLOAD auth without the required config file
+		String url = "jdbc:bigquery:my-project?authType=WORKLOAD";
+
+		// Then: Should throw SQLException naming the missing property
+		SQLException ex = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
+		assertTrue(ex.getMessage().contains("credentialConfigFile"));
+	}
+
+	@Test
+	void testParseUnknownAuthTypeIsRejected() {
+		// Given: The class name rather than the URL token — the mistake the
+		// WorkforceIdentityAuth/WorkloadIdentityAuth Javadoc examples used to invite
+		String url = "jdbc:bigquery:my-project?authType=WORKFORCE_IDENTITY&credentialConfigFile=/path/to/config.json";
+
+		// Then: Should throw, naming the value it could not map
+		SQLException ex = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
+		assertTrue(ex.getMessage().contains("WORKFORCE_IDENTITY"));
 	}
 
 	@Test
