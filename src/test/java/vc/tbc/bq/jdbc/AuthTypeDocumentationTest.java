@@ -117,9 +117,18 @@ class AuthTypeDocumentationTest {
 				for (Path file : files) {
 					String text = Files.readString(file, StandardCharsets.UTF_8);
 					Matcher m = USAGE.matcher(text);
+					// Line number so a failure points at the example, not just the file.
+					// Counted forward from the previous match rather than from the start of
+					// the file, so a file is walked once however many matches it holds.
+					int line = 1;
+					int counted = 0;
 					while (m.find()) {
-						// Line number so a failure points at the example, not just the file
-						long line = text.chars().limit(m.start()).filter(c -> c == '\n').count() + 1;
+						for (int i = counted; i < m.start(); i++) {
+							if (text.charAt(i) == '\n') {
+								line++;
+							}
+						}
+						counted = m.start();
 						usages.add(file + ":" + line + " -> " + m.group(1));
 					}
 				}

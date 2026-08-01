@@ -232,6 +232,12 @@ public final class RecordingProxyServer implements AutoCloseable {
 			throw new IOException("CONNECT target has no port: " + target);
 		}
 		String host = target.substring(0, colon);
+		// An empty host is not an error to Socket: InetAddress.getByName("") returns
+		// the loopback address, so ":443" would quietly relay to the local machine
+		// instead of failing like every other malformed target.
+		if (host.isBlank()) {
+			throw new IOException("CONNECT target has no host: " + target);
+		}
 		int port;
 		try {
 			port = Integer.parseInt(target.substring(colon + 1));
