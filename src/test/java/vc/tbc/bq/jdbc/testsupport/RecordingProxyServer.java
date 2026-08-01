@@ -215,11 +215,29 @@ public final class RecordingProxyServer implements AutoCloseable {
 		}
 	}
 
-	/** Pipes bytes between the client and {@code host:port} until either closes. */
+	/**
+	 * Pipes bytes between the client and {@code host:port} until either closes.
+	 *
+	 * <p>
+	 * A malformed target is reported as {@link IOException} rather than left to
+	 * throw {@link NumberFormatException} (or
+	 * {@link StringIndexOutOfBoundsException}, when there is no colon at all) out
+	 * of the handler thread, where nothing would catch it. That matches how an
+	 * unreachable upstream already behaves: the caller treats an
+	 * {@code IOException} here as a connection that ended.
+	 */
 	private void relayTo(String target, Socket client) throws IOException {
 		int colon = target.lastIndexOf(':');
+		if (colon < 0) {
+			throw new IOException("CONNECT target has no port: " + target);
+		}
 		String host = target.substring(0, colon);
-		int port = Integer.parseInt(target.substring(colon + 1));
+		int port;
+		try {
+			port = Integer.parseInt(target.substring(colon + 1));
+		} catch (NumberFormatException e) {
+			throw new IOException("CONNECT target has a non-numeric port: " + target, e);
+		}
 
 		try (Socket upstream = new Socket(host, port)) {
 			Thread outbound = Thread.ofVirtual().start(() -> pipe(client, upstream));
