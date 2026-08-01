@@ -71,7 +71,7 @@ import java.util.Objects;
  * <b>Usage Example:</b>
  *
  * <pre>{@code
- * String url = "jdbc:bigquery:my-project/my_dataset?" + "authType=WORKLOAD_IDENTITY&"
+ * String url = "jdbc:bigquery:my-project/my_dataset?" + "authType=WORKLOAD&"
  * 		+ "credentialConfigFile=/path/to/credential-config.json";
  * Connection conn = DriverManager.getConnection(url);
  * }</pre>
