@@ -306,12 +306,6 @@ public final class MetadataCache {
 	}
 
 	/**
-	 * Clears all entries from the cache.
-	 *
-	 * <p>
-	 * This method removes all cached metadata results immediately.
-	 */
-	/**
 	 * Drops entries whose TTL has passed.
 	 *
 	 * <p>
@@ -403,6 +397,12 @@ public final class MetadataCache {
 		}
 	}
 
+	/**
+	 * Clears all entries from the cache.
+	 *
+	 * <p>
+	 * This method removes all cached metadata results immediately.
+	 */
 	public void clear() {
 		int size = cache.size();
 		cache.clear();

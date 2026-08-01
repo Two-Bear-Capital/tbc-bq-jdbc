@@ -1215,13 +1215,6 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 	}
 
 	/**
-	 * Maps a BigQuery error reason to the closest JDBC SQLState.
-	 *
-	 * @param error
-	 *            the BigQuery error, may be null
-	 * @return the mapped SQLState, never null
-	 */
-	/**
 	 * SQLState for a {@link BigQueryException}, including the client-side failures
 	 * that never reached BigQuery.
 	 *
@@ -1252,6 +1245,13 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 		return state;
 	}
 
+	/**
+	 * Maps a BigQuery error reason to the closest JDBC SQLState.
+	 *
+	 * @param error
+	 *            the BigQuery error, may be null
+	 * @return the mapped SQLState, never null
+	 */
 	static String sqlStateFor(BigQueryError error) {
 		String reason = error == null ? null : error.getReason();
 		if (reason == null) {

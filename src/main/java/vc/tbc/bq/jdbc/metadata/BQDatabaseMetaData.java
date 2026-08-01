@@ -3570,17 +3570,6 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	}
 
 	/**
-	 * Executes a metadata query with caching support.
-	 *
-	 * @param cacheKey
-	 *            the cache key
-	 * @param supplier
-	 *            the function to execute if cache miss
-	 * @return the ResultSet (either from cache or freshly generated)
-	 * @throws SQLException
-	 *             if query execution fails
-	 */
-	/**
 	 * Distinguishes cache entries by the connection settings that change what a
 	 * metadata call returns.
 	 *
@@ -3616,6 +3605,18 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				+ "+" + properties.additionalProjects() + "|";
 	}
 
+	/**
+	 * Executes a metadata query with caching support.
+	 *
+	 * @param rawKey
+	 *            the call-site cache key, prefixed with {@link #metadataShapeKey()}
+	 *            when caching is on
+	 * @param supplier
+	 *            the function to execute if cache miss
+	 * @return the ResultSet (either from cache or freshly generated)
+	 * @throws SQLException
+	 *             if query execution fails
+	 */
 	private ResultSet getCachedOrExecute(String rawKey, SqlSupplier<ResultSet> supplier) throws SQLException {
 		// Only built when there is a cache to key: with caching off the string is
 		// never read, and reading the settings to compose it would be pure work.
@@ -3856,20 +3857,6 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	}
 
 	/**
-	 * Convert SQL LIKE pattern to Java regex pattern.
-	 *
-	 * <p>
-	 * SQL LIKE patterns support: - % matches any sequence of characters - _ matches
-	 * any single character - \ is the escape character (e.g., \_ matches literal
-	 * underscore, \% matches literal percent)
-	 *
-	 * @param value
-	 *            the value to match
-	 * @param pattern
-	 *            the SQL LIKE pattern
-	 * @return true if value matches pattern
-	 */
-	/**
 	 * Compiled JDBC name patterns, keyed by the pattern as supplied.
 	 *
 	 * <p>
@@ -3882,6 +3869,15 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private static final java.util.Map<String, java.util.regex.Pattern> PATTERN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
+	/**
+	 * Tests a value against a JDBC/SQL {@code LIKE} pattern.
+	 *
+	 * @param value
+	 *            the value to match
+	 * @param pattern
+	 *            the SQL LIKE pattern, or null to match everything
+	 * @return true if value matches pattern
+	 */
 	private boolean matchesPattern(String value, String pattern) {
 		if (pattern == null) {
 			return true;
