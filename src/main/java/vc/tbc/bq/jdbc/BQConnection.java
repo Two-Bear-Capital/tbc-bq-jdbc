@@ -285,6 +285,11 @@ public final class BQConnection extends AbstractBQConnection {
 		return builder;
 	}
 
+	/**
+	 * Gets the BigQuery client.
+	 *
+	 * @return the BigQuery client
+	 */
 	public BigQuery getBigQuery() {
 		return bigquery;
 	}

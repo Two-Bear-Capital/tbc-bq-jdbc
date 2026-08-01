@@ -391,9 +391,12 @@ Covers `useStorageApi`, `metadataCacheEnabled`, `metadataCacheTtl`,
 jdbc:bigquery:my-project/my_dataset?authType=ADC&pageSize=50000&metadataCacheTtl=600
 ```
 
-> **`connectionTimeout` and `retryCount` are accepted but not yet applied.** The driver
-> parses them, but neither changes its behaviour today; retries and timeouts come from
-> the Google Cloud client defaults. Use the `timeout` property for query timeouts.
+> **`timeout`, `connectionTimeout` and `retryCount` control three different things.**
+> `timeout` bounds how long a query job may run. `connectionTimeout` becomes the HTTP
+> transport's connect timeout — how long establishing the TCP/TLS connection may take —
+> and `retryCount` becomes the client's maximum attempts — the *total* number, not
+> retries after the first, so `1` means a single try with no retry. Leave the latter two
+> unset to keep the Google Cloud client defaults.
 
 **Storage API Modes:**
 

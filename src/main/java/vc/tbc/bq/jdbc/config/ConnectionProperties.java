@@ -153,7 +153,6 @@ public record ConnectionProperties(String projectId, String datasetId, String da
 	/** Default timeout in seconds. */
 	public static final int DEFAULT_TIMEOUT_SECONDS = 300;
 
-	/** Default page size. */
 	/**
 	 * Rows requested per {@code jobs.getQueryResults} page.
 	 *
