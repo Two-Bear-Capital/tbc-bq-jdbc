@@ -530,6 +530,9 @@ the DML path, which is always correct:
   BigQuery transaction**, so the rows would land outside it and survive a rollback
 - the statement is a simple `INSERT` with an **explicit column list**. Without one the
   column order is the table's, which the driver will not guess
+- the VALUES tuple is **placeholders only**. This path writes bound values straight to
+  NDJSON and never sees the SQL, so a tuple that wraps a placeholder in type construction
+  — `PARSE_JSON(?)`, `CAST(? AS DATETIME)` — would have that wrapping silently dropped
 - every parameter is a scalar type: STRING, INT64, FLOAT64, NUMERIC, BIGNUMERIC, BOOL,
   BYTES, DATE, TIME, DATETIME or TIMESTAMP. ARRAY, STRUCT, JSON, GEOGRAPHY and INTERVAL
   each need a bespoke JSON form, and a wrong one writes bad data rather than failing
