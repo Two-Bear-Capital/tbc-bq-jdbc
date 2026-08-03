@@ -28,6 +28,13 @@ import java.util.Locale;
  */
 public final class TypeMapper {
 
+	/**
+	 * Sentinel for a type argument the declaration did not carry, distinct from a
+	 * declared zero. {@code NUMERIC(10)} declares scale 0 and must not inherit the
+	 * type's default scale of 9.
+	 */
+	private static final int NOT_DECLARED = -1;
+
 	private TypeMapper() {
 		// Utility class
 	}
@@ -301,24 +308,22 @@ public final class TypeMapper {
 		int parenIdx = upper.indexOf('(');
 		String base = parenIdx >= 0 ? upper.substring(0, parenIdx).trim() : upper;
 
-		// Extract precision/scale from parameterized numeric types (e.g. NUMERIC(38,9))
-		int precision = 0;
-		int scale = 0;
+		// Extract precision/scale from parameterized numeric types, e.g. NUMERIC(38,9).
+		// NOT_DECLARED rather than 0 separates "the declaration carried no arguments"
+		// from a declared zero. The distinction only matters for scale: a declared
+		// precision is never legitimately 0, but a declared scale is, and a
+		// declaration that names only a precision means scale 0 -- NUMERIC(10) is
+		// NUMERIC(10, 0), not the type's default scale of 9.
+		int precision = NOT_DECLARED;
+		int scale = NOT_DECLARED;
 		if (parenIdx >= 0) {
 			int closeIdx = upper.indexOf(')');
 			if (closeIdx > parenIdx) {
 				String[] parts = upper.substring(parenIdx + 1, closeIdx).split(",");
-				try {
-					precision = Integer.parseInt(parts[0].trim());
-				} catch (NumberFormatException ignored) {
-					// Leave as 0
-				}
-				if (parts.length >= 2) {
-					try {
-						scale = Integer.parseInt(parts[1].trim());
-					} catch (NumberFormatException ignored) {
-						// Leave as 0
-					}
+				precision = parseArgument(parts, 0);
+				if (precision != NOT_DECLARED) {
+					int declaredScale = parseArgument(parts, 1);
+					scale = declaredScale == NOT_DECLARED ? 0 : declaredScale;
 				}
 			}
 		}
@@ -329,9 +334,24 @@ public final class TypeMapper {
 
 		// For parameterized numeric types use extracted precision/scale directly;
 		// otherwise fall back to the StandardSQLTypeName defaults
-		int columnSize = precision > 0 ? precision : (stdType != null ? getColumnSize(stdType) : 0);
-		int decimalDigits = scale > 0 ? scale : (stdType != null ? getDecimalDigits(stdType) : 0);
+		int columnSize = precision != NOT_DECLARED ? precision : (stdType != null ? getColumnSize(stdType) : 0);
+		int decimalDigits = scale != NOT_DECLARED ? scale : (stdType != null ? getDecimalDigits(stdType) : 0);
 		return new InfoSchemaTypeInfo(jdbcType, columnSize, decimalDigits);
+	}
+
+	/**
+	 * Reads one comma-separated type argument, or {@link #NOT_DECLARED} when it is
+	 * absent or unparseable.
+	 */
+	private static int parseArgument(String[] parts, int index) {
+		if (index >= parts.length) {
+			return NOT_DECLARED;
+		}
+		try {
+			return Integer.parseInt(parts[index].trim());
+		} catch (NumberFormatException ignored) {
+			return NOT_DECLARED;
+		}
 	}
 
 	private static StandardSQLTypeName toStandardSQLTypeNameFromString(String upper) {

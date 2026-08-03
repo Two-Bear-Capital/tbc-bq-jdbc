@@ -930,6 +930,104 @@ class TypeMapperTest {
 		assertTrue(isFinal, "TypeMapper class should be final");
 	}
 
+	// parseInfoSchemaTypeInfo(String) Tests
+
+	@Test
+	void testParseInfoSchemaTypeInfoUsesTypeDefaultsWhenNothingIsDeclared() {
+		// When: Parsing a bare NUMERIC, which carries no type arguments
+		TypeMapper.InfoSchemaTypeInfo info = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC");
+
+		// Then: Should fall back to the type's own precision and scale
+		assertEquals(Types.NUMERIC, info.jdbcType());
+		assertEquals(38, info.columnSize());
+		assertEquals(9, info.decimalDigits());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoHonorsADeclaredScaleOfZero() {
+		// When: Parsing NUMERIC(10), which declares precision 10 and scale 0
+		TypeMapper.InfoSchemaTypeInfo info = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC(10)");
+
+		// Then: Scale must be 0, not the type default of 9 -- a caller that trusts
+		// DECIMAL_DIGITS would generate 9 fractional digits and have its INSERT
+		// rejected by a scale-0 column, with no way to detect the discrepancy
+		assertEquals(10, info.columnSize());
+		assertEquals(0, info.decimalDigits());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoReadsBothTypeArguments() {
+		// When: Parsing a fully parameterized NUMERIC
+		TypeMapper.InfoSchemaTypeInfo info = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC(10, 2)");
+
+		// Then: Both arguments should be used verbatim
+		assertEquals(10, info.columnSize());
+		assertEquals(2, info.decimalDigits());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoHonorsAnExplicitZeroScale() {
+		// When: Parsing NUMERIC(10, 0), the explicit form of the same declaration
+		TypeMapper.InfoSchemaTypeInfo info = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC(10, 0)");
+
+		// Then: Should agree with the single-argument form
+		assertEquals(10, info.columnSize());
+		assertEquals(0, info.decimalDigits());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoHandlesBigNumeric() {
+		// When: Parsing BIGNUMERIC in both its bare and declared forms
+		TypeMapper.InfoSchemaTypeInfo bare = TypeMapper.parseInfoSchemaTypeInfo("BIGNUMERIC");
+		TypeMapper.InfoSchemaTypeInfo declared = TypeMapper.parseInfoSchemaTypeInfo("BIGNUMERIC(40)");
+
+		// Then: The bare form takes the type defaults, the declared form its argument
+		assertEquals(76, bare.columnSize());
+		assertEquals(38, bare.decimalDigits());
+		assertEquals(40, declared.columnSize());
+		assertEquals(0, declared.decimalDigits());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoHandlesSizedStringAndBytes() {
+		// When: Parsing the parameterized string types
+		TypeMapper.InfoSchemaTypeInfo string = TypeMapper.parseInfoSchemaTypeInfo("STRING(20)");
+		TypeMapper.InfoSchemaTypeInfo bytes = TypeMapper.parseInfoSchemaTypeInfo("BYTES(16)");
+
+		// Then: The declared length should win over the type maximum
+		assertEquals(Types.VARCHAR, string.jdbcType());
+		assertEquals(20, string.columnSize());
+		assertEquals(Types.VARBINARY, bytes.jdbcType());
+		assertEquals(16, bytes.columnSize());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoFallsBackWhenArgumentsAreUnparseable() {
+		// When: Parsing a malformed declaration
+		TypeMapper.InfoSchemaTypeInfo info = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC(oops)");
+
+		// Then: Should behave as if nothing was declared rather than reporting zero
+		assertEquals(38, info.columnSize());
+		assertEquals(9, info.decimalDigits());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoHandlesComplexAndUnknownTypes() {
+		// When: Parsing types that carry no precision at all
+		TypeMapper.InfoSchemaTypeInfo array = TypeMapper.parseInfoSchemaTypeInfo("ARRAY<INT64>");
+		TypeMapper.InfoSchemaTypeInfo struct = TypeMapper.parseInfoSchemaTypeInfo("STRUCT<a INT64>");
+		TypeMapper.InfoSchemaTypeInfo range = TypeMapper.parseInfoSchemaTypeInfo("RANGE<DATE>");
+		TypeMapper.InfoSchemaTypeInfo blank = TypeMapper.parseInfoSchemaTypeInfo("");
+
+		// Then: Should report the right JDBC type and no size information
+		assertEquals(Types.ARRAY, array.jdbcType());
+		assertEquals(Types.STRUCT, struct.jdbcType());
+		assertEquals(Types.OTHER, range.jdbcType());
+		assertEquals(Types.OTHER, blank.jdbcType());
+		assertEquals(0, array.columnSize());
+		assertEquals(0, struct.decimalDigits());
+	}
+
 	@Test
 	void testPrivateConstructor() throws Exception {
 		// When: Getting constructor
