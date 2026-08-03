@@ -1012,6 +1012,32 @@ class TypeMapperTest {
 	}
 
 	@Test
+	void testParseInfoSchemaTypeInfoRejectsAMeaninglessPrecision() {
+		// When: Parsing declarations whose precision cannot be real
+		TypeMapper.InfoSchemaTypeInfo zero = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC(0)");
+		TypeMapper.InfoSchemaTypeInfo negative = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC(-2)");
+
+		// Then: Both fall back to the type defaults. A precision of 0 is not a type the
+		// way a scale of 0 is, and reporting a negative COLUMN_SIZE would be worse than
+		// reporting the default.
+		assertEquals(38, zero.columnSize());
+		assertEquals(9, zero.decimalDigits());
+		assertEquals(38, negative.columnSize());
+		assertEquals(9, negative.decimalDigits());
+	}
+
+	@Test
+	void testParseInfoSchemaTypeInfoRejectsANegativeScale() {
+		// When: Parsing a declaration with a real precision but a nonsense scale
+		TypeMapper.InfoSchemaTypeInfo info = TypeMapper.parseInfoSchemaTypeInfo("NUMERIC(10, -2)");
+
+		// Then: The precision stands and the scale takes the value a precision-only
+		// declaration implies -- never a negative DECIMAL_DIGITS
+		assertEquals(10, info.columnSize());
+		assertEquals(0, info.decimalDigits());
+	}
+
+	@Test
 	void testParseInfoSchemaTypeInfoHandlesComplexAndUnknownTypes() {
 		// When: Parsing types that carry no precision at all
 		TypeMapper.InfoSchemaTypeInfo array = TypeMapper.parseInfoSchemaTypeInfo("ARRAY<INT64>");
@@ -1019,13 +1045,20 @@ class TypeMapperTest {
 		TypeMapper.InfoSchemaTypeInfo range = TypeMapper.parseInfoSchemaTypeInfo("RANGE<DATE>");
 		TypeMapper.InfoSchemaTypeInfo blank = TypeMapper.parseInfoSchemaTypeInfo("");
 
-		// Then: Should report the right JDBC type and no size information
+		// Then: Should report the right JDBC type and no size information at all
 		assertEquals(Types.ARRAY, array.jdbcType());
 		assertEquals(Types.STRUCT, struct.jdbcType());
 		assertEquals(Types.OTHER, range.jdbcType());
 		assertEquals(Types.OTHER, blank.jdbcType());
+
 		assertEquals(0, array.columnSize());
+		assertEquals(0, array.decimalDigits());
+		assertEquals(0, struct.columnSize());
 		assertEquals(0, struct.decimalDigits());
+		assertEquals(0, range.columnSize());
+		assertEquals(0, range.decimalDigits());
+		assertEquals(0, blank.columnSize());
+		assertEquals(0, blank.decimalDigits());
 	}
 
 	@Test

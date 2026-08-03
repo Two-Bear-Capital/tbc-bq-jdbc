@@ -35,6 +35,14 @@ public final class TypeMapper {
 	 */
 	private static final int NOT_DECLARED = -1;
 
+	/** Smallest meaningful declared precision; {@code NUMERIC(0)} is not a type. */
+	private static final int MIN_PRECISION = 1;
+
+	/**
+	 * Smallest meaningful declared scale; {@code NUMERIC(10, 0)} is a real type.
+	 */
+	private static final int MIN_SCALE = 0;
+
 	private TypeMapper() {
 		// Utility class
 	}
@@ -320,10 +328,10 @@ public final class TypeMapper {
 			int closeIdx = upper.indexOf(')');
 			if (closeIdx > parenIdx) {
 				String[] parts = upper.substring(parenIdx + 1, closeIdx).split(",");
-				precision = parseArgument(parts, 0);
+				precision = parseArgument(parts, 0, MIN_PRECISION);
 				if (precision != NOT_DECLARED) {
-					int declaredScale = parseArgument(parts, 1);
-					scale = declaredScale == NOT_DECLARED ? 0 : declaredScale;
+					int declaredScale = parseArgument(parts, 1, MIN_SCALE);
+					scale = declaredScale == NOT_DECLARED ? MIN_SCALE : declaredScale;
 				}
 			}
 		}
@@ -341,14 +349,31 @@ public final class TypeMapper {
 
 	/**
 	 * Reads one comma-separated type argument, or {@link #NOT_DECLARED} when it is
-	 * absent or unparseable.
+	 * absent, unparseable, or below the smallest value the argument can
+	 * legitimately take.
+	 *
+	 * <p>
+	 * The minimum is what separates the two arguments: a precision of 0 is
+	 * meaningless, so {@code NUMERIC(0)} falls back to the type default, while a
+	 * scale of 0 is a real declaration that must be preserved. Both reject negative
+	 * values — reporting a negative {@code COLUMN_SIZE} or {@code DECIMAL_DIGITS}
+	 * would be worse than reporting the default.
+	 *
+	 * @param parts
+	 *            the comma-separated arguments
+	 * @param index
+	 *            which argument to read
+	 * @param minimum
+	 *            the smallest legitimate value for this argument
+	 * @return the parsed argument, or {@link #NOT_DECLARED}
 	 */
-	private static int parseArgument(String[] parts, int index) {
+	private static int parseArgument(String[] parts, int index, int minimum) {
 		if (index >= parts.length) {
 			return NOT_DECLARED;
 		}
 		try {
-			return Integer.parseInt(parts[index].trim());
+			int value = Integer.parseInt(parts[index].trim());
+			return value < minimum ? NOT_DECLARED : value;
 		} catch (NumberFormatException ignored) {
 			return NOT_DECLARED;
 		}
