@@ -128,12 +128,100 @@ class BatchInsertRewriterTest {
 
 	@Test
 	void testTupleWithLiteralIsNotRewritable() {
+		// A constant element is the same on every row rather than varying per
+		// parameter set, so such statements stay on the sequential path
 		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a, b) VALUES (?, 1)").isEmpty());
 	}
 
 	@Test
 	void testTupleWithFunctionIsNotRewritable() {
+		// Collapsing this would evaluate CURRENT_TIMESTAMP() once for the whole
+		// statement rather than once per row, quietly changing what the batch means
 		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a, b) VALUES (?, CURRENT_TIMESTAMP())").isEmpty());
+	}
+
+	@Test
+	void testStringLiteralInTupleIsNotRewritable() {
+		// Critical: a raw '?' scan cannot see into a string literal, so admitting one
+		// would bind the whole batch one placeholder out of step. Quote characters are
+		// excluded from the tuple entirely rather than parsed around.
+		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a, b) VALUES (?, 'what?')").isEmpty());
+		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a, b) VALUES (?, \"what?\")").isEmpty());
+	}
+
+	@Test
+	void testOperatorInTupleIsNotRewritable() {
+		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a) VALUES (? + 1)").isEmpty());
+	}
+
+	@Test
+	void testUnbalancedTupleIsNotRewritable() {
+		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a) VALUES (PARSE_JSON(?)").isEmpty());
+		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a) VALUES (PARSE_JSON(?)))").isEmpty());
+	}
+
+	@Test
+	void testTrailingContentAfterTupleIsNotRewritable() {
+		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a) VALUES (?) RETURNING a").isEmpty());
+	}
+
+	// Placeholders wrapped in type construction
+
+	@Test
+	void testTupleWrappingPlaceholdersInFunctionsIsRewritable() {
+		// The only way to write JSON, GEOGRAPHY and DATETIME columns: none of them has
+		// a parameter binding, and GoogleSQL will not coerce a STRING or TIMESTAMP
+		// parameter into them
+		Optional<RewritableInsert> result = BatchInsertRewriter.parse("INSERT INTO `ds.t` (`a`, `j`, `g`, `d`) "
+				+ "VALUES (?, PARSE_JSON(?), ST_GEOGFROMTEXT(?), CAST(? AS DATETIME))");
+
+		assertTrue(result.isPresent());
+		assertEquals(4, result.get().parametersPerRow());
+		assertEquals("(?, PARSE_JSON(?), ST_GEOGFROMTEXT(?), CAST(? AS DATETIME))", result.get().valuesTuple());
+	}
+
+	@Test
+	void testWrappedTupleRepeatsVerbatimPerRow() {
+		RewritableInsert insert = BatchInsertRewriter.parse("INSERT INTO t (a, j) VALUES (?, PARSE_JSON(?))")
+				.orElseThrow();
+
+		assertEquals("INSERT INTO t (a, j) VALUES (?, PARSE_JSON(?)), (?, PARSE_JSON(?))", insert.buildSql(2));
+	}
+
+	@Test
+	void testNestedParenthesesInATypeArgumentAreBalanced() {
+		Optional<RewritableInsert> result = BatchInsertRewriter
+				.parse("INSERT INTO t (a) VALUES (CAST(? AS NUMERIC(10, 2)))");
+
+		assertTrue(result.isPresent());
+		assertEquals(1, result.get().parametersPerRow());
+	}
+
+	@Test
+	void testMultiplePlaceholdersInOneElementAreCounted() {
+		Optional<RewritableInsert> result = BatchInsertRewriter.parse("INSERT INTO t (a, r) VALUES (?, RANGE(?, ?))");
+
+		assertTrue(result.isPresent());
+		assertEquals(3, result.get().parametersPerRow());
+	}
+
+	// Load-path safety
+
+	@Test
+	void testPlaceholderOnlyTupleIsRecognised() {
+		assertTrue(
+				BatchInsertRewriter.parse("INSERT INTO t (a, b) VALUES (?, ?)").orElseThrow().placeholderOnlyTuple());
+		assertTrue(BatchInsertRewriter.parse("INSERT INTO t (a) VALUES ( ? )").orElseThrow().placeholderOnlyTuple());
+	}
+
+	@Test
+	void testWrappedTupleIsNotPlaceholderOnly() {
+		// The load path writes bound values straight to NDJSON and never sees the SQL,
+		// so it must not accept a tuple whose wrapping would be silently dropped
+		assertFalse(BatchInsertRewriter.parse("INSERT INTO t (a, j) VALUES (?, PARSE_JSON(?))").orElseThrow()
+				.placeholderOnlyTuple());
+		assertFalse(BatchInsertRewriter.parse("INSERT INTO t (d) VALUES (CAST(? AS DATETIME))").orElseThrow()
+				.placeholderOnlyTuple());
 	}
 
 	@Test
