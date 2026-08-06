@@ -112,6 +112,22 @@ jobs:
   # and manual dispatch. PRs from forks cannot access secrets (GitHub's
   # built-in protection), so fork PRs are excluded; the WIF attribute
   # condition additionally restricts authentication to this repository.
+  #
+  # Dependabot PRs are excluded for the same reason, and need saying separately
+  # because they are *not* fork PRs: Dependabot pushes its branches to this
+  # repository, so head.repo.full_name matches and the fork test alone lets them
+  # through. They still cannot read repository secrets, so WIF authentication
+  # fails within seconds and takes the job's required check red with it. Moving
+  # the values into Dependabot secrets would not help either: Dependabot
+  # pull_request events run with a read-only token and are not granted
+  # id-token: write, which Workload Identity Federation requires.
+  #
+  # A job skipped by this condition reports "skipped", which GitHub counts as
+  # success for a required check, so a dependency bump is no longer blocked by a
+  # tier it structurally cannot run. Coverage is deferred rather than lost: the
+  # push-to-main clause runs the full suite once the bump lands, and the release
+  # workflow only fires on a successful Build, so a bad bump cannot reach a
+  # release unnoticed.
   real-integration-tests:
     name: Real BigQuery Integration Tests
     runs-on: ubuntu-latest
@@ -129,7 +145,9 @@ jobs:
       cancel-in-progress: true
     if: |
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor != 'dependabot[bot]') ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
