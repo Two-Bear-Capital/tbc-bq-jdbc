@@ -50,6 +50,7 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 | `OAuthClientId` | `clientId` | OAuth 2.0 client ID |
 | `OAuthClientSecret` | `clientSecret` | OAuth 2.0 client secret |
 | `OAuthRefreshToken` | `refreshToken` | OAuth 2.0 refresh token |
+| `OAuthAccessToken` | `accessToken` | Pre-generated OAuth 2.0 access token |
 | `Timeout` | `timeout` | Query timeout in seconds |
 | `MaxResults` | `maxResults` | Maximum rows to fetch |
 | `UseLegacySQL` | `useLegacySql` | Use legacy SQL dialect |
@@ -71,7 +72,7 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 |-----------|-------------------|---------------------|-------------------|
 | `0` | Service Account | `SERVICE_ACCOUNT` | `OAuthPvtKeyPath` |
 | `1` | User OAuth | `USER_OAUTH` | `OAuthClientId`, `OAuthClientSecret`, `OAuthRefreshToken` |
-| `2` | Pre-generated Token | ❌ Not supported | - |
+| `2` | Pre-generated Token | `ACCESS_TOKEN` | `OAuthAccessToken` |
 | `3` | Application Default | `ADC` | None (recommended) |
 | `4` | External Account | `WORKLOAD` | `credentialConfigFile` (via Properties) |
 
@@ -94,10 +95,9 @@ All Simba properties are automatically mapped to tbc-bq-jdbc equivalents:
 **Migration from Simba:**
 
 Replace the Simba JDBC driver with tbc-bq-jdbc and set the driver class to
-`vc.tbc.bq.jdbc.BQDriver`. The twenty-one Simba property names in the table above are
-translated automatically, so most connection strings work unchanged. Two things to check:
+`vc.tbc.bq.jdbc.BQDriver`. The twenty-two Simba property names in the table above are
+translated automatically, so most connection strings work unchanged. One thing to check:
 
-- `OAuthType=2` (pre-generated access tokens) is rejected with an error. Use `0` or `3`.
 - Any other property name is passed through untranslated. Native tbc-bq-jdbc property
   names therefore work in a Simba-format URL, but Simba-only options the driver has no
   equivalent for (`OAuthPvtKey`, `AllowLargeResults`, `LogLevel`, …) are accepted and
@@ -328,6 +328,24 @@ jdbc:bigquery:my-project/my_dataset?proxyHost=proxy.corp.example.com&proxyPort=3
 
 ---
 
+### Tracing
+
+Controlled by `enableTracing` (default `true`).
+
+The driver emits an OpenTelemetry span per query, metadata read, session and credential
+build, carrying the BigQuery job id. It bundles **no** OpenTelemetry API, SDK or exporters:
+put the API on the classpath and register an SDK in your application, and the spans join
+your traces. Without both, a span is a no-op and nothing leaves the process.
+
+**Example — silence the driver inside a host that traces everything else:**
+```
+jdbc:bigquery:my-project/my_dataset?enableTracing=false
+```
+
+See [Observability](OBSERVABILITY.md#tracing) for what each span carries.
+
+---
+
 ### Session and Transaction Properties
 
 Controlled by `enableSessions` (see the
@@ -373,9 +391,12 @@ Covers `useStorageApi`, `metadataCacheEnabled`, `metadataCacheTtl`,
 jdbc:bigquery:my-project/my_dataset?authType=ADC&pageSize=50000&metadataCacheTtl=600
 ```
 
-> **`connectionTimeout` and `retryCount` are accepted but not yet applied.** The driver
-> parses them, but neither changes its behaviour today; retries and timeouts come from
-> the Google Cloud client defaults. Use the `timeout` property for query timeouts.
+> **`timeout`, `connectionTimeout` and `retryCount` control three different things.**
+> `timeout` bounds how long a query job may run. `connectionTimeout` becomes the HTTP
+> transport's connect timeout — how long establishing the TCP/TLS connection may take —
+> and `retryCount` becomes the client's maximum attempts — the *total* number, not
+> retries after the first, so `1` means a single try with no retry. Leave the latter two
+> unset to keep the Google Cloud client defaults.
 
 **Storage API Modes:**
 
@@ -509,6 +530,9 @@ the DML path, which is always correct:
   BigQuery transaction**, so the rows would land outside it and survive a rollback
 - the statement is a simple `INSERT` with an **explicit column list**. Without one the
   column order is the table's, which the driver will not guess
+- the VALUES tuple is **placeholders only**. This path writes bound values straight to
+  NDJSON and never sees the SQL, so a tuple that wraps a placeholder in type construction
+  — `PARSE_JSON(?)`, `CAST(? AS DATETIME)` — would have that wrapping silently dropped
 - every parameter is a scalar type: STRING, INT64, FLOAT64, NUMERIC, BIGNUMERIC, BOOL,
   BYTES, DATE, TIME, DATETIME or TIMESTAMP. ARRAY, STRUCT, JSON, GEOGRAPHY and INTERVAL
   each need a bespoke JSON form, and a wrong one writes bad data rather than failing

@@ -42,6 +42,8 @@ import vc.tbc.bq.jdbc.base.BaseJdbcWrapper;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.config.MetadataCache;
 import vc.tbc.bq.jdbc.exception.BQSQLException;
+import vc.tbc.bq.jdbc.telemetry.DriverTracing;
+import vc.tbc.bq.jdbc.telemetry.QuerySpan;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
 import vc.tbc.bq.jdbc.util.SqlStringLiterals;
@@ -3568,17 +3570,6 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	}
 
 	/**
-	 * Executes a metadata query with caching support.
-	 *
-	 * @param cacheKey
-	 *            the cache key
-	 * @param supplier
-	 *            the function to execute if cache miss
-	 * @return the ResultSet (either from cache or freshly generated)
-	 * @throws SQLException
-	 *             if query execution fails
-	 */
-	/**
 	 * Distinguishes cache entries by the connection settings that change what a
 	 * metadata call returns.
 	 *
@@ -3614,22 +3605,60 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 				+ "+" + properties.additionalProjects() + "|";
 	}
 
+	/**
+	 * Executes a metadata query with caching support.
+	 *
+	 * @param rawKey
+	 *            the call-site cache key, prefixed with {@link #metadataShapeKey()}
+	 *            when caching is on
+	 * @param supplier
+	 *            the function to execute if cache miss
+	 * @return the ResultSet (either from cache or freshly generated)
+	 * @throws SQLException
+	 *             if query execution fails
+	 */
 	private ResultSet getCachedOrExecute(String rawKey, SqlSupplier<ResultSet> supplier) throws SQLException {
 		// Only built when there is a cache to key: with caching off the string is
 		// never read, and reading the settings to compose it would be pure work.
 		String cacheKey = cache == null ? rawKey : metadataShapeKey() + rawKey;
 
-		// Check cache if enabled
-		if (cache != null) {
-			java.util.Optional<ResultSet> cached = cache.get(cacheKey);
-			if (cached.isPresent()) {
-				cacheHits++;
-				logger.trace("Cache hit for: {}", cacheKey);
-				logCacheStatsIfNeeded();
-				return cached.get();
-			}
-		}
+		// Spanned here rather than at MetadataCache.get(), which sees only the
+		// lookup. This covers hit-or-load, so the INFORMATION_SCHEMA job spans a miss
+		// fans out get a parent naming the metadata call they belong to — a
+		// getTables that took three seconds over twelve datasets reads as one tree
+		// rather than twelve unattached jobs.
+		try (QuerySpan span = DriverTracing.start("BigQuery.metadata", connection.getProperties().enableTracing())) {
+			span.setAttribute("db.system.name", "bigquery");
+			// The key's prefix, never the key: everything after the first colon is
+			// the caller's catalog and pattern arguments, which are unbounded and
+			// theirs.
+			span.setAttribute("db.operation.name", operationOf(rawKey));
 
+			// Check cache if enabled
+			if (cache != null) {
+				java.util.Optional<ResultSet> cached = cache.get(cacheKey);
+				if (cached.isPresent()) {
+					cacheHits++;
+					logger.trace("Cache hit for: {}", cacheKey);
+					logCacheStatsIfNeeded();
+					span.setAttribute("bigquery.metadata.cache", "hit");
+					return cached.get();
+				}
+			}
+			span.setAttribute("bigquery.metadata.cache", "miss");
+			return executeAndCache(cacheKey, supplier);
+		}
+	}
+
+	/**
+	 * The operation a cache key names, which is everything before its first colon.
+	 */
+	private static String operationOf(String rawKey) {
+		int colon = rawKey.indexOf(':');
+		return colon < 0 ? rawKey : rawKey.substring(0, colon);
+	}
+
+	private ResultSet executeAndCache(String cacheKey, SqlSupplier<ResultSet> supplier) throws SQLException {
 		// Execute query
 		cacheMisses++;
 		logger.trace("Cache miss for: {}", cacheKey);
@@ -3828,20 +3857,6 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	}
 
 	/**
-	 * Convert SQL LIKE pattern to Java regex pattern.
-	 *
-	 * <p>
-	 * SQL LIKE patterns support: - % matches any sequence of characters - _ matches
-	 * any single character - \ is the escape character (e.g., \_ matches literal
-	 * underscore, \% matches literal percent)
-	 *
-	 * @param value
-	 *            the value to match
-	 * @param pattern
-	 *            the SQL LIKE pattern
-	 * @return true if value matches pattern
-	 */
-	/**
 	 * Compiled JDBC name patterns, keyed by the pattern as supplied.
 	 *
 	 * <p>
@@ -3854,6 +3869,15 @@ public class BQDatabaseMetaData extends BaseJdbcWrapper implements DatabaseMetaD
 	 */
 	private static final java.util.Map<String, java.util.regex.Pattern> PATTERN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
+	/**
+	 * Tests a value against a JDBC/SQL {@code LIKE} pattern.
+	 *
+	 * @param value
+	 *            the value to match
+	 * @param pattern
+	 *            the SQL LIKE pattern, or null to match everything
+	 * @return true if value matches pattern
+	 */
 	private boolean matchesPattern(String value, String pattern) {
 		if (pattern == null) {
 			return true;

@@ -1,10 +1,14 @@
 # Observability
 
-The driver keeps counters and timers describing what it is doing. Your application
-can read them at any time, with no configuration and no extra dependencies.
+The driver keeps counters and timers describing what it is doing, and — when your
+application supplies OpenTelemetry — emits a span per unit of work. Counters need no
+configuration and no extra dependencies; [tracing](#tracing) needs an OpenTelemetry SDK
+you already run.
 
-Use them to answer questions about your own workload: why an IDE feels slow, whether a
-pool is sharing credentials, whether a session is leaking.
+Use the counters to answer questions about your own workload: why an IDE feels slow,
+whether a pool is sharing credentials, whether a session is leaking. Use tracing to
+answer a question counters structurally cannot: **which BigQuery job made *this* request
+slow.**
 
 ## Reading them
 
@@ -140,6 +144,74 @@ Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(
         () -> log.info("BigQuery driver: {}", DriverMetrics.snapshot()),
         1, 1, TimeUnit.MINUTES);
 ```
+
+## Tracing
+
+Counters say how much the driver is doing. They cannot say which job made one particular
+request slow, because a counter has no identity — no matter how many you add. A span can,
+because it carries the BigQuery job id.
+
+```
+POST /reports/monthly            1.9 s
+└── BigQuery.query               1.7 s   bigquery.job_id=job_Ab3xK...
+```
+
+Paste that job id into the BigQuery console, or into `INFORMATION_SCHEMA.JOBS`, and you
+have the query, its slot time and its bytes billed.
+
+### Turning it on
+
+There is nothing to turn on in the driver — `enableTracing` defaults to `true`. What is
+required is that **your application** puts the OpenTelemetry API on the classpath and
+registers an SDK:
+
+```xml
+<dependency>
+  <groupId>io.opentelemetry</groupId>
+  <artifactId>opentelemetry-api</artifactId>
+</dependency>
+```
+
+**The driver bundles no OpenTelemetry API, no SDK and no exporters.** A JDBC driver
+dropped into an IDE should not drag in an observability stack, and exporter configuration
+belongs to the application, not to a driver. With the API absent, or with an SDK
+unregistered, a span is a no-op and nothing leaves the process — which is why this is safe
+to leave on. Set `enableTracing=false` to silence the driver inside a host that traces
+everything else.
+
+Because the API is not bundled, it is also not relocated in the shaded jars. That matters:
+a relocated copy would resolve to a different `GlobalOpenTelemetry` than your application's,
+so the driver's spans would be emitted into a global nobody is reading, and would silently
+fail to join your traces.
+
+### What is spanned
+
+The same four choke points the counters use, so the two describe the same work.
+
+| Span | Emitted for | Attributes |
+|---|---|---|
+| `BigQuery.query`, `BigQuery.dml` | Every query and DML job | `bigquery.job_id`, `db.namespace`, `db.operation.name` |
+| `BigQuery.metadata` | Each `DatabaseMetaData` call, covering cache hit or load | `db.operation.name`, `bigquery.metadata.cache` = `hit`/`miss` |
+| `BigQuery.session.create`, `BigQuery.session.close` | Session creation and termination | — |
+| `BigQuery.credentials` | Building or reusing credentials | — |
+
+Spans are `CLIENT` kind, so they nest under your request span as a call out to a remote
+service. A failed job sets the span status to error and records the SQLState as
+`db.response.status_code`, alongside the exception.
+
+`BigQuery.metadata` is the parent of the jobs a cache miss fans out, so a `getTables` that
+took three seconds across twelve datasets reads as one tree rather than twelve unattached
+jobs.
+
+**The SQL text is not recorded.** A statement can carry literal values, and those would
+then leave the process in traces. The job id identifies the query without reproducing it.
+
+### Metrics are not exported to OpenTelemetry
+
+Only tracing is emitted. The counters stay readable through `DriverMetrics.snapshot()` and
+are forwarded wherever you like — see [Exporting](#exporting) — because bridging them into
+OpenTelemetry metrics would duplicate a mechanism that already works and pick a metrics
+stack on your behalf.
 
 ## A note on precision
 

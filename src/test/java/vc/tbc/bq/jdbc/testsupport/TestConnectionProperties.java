@@ -80,6 +80,7 @@ public final class TestConnectionProperties {
 	private Boolean collapseShardedTables;
 	private Integer batchLoadThreshold;
 	private TransportConfig transport;
+	private Boolean enableTracing;
 
 	private TestConnectionProperties() {
 	}
@@ -232,6 +233,11 @@ public final class TestConnectionProperties {
 
 	public TestConnectionProperties transport(TransportConfig value) {
 		this.transport = value;
+		return this;
+	}
+
+	public TestConnectionProperties enableTracing(Boolean value) {
+		this.enableTracing = value;
 		return this;
 	}
 
