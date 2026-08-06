@@ -1430,6 +1430,16 @@ public abstract class AbstractBQStatement extends BaseCloseable implements State
 				failureSqlState = e.getSQLState();
 				failure = e;
 				throw e;
+			} catch (BigQueryException e) {
+				// Caught ahead of RuntimeException, which it extends, so the span still gets a
+				// SQLState when create() or waitFor() fails outright rather than the job coming
+				// back with an error. That is the transport and credential path, and it is
+				// exactly where sqlStateFor's authentication detection earns its place: an
+				// expired credential is the most common real failure here, and it would
+				// otherwise reach the span with no db.response.status_code at all.
+				failureSqlState = sqlStateFor(e);
+				failure = e;
+				throw e;
 			} catch (RuntimeException e) {
 				failure = e;
 				throw e;
