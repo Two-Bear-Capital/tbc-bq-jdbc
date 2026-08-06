@@ -103,7 +103,7 @@ class DriverTracingTest {
 		try (URLClassLoader hidden = new HidingClassLoader(classpath(), "io.opentelemetry.")) {
 			Class<?> tracing = Class.forName("vc.tbc.bq.jdbc.telemetry.DriverTracing", true, hidden);
 
-			assertNotSameLoader(tracing, hidden);
+			assertLoadedBy(tracing, hidden);
 			assertEquals(Boolean.FALSE, tracing.getMethod("isAvailable").invoke(null),
 					"tracing must report itself unavailable when the API is hidden");
 
@@ -118,7 +118,10 @@ class DriverTracingTest {
 		}
 	}
 
-	private static void assertNotSameLoader(Class<?> loaded, ClassLoader expected) {
+	/**
+	 * Asserts the class came from the isolated loader, not the ambient classpath.
+	 */
+	private static void assertLoadedBy(Class<?> loaded, ClassLoader expected) {
 		assertSame(expected, loaded.getClassLoader(), "the test must exercise the isolated copy, not the ambient one");
 	}
 

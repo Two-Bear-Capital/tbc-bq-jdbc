@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -93,7 +94,7 @@ class SpanContentTest {
 			span.setAttribute("bigquery.job_id", null);
 		}
 
-		assertEquals(null, onlySpan().getAttributes().get(JOB_ID));
+		assertNull(onlySpan().getAttributes().get(JOB_ID), "the attribute must be absent, not present and null");
 	}
 
 	@Test
