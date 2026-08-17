@@ -40,14 +40,14 @@
         <project.build.outputTimestamp>2026-07-30T19:58:39Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
-        <google.cloud.bom.version>26.85.1</google.cloud.bom.version>
+        <google.cloud.bom.version>26.86.0</google.cloud.bom.version>
         <!-- Security overrides for transitive deps pulled in by libraries-bom.
              Declared before libraries-bom so these patched versions win.
              opentelemetry: CVE-2026-45292 (W3C Baggage), jackson: GHSA-72hv-8253-57qq. -->
-        <opentelemetry.bom.version>1.64.0</opentelemetry.bom.version>
+        <opentelemetry.bom.version>1.65.0</opentelemetry.bom.version>
         <jackson.bom.version>2.22.1</jackson.bom.version>
         <slf4j.version>2.0.18</slf4j.version>
-        <junit.version>6.1.2</junit.version>
+        <junit.version>6.1.3</junit.version>
         <jmh.version>1.37</jmh.version>
         <hikaricp.version>7.1.0</hikaricp.version>
         <!-- Arrow cannot allocate without this on JDK 16+ (see ArrowSupport). Every
@@ -69,7 +69,7 @@
         <git-commit-id-maven-plugin.version>10.0.0</git-commit-id-maven-plugin.version>
         <spotless-maven-plugin.version>3.9.0</spotless-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-        <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
+        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
         <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
@@ -179,7 +179,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.6.1</version>
+            <version>1.6.3</version>
             <optional>true</optional>
         </dependency>
 
