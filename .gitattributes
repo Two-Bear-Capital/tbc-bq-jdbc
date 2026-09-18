@@ -1,6 +1,9 @@
 # Every text file is stored in the repository with LF, whatever a contributor's
-# platform checks it out with. No file currently tracked holds a CR, so this
-# normalises nothing retroactively — it only keeps it that way.
+# platform checks it out with. That held when this rule was written and stopped
+# holding immediately: Dependabot #319 committed mvnw.cmd and mvnwDebug.cmd with
+# CRLF blobs, because a commit made through the GitHub API never runs the clean
+# filter this file configures. 4.4.1 renormalised them. The rule cannot enforce
+# itself, so build.yml re-checks it on every PR.
 * text=auto
 
 # The Maven wrapper's Windows scripts ship from upstream with CRLF, while the copies

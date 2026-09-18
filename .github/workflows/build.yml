@@ -32,6 +32,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      # .gitattributes says what a blob must hold; nothing enforces it. A commit
+      # made through the GitHub API never runs the clean filter, and that is every
+      # Dependabot bump, so one can land a CRLF blob against an `eol=crlf` rule.
+      # #319 did exactly that to mvnw.cmd and mvnwDebug.cmd. The damage is
+      # invisible in review and permanent afterwards: the smudge filter hands each
+      # checkout CRLF, the clean filter normalises it back to LF, and the working
+      # tree reports 216 modified lines that neither `git checkout --` nor `git
+      # stash` can clear. Renormalising reproduces what the filters would have
+      # stored and fails when that is not what was committed.
+      #
+      # First step in the job, before the JDK: it needs nothing but the checkout
+      # and answers in well under a second.
+      - name: Check committed line endings match .gitattributes
+        run: |
+          git add --renormalize .
+          if ! git diff --cached --quiet; then
+            echo "::error::Committed line endings contradict .gitattributes in:"
+            git diff --cached --name-only | sed 's/^/::error::  /'
+            echo "::error::Fix on a branch with: git add --renormalize . && git commit"
+            exit 1
+          fi
+          echo "Committed line endings match .gitattributes."
+
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
