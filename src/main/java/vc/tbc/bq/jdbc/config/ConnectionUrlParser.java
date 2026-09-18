@@ -21,6 +21,8 @@ import vc.tbc.bq.jdbc.transport.TlsConfig;
 import vc.tbc.bq.jdbc.transport.TransportConfig;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -343,6 +345,7 @@ public final class ConnectionUrlParser {
 				case "OAuthClientId" -> properties.put("clientId", value);
 				case "OAuthClientSecret" -> properties.put("clientSecret", value);
 				case "OAuthRefreshToken" -> properties.put("refreshToken", value);
+				case "OAuthAccessToken" -> properties.put("accessToken", value);
 				case "Timeout" -> properties.put("timeout", value);
 				case "MaxResults" -> properties.put("maxResults", value);
 				case "UseLegacySQL" -> properties.put("useLegacySql", value);
@@ -385,8 +388,7 @@ public final class ConnectionUrlParser {
 		return switch (oauthType) {
 			case "0" -> "SERVICE_ACCOUNT"; // Service Account
 			case "1" -> "USER_OAUTH"; // User Account
-			case "2" -> throw new SQLException(
-					"Pre-generated access tokens (OAuthType=2) not supported. Use Service Account (0) or ADC (3)");
+			case "2" -> "ACCESS_TOKEN"; // Pre-generated access token
 			case "3" -> "ADC"; // Application Default Credentials
 			case "4" -> // External Account - could be WORKFORCE or WORKLOAD
 				// Default to WORKLOAD for now; users can override via Properties object if
@@ -447,13 +449,14 @@ public final class ConnectionUrlParser {
 		Boolean includeStructFields = parseBooleanObject(properties, "includeStructFields");
 		Boolean metadataJobCreationOptional = parseBooleanObject(properties, "metadataJobCreationOptional");
 		TransportConfig transport = parseTransport(properties);
+		Boolean enableTracing = parseBooleanObject(properties, "enableTracing");
 
 		return new ConnectionProperties(projectId, datasetId, datasetProjectId, authType, host, port, timeoutSeconds,
 				maxResults, useLegacySql, location, labels, pageSize, useStorageApi, enableSessions, connectionTimeout,
 				retryCount, maxBillingBytes, metadataCacheTtl, metadataCacheEnabled, metadataLazyLoad,
 				enableQueryCostEstimation, nativeComplexTypes, metadataCacheMaxRows, queryPricePerTiB,
 				metadataIncludeDescriptions, collapseShardedTables, batchLoadThreshold, includeInformationSchema,
-				additionalProjects, includeStructFields, metadataJobCreationOptional, transport);
+				additionalProjects, includeStructFields, metadataJobCreationOptional, transport, enableTracing);
 	}
 
 	/**
@@ -495,6 +498,13 @@ public final class ConnectionUrlParser {
 				yield new ServiceAccountAuth(credentials);
 			}
 			case "ADC" -> new ApplicationDefaultAuth();
+			case "ACCESS_TOKEN" -> {
+				String accessToken = properties.get("accessToken");
+				if (accessToken == null || accessToken.isBlank()) {
+					throw new SQLException("accessToken property required for ACCESS_TOKEN authentication");
+				}
+				yield new AccessTokenAuth(accessToken, parseInstant(properties, "accessTokenExpiry"));
+			}
 			case "USER_OAUTH" -> {
 				String clientId = properties.get("clientId");
 				String clientSecret = properties.get("clientSecret");
@@ -571,6 +581,28 @@ public final class ConnectionUrlParser {
 			return new ImpersonatedAuth(authType, target.trim(), delegates);
 		} catch (IllegalArgumentException e) {
 			throw new SQLException("Invalid impersonation configuration: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Parses an ISO-8601 instant, such as {@code 2026-07-30T20:00:00Z}.
+	 *
+	 * <p>
+	 * ISO-8601 rather than epoch seconds because a connection string is read by
+	 * people: a wrong instant is obvious where a wrong epoch is not. It also
+	 * carries its own offset, so there is no ambiguity about whose clock it names.
+	 * Neither form needs URL-encoding in either URL format.
+	 */
+	private static Instant parseInstant(Map<String, String> properties, String key) throws SQLException {
+		String value = properties.get(key);
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			return Instant.parse(value.trim());
+		} catch (DateTimeParseException e) {
+			throw new SQLException(
+					"Invalid ISO-8601 instant for " + key + ": " + value + " (expected e.g. 2026-07-30T20:00:00Z)", e);
 		}
 	}
 

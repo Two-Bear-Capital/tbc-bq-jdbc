@@ -149,6 +149,27 @@
         </dependency>
 
         <!--
+            OpenTelemetry API, at provided scope, and both halves of that matter.
+
+            Compiled against, so spans are written in normal typed code rather than
+            through reflection. Never shipped: the API is absent from the slim jar and
+            from both shaded jars, so a driver dropped into an IDE or a fat jar drags in
+            no observability stack, and there is nothing for shade to relocate. A
+            relocated OTel API would be worse than none — the driver's spans would go to
+            a different global than the host application's and silently fail to join its
+            traces.
+
+            The consequence is that every reference to io.opentelemetry must sit behind
+            the probe in DriverTracing, because the classes holding those references
+            cannot load when the host has not supplied the API.
+        -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
             Apache HttpClient is what the driver's proxy path runs on (see
             DriverTransports): it is the only stack on this classpath that can
             authenticate a CONNECT tunnel without JVM-global state. It arrives
@@ -184,6 +205,17 @@
         </dependency>
 
         <!-- Test Dependencies -->
+        <!--
+            The in-memory OpenTelemetry SDK, test scope only. Without it nothing
+            asserts what a span actually carries, and the job-id attribute is the
+            entire point of the feature. The driver ships no SDK.
+        -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

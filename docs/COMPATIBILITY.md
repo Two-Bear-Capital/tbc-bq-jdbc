@@ -62,17 +62,41 @@ statements, the equivalent of PostgreSQL's `reWriteBatchedInserts`. Large batche
 chunked to stay under BigQuery's per-query limits (10,000 query parameters, ~1 MB query
 text), one query job per chunk.
 
+The VALUES tuple may wrap its placeholders in type construction, which is the only way to
+write a `JSON`, `GEOGRAPHY`, `INTERVAL`, `BIGNUMERIC` or `DATETIME` column — none of them
+has a parameter binding, and GoogleSQL will not coerce a `STRING` or `TIMESTAMP` parameter
+into them:
+
+```sql
+INSERT INTO dataset.events (id, payload, location, occurred_at)
+VALUES (?, PARSE_JSON(?), ST_GEOGFROMTEXT(?), CAST(? AS DATETIME))
+```
+
+Such a batch still collapses: the tuple is repeated verbatim per row, and each repetition
+binds its own parameters.
+
 Details:
 
 - Statements that cannot be collapsed execute sequentially, one query job per parameter
   set — correct, but subject to BigQuery DML quotas and job latency. This covers
-  UPDATE/DELETE/MERGE, `INSERT ... SELECT`, tuples mixing literals with placeholders,
-  and any batch whose parameter sets do not all match the template's placeholder count.
+  UPDATE/DELETE/MERGE, `INSERT ... SELECT`, and any batch whose parameter sets do not all
+  match the template's placeholder count.
+- A tuple element holding no placeholder also stays on the sequential path, because such
+  an element is the same on every row. That covers constants (`VALUES (?, 1)`) and, more
+  importantly, volatile functions (`VALUES (?, CURRENT_TIMESTAMP())`), where collapsing
+  would evaluate the function once for the whole statement rather than once per row.
+- Only a restricted character set may appear in the tuple: placeholders, identifiers,
+  digits, `. _ $ < >`, commas, balanced parentheses and whitespace. Quotes are excluded,
+  so a tuple containing a string literal falls back to sequential execution rather than
+  risk miscounting placeholders.
 - `Statement.addBatch(String)` (heterogeneous SQL batches) also executes sequentially.
 - Set `batchLoadThreshold` to have large batches written by a single BigQuery **load job**
   instead of chunked DML — not bound by DML quotas, and far faster at volume. Off by
   default; see [Connection properties](CONNECTION_PROPERTIES.md#performance-tuning) for
   the conditions a batch must meet, including that load jobs cannot join a transaction.
+  A tuple that wraps a placeholder never takes the load path: that path writes bound
+  values straight to NDJSON and never sees the SQL, so the wrapping would be silently
+  dropped.
 - Update counts come from BigQuery DML statistics. On the sequential path each entry
   carries that statement's affected-row count. On the collapsed path a chunk reports
   `1` per row only when BigQuery confirms exactly the expected total; otherwise every
