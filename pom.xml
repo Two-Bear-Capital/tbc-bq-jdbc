@@ -1057,8 +1057,13 @@
                                  CI uploads target/*.jfr as an artifact; see docs/contributing/PERFORMANCE.md
                                  for how to read one. -->
                             <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens} -XX:StartFlightRecording:name=real-integration-tests,settings=profile,dumponexit=true,filename=target/real-integration-tests-%p.jfr</argLine>
+                            <!-- No `**/` between the package and the file name. Failsafe 3.6.0
+                                 stopped letting a mid-pattern `**/` match zero directories, so
+                                 `**/integration/{tier}/**/*Test.java` silently matched nothing and
+                                 the tier ran 0 tests. The CI guard on a non-zero completed count is
+                                 what caught it; the run itself was green. -->
                             <includes>
-                                <include>**/integration/real/**/*Test.java</include>
+                                <include>**/integration/real/*Test.java</include>
                             </includes>
                             <!-- Run test classes concurrently: the suite is dominated by BigQuery
                                  round-trips, not CPU. Methods stay sequential within a class -
@@ -1137,8 +1142,12 @@
                                  JFR is on here for the same reason it is on for the real suite: when
                                  a scale run is slow, the recording is the evidence. -->
                             <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens} -Xmx512m -XX:StartFlightRecording:name=scale-tests,settings=profile,dumponexit=true,filename=target/scale-tests-%p.jfr</argLine>
+                            <!-- No `**/` between the package and the file name, for the same
+                                 reason as the real tier above. Nothing in CI runs this profile, so
+                                 there is no completed-count guard here to notice the day it matches
+                                 nothing - it would just stop testing. -->
                             <includes>
-                                <include>**/integration/scale/**/*Test.java</include>
+                                <include>**/integration/scale/*Test.java</include>
                             </includes>
                             <!-- Sequential, unlike the real suite. Each of these classes is itself a
                                  concurrency or throughput measurement; running two at once would
