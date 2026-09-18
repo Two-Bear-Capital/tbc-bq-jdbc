@@ -52,6 +52,9 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	private final BQStatement statement;
 	private final TableResult tableResult;
 	private final Iterator<FieldValueList> rowIterator;
+	// Nullable: TableResult.getSchema() is @Nullable, and the protected constructor
+	// admits a subclass carrying no TableResult at all.
+	private final Schema schema;
 	private final FieldList schemaFields; // Cached at construction to avoid repeated schema traversal
 	private final int maxRows; // Cached at construction; setMaxRows must be called before execution per JDBC
 								// spec
@@ -74,8 +77,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.statement = statement;
 		this.tableResult = tableResult;
 		this.rowIterator = tableResult.iterateAll().iterator();
-		Schema schema = tableResult.getSchema();
-		this.schemaFields = schema != null ? schema.getFields() : null;
+		this.schema = tableResult.getSchema();
+		this.schemaFields = this.schema != null ? this.schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
 		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
 		initialiseFetchSize(resolveFetchSize(statement));
@@ -129,8 +132,8 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 		this.statement = statement;
 		this.tableResult = tableResult;
 		this.rowIterator = tableResult != null ? tableResult.iterateAll().iterator() : null;
-		Schema schema = tableResult != null ? tableResult.getSchema() : null;
-		this.schemaFields = schema != null ? schema.getFields() : null;
+		this.schema = tableResult != null ? tableResult.getSchema() : null;
+		this.schemaFields = this.schema != null ? this.schema.getFields() : null;
 		this.maxRows = resolveMaxRows(statement);
 		this.nativeComplexTypes = resolveNativeComplexTypes(statement);
 		initialiseFetchSize(resolveFetchSize(statement));
@@ -496,7 +499,14 @@ public class BQResultSet extends BaseReadOnlyResultSet {
 	@Override
 	public ResultSetMetaData getMetaData() throws SQLException {
 		checkClosed();
-		return new BQResultSetMetaData(tableResult.getSchema());
+		// TableResult.getSchema() is @Nullable and both constructors already treat it
+		// as such, so this cannot assume one is present. Without the guard the null
+		// reaches BQResultSetMetaData's requireNonNull and leaves a JDBC method as an
+		// NPE; findColumn() reports the same condition as the SQLException below.
+		if (schema == null) {
+			throw new BQSQLException("Schema is not available");
+		}
+		return new BQResultSetMetaData(schema);
 	}
 
 	@Override

@@ -32,6 +32,7 @@ import java.sql.SQLException;
 import java.util.List;
 
 import static vc.tbc.bq.jdbc.testsupport.TestResultSets.singleColumn;
+import static vc.tbc.bq.jdbc.testsupport.TestResultSets.tableResult;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
@@ -227,5 +228,19 @@ class BQResultSetTest {
 		BQResultSet rs = singleValue(StandardSQLTypeName.INT64, null);
 		assertFalse(rs.getBoolean("flag"), "SQL NULL reads as false per the JDBC spec");
 		assertTrue(rs.wasNull());
+	}
+
+	@Test
+	void testGetMetaDataReportsAnAbsentSchemaAsSqlException() {
+		// Given: a result carrying no schema. TableResult.getSchema() is @Nullable and
+		// both BQResultSet constructors already treat it as such, so getMetaData()
+		// cannot assume one is present.
+		BQResultSet rs = new BQResultSet(null, tableResult(null, List.of()));
+
+		// Then: the absence is reported through the method's own SQLException, the way
+		// findColumn() reports it — not as the BQResultSetMetaData constructor's
+		// requireNonNull escaping a JDBC method as an NPE.
+		SQLException thrown = assertThrows(SQLException.class, rs::getMetaData);
+		assertEquals("Schema is not available", thrown.getMessage());
 	}
 }
