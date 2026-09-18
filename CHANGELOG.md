@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.2] - 2026-09-18
+
+### 🐛 Bug Fixes
+
+- **build:** Fail CI when committed line endings contradict .gitattributes ([#321](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/321))
+
 ## [4.4.1] - 2026-09-18
 
 ### 🐛 Bug Fixes
@@ -2743,6 +2749,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.4.2]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.1...v4.4.2
 [4.4.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.0...v4.4.1
 [4.4.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.2.0...v4.3.0
