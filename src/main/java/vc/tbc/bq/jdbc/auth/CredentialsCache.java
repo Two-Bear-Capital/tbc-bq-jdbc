@@ -128,6 +128,17 @@ public final class CredentialsCache {
 	 * @since 4.3.0
 	 */
 	public static Credentials forAuthType(AuthType authType, TransportConfig transport) throws IOException {
+		// An access token is not cached, and is the only auth type that is not.
+		// This cache exists to avoid re-reading a key file or re-probing an
+		// environment; wrapping a string the caller already supplied costs nothing,
+		// so there is no saving to make. What there is instead is a hazard: the
+		// token cannot be refreshed, so a cached copy would go on being handed out
+		// after it expired, for as long as the reuse window lasted. Neither counter
+		// is recorded either — nothing was cached, hit or missed.
+		if (authType instanceof AccessTokenAuth) {
+			return authType.toCredentials(DriverTransports.forTransport(transport));
+		}
+
 		Key key = new Key(authType, transport);
 		Entry cached = CACHE.get(key);
 		if (cached != null && !isExpired(cached)) {

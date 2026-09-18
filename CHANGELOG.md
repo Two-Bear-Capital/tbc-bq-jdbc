@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-09-18
+
+### ⚡ Features
+
+- **auth:** Accept a pre-generated access token ([#295](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/295))
+- **telemetry:** Emit an OpenTelemetry span carrying the BigQuery job id ([#296](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/296))
+- **execution:** Collapse batches whose VALUES tuple wraps placeholders ([#299](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/299)) ([#302](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/302))
+
+### 🐛 Bug Fixes
+
+- **types:** Honor a declared scale of zero on a parameterized numeric ([#300](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/300)) ([#301](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/301))
+- **telemetry:** Record the SQLState when a job fails before BigQuery reports one ([#305](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/305))
+- **resultset:** Guard getMetaData() against a result with no schema
+
+### 🔀 Pull Requests
+
+- Merge pull request #304 from Two-Bear-Capital/release/4.4.0
+
+release: 4.4.0
+
+### 📚 Documentation
+
+- **comparison:** Re-verify against Google's 1.2.0 and make the doc a per-PR duty ([#294](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/294))
+- Correct the authType examples, reattach orphaned Javadoc, and guard both with a test ([#297](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/297))
+
+### 👷 CI/CD
+
+- Skip the real BigQuery tier on Dependabot pull requests ([#303](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/303))
+
 ## [4.3.0] - 2026-07-30
 
 ### ⚡ Features
@@ -2702,6 +2731,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.4.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.0.0...v4.1.0

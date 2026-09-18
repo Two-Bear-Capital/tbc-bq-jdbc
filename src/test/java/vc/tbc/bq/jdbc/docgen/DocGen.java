@@ -207,6 +207,8 @@ public final class DocGen {
 			case "USER_OAUTH" -> "User OAuth flow (client id/secret/refresh token).";
 			case "WORKFORCE" -> "Workforce identity federation (set via `credentialConfigFile`).";
 			case "WORKLOAD" -> "Workload identity federation (set via `credentialConfigFile`).";
+			case "ACCESS_TOKEN" -> "A pre-generated OAuth 2.0 access token (set via `accessToken`). "
+					+ "Cannot be refreshed, so the connection ends when the token expires.";
 			default -> "";
 		};
 	}
@@ -220,6 +222,8 @@ public final class DocGen {
 		return switch (impl) {
 			case "ImpersonatedAuth" -> "Not an `authType` value. Wraps whichever of the others is configured, "
 					+ "when `impersonateServiceAccount` is set.";
+			case "AccessTokenAuth" -> "The only credential the driver cannot renew, and the only one it does "
+					+ "not cache between connections.";
 			default -> "";
 		};
 	}

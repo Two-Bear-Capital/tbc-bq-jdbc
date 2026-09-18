@@ -21,6 +21,8 @@ import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.http.HttpTransportOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vc.tbc.bq.jdbc.auth.AccessTokenAuth;
+import vc.tbc.bq.jdbc.auth.AuthType;
 import vc.tbc.bq.jdbc.auth.CredentialsCache;
 import vc.tbc.bq.jdbc.base.AbstractBQConnection;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
@@ -30,6 +32,8 @@ import vc.tbc.bq.jdbc.exception.BQSQLException;
 import vc.tbc.bq.jdbc.util.BigQueryIdentifiers;
 import vc.tbc.bq.jdbc.exception.BQSQLFeatureNotSupportedException;
 import vc.tbc.bq.jdbc.metadata.BQDatabaseMetaData;
+import vc.tbc.bq.jdbc.telemetry.DriverTracing;
+import vc.tbc.bq.jdbc.telemetry.QuerySpan;
 import vc.tbc.bq.jdbc.transport.DriverTransports;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.StructTypeNames;
@@ -130,15 +134,24 @@ public final class BQConnection extends AbstractBQConnection {
 	public BQConnection(ConnectionProperties properties) throws SQLException {
 		this.properties = properties;
 		this.currentCatalog = properties.projectId();
+		rejectExpiredAccessToken(properties.authType());
 		try {
 			// Shared across connections authenticating the same way: building these
 			// means an ADC probe plus token fetch, or reading and parsing a key file
-			Credentials credentials = CredentialsCache.forAuthType(properties.authType(), properties.transport());
+			//
+			// Spanned at the call site rather than inside CredentialsCache, which is
+			// static and has no connection to read the tracing setting from. A cache
+			// hit is a fast span and a miss is the ADC probe and token fetch, which is
+			// the case worth seeing in a trace of a slow first connection.
+			Credentials credentials;
+			try (QuerySpan span = DriverTracing.start("BigQuery.credentials", properties.enableTracing())) {
+				credentials = CredentialsCache.forAuthType(properties.authType(), properties.transport());
+			}
 			this.bigquery = buildOptions(properties, credentials).build().getService();
 			logger.debug("Connected to BigQuery project: {}", properties.projectId());
 
 			// Initialize session manager
-			this.sessionManager = new SessionManager(bigquery);
+			this.sessionManager = new SessionManager(bigquery, properties.enableTracing());
 
 			// Initialize session if enabled
 			if (properties.enableSessions()) {
@@ -153,10 +166,33 @@ public final class BQConnection extends AbstractBQConnection {
 	}
 
 	/**
-	 * Gets the BigQuery client.
+	 * Refuses to open a connection on an access token that has already expired.
 	 *
-	 * @return the BigQuery client
+	 * <p>
+	 * Checked here rather than left to BigQuery because the answers differ in kind.
+	 * BigQuery would return a 401 on the first statement, which classifies as
+	 * {@code 28000} but arrives a round trip later, after the connection appeared
+	 * to open, and says nothing about which of the credential's properties is at
+	 * fault. This says the token expired, and when.
+	 *
+	 * <p>
+	 * Only possible when the caller supplied {@code accessTokenExpiry}; without it
+	 * the driver has nothing to test and BigQuery remains the judge.
+	 *
+	 * @param authType
+	 *            the connection's authentication
+	 * @throws SQLException
+	 *             with SQLState {@code 28000} when the token is known to be expired
 	 */
+	private static void rejectExpiredAccessToken(AuthType authType) throws SQLException {
+		if (authType instanceof AccessTokenAuth accessToken && accessToken.isExpired()) {
+			throw new BQSQLException(
+					"The access token expired at " + accessToken.expiry()
+							+ ". A pre-generated token cannot be refreshed by the driver; supply a new one.",
+					BQSQLException.SQLSTATE_AUTH_FAILED);
+		}
+	}
+
 	/**
 	 * Builds the BigQuery client options for a connection.
 	 *
@@ -249,6 +285,11 @@ public final class BQConnection extends AbstractBQConnection {
 		return builder;
 	}
 
+	/**
+	 * Gets the BigQuery client.
+	 *
+	 * @return the BigQuery client
+	 */
 	public BigQuery getBigQuery() {
 		return bigquery;
 	}

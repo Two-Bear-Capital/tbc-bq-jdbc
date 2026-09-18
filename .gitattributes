@@ -1,0 +1,23 @@
+# Every text file is stored in the repository with LF, whatever a contributor's
+# platform checks it out with. No file currently tracked holds a CR, so this
+# normalises nothing retroactively — it only keeps it that way.
+* text=auto
+
+# The Maven wrapper's Windows scripts ship from upstream with CRLF, while the copies
+# here are LF. Without a rule, every wrapper bump rewrites all of mvnw.cmd and
+# mvnwDebug.cmd line by line: Dependabot #319 carried 216 changed lines across the two
+# for a change that touched neither. Storing them as LF and checking them out as CRLF
+# keeps that diff to the lines that actually moved, and Windows still gets the line
+# endings cmd.exe expects.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# mvnw is a POSIX shell script and must keep LF even on a Windows checkout, or the
+# shell rejects it. Git Bash and WSL both run this file.
+mvnw text eol=lf
+
+# Windows-1252 and UTF-16 have no business here, and a .jar or image must never be
+# line-ending filtered.
+*.jar binary
+*.png binary
+*.jfr binary

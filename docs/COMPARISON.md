@@ -5,8 +5,8 @@ Google published its own first-party BigQuery JDBC driver,
 reaching 1.0.0 on 4 June 2026. This page compares it with `tbc-bq-jdbc` so you can pick the
 right driver for your situation. It is a snapshot, not a running scoreboard.
 
-**Compared:** `tbc-bq-jdbc` 4.2.0 · `google-cloud-bigquery-jdbc` 1.1.0 · Google's driver read
-at **1.1.0 on 29 July 2026** and not re-read since
+**Compared:** `tbc-bq-jdbc` 4.4.0 · `google-cloud-bigquery-jdbc` 1.2.0 · both read from source
+on **30 July 2026**, Google's from the sources jar it published to Maven Central that same day
 
 Google's driver is under heavy active development and this comparison will date quickly.
 Both drivers are Apache 2.0.
@@ -48,24 +48,31 @@ before you run it.
 
 ## At a glance
 
-| | `tbc-bq-jdbc` 4.2.0 | `google-cloud-bigquery-jdbc` 1.1.0 |
+| | `tbc-bq-jdbc` 4.4.0 | `google-cloud-bigquery-jdbc` 1.2.0 |
 |---|---|---|
 | Java baseline | 21+ | 8+ |
 | JDBC spec | 4.3 | 4.2 |
 | Maven Central | ❌ not published | ✅ `com.google.cloud:google-cloud-bigquery-jdbc` |
 | Support | Community | Google, via the `google-cloud-java` issue tracker |
-| Connection properties | 37 | 73 |
+| Connection properties | 48 | 76 recognised, 56 advertised |
 | Simba-style URLs | ⚠️ common subset translated | ✅ broad |
 | Storage Read API (Arrow) | ✅ `useStorageApi` | ✅ `EnableHighThroughputAPI` |
 | Storage Write API | ⏳ tracked ([#267][i267]) — load jobs today | ✅ `EnableWriteAPI` |
 | Metadata caching | ✅ TTL cache, shared across connections | ❌ none |
 | Sessions | One per connection, reused | New session per statement in auto-commit |
-| OpenTelemetry | ⏳ tracked ([#269][i269]) — own counters today | ✅ traces + GCP exporters |
+| OpenTelemetry | ✅ traces, API-only — plus own counters | ✅ traces + GCP exporters |
 | HTTP proxy | ✅ `proxyHost`/`proxyPort`, with proxy auth | ✅ |
 | Custom TLS truststore | ✅ `trustStore`, incl. type and provider | ✅ |
 | `CallableStatement` | ❌ by design ([#272][i272]) | ✅ |
 | `javax.sql.DataSource` | ✅ | ✅ |
 | `ConnectionPoolDataSource` | ❌ by design — pool with HikariCP | ✅ |
+
+Counted the same way for both drivers, from source rather than from documentation. For
+`tbc-bq-jdbc` the two numbers are the same: every property it parses is advertised through
+`Driver.getPropertyInfo()`, and a test fails the build if one is not. Google's driver
+recognises 76 names in a connection URL but lists 56 of them in `VALID_PROPERTIES`, which is
+what its `getPropertyInfo()` returns — so its proxy, OAuth and Private Service Connect
+properties work but are not discoverable by a tool that asks the driver what it accepts.
 
 ---
 
@@ -88,7 +95,7 @@ the difference.
 
 | Area | Detail |
 |---|---|
-| **Session reuse** | With `EnableSession=1` and auto-commit on, Google's driver sets `createSession=true` on *every* query job and never reads the assigned ID back, so each statement gets a **new** session and temp tables do not survive between statements. This was reported as [#13787](https://github.com/googleapis/google-cloud-java/issues/13787) and closed as intended, with a manual `QueryProperties=session_id=…` workaround. `tbc-bq-jdbc` reads the ID from `JobStatistics.getSessionInfo()` once and attaches it as the `session_id` connection property on every later job, so one session serves the whole connection. |
+| **Session reuse** | With `EnableSession=1` and auto-commit on, Google's driver sets `createSession=true` on *every* query job, so each statement gets a **new** session and temp tables do not survive between statements. It does read an assigned session ID back and reuse it — but only on the transaction path, where `beginTransaction()` stores it and later jobs carry it; a connection that never leaves auto-commit never reaches that code. Reported as [#13787](https://github.com/googleapis/google-cloud-java/issues/13787) and closed as intended, with a manual `QueryProperties=session_id=…` workaround. `tbc-bq-jdbc` reads the ID from `JobStatistics.getSessionInfo()` once and attaches it as the `session_id` connection property on every later job, so one session serves the whole connection regardless of auto-commit. |
 | **Deferred `BEGIN TRANSACTION`** | Google's `setAutoCommit(false)` issues a real `BEGIN TRANSACTION` job immediately, and `commit()` issues `COMMIT` *and* a fresh `BEGIN` — so a commit costs two jobs, and a connection pool that toggles auto-commit on checkout pays a job every time. `tbc-bq-jdbc` defers `BEGIN` to the first statement that actually runs (`beginTransactionIfNeeded()`), so toggling auto-commit costs nothing and `commit()` with nothing in flight is a no-op. |
 | **User-managed transactions** | Because Google's driver opens a transaction eagerly, a script that manages its own transaction fails on its own `BEGIN TRANSACTION` — reported as [#13788](https://github.com/googleapis/google-cloud-java/issues/13788) and closed as intended. `tbc-bq-jdbc` issues nothing until a statement runs, so in auto-commit mode such a script executes as written. |
 | **Session cleanup** | `tbc-bq-jdbc` terminates the session with `CALL BQ.ABORT_SESSION()` on connection close, best-effort. Google's driver leaves sessions to BigQuery's 24-hour reaper; wanting to reclaim session temp-table storage sooner is what drives open issue [#13922](https://github.com/googleapis/google-cloud-java/issues/13922). |
@@ -148,7 +155,7 @@ Anything unmarked is a genuine difference that is simply not addressed here.
 |---|---|
 | **`ConnectionPoolDataSource`** *(by design)* | Google implements the optional JDBC pooling API — `ConnectionPoolDataSource` and `PooledConnection`, with `ConnectionPoolSize` and `ListenerPoolSize`. `tbc-bq-jdbc` ships a [`DataSource`](DATASOURCE.md) and stops there: HikariCP, Tomcat JDBC and Spring all pool `java.sql.Connection` directly, `beginRequest()`/`endRequest()` are the modern hint and are implemented, and the deferred `BEGIN TRANSACTION` exists precisely because an external pool is assumed. Wrap it in HikariCP. |
 | **`CallableStatement`** *(by design — [#272][i272])* | Implemented, for calling BigQuery stored procedures. `tbc-bq-jdbc` throws `SQLFeatureNotSupportedException`. |
-| **Pre-generated access tokens** *(tracked — [#273][i273])* | `OAuthType=2` is supported. `tbc-bq-jdbc` rejects it, and supports JSON service-account keys only — Google also accepts P12 (`OAuthP12Password`). |
+| **P12 service-account keys** *(by design — [#273][i273])* | Google accepts P12 alongside JSON (`OAuthP12Password`). `tbc-bq-jdbc` takes JSON only: P12 is Google's legacy key format, a P12 key can be converted to JSON, and carrying a second key-file format for one on the way out is surface area kept forever. |
 
 ### Performance
 
@@ -163,7 +170,7 @@ Anything unmarked is a genuine difference that is simply not addressed here.
 
 | Area | Detail |
 |---|---|
-| **OpenTelemetry** *(tracked — [#269][i269])* | Traces and spans, GCP trace and log exporters, `useGlobalOpenTelemetry`, and trace/span IDs injected into local logs. `tbc-bq-jdbc` exposes JVM-global counters through `DriverMetrics` and no tracing. |
+| **Bundled telemetry exporters** *(by design — [#269][i269])* | Google ships GCP trace and log exporters and injects trace/span IDs into local log lines (`enableGcpTraceExporter`, `enableGcpLogExporter`, `gcpTelemetryProjectId`, `gcpTelemetryCredentials`). `tbc-bq-jdbc` emits spans through the OpenTelemetry **API only** and bundles no SDK and no exporters: sampling and export belong to the host application, and a driver dropped into an IDE should not drag in an observability stack. Both join an existing SDK — Google through `useGlobalOpenTelemetry`, this driver through `GlobalOpenTelemetry` by default. |
 | **Per-connection log files** *(by design — [#277][i277])* | `LogLevel`/`LogPath` with a per-connection file handler and MDC, matching Simba's diagnostic workflow. `tbc-bq-jdbc` logs through SLF4J and leaves the backend to the host application; the `with-logging` jar bundles one for tools that have none. |
 | **Job controls** *(by design — [#276][i276])* | `KMSKeyName`, `RequestReason`, `PartnerToken`, `AllowLargeResults` with `LargeResultDataset`/`LargeResultTable`, destination table and dataset control, `RetryInitialDelay`/`RetryMaxDelay`, and `QueryDialect` for legacy SQL. `tbc-bq-jdbc` covers `labels`, `maxBillingBytes`, `retryCount` and `useLegacySql` only. |
 | **Project discovery** | `EnableProjectDiscovery` finds projects automatically. `tbc-bq-jdbc` requires them to be listed in `additionalProjects`. |
@@ -180,8 +187,9 @@ Neither driver has a meaningful edge here.
 | **Multi-statement scripts** | Both run a script as one parent job, enumerate its child jobs, order them oldest-first, and produce a `ResultSet` for a child only when its statement type is `SELECT`. Both walk the children through `getMoreResults()`. |
 | **Storage Read API** | Both read Arrow over the Storage Read API and fall back to the REST path when the read session cannot be created or permission is denied. |
 | **Key metadata** | Both report primary and foreign keys from BigQuery's table constraints. |
-| **Authentication** | Both cover ADC, service-account keys, user OAuth refresh tokens, service-account impersonation, and workload/workforce identity federation. Google additionally supports P12 keys and pre-generated access tokens. |
+| **Authentication** | Both cover ADC, service-account keys, user OAuth refresh tokens, pre-generated access tokens, service-account impersonation, and workload/workforce identity federation. Google additionally supports P12 keys. `tbc-bq-jdbc` is alone in accepting an expiry for a pre-generated token, which turns the eventual 401 into a connection-time error naming the expiry. |
 | **Parallel metadata fan-out** | Both fan out per-dataset metadata queries across a bounded thread pool. `tbc-bq-jdbc` uses `INFORMATION_SCHEMA` queries; Google uses the REST list APIs. |
+| **Distributed tracing** | Both emit OpenTelemetry spans carrying the BigQuery job id, and both join an SDK the host has registered. They differ in what else ships with them, above. |
 | **Cancellation and timeouts** | Both implement `Statement.cancel()` and query timeouts against the underlying job. |
 | **Metadata completeness** | Both implement the full `DatabaseMetaData` surface including `getProcedures`, `getProcedureColumns`, `getFunctions` and `getFunctionColumns`. |
 | **Unsupported by BigQuery** | Neither offers scrollable or updatable result sets, savepoints, or configurable transaction isolation — BigQuery does not support them. |
@@ -191,8 +199,18 @@ Neither driver has a meaningful edge here.
 ## Notes on reading this page
 
 Every claim above was checked against the source of both drivers at the versions named, not
-against either project's documentation. Google's driver moves fast — 60+ merged pull requests
-between May and July 2026 — so re-verify before relying on any gap listed here.
+against either project's documentation — Google's from the published sources jar on Maven
+Central, this driver's from its own tree.
+
+**Read the published release, not the main branch.** The previous pass named 1.1.0 as its
+baseline but described `SSLTrustStoreType`, `SSLTrustStoreProvider`, `useGlobalOpenTelemetry`
+and the GCP telemetry exporters — none of which existed in 1.1.0. All seven arrived in 1.2.0.
+Reading unreleased work as though it had shipped credits a driver with features nobody can
+use yet, and it is the easiest mistake to make here.
+
+Google's driver moves fast: 1.2.0 was published the same day this page was last verified, and
+it added seven connection properties over 1.1.0. Treat any gap listed here as needing
+re-verification before you rely on it.
 
 The *tracked* and *by design* markers link into this project's issue tracker, where the
 reasoning is recorded and open to argument. They are there so a reader can tell a decision from

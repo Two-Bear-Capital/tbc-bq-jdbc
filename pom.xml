@@ -6,7 +6,7 @@
 
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>4.3.0</version>
+    <version>4.4.0</version>
     <packaging>jar</packaging>
 
     <name>TBC BigQuery JDBC Driver</name>
@@ -37,17 +37,17 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.build.outputTimestamp>2026-07-30T19:58:39Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-09-18T02:43:40Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
-        <google.cloud.bom.version>26.85.1</google.cloud.bom.version>
+        <google.cloud.bom.version>26.88.1</google.cloud.bom.version>
         <!-- Security overrides for transitive deps pulled in by libraries-bom.
              Declared before libraries-bom so these patched versions win.
              opentelemetry: CVE-2026-45292 (W3C Baggage), jackson: GHSA-72hv-8253-57qq. -->
-        <opentelemetry.bom.version>1.64.0</opentelemetry.bom.version>
-        <jackson.bom.version>2.22.1</jackson.bom.version>
-        <slf4j.version>2.0.18</slf4j.version>
-        <junit.version>6.1.2</junit.version>
+        <opentelemetry.bom.version>1.66.0</opentelemetry.bom.version>
+        <jackson.bom.version>2.22.2</jackson.bom.version>
+        <slf4j.version>2.0.19</slf4j.version>
+        <junit.version>6.1.3</junit.version>
         <jmh.version>1.37</jmh.version>
         <hikaricp.version>7.1.0</hikaricp.version>
         <!-- Arrow cannot allocate without this on JDK 16+ (see ArrowSupport). Every
@@ -57,23 +57,23 @@
         <arrow.add.opens>--add-opens=java.base/java.nio=ALL-UNNAMED</arrow.add.opens>
 
         <!-- Plugin versions -->
-        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
         <maven-resources-plugin.version>3.5.0</maven-resources-plugin.version>
         <maven-jar-plugin.version>3.5.1</maven-jar-plugin.version>
         <maven-source-plugin.version>3.4.0</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
-        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
-        <maven-failsafe-plugin.version>3.5.6</maven-failsafe-plugin.version>
+        <maven-surefire-plugin.version>3.6.0</maven-surefire-plugin.version>
+        <maven-failsafe-plugin.version>3.6.0</maven-failsafe-plugin.version>
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
-        <git-commit-id-maven-plugin.version>10.0.0</git-commit-id-maven-plugin.version>
-        <spotless-maven-plugin.version>3.9.0</spotless-maven-plugin.version>
+        <git-commit-id-maven-plugin.version>10.0.1</git-commit-id-maven-plugin.version>
+        <spotless-maven-plugin.version>3.10.2</spotless-maven-plugin.version>
         <jacoco-maven-plugin.version>0.8.15</jacoco-maven-plugin.version>
-        <cyclonedx-maven-plugin.version>2.9.2</cyclonedx-maven-plugin.version>
-        <exec-maven-plugin.version>3.6.3</exec-maven-plugin.version>
+        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
+        <exec-maven-plugin.version>3.6.4</exec-maven-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
-        <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
     </properties>
 
@@ -149,6 +149,27 @@
         </dependency>
 
         <!--
+            OpenTelemetry API, at provided scope, and both halves of that matter.
+
+            Compiled against, so spans are written in normal typed code rather than
+            through reflection. Never shipped: the API is absent from the slim jar and
+            from both shaded jars, so a driver dropped into an IDE or a fat jar drags in
+            no observability stack, and there is nothing for shade to relocate. A
+            relocated OTel API would be worse than none — the driver's spans would go to
+            a different global than the host application's and silently fail to join its
+            traces.
+
+            The consequence is that every reference to io.opentelemetry must sit behind
+            the probe in DriverTracing, because the classes holding those references
+            cannot load when the host has not supplied the API.
+        -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
             Apache HttpClient is what the driver's proxy path runs on (see
             DriverTransports): it is the only stack on this classpath that can
             authenticate a CONNECT tunnel without JVM-global state. It arrives
@@ -179,11 +200,22 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.6.1</version>
+            <version>1.6.3</version>
             <optional>true</optional>
         </dependency>
 
         <!-- Test Dependencies -->
+        <!--
+            The in-memory OpenTelemetry SDK, test scope only. Without it nothing
+            asserts what a span actually carries, and the job-id attribute is the
+            entire point of the feature. The driver ships no SDK.
+        -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

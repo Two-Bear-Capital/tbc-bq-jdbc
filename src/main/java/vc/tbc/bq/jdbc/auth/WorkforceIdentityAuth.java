@@ -83,7 +83,7 @@ import java.util.Objects;
  * <b>Usage Example:</b>
  *
  * <pre>{@code
- * String url = "jdbc:bigquery:my-project/my_dataset?" + "authType=WORKFORCE_IDENTITY&"
+ * String url = "jdbc:bigquery:my-project/my_dataset?" + "authType=WORKFORCE&"
  * 		+ "credentialConfigFile=/path/to/workforce-credential-config.json";
  * Connection conn = DriverManager.getConnection(url);
  * }</pre>

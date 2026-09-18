@@ -16,6 +16,7 @@
 package vc.tbc.bq.jdbc;
 
 import org.junit.jupiter.api.Test;
+import vc.tbc.bq.jdbc.auth.AccessTokenAuth;
 import vc.tbc.bq.jdbc.auth.ApplicationDefaultAuth;
 import vc.tbc.bq.jdbc.auth.ServiceAccountAuth;
 import vc.tbc.bq.jdbc.auth.UserOAuthAuth;
@@ -271,14 +272,26 @@ class ConnectionUrlParserSimbaTest {
 	}
 
 	@Test
-	void testParseSimbaUrlUnsupportedOAuthType2() {
-		// Given: Simba URL with unsupported OAuthType=2 (pre-generated tokens)
+	void testParseSimbaUrlOAuthType2MapsToAnAccessToken() throws SQLException {
+		// Given: a Simba URL carrying a pre-generated token, which this driver used
+		// to reject outright
+		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=2"
+				+ ";OAuthAccessToken=ya29.test-token";
+
+		ConnectionProperties props = ConnectionUrlParser.parse(url, null);
+
+		assertInstanceOf(AccessTokenAuth.class, props.authType());
+		assertEquals("ya29.test-token", ((AccessTokenAuth) props.authType()).token());
+	}
+
+	@Test
+	void testParseSimbaUrlOAuthType2WithoutATokenIsRejected() {
+		// The auth type is accepted now; the token it needs is still required, and
+		// the error names the property rather than the OAuthType
 		String url = "jdbc:bigquery://https://www.googleapis.com/bigquery/v2:443;ProjectId=my-project;OAuthType=2";
 
-		// Then: Should throw SQLException with specific message
 		SQLException ex = assertThrows(SQLException.class, () -> ConnectionUrlParser.parse(url, null));
-		assertTrue(ex.getMessage().contains("Pre-generated"));
-		assertTrue(ex.getMessage().contains("OAuthType=2"));
+		assertTrue(ex.getMessage().contains("accessToken"), ex.getMessage());
 	}
 
 	@Test

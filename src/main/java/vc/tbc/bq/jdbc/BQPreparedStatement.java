@@ -1297,6 +1297,14 @@ public final class BQPreparedStatement extends AbstractBQPreparedStatement {
 					parameterSets.size());
 			return Optional.empty();
 		}
+		// The load path writes bound values straight to NDJSON and never sees the SQL,
+		// so a tuple wrapping a placeholder in PARSE_JSON(?) or CAST(? AS DATETIME)
+		// would have that wrapping silently dropped -- wrong data rather than an error.
+		if (!insert.placeholderOnlyTuple()) {
+			logger.debug("Batch of {} rows stays on the DML path: the VALUES tuple wraps a placeholder in SQL",
+					parameterSets.size());
+			return Optional.empty();
+		}
 		if (!BatchLoadEncoder.canEncode(parameterSets)) {
 			logger.debug("Batch of {} rows stays on the DML path: a parameter type is not loadable",
 					parameterSets.size());

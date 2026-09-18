@@ -13,6 +13,7 @@ tbc-bq-jdbc supports all Google Cloud authentication methods:
 | **User OAuth** | `USER_OAUTH` | End-user applications | `clientId`, `clientSecret`, `refreshToken` |
 | **Workforce Identity** | `WORKFORCE` | Federated workforce access | `credentialConfigFile` |
 | **Workload Identity** | `WORKLOAD` | GKE / workload federation | `credentialConfigFile` |
+| **Access Token** | `ACCESS_TOKEN` | A host application that already holds a token | `accessToken` |
 
 `authType` defaults to `ADC` when omitted, and its value is case-insensitive. Omitting a
 required property fails at connection time with a message naming the property.
@@ -541,6 +542,67 @@ String url = "jdbc:bigquery:my-project/my_dataset?" +
              "authType=SERVICE_ACCOUNT&" +
              "credentials=/vault/bigquery-rotating-key.json";
 ```
+
+---
+
+## Pre-generated Access Token
+
+**Recommended for:** a host application that already holds a valid access token — because it
+ran the OAuth flow itself, or because it brokers per-user access and mints a token per request.
+
+Every other method hands the driver something it can turn into tokens repeatedly. This one
+hands over a finished token.
+
+### Usage
+
+```java
+String url = "jdbc:bigquery:my-project/my_dataset?" +
+             "authType=ACCESS_TOKEN&" +
+             "accessToken=ya29.a0Af..." +
+             "&accessTokenExpiry=2026-07-30T20:00:00Z";
+
+try (Connection conn = DriverManager.getConnection(url)) {
+    // Authenticated as whoever the token represents
+}
+```
+
+### Configuration Properties
+
+| Property | Required | Description |
+|----------|----------|-------------|
+| `authType` | Yes | Must be `ACCESS_TOKEN` |
+| `accessToken` | Yes | The OAuth 2.0 access token |
+| `accessTokenExpiry` | No | When it expires, as an ISO-8601 instant |
+
+### The token cannot be refreshed
+
+This is inherent, not a limitation to work around: the driver was given a token, not the means
+to obtain one. **The connection stops working when the token expires**, and the driver cannot
+renew it. Open a new connection with a new token.
+
+Supplying `accessTokenExpiry` is how you get a clear failure instead of a confusing one:
+
+```
+The access token expired at 2026-07-30T20:00:00Z. A pre-generated token cannot be
+refreshed by the driver; supply a new one.        [SQLState 28000]
+```
+
+That is raised as the connection opens. Without the expiry, the token is used until BigQuery
+rejects it, which surfaces as a 401 on the first statement — also SQLState `28000`, but a round
+trip later and without naming the cause.
+
+Unlike every other authentication method, these credentials are **not cached** between
+connections. Building one costs nothing, and a cached copy would go on being handed out after
+the token had expired.
+
+### Cost estimation needs a token that can create jobs
+
+`enableQueryCostEstimation` runs a dry run before each statement, and a dry run creates a
+BigQuery job. A **read-only** token has no scope for that, so estimates will not be produced and
+the driver logs the reason once per statement. Nothing else is affected — queries run normally.
+
+If you are migrating from the Simba driver, `OAuthType=2` with `OAuthAccessToken` maps here
+automatically.
 
 ---
 
