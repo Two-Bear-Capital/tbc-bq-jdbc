@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.1] - 2026-09-18
+
+### 🐛 Bug Fixes
+
+- **build:** Stop failsafe 3.6.0 discovering zero integration tests ([#320](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/320))
+
+### 🏗️ Build
+
+- **deps:** Bump the maven-dependencies group across 1 directory with 16 updates ([#319](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/319))
+- **deps:** Bump actions/setup-java ([#318](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/318))
+- **deps:** Bump js-yaml ([#307](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/307))
+
 ## [4.4.0] - 2026-09-18
 
 ### ⚡ Features
@@ -2731,6 +2743,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.4.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.0...v4.4.1
 [4.4.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.1.0...v4.2.0
