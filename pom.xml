@@ -1057,7 +1057,14 @@
                                  CI uploads target/*.jfr as an artifact; see docs/contributing/PERFORMANCE.md
                                  for how to read one. -->
                             <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens} -XX:StartFlightRecording:name=real-integration-tests,settings=profile,dumponexit=true,filename=target/real-integration-tests-%p.jfr</argLine>
+                            <!-- Both patterns, because failsafe 3.6.0 stopped letting `**` match
+                                 zero directories: `real/**/*Test.java` no longer matches a test
+                                 sitting directly in `real/`, which is all 39 of them, so the tier
+                                 silently discovered nothing and Maven still reported BUILD SUCCESS.
+                                 The first line is what actually runs today; the second keeps a
+                                 future subpackage from being skipped just as quietly. -->
                             <includes>
+                                <include>**/integration/real/*Test.java</include>
                                 <include>**/integration/real/**/*Test.java</include>
                             </includes>
                             <!-- Run test classes concurrently: the suite is dominated by BigQuery
@@ -1138,6 +1145,11 @@
                                  a scale run is slow, the recording is the evidence. -->
                             <argLine>@{argLine} -XX:+EnableDynamicAgentLoading ${arrow.add.opens} -Xmx512m -XX:StartFlightRecording:name=scale-tests,settings=profile,dumponexit=true,filename=target/scale-tests-%p.jfr</argLine>
                             <includes>
+                                <!-- Both patterns, for the failsafe 3.6.0 `**` change described on the
+                                     real-integration profile above. This tier is opt-in and never
+                                     runs in CI, so a silently empty run here would have gone
+                                     unnoticed for far longer. -->
+                                <include>**/integration/scale/*Test.java</include>
                                 <include>**/integration/scale/**/*Test.java</include>
                             </includes>
                             <!-- Sequential, unlike the real suite. Each of these classes is itself a
