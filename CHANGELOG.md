@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.4] - 2026-10-19
+
+### 🐛 Bug Fixes
+
+- **website:** Restore the markdown processor and build the site in CI ([#332](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/332))
+
+### 🏗️ Build
+
+- **deps:** Bump org.sonatype.central:central-publishing-maven-plugin ([#333](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/333))
+
 ## [4.4.3] - 2026-10-19
 
 ### 👷 CI/CD
@@ -2764,6 +2774,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.4.4]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.3...v4.4.4
 [4.4.3]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.2...v4.4.3
 [4.4.2]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.1...v4.4.2
 [4.4.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.0...v4.4.1
