@@ -6,7 +6,7 @@
 
     <groupId>vc.tbc</groupId>
     <artifactId>tbc-bq-jdbc</artifactId>
-    <version>4.4.2</version>
+    <version>4.4.3</version>
     <packaging>jar</packaging>
 
     <name>TBC BigQuery JDBC Driver</name>
@@ -37,7 +37,7 @@
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.build.outputTimestamp>2026-09-18T11:43:13Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-10-19T00:11:57Z</project.build.outputTimestamp>
 
         <!-- Dependency versions -->
         <google.cloud.bom.version>26.90.0</google.cloud.bom.version>
@@ -72,7 +72,7 @@
         <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
         <exec-maven-plugin.version>3.6.4</exec-maven-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
-        <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
+        <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
         <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
         <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
     </properties>
