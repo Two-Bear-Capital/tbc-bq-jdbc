@@ -1,0 +1,45 @@
+name: Website
+
+# Build-only check for the docs site. docs-site.yml is manual-trigger only, so
+# nothing else builds website/ — Dependabot #323 bumped Astro past a breaking
+# change and merged green, and the site stayed broken until someone built it by
+# hand. docs/** is included because the prebuild step syncs those files into the
+# site, so a doc edit can break the build too.
+#
+# Path-filtered, so this must not be made a required check: a PR that touches
+# neither path would wait on it forever.
+on:
+  push:
+    branches: [ main, 'release/**' ]
+    paths: [ 'website/**', 'docs/**', '.github/workflows/website.yml' ]
+  pull_request:
+    branches: [ main, 'release/**' ]
+    paths: [ 'website/**', 'docs/**', '.github/workflows/website.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build docs site
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Javadoc is skipped: it only fills public/api, which nothing in the
+      # build reads, and it would add a Maven run to every docs PR.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install & build site
+        working-directory: website
+        run: |
+          npm ci
+          npm run build
