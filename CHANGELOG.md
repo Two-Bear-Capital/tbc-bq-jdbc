@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.3] - 2026-10-19
+
+### 👷 CI/CD
+
+- Stop dependabot bumping the maven wrapper ([#331](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/331))
+
+### 🏗️ Build
+
+- **deps:** Bump com.fasterxml.jackson:jackson-bom ([#322](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/322))
+- **deps:** Bump the npm_and_yarn group across 1 directory with 6 updates ([#323](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/323))
+- **deps:** Bump the maven-dependencies group with 6 updates ([#324](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/324))
+- **deps:** Bump com.diffplug.spotless:spotless-maven-plugin ([#325](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/325))
+- **deps:** Bump the maven-dependencies group across 1 directory with 6 updates ([#329](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/329))
+- **deps:** Bump the npm_and_yarn group across 1 directory with 3 updates ([#330](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/330))
+
 ## [4.4.2] - 2026-09-18
 
 ### 🐛 Bug Fixes
@@ -2749,6 +2764,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.4.3]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.2...v4.4.3
 [4.4.2]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.1...v4.4.2
 [4.4.1]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.0...v4.4.1
 [4.4.0]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.3.0...v4.4.0
