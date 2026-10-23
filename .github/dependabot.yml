@@ -35,3 +35,30 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+
+  # The docs site (website/, Astro).
+  - package-ecosystem: "npm"
+    directory: "/website"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    groups:
+      website:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+
+  # The integration-test project's Terraform (terraform/, project bigquery-jdbc-driver-test).
+  - package-ecosystem: "terraform"
+    directory: "/terraform"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
