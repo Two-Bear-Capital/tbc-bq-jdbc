@@ -1,0 +1,121 @@
+# Canonical "no review finding gets lost" workflow. THIS repo-level copy is generated —
+# do NOT hand-edit it (a drifted copy is a review finding). The single source lives in the
+# tbc-platform-workspace meta-repo at scripts/workflows/review-followups.yml; edit it there
+# and re-run `make workflows` to roll the change out everywhere.
+#
+# Two jobs, one purpose: a finding that a reviewer wrote down should reach a human.
+#
+#   surface  — Copilot collapses some findings into a "Suppressed comments" block instead
+#              of posting them. 26% of PRs had one. They are invisible in round 1, so the
+#              author's fix misses them and the other reviewer re-finds them in round 2.
+#              This re-posts them as a PR comment while the PR is still open.
+#
+#   collect  — the blocking/advisory merge gate (conventions/commits-and-releases.md) only
+#              works if the advisory half survives. It does not survive on its own: over 30
+#              days every deferred finding that became an ISSUE got handled, and every one
+#              left as a replied-to thread was lost — including five real design-security
+#              findings on tbc-platform#441 and a cache-poisoning bug on tbc-mcp-server#296
+#              that arrived 64 seconds after merge. This files them automatically.
+#
+# The daily schedule exists for exactly that last case: a finding posted after the merge
+# event has already fired is invisible to the merge trigger, and those are the ones that
+# have escaped. 17 findings across 9 PRs in the 30 days before this shipped.
+name: Review Follow-ups
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [closed]
+  schedule:
+    # Daily, after the overnight PRs have settled. Catches findings posted after merge.
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+# Never cancel: each run either files an issue or surfaces a finding, and a cancelled run
+# silently drops one. These are cheap and short — there is nothing to save by racing them.
+concurrency:
+  group: review-followups-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  # Runs the moment Copilot submits, which is when the hidden findings exist and the PR is
+  # still open enough to act on them.
+  surface:
+    # Same-repo PRs only: GITHUB_TOKEN is read-only on a fork PR, so posting the comment
+    # would just fail. `contains` is case-insensitive in GitHub expressions, which is why
+    # it matches `copilot-pull-request-reviewer[bot]` without spelling the whole login.
+    if: >-
+      github.event_name == 'pull_request_review' &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.review.user.login, 'copilot')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Surface Copilot's suppressed findings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_ID: ${{ github.event.review.id }}
+        run: ./.github/scripts/surface-suppressed-findings.sh
+
+  # On merge, and again daily for anything that arrived after the merge event fired.
+  collect:
+    if: >-
+      github.event_name != 'pull_request_review' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write # files the follow-up issue
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Collect follow-ups from this PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: ./.github/scripts/collect-review-followups.sh
+
+      # The sweep. A 48-hour window rather than 24 so a finding posted just after a run
+      # is still caught by the next one; the script is idempotent, so overlap is free.
+      - name: Sweep PRs merged in the last 48h
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          since=$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          # --limit caps what the API returns BEFORE the jq filter drops Dependabot, so a
+          # dependency-bump storm could fill the page and push every human PR out of the
+          # window unnoticed. Dependabot merges run to dozens a day here; 500 keeps the
+          # human PRs in frame even then.
+          gh pr list --repo "$REPO" --state merged --limit 500 \
+            --json number,mergedAt,author \
+            --jq ".[] | select(.mergedAt >= \"$since\") | select(.author.login | test(\"dependabot\") | not) | .number" \
+            > /tmp/merged-prs.txt
+          # One bad PR must not abandon the sweep — that would silently drop every
+          # finding after it, which is the failure this whole workflow exists to stop.
+          while read -r n; do
+            [ -n "$n" ] || continue
+            PR_NUMBER="$n" ./.github/scripts/collect-review-followups.sh \
+              || echo "::warning::follow-up collection failed for $REPO#$n"
+          done < /tmp/merged-prs.txt
