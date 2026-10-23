@@ -4,10 +4,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-    assignees:
-      - "timveil"
-    reviewers:
-      - "timveil"
     labels:
       - "dependencies"
     groups:
@@ -20,15 +16,15 @@ updates:
     # wrapper locally instead: ./mvnw wrapper:wrapper -Dmaven=<version>
     ignore:
       - dependency-name: "org.apache.maven:apache-maven"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
-    assignees:
-      - "timveil"
-    reviewers:
-      - "timveil"
     labels:
       - "dependencies"
       - "github-actions"
@@ -36,3 +32,6 @@ updates:
       github-actions:
         patterns:
           - "*"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
