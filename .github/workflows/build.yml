@@ -16,6 +16,10 @@ on:
     branches: [ main ]
     types: [ completed ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Build and Unit Tests
@@ -30,7 +34,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # .gitattributes says what a blob must hold; nothing enforces it. A commit
       # made through the GitHub API never runs the clean filter, and that is every
@@ -56,7 +60,7 @@ jobs:
           echo "Committed line endings match .gitattributes."
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -96,7 +100,7 @@ jobs:
       # false deliberately: coverage reporting is a nice-to-have, and an outage
       # in the upload API should not turn a green build red.
       - name: Upload coverage to GitHub Code Quality
-        uses: actions/upload-code-coverage@v1
+        uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
         with:
           file: target/site/jacoco/cobertura.xml
           language: Java
@@ -111,21 +115,21 @@ jobs:
         run: ./mvnw test-compile exec:java -Pdocs -Dexec.args="--check" -B
 
       - name: Upload test reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: test-reports
           path: target/surefire-reports/
 
       - name: Upload integration test reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: integration-test-reports
           path: target/failsafe-reports/
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: coverage-reports
@@ -180,16 +184,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Authenticate to Google Cloud (WIF)
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -285,7 +289,7 @@ jobs:
           fi
 
       - name: Upload real integration test reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: real-integration-test-reports
@@ -308,7 +312,7 @@ jobs:
       # only way to lose the file is a hard JVM crash, which is worth a red step
       # of its own.
       - name: Upload JFR recording
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: real-integration-tests-jfr
