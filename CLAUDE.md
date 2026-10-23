@@ -2,6 +2,40 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Part of the Two Bear Capital platform
+
+`tbc-bq-jdbc` is a public JDBC 4.3 driver for BigQuery, part of the
+`tbc-platform-workspace` virtual monorepo, where it sits in the **Data platform** section
+of the service map (the workspace `CLAUDE.md`).
+
+## Conventions
+
+Shared TBC conventions, imported live from the workspace catalog (resolves because every
+repo is a sibling under `tbc-platform-workspace`). Rules live once in the catalog; only this
+repo's **Deviations** are recorded below.
+
+@../conventions/core.md
+@../conventions/testing.md
+
+### Deviations
+- **Build hub:** the Maven wrapper (`./mvnw`), not a `Makefile`. The `testing` skill lists
+  the commands.
+- **Release tooling:** `git-cliff` (`cliff.toml`), and a release fires on every merge to
+  `main`. Milestone work goes through a `release/<version>` branch that merges to `main`
+  **with a merge commit** (see "Milestone work goes on a release branch" below), so this
+  repo allows merge commits where the rest of the platform is squash-only. The workspace's
+  settings audit records that as a deviation.
+- **Terraform:** `terraform/` manages this repo's own integration-test project
+  (`bigquery-jdbc-driver-test`), not the platform's GCP project, so it stays here rather
+  than in `terraform-google-cloud`.
+- **Branch protection:** CI is `build.yml`, not a `ci.yml`, so the workspace's `ci-gate`
+  ruleset doesn't apply. Classic branch protection stays: it requires CI, up-to-date branches
+  (strict) and a pull request (with zero required approvals), which `ci-gate` alone would not.
+- **Public repo:** no automated Claude review or convention sweep, because both post output
+  that quotes code.
+- **Coverage:** JaCoCo's `check` goal runs with a `0.0` line minimum, so the catalog's 80%
+  floor is measured but not enforced.
+
 ## Build Commands
 
 **Note:** This project uses the Maven Wrapper (`./mvnw`) to ensure consistent Maven version across environments. No local Maven installation required.
