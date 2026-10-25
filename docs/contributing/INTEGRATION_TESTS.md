@@ -79,7 +79,7 @@ on the first statement with `Error requesting access token (HTTP 403: Permission
 **These are the only tests that reach the IAM `generateAccessToken` call**, so
 nothing else can show impersonation works. The class is gated so a local run
 without the grant skips rather than fails — which means CI must not be allowed to
-skip it quietly: `build.yml` fails the job before running anything if either
+skip it quietly: `ci.yml` fails the job before running anything if either
 variable is unset, the same two-sided guard `BQ_TEST_PROJECT` has.
 
 ### Table snapshot tests
@@ -139,7 +139,7 @@ Classes that mutate their fixture take a table per method and opt into
 
 ## CI
 
-`.github/workflows/build.yml` has two jobs, both required status checks:
+`.github/workflows/ci.yml` has two jobs, both required status checks:
 
 - **Build and Unit Tests** — compile, unit suite, spotless, SpotBugs, PMD,
   coverage, packaging. No credentials.
