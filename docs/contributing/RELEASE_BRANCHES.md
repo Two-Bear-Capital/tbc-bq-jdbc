@@ -54,7 +54,7 @@ subject happens to carry.
 allowed. It just has to be the option chosen in the merge dialog, and squash is
 the more habitual click.
 
-### `build.yml` must keep its `release/**` triggers
+### `ci.yml` must keep its `release/**` triggers
 
 ```yaml
 on:

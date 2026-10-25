@@ -28,9 +28,6 @@ repo's **Deviations** are recorded below.
 - **Terraform:** `terraform/` manages this repo's own integration-test project
   (`bigquery-jdbc-driver-test`), not the platform's GCP project, so it stays here rather
   than in `terraform-google-cloud`.
-- **Branch protection:** CI is `build.yml`, not a `ci.yml`, so the workspace's `ci-gate`
-  ruleset doesn't apply. Classic branch protection stays: it requires CI, up-to-date branches
-  (strict) and a pull request (with zero required approvals), which `ci-gate` alone would not.
 - **Public repo:** no automated Claude review or convention sweep, because both post output
   that quotes code.
 - **Coverage:** JaCoCo's `check` goal runs with a `0.0` line minimum, so the catalog's 80%
@@ -318,7 +315,7 @@ never a squash, or `git-cliff` sees a single commit and the changelog and versio
 both collapse. Established for 3.1.0 (PRs #212–#219, merged as #221).
 
 Read `docs/contributing/RELEASE_BRANCHES.md` before starting a milestone; it covers the
-rest, including why `build.yml` must keep its `release/**` triggers and why `Closes #NNN`
+rest, including why `ci.yml` must keep its `release/**` triggers and why `Closes #NNN`
 does nothing until the work reaches `main`.
 
 ## Documentation

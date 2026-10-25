@@ -3,7 +3,7 @@
 # holding immediately: Dependabot #319 committed mvnw.cmd and mvnwDebug.cmd with
 # CRLF blobs, because a commit made through the GitHub API never runs the clean
 # filter this file configures. 4.4.1 renormalised them. The rule cannot enforce
-# itself, so build.yml re-checks it on every PR.
+# itself, so ci.yml re-checks it on every PR.
 * text=auto
 
 # The Maven wrapper's Windows scripts ship from upstream with CRLF, while the copies

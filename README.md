@@ -1,6 +1,6 @@
 # TBC BigQuery JDBC Driver
 
-[![Build](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/build.yml/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/build.yml)
+[![Build](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/ci.yml/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/github-code-scanning/codeql)
 [![Dependabot Updates](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/actions/workflows/dependabot/dependabot-updates)
 [![Java](https://img.shields.io/badge/Java-21+-blue.svg)](https://openjdk.org/)

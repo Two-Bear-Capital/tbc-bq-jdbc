@@ -12,7 +12,7 @@ updates:
           - "*"
     # A wrapper bump regenerates mvnw.cmd and mvnwDebug.cmd with upstream's CRLF, and
     # Dependabot commits through the API, which skips the .gitattributes clean filter.
-    # build.yml's line-ending check then fails the whole group (#319, #329). Bump the
+    # ci.yml's line-ending check then fails the whole group (#319, #329). Bump the
     # wrapper locally instead: ./mvnw wrapper:wrapper -Dmaven=<version>
     ignore:
       - dependency-name: "org.apache.maven:apache-maven"
