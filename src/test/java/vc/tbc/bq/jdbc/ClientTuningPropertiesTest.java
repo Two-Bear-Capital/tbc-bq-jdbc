@@ -21,6 +21,7 @@ import com.google.cloud.http.HttpTransportOptions;
 import org.junit.jupiter.api.Test;
 import vc.tbc.bq.jdbc.config.ConnectionProperties;
 import vc.tbc.bq.jdbc.transport.DriverTransports;
+import vc.tbc.bq.jdbc.transport.HandshakeDropRetryAlgorithm;
 import vc.tbc.bq.jdbc.transport.ProxyConfig;
 import vc.tbc.bq.jdbc.transport.TransportConfig;
 
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -123,6 +125,13 @@ class ClientTuningPropertiesTest {
 		// keeps exactly the resilience it had before the property worked
 		assertEquals(BigQueryOptions.getDefaultRetrySettings().getMaxAttempts(),
 				options.getRetrySettings().getMaxAttempts());
+	}
+
+	@Test
+	void everyConnectionRetriesADroppedHandshake() throws IOException {
+		BigQueryOptions options = optionsFor(null, null, null, null);
+
+		assertInstanceOf(HandshakeDropRetryAlgorithm.class, options.getResultRetryAlgorithm());
 	}
 
 	@Test

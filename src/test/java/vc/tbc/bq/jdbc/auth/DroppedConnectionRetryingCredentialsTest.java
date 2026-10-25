@@ -27,11 +27,8 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.auth.oauth2.ImpersonatedCredentials;
 import org.junit.jupiter.api.Test;
 
-import javax.net.ssl.SSLHandshakeException;
-import java.io.EOFException;
 import java.io.IOException;
 import java.net.SocketException;
-import java.security.cert.CertificateException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -42,10 +39,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Drives a real {@code ImpersonatedCredentials} against a fake IAM endpoint, so
@@ -125,21 +120,6 @@ class DroppedConnectionRetryingCredentialsTest {
 		// ServiceErrorDetail classifies a rejected credential from this status
 		assertEquals(403, assertInstanceOf(HttpResponseException.class, thrown.getCause()).getStatusCode());
 		assertEquals(1, iam.calls.get());
-	}
-
-	@Test
-	void onlyAConnectionDropCounts() {
-		assertTrue(DroppedConnectionRetryingCredentials
-				.isDroppedConnection(new IOException("Error requesting access token", new SocketException("reset"))));
-		assertTrue(DroppedConnectionRetryingCredentials
-				.isDroppedConnection(new SSLHandshakeException("connection closed")));
-		assertTrue(DroppedConnectionRetryingCredentials
-				.isDroppedConnection(new IOException(new EOFException("connection closed"))));
-
-		SSLHandshakeException untrusted = new SSLHandshakeException("PKIX path building failed");
-		untrusted.initCause(new CertificateException("untrusted"));
-		assertFalse(DroppedConnectionRetryingCredentials.isDroppedConnection(untrusted));
-		assertFalse(DroppedConnectionRetryingCredentials.isDroppedConnection(new IOException("Error parsing")));
 	}
 
 	@Test

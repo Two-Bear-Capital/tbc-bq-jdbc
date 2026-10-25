@@ -35,6 +35,7 @@ import vc.tbc.bq.jdbc.metadata.BQDatabaseMetaData;
 import vc.tbc.bq.jdbc.telemetry.DriverTracing;
 import vc.tbc.bq.jdbc.telemetry.QuerySpan;
 import vc.tbc.bq.jdbc.transport.DriverTransports;
+import vc.tbc.bq.jdbc.transport.HandshakeDropRetryAlgorithm;
 import vc.tbc.bq.jdbc.util.ErrorMessages;
 import vc.tbc.bq.jdbc.util.StructTypeNames;
 import vc.tbc.bq.jdbc.util.UnsupportedOperations;
@@ -282,6 +283,9 @@ public final class BQConnection extends AbstractBQConnection {
 				logger.info("Using custom BigQuery endpoint: {}", endpoint);
 			}
 		}
+
+		// Last, so the probe build sees every other setting
+		builder.setResultRetryAlgorithm(new HandshakeDropRetryAlgorithm(builder.build().getResultRetryAlgorithm()));
 		return builder;
 	}
 
