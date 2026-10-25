@@ -198,7 +198,9 @@ that job.
 | `BQ_TEST_DATASET` | Terraform output `dataset_id` |
 | `BQ_TEST_IMPERSONATE_SA` | Terraform output `impersonation_target_service_account` |
 | `BQ_TEST_IMPERSONATE_DELEGATE` | Terraform output `impersonation_delegate_service_account` |
-| `GCP_TERRAFORM_SA_KEY` | Bootstrap SA key, used by `terraform.yml` only |
+
+`terraform.yml` needs no key: it authenticates as `terraform-bootstrap` through `WIF_PROVIDER`,
+and only that workflow on `main` may.
 
 ## Infrastructure
 
