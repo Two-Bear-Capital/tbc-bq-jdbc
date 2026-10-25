@@ -1,0 +1,3 @@
+# Node for the website/ docs build (website.yml, docs-site.yml), matching tbc-platform.
+# Java comes from the Maven wrapper and the workflows' setup-java, so it is not listed.
+nodejs 24.15.0

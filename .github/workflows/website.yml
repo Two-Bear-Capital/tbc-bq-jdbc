@@ -11,10 +11,10 @@ name: Website
 on:
   push:
     branches: [ main, 'release/**' ]
-    paths: [ 'website/**', 'docs/**', '.github/workflows/website.yml' ]
+    paths: [ 'website/**', 'docs/**', '.github/workflows/website.yml', '.tool-versions' ]
   pull_request:
     branches: [ main, 'release/**' ]
-    paths: [ 'website/**', 'docs/**', '.github/workflows/website.yml' ]
+    paths: [ 'website/**', 'docs/**', '.github/workflows/website.yml', '.tool-versions' ]
   workflow_dispatch:
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version-file: .tool-versions
           cache: npm
           cache-dependency-path: website/package-lock.json
 
