@@ -9,10 +9,12 @@ name: Version Increment and Release
 # directly. This used to be a repo admin's PAT, which the org no longer allows
 # (workspace#326).
 #
-# GH_RELEASE_CLIENT_ID / GH_RELEASE_SIGNING_KEY are repo secrets copied from the
-# 1Password item gh-release-app-ci. They are repo secrets rather than an op://
-# read because this repo is public: it holds only the App's key, never a token
-# that can read the CI vault.
+# GH_RELEASE_CLIENT_ID / GH_RELEASE_SIGNING_KEY are copied from the 1Password item
+# gh-release-app-ci into the `release` environment, which only main may deploy to.
+# The key mints a contents-write token, past ci-gate, for every org repo. As a repo
+# secret, a workflow pushed on any branch could read it. As an environment secret,
+# only this job on main can. It is a copy rather than an op:// read because this
+# repo is public: it holds only the App's key, never a token that reads the CI vault.
 
 # Only run after the Build workflow completes successfully on main.
 on:
@@ -39,6 +41,7 @@ jobs:
   version-and-release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: release
     # Run on a successful Build of a normal main commit. The bump commit we push
     # below also lands on main and re-runs Build; the "Bump version to" guard on
     # the triggering commit prevents an infinite release loop.
