@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.6] - 2026-10-25
+
+### 👷 CI/CD
+
+- Pin the website build's node in .tool-versions ([#349](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/349))
+
 ## [4.4.5] - 2026-10-25
 
 ### 📚 Documentation
@@ -2797,6 +2803,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.4.6]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.5...v4.4.6
 [4.4.5]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.4...v4.4.5
 [4.4.4]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.3...v4.4.4
 [4.4.3]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.2...v4.4.3
