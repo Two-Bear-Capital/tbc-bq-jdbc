@@ -19,13 +19,10 @@ import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import vc.tbc.bq.jdbc.transport.ConnectionDrops;
 
-import javax.net.ssl.SSLHandshakeException;
-import java.io.EOFException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.net.SocketException;
-import java.security.cert.CertificateException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -83,7 +80,7 @@ final class DroppedConnectionRetryingCredentials extends GoogleCredentials {
 			try {
 				return delegate.refreshAccessToken();
 			} catch (IOException e) {
-				if (retry >= backoff.size() || !isDroppedConnection(e)) {
+				if (retry >= backoff.size() || !ConnectionDrops.isDroppedConnection(e)) {
 					throw e;
 				}
 				logger.warn("Token refresh lost its connection ({}), retry {} of {}", rootCause(e), retry + 1,
@@ -96,19 +93,6 @@ final class DroppedConnectionRetryingCredentials extends GoogleCredentials {
 	@Override
 	public String getUniverseDomain() throws IOException {
 		return delegate.getUniverseDomain();
-	}
-
-	static boolean isDroppedConnection(Throwable failure) {
-		boolean dropped = false;
-		for (Throwable t = failure; t != null; t = t.getCause()) {
-			// A handshake that failed on the certificate is a trust problem, and
-			// retrying it would only delay the same error
-			if (t instanceof CertificateException) {
-				return false;
-			}
-			dropped |= t instanceof SocketException || t instanceof EOFException || t instanceof SSLHandshakeException;
-		}
-		return dropped;
 	}
 
 	// google-auth's own wrapper is always the outermost layer, so it says nothing
