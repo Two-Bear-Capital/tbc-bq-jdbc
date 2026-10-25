@@ -149,7 +149,10 @@ public final class CredentialsCache {
 		// Counted as a miss whether the entry was absent or stale: both mean this
 		// call paid to build credentials, which is the cost worth seeing.
 		DriverMetrics.recordCredentialCacheMiss();
-		Credentials created = authType.toCredentials(DriverTransports.forTransport(transport));
+		// Wrapped here, once, rather than in each AuthType: the gap is in
+		// google-auth's credential classes, and ADC alone can return any of them
+		Credentials created = DroppedConnectionRetryingCredentials
+				.wrap(authType.toCredentials(DriverTransports.forTransport(transport)));
 		// put rather than putIfAbsent: an expired entry must be replaced. Two threads
 		// racing here each build credentials and the last write wins, which is
 		// harmless — the discarded copy is equivalent.
