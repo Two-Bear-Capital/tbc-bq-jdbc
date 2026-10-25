@@ -139,8 +139,8 @@ public record ImpersonatedAuth(AuthType source, String targetPrincipal, List<Str
 		// Built here rather than through CredentialsCache: toCredentials() is the
 		// "build it" half of the pair and the cache is the "reuse it" half, so
 		// recursing would double-count a single connection's credential build.
-		return ImpersonatedCredentials.newBuilder().setSourceCredentials(googleCredentials)
-				.setTargetPrincipal(targetPrincipal).setDelegates(delegates).setScopes(List.of(CLOUD_PLATFORM_SCOPE))
-				.setHttpTransportFactory(transportFactory).build();
+		return new DroppedConnectionRetryingCredentials(ImpersonatedCredentials.newBuilder()
+				.setSourceCredentials(googleCredentials).setTargetPrincipal(targetPrincipal).setDelegates(delegates)
+				.setScopes(List.of(CLOUD_PLATFORM_SCOPE)).setHttpTransportFactory(transportFactory).build());
 	}
 }
