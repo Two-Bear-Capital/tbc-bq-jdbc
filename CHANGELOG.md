@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.5] - 2026-10-25
+
+### 📚 Documentation
+
+- Record the platform conventions and this repo's deviations ([#344](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/344))
+
+### ⚙️ Miscellaneous Tasks
+
+- Route code review to the platform team and pin dependabot commit prefixes ([#336](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/336))
+- Track the docs site's npm and the test project's terraform in dependabot ([#341](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/341))
+
+### 👷 CI/CD
+
+- Sync canonical dependabot-auto-merge.yml workflow and its script ([#338](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/338))
+- Sync canonical review-followups.yml workflow and its script ([#339](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/339))
+- Pin actions to commit SHAs and add job timeouts and concurrency ([#345](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/345))
+- Verify terraform-derived secrets instead of writing them with a pat ([#346](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/346))
+- Release with the org github app instead of an admin pat ([#347](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/347))
+
+### 🏗️ Build
+
+- **deps:** Bump com.fasterxml.jackson:jackson-bom ([#334](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/334))
+
 ## [4.4.4] - 2026-10-19
 
 ### 🐛 Bug Fixes
@@ -2774,6 +2797,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.4.5]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.4...v4.4.5
 [4.4.4]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.3...v4.4.4
 [4.4.3]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.2...v4.4.3
 [4.4.2]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.4.1...v4.4.2
