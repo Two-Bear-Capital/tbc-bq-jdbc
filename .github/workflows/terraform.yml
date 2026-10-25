@@ -6,6 +6,7 @@ on:
     paths:
       - 'terraform/**'
       - '.github/workflows/terraform.yml'
+      - '.github/scripts/verify-terraform-secrets.sh'
   workflow_dispatch:
 
 # Prevent parallel applies — only one Terraform run at a time
@@ -84,9 +85,12 @@ jobs:
           TF_VAR_billing_account: ${{ secrets.GCP_BILLING_ACCOUNT }}
           TF_VAR_github_repo: Two-Bear-Capital/tbc-bq-jdbc
 
-      - name: Export Terraform Outputs to GitHub Secrets
-        run: |
-          terraform output -raw wif_provider | gh secret set WIF_PROVIDER --repo $GITHUB_REPOSITORY
-          terraform output -raw ci_service_account_email | gh secret set WIF_SERVICE_ACCOUNT --repo $GITHUB_REPOSITORY
+      - name: Verify the secrets derived from Terraform outputs
+        run: ../.github/scripts/verify-terraform-secrets.sh
         env:
-          GH_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+          WIF_PROVIDER: ${{ secrets.WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          BQ_TEST_PROJECT: ${{ secrets.BQ_TEST_PROJECT }}
+          BQ_TEST_DATASET: ${{ secrets.BQ_TEST_DATASET }}
+          BQ_TEST_IMPERSONATE_SA: ${{ secrets.BQ_TEST_IMPERSONATE_SA }}
+          BQ_TEST_IMPERSONATE_DELEGATE: ${{ secrets.BQ_TEST_IMPERSONATE_DELEGATE }}
