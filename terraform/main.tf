@@ -243,6 +243,9 @@ resource "google_iam_workload_identity_pool_provider" "github_oidc" {
     "attribute.actor"      = "assertion.actor"
     "attribute.repository" = "assertion.repository"
     "attribute.ref"        = "assertion.ref"
+    # "<owner>/<repo>/.github/workflows/<file>@<ref>": names one workflow file on
+    # one ref, which is what the terraform grant below is keyed on.
+    "attribute.workflow_ref" = "assertion.job_workflow_ref"
   }
 
   # Restrict to the specific GitHub repository and owner
@@ -252,11 +255,24 @@ resource "google_iam_workload_identity_pool_provider" "github_oidc" {
   EOT
 }
 
-# Allow GitHub Actions (main branch only) to impersonate the CI service account
+# Any workflow in this repo, on any ref, may impersonate the CI service account:
+# PR runs need it for the integration suite, and the account holds only test
+# BigQuery access. Fork PRs never get an OIDC token, so this is not open to them.
 resource "google_service_account_iam_member" "wif_impersonation" {
   service_account_id = google_service_account.ci.name
   role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_actions.name}/attribute.repository/${var.github_repo}"
+}
 
-  # Restrict to pushes on the main branch only
-  member = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_actions.name}/attribute.repository/${var.github_repo}"
+# terraform.yml on main, and nothing else, may impersonate terraform-bootstrap.
+# That account owns the project and can rewrite its IAM, so a repo-wide grant
+# like the CI one above would hand project ownership to any branch's workflow.
+# It replaces the account's long-lived JSON key (GCP_TERRAFORM_SA_KEY).
+#
+# The account itself is not managed here: it created this project and predates
+# the state, so it stays outside Terraform and is referenced by name.
+resource "google_service_account_iam_member" "terraform_wif_impersonation" {
+  service_account_id = "projects/${google_project.integration.project_id}/serviceAccounts/terraform-bootstrap@${google_project.integration.project_id}.iam.gserviceaccount.com"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_actions.name}/attribute.workflow_ref/${var.github_repo}/.github/workflows/terraform.yml@refs/heads/main"
 }
