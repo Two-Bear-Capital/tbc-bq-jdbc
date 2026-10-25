@@ -14,6 +14,18 @@ variable "github_repo" {
   default     = "Two-Bear-Capital/tbc-bq-jdbc"
 }
 
+variable "github_repository_id" {
+  description = "Numeric id of github_repo (gh api repos/<owner>/<repo> -q .id). The WIF condition matches it."
+  type        = string
+  default     = "1148988323"
+}
+
+variable "github_owner_id" {
+  description = "Numeric id of github_repo's owner (gh api repos/<owner>/<repo> -q .owner.id). The WIF condition matches it."
+  type        = string
+  default     = "196837509"
+}
+
 variable "project_id" {
   description = "The GCP project ID to create for integration tests."
   type        = string

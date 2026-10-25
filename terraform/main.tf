@@ -248,10 +248,12 @@ resource "google_iam_workload_identity_pool_provider" "github_oidc" {
     "attribute.workflow_ref" = "assertion.job_workflow_ref"
   }
 
-  # Restrict to the specific GitHub repository and owner
+  # Keyed on GitHub's immutable ids, not names: a name is reusable, so if this
+  # repo were renamed or deleted, a new repo created under the old name would
+  # otherwise satisfy the condition and inherit every grant below.
   attribute_condition = <<-EOT
-    assertion.repository == "${var.github_repo}" &&
-    assertion.repository_owner == "${split("/", var.github_repo)[0]}"
+    assertion.repository_id == "${var.github_repository_id}" &&
+    assertion.repository_owner_id == "${var.github_owner_id}"
   EOT
 }
 
