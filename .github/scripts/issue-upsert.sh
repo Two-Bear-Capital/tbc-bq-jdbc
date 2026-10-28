@@ -17,7 +17,11 @@
 #       edits <number> when given, otherwise files the issue (with <label>) and then tries
 #       to assign <assignee>. Overwrites ISSUE_JSON.
 #       ISSUE_NUMBER the issue written
-#       ISSUE_CREATED true when it was filed now (and survived), false otherwise
+#       ISSUE_OUTCOME created (filed now, and it survived) | updated (<number> was edited) |
+#                     duplicate (filed now, but a concurrent run filed first: ours was closed and
+#                     ISSUE_NUMBER is theirs)
+#       ISSUE_CREATED true for created, false otherwise. Superseded, but kept: a caller can
+#                     run one sync behind this helper (prerequisites_for in sync-workflows.sh).
 
 # Exact title over the FULL open list, paginated. Not `--search`: the search index is
 # eventually consistent, so an issue filed a minute ago can be missing from it and the next
@@ -44,6 +48,7 @@ issue_write() {
 		gh issue edit "$number" --repo "$repo" --body "$body" >/dev/null
 		ISSUE_NUMBER="$number"
 		ISSUE_CREATED=false
+		ISSUE_OUTCOME=updated
 		return
 	fi
 
@@ -51,6 +56,7 @@ issue_write() {
 	[[ -n "$label" ]] && args+=(--label "$label")
 	ISSUE_NUMBER=$(gh issue create "${args[@]}" | sed -E 's#.*/issues/##')
 	ISSUE_CREATED=true
+	ISSUE_OUTCOME=created
 
 	# Find-then-create is a race: two runs can both miss the issue and both file it
 	# (review-followups.yml: a PR's close-event run and the daily sweep sit in different
@@ -68,6 +74,7 @@ issue_write() {
 		gh issue close "$mine" --repo "$repo" --reason duplicate \
 			--comment "Duplicate of #$ISSUE_NUMBER — filed by a concurrent run." >/dev/null
 		ISSUE_CREATED=false
+		ISSUE_OUTCOME=duplicate
 		return
 	fi
 	ISSUE_NUMBER="$mine"
