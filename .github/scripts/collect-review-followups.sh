@@ -204,8 +204,9 @@ body+=$(jq -r '.[] | "### \(.tier) — `\(.path):\(.line)`\(if .late then "  · 
 # issue-upsert.sh explains why that rules out search and a capped list.
 issue_find "$REPO" "$TITLE" "$LABEL"
 issue_write "$REPO" "$ISSUE_NUMBER" "$TITLE" "$body" "$LABEL" "$pr_author"
-if [[ "$ISSUE_CREATED" == true ]]; then
-	echo "Filed $REPO#$ISSUE_NUMBER with $count thread(s) ($blocking_count blocking, $late_count post-merge)."
-else
-	echo "Updated $REPO#$ISSUE_NUMBER with $count thread(s) ($blocking_count blocking, $late_count post-merge)."
-fi
+case "$ISSUE_OUTCOME" in
+created) echo "Filed $REPO#$ISSUE_NUMBER with $count thread(s) ($blocking_count blocking, $late_count post-merge)." ;;
+updated) echo "Updated $REPO#$ISSUE_NUMBER with $count thread(s) ($blocking_count blocking, $late_count post-merge)." ;;
+duplicate) echo "A concurrent run filed first: closed this run's copy as a duplicate of $REPO#$ISSUE_NUMBER." ;;
+*) echo "unexpected ISSUE_OUTCOME=$ISSUE_OUTCOME" >&2; exit 1 ;;
+esac
