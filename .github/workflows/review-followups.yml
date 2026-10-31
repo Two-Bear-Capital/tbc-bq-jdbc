@@ -3,28 +3,29 @@
 # tbc-platform-workspace meta-repo at scripts/workflows/review-followups.yml; edit it there
 # and re-run `make workflows` to roll the change out everywhere.
 #
-# Two jobs, one purpose: a finding that a reviewer wrote down should reach a human.
+# One purpose: a finding that a reviewer wrote down should reach a human.
 #
-#   surface  — Copilot collapses some findings into a "Suppressed comments" block instead
-#              of posting them. 26% of PRs had one. They are invisible in round 1, so the
-#              author's fix misses them and the other reviewer re-finds them in round 2.
-#              This re-posts them as a PR comment while the PR is still open.
-#
-#   collect  — the blocking/advisory merge gate (conventions/commits-and-releases.md) only
-#              works if the advisory half survives. It does not survive on its own: over 30
-#              days every deferred finding that became an ISSUE got handled, and every one
-#              left as a replied-to thread was lost — including five real design-security
-#              findings on tbc-platform#441 and a cache-poisoning bug on tbc-mcp-server#296
-#              that arrived 64 seconds after merge. This files them automatically.
+# The blocking/advisory merge gate (conventions/commits-and-releases.md) only works if the
+# advisory half survives. It does not survive on its own: over 30 days every deferred
+# finding that became an ISSUE got handled, and every one left as a replied-to thread was
+# lost — including five real design-security findings on tbc-platform#441 and a
+# cache-poisoning bug on tbc-mcp-server#296 that arrived 64 seconds after merge. This files
+# them automatically.
 #
 # The daily schedule exists for exactly that last case: a finding posted after the merge
 # event has already fired is invisible to the merge trigger, and those are the ones that
 # have escaped. 17 findings across 9 PRs in the 30 days before this shipped.
+#
+# There is deliberately no `pull_request_review` trigger. A second job once re-posted
+# Copilot's "Suppressed comments" block from it, and it never ran once: GitHub holds every
+# run a Copilot review triggers for manual approval, then marks it failed when the PR
+# merges — a failure alert per PR and nothing else. Copilot's review format also stopped
+# producing that block on 2026-09-20 (0 in ~700 reviews since); every finding is now a
+# thread, which the collector below already carries. Re-adding a Copilot-triggered job
+# brings the approval hold back with it.
 name: Review Follow-ups
 
 on:
-  pull_request_review:
-    types: [submitted]
   pull_request:
     types: [closed]
   schedule:
@@ -39,41 +40,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Runs the moment Copilot submits, which is when the hidden findings exist and the PR is
-  # still open enough to act on them.
-  surface:
-    # Same-repo PRs only: GITHUB_TOKEN is read-only on a fork PR, so posting the comment
-    # would just fail. `contains` is case-insensitive in GitHub expressions, which is why
-    # it matches `copilot-pull-request-reviewer[bot]` without spelling the whole login.
-    if: >-
-      github.event_name == 'pull_request_review' &&
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(github.event.review.user.login, 'copilot')
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-
-      - name: Surface Copilot's suppressed findings
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REVIEW_ID: ${{ github.event.review.id }}
-        run: ./.github/scripts/surface-suppressed-findings.sh
-
   # On merge, and again daily for anything that arrived after the merge event fired.
   collect:
-    if: >-
-      github.event_name != 'pull_request_review' &&
-      (github.event_name != 'pull_request' || github.event.pull_request.merged == true)
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

@@ -114,19 +114,14 @@ pr_author=$(jq -r '.author.login // empty' <<<"$pr")
 # never to decide admission. A regex cannot lose a finding it does not gate.
 #
 # Admission is therefore: unresolved, and raised by an automated reviewer (the author test below:
-# Copilot or Claude — a human's thread is out of scope). The marker clause covers the
-# threads surface-suppressed-findings.sh posts under the workflow's GITHUB_TOKEN, which no
-# author test would match.
+# Copilot or Claude — a human's thread is out of scope).
 findings=$(jq -r --arg merged "$merged_at" '
   [ .reviewThreads.nodes[]
     | select(.isResolved == false)
     | select((.comments.nodes | length) > 0)
     | . as $t
     | $t.comments.nodes[0] as $c
-    | select(
-        ($c.author.login | test("copilot|claude"; "i"))
-        or ($c.body | test("<!-- surfaced-suppressed:"))
-      )
+    | select($c.author.login | test("copilot|claude"; "i"))
     | {
         path: ($t.path // "—"),
         line: ($t.line // 0),
