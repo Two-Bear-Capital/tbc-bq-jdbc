@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.11] - 2026-11-17
+
+### 🧪 Testing
+
+- **integration:** Keep the cross-region cancel query uncacheable so the cancel lands ([#378](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/378))
+
+### ⚙️ Miscellaneous Tasks
+
+- Move to Node 24.22.3 ([#377](https://github.com/Two-Bear-Capital/tbc-bq-jdbc/issues/377))
+
 ## [4.5.10] - 2026-10-31
 
 ### 👷 CI/CD
@@ -2864,6 +2874,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 - Comment out attestations-related steps and permissions.
 - Retain minimal permissions for GitHub release creation.
 
+[4.5.11]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.5.10...v4.5.11
 [4.5.10]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.5.9...v4.5.10
 [4.5.9]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.5.8...v4.5.9
 [4.5.8]: https://github.com/Two-Bear-Capital/tbc-bq-jdbc/compare/v4.5.7...v4.5.8
