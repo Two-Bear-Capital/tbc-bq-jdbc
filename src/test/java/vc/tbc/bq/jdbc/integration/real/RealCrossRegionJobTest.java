@@ -81,9 +81,17 @@ class RealCrossRegionJobTest extends AbstractRealBigQueryIntegrationTest {
 	 * Long enough to still be running when the cancel arrives, and referencing no
 	 * table so it scans no bytes and can run in any region. A cross join of two
 	 * generated arrays is ten billion rows of pure compute.
+	 *
+	 * <p>
+	 * {@code RAND()} is what keeps it long. Without it the query text is
+	 * deterministic, so BigQuery can answer it from the query cache, or count the
+	 * cross join without producing its rows; either way it finished before the
+	 * cancel landed, and this test failed twice in a row on 2026-11-17 with "the
+	 * query completed instead of being cancelled". A query using {@code RAND()} is
+	 * never cached, and evaluating it per row forces every row to be produced.
 	 */
 	private static final String LONG_RUNNING_QUERY = "SELECT COUNT(*) FROM UNNEST(GENERATE_ARRAY(1, 100000)) a "
-			+ "CROSS JOIN UNNEST(GENERATE_ARRAY(1, 100000)) b";
+			+ "CROSS JOIN UNNEST(GENERATE_ARRAY(1, 100000)) b WHERE RAND() >= 0";
 
 	/**
 	 * Bound on the cancel loop below. Generous: it is a backstop against hanging
